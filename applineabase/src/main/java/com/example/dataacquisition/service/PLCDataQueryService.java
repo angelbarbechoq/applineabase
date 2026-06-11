@@ -154,7 +154,7 @@ public class PLCDataQueryService {
         String monthName = getMonthName(month);
         //String monthFolder = String.format("%02d", month) + "_" + monthName;
         String monthFolder = monthName;
-        String fileName = String.format("%02d", month) + monthName + (vip ? "VIP" : "");
+        String fileName =  monthName + (vip ? "VIP" : "");
         return "C:\\LineaBaseX\\" + year + "\\" + monthFolder + "\\" + fileName;
     }
 
