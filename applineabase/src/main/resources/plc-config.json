@@ -1,0 +1,16 @@
+{
+  "plcs": [
+    {
+      "nombre": "PLC1",
+      "ipAddress": "192.168.0.5"
+    },
+    {
+      "nombre": "PLC2",
+      "ipAddress": "192.168.0.2"
+    },
+    {
+      "nombre": "PLC3",
+      "ipAddress": "192.168.0.3"
+    }
+  ]
+}

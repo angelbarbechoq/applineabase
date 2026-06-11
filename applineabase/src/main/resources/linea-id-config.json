@@ -1,0 +1,298 @@
+{
+  "lineas": [
+    {
+      "id": 102,
+      "lineaMaquina": "Linea02",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060660837"
+    },
+    {
+      "id": 103,
+      "lineaMaquina": "Linea03",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060710699"
+    },
+    {
+      "id": 104,
+      "lineaMaquina": "Linea04",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060710706"
+    },
+    {
+      "id": 105,
+      "lineaMaquina": "Linea05",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060645965"
+    },
+    {
+      "id": 113,
+      "lineaMaquina": "Chiller3",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC3",
+      "numeroSerie": "540060642863"
+    },
+    {
+      "id": 116,
+      "lineaMaquina": "Chiller6",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060642867"
+    },
+    {
+      "id": 120,
+      "lineaMaquina": "GA751",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060660822"
+    },
+    {
+      "id": 110,
+      "lineaMaquina": "Linea10",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060698920"
+    },
+    {
+      "id": 108,
+      "lineaMaquina": "Linea08",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060651558"
+    },
+    {
+      "id": 118,
+      "lineaMaquina": "Linea18",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060677916"
+    },
+    {
+      "id": 145,
+      "lineaMaquina": "OrientadoraL1",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060698926"
+    },
+    {
+      "id": 133,
+      "lineaMaquina": "CompAP",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060701264"
+    },
+    {
+      "id": 109,
+      "lineaMaquina": "Linea09",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060677917"
+    },
+    {
+      "id": 114,
+      "lineaMaquina": "Chiller4",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC3",
+      "numeroSerie": "540060701227"
+    },
+    {
+      "id": 115,
+      "lineaMaquina": "Chiller5",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060701270"
+    },
+    {
+      "id": 147,
+      "lineaMaquina": "ServAuxP3LabCalid",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC3",
+      "numeroSerie": "540060642870"
+    },
+    {
+      "id": 101,
+      "lineaMaquina": "CabezalXTR2",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060660837"
+    },
+    {
+      "id": 122,
+      "lineaMaquina": "Mixer01",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060642871"
+    },
+    {
+      "id": 144,
+      "lineaMaquina": "Trafo2",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060677915"
+    },
+    {
+      "id": 134,
+      "lineaMaquina": "Linea34",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060698953"
+    },
+    {
+      "id": 143,
+      "lineaMaquina": "Inyeccion",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060642869"
+    },
+    {
+      "id": 121,
+      "lineaMaquina": "GA752",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "GteWay01",
+      "numeroSerie": "4C3DF472"
+    },
+    {
+      "id": 126,
+      "lineaMaquina": "Molino",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060659388"
+    },
+    {
+      "id": 127,
+      "lineaMaquina": "Pulverizador",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "54006066145"
+    },
+    {
+      "id": 123,
+      "lineaMaquina": "Mixer02",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060666051"
+    },
+    {
+      "id": 119,
+      "lineaMaquina": "ServicioAux",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060677697"
+    },
+    {
+      "id": 128,
+      "lineaMaquina": "BombasCisterna",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060651544"
+    },
+    {
+      "id": 148,
+      "lineaMaquina": "OrientadoraL2",
+      "modeloMedidor": "PM710",
+      "nombrePLC": "GteWay01",
+      "numeroSerie": "4C3DF191"
+    },
+    {
+      "id": 150,
+      "lineaMaquina": "Trafo1",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060666058"
+    },
+    {
+      "id": 146,
+      "lineaMaquina": "HornoL3",
+      "modeloMedidor": "PM710",
+      "nombrePLC": "GteWay01",
+      "numeroSerie": "4C3DF337"
+    },
+    {
+      "id": 131,
+      "lineaMaquina": "Linea31",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "5400607O2258"
+    },
+    {
+      "id": 124,
+      "lineaMaquina": "Mixer03",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060714113"
+    },
+    {
+      "id": 112,
+      "lineaMaquina": "Chiller1",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060710700"
+    },
+    {
+      "id": 111,
+      "lineaMaquina": "Linea01",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060702311"
+    },
+    {
+      "id": 132,
+      "lineaMaquina": "Linea32",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060701446"
+    },
+    {
+      "id": 137,
+      "lineaMaquina": "OrientadoraL3",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060713814"
+    },
+    {
+      "id": 125,
+      "lineaMaquina": "Mixer04",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060708396"
+    },
+    {
+      "id": 142,
+      "lineaMaquina": "Ribloc",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "540060710702"
+    },
+    {
+      "id": 117,
+      "lineaMaquina": "Linea17",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC2",
+      "numeroSerie": "540060708283"
+    },
+    {
+      "id": 201,
+      "lineaMaquina": "KWhPlanta1",
+      "modeloMedidor": "ION8600",
+      "nombrePLC": "PLC3",
+      "numeroSerie": "PT-0610A041-01"
+    },
+    {
+      "id": 153,
+      "lineaMaquina": "TDGeneradorSA",
+      "modeloMedidor": "PAC1020",
+      "nombrePLC": "PLC3",
+      "numeroSerie": "240616810470"
+    },
+    {
+      "id": 149,
+      "lineaMaquina": "Sauer",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "null"
+    }
+  ]
+}

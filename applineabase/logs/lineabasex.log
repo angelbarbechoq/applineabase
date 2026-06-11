@@ -1,0 +1,817 @@
+2026-05-08 10:43:27.089 INFO  [restartedMain] com.example.Application - Starting Application using Java 25.0.2 with PID 3656 (C:\Users\MantenimientoX\Desktop\IntelliJ IDEA\LineaBaseX\applineabase\target\classes started by MantenimientoX in C:\Users\MantenimientoX\Desktop\IntelliJ IDEA\LineaBaseX\applineabase)
+2026-05-08 10:43:27.094 INFO  [restartedMain] com.example.Application - The following 1 profile is active: "dev"
+2026-05-08 10:43:27.174 INFO  [restartedMain] o.s.b.d.restart.ChangeableUrls - The Class-Path manifest attribute in C:\Users\MantenimientoX\Desktop\IntelliJ IDEA\LineaBaseX\applineabase\lib\EasyModbusJavaClient.jar referenced one or more files that do not exist: file:/C:/Users/MantenimientoX/Desktop/IntelliJ%20IDEA/LineaBaseX/applineabase/lib/
+2026-05-08 10:43:27.177 INFO  [restartedMain] o.s.b.d.restart.ChangeableUrls - The Class-Path manifest attribute in C:\Users\MantenimientoX\Desktop\IntelliJ IDEA\LineaBaseX\applineabase\lib\EasyModbusJavaServer.jar referenced one or more files that do not exist: file:/C:/Users/MantenimientoX/Desktop/IntelliJ%20IDEA/LineaBaseX/applineabase/lib/
+2026-05-08 10:43:27.178 INFO  [restartedMain] o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-05-08 10:43:27.178 INFO  [restartedMain] o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-05-08 10:43:28.795 INFO  [restartedMain] o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-08 10:43:28.891 INFO  [restartedMain] o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 64 ms. Found 0 JPA repository interfaces.
+2026-05-08 10:43:31.309 INFO  [restartedMain] o.s.boot.tomcat.TomcatWebServer - Tomcat initialized with port 8081 (http)
+2026-05-08 10:43:31.330 INFO  [restartedMain] o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-05-08 10:43:31.331 INFO  [restartedMain] o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/11.0.20]
+2026-05-08 10:43:31.420 INFO  [restartedMain] o.s.b.w.c.s.WebApplicationContextInitializer - Root WebApplicationContext: initialization completed in 4241 ms
+2026-05-08 10:43:31.876 INFO  [restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing AtmosphereFramework
+2026-05-08 10:43:43.650 INFO  [restartedMain] c.v.f.s.VaadinServletContextInitializer - Search for subclasses and classes with annotations took 11275 ms
+2026-05-08 10:43:43.902 INFO  [restartedMain] c.v.b.d.s.DevModeStartupListener - Starting dev-mode updaters in C:\Users\MantenimientoX\Desktop\IntelliJ IDEA\LineaBaseX\applineabase folder.
+2026-05-08 10:43:43.955 INFO  [restartedMain] c.v.f.s.f.s.FullDependenciesScanner - Visited 123 classes. Took 25 ms.
+2026-05-08 10:43:43.958 INFO  [restartedMain] c.v.f.s.f.BundleValidationUtil - Checking if a development mode bundle build is needed
+2026-05-08 10:43:44.379 INFO  [restartedMain] c.v.f.s.f.BundleValidationUtil - A development mode bundle build is not needed
+2026-05-08 10:43:44.435 INFO  [vaadin-dev-server-1] c.v.f.s.f.TaskCopyFrontendFiles - Copying frontend resources from jar files ...
+2026-05-08 10:43:44.574 INFO  [vaadin-dev-server-1] c.v.f.s.f.TaskCopyFrontendFiles - Visited 22 resources. Took 138 ms.
+2026-05-08 10:43:44.996 INFO  [restartedMain] org.hibernate.orm.jpa - HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-05-08 10:43:45.109 INFO  [restartedMain] org.hibernate.orm.core - HHH000001: Hibernate ORM core version 7.2.7.Final
+2026-05-08 10:43:46.267 INFO  [restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-08 10:43:46.329 INFO  [restartedMain] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-05-08 10:43:47.012 INFO  [restartedMain] com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection ConnectionID:1 ClientConnectionId: e1174283-efeb-470f-a918-78bf8e20bcb4
+2026-05-08 10:43:47.015 INFO  [restartedMain] com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-05-08 10:43:47.301 INFO  [restartedMain] o.hibernate.orm.connections.pooling - HHH10001005: Database info:
+	Database JDBC URL [jdbc:sqlserver://192.168.2.1:1433;concatNullYieldsNull=ON;quotedIdentifier=ON;connectRetryInterval=10;connectRetryCount=1;maxResultBuffer=-1;sendTemporalDataTypesAsStringForBulkCopy=true;delayLoadingLobs=true;useFmtOnly=false;vectorTypeSupport=v1;cacheBulkCopyMetadata=false;bulkCopyForBatchInsertAllowEncryptedValueModifications=false;bulkCopyForBatchInsertTableLock=false;bulkCopyForBatchInsertKeepNulls=false;bulkCopyForBatchInsertKeepIdentity=false;bulkCopyForBatchInsertFireTriggers=false;bulkCopyForBatchInsertCheckConstraints=false;bulkCopyForBatchInsertBatchSize=0;useBulkCopyForBatchInsert=false;cancelQueryTimeout=-1;sslProtocol=TLS;calcBigDecimalPrecision=false;useDefaultJaasConfig=false;jaasConfigurationName=SQLJDBCDriver;statementPoolingCacheSize=0;serverPreparedStatementDiscardThreshold=10;enablePrepareOnFirstPreparedStatementCall=false;fips=false;socketTimeout=0;authentication=NotSpecified;authenticationScheme=nativeAuthentication;xopenStates=false;datetimeParameterType=datetime2;sendTimeAsDatetime=true;replication=false;trustStoreType=JKS;trustServerCertificate=true;TransparentNetworkIPResolution=true;iPAddressPreference=IPv4First;serverNameAsACE=false;sendStringParametersAsUnicode=true;selectMethod=direct;responseBuffering=adaptive;queryTimeout=-1;packetSize=8000;multiSubnetFailover=false;loginTimeout=30;lockTimeout=-1;lastUpdateCount=true;useDefaultGSSCredential=false;prepareMethod=prepexec;encrypt=true;disableStatementPooling=true;databaseName=lineabasebd;columnEncryptionSetting=Disabled;applicationName=Microsoft JDBC Driver for SQL Server;applicationIntent=readwrite;]
+	Database driver: Microsoft JDBC Driver 13.2 for SQL Server
+	Database dialect: SQLServerDialect
+	Database version: 16.0
+	Default catalog/schema: lineabasebd/dbo
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: 128
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-05-08 10:43:49.255 INFO  [restartedMain] org.hibernate.orm.core - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-08 10:43:49.266 INFO  [restartedMain] o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-08 10:43:49.342 WARN  [restartedMain] c.e.d.service.LecturaRepository - ===========================================================
+2026-05-08 10:43:49.342 WARN  [restartedMain] c.e.d.service.LecturaRepository - DEV MODE: lineabase.acquisition.persist-readings=false
+2026-05-08 10:43:49.342 WARN  [restartedMain] c.e.d.service.LecturaRepository - Las lecturas Modbus NO se van a guardar en la BD.
+2026-05-08 10:43:49.343 WARN  [restartedMain] c.e.d.service.LecturaRepository - ===========================================================
+2026-05-08 10:43:49.464 INFO  [restartedMain] c.e.d.service.LecturaRepository - Cache cargado: 42 maquinas, 10 magnitudes
+2026-05-08 10:43:49.543 INFO  [restartedMain] c.e.d.s.PLCDataAcquisitionService - Initializing PLC devices from configuration...
+2026-05-08 10:43:49.603 INFO  [restartedMain] c.e.d.s.PLCDataAcquisitionService - Initialized PLC device: PLC1 (192.168.0.5)
+2026-05-08 10:43:49.604 INFO  [restartedMain] c.e.d.s.PLCDataAcquisitionService - Initialized PLC device: PLC2 (192.168.0.2)
+2026-05-08 10:43:49.604 INFO  [restartedMain] c.e.d.s.PLCDataAcquisitionService - Initialized PLC device: PLC3 (192.168.0.3)
+2026-05-08 10:43:49.604 INFO  [restartedMain] c.e.d.s.PLCDataAcquisitionService - Initialized PLC device: GteWay01 (0.0.0.0)
+2026-05-08 10:43:49.604 INFO  [restartedMain] c.e.d.s.PLCDataAcquisitionService - Total PLC devices initialized: 4
+2026-05-08 10:43:49.607 INFO  [restartedMain] c.e.d.service.DataAcquisitionTask - DataAcquisitionTask initialized - reading cycle every 60 seconds
+2026-05-08 10:43:49.790 WARN  [restartedMain] o.s.b.j.a.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-05-08 10:43:54.887 INFO  [restartedMain] c.v.f.s.DefaultDeploymentConfiguration - 
+Vaadin is running in DEVELOPMENT mode - do not use for production deployments.
+2026-05-08 10:43:55.093 INFO  [restartedMain] o.s.boot.tomcat.TomcatWebServer - Tomcat started on port 8081 (http) with context path '/'
+2026-05-08 10:43:55.136 INFO  [restartedMain] com.example.Application - Started Application in 28.643 seconds (process running for 29.653)
+2026-05-08 10:43:55.155 INFO  [restartedMain] c.v.b.d.DevModeHandlerManagerImpl - Application running at http://localhost:8081/
+2026-05-08 10:43:55.175 INFO  [core-1] c.e.d.service.DataAcquisitionTask - >>> READING CYCLE (every 60 seconds) <<<
+2026-05-08 10:43:55.176 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - === STARTING PLC READ CYCLE ===
+2026-05-08 10:43:55.182 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - Reading PLC: PLC1 (192.168.0.5)
+2026-05-08 10:43:55.457 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea03 - Primer dato (esperando próximo ciclo): 336226.4375
+2026-05-08 10:43:55.457 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea04 - Primer dato (esperando próximo ciclo): 340025.5
+2026-05-08 10:43:55.457 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea09 - Primer dato (esperando próximo ciclo): 435870.4375
+2026-05-08 10:43:55.457 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea18 - Primer dato (esperando próximo ciclo): 746216.375
+2026-05-08 10:43:55.457 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea34 - Primer dato (esperando próximo ciclo): 91119.0078125
+2026-05-08 10:43:55.459 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh OrientadoraL3 - Primer dato (esperando próximo ciclo): 236456.671875
+2026-05-08 10:43:55.459 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh CabezalXTR2 - Primer dato (esperando próximo ciclo): 271504.96875
+2026-05-08 10:43:55.459 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Mixer01 - Primer dato (esperando próximo ciclo): 288304.0625
+2026-05-08 10:43:55.460 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Mixer02 - Primer dato (esperando próximo ciclo): 421131.46875
+2026-05-08 10:43:55.460 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Mixer03 - Primer dato (esperando próximo ciclo): 242766.75
+2026-05-08 10:43:55.460 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Mixer04 - Primer dato (esperando próximo ciclo): 144834.109375
+2026-05-08 10:43:55.461 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Molino - Primer dato (esperando próximo ciclo): 105507.859375
+2026-05-08 10:43:55.461 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Pulverizador - Primer dato (esperando próximo ciclo): 34023.51953125
+2026-05-08 10:43:55.462 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh ServicioAux - Primer dato (esperando próximo ciclo): 39166.90234375
+2026-05-08 10:43:55.463 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Ribloc - Primer dato (esperando próximo ciclo): 32654.033203125
+2026-05-08 10:43:55.468 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Sauer - Primer dato (esperando próximo ciclo): 30148.591796875
+2026-05-08 10:43:55.965 INFO  [core-1] c.e.d.service.LecturaRepository - DEV MODE: salteando insert de 160 lecturas (persist-readings=false)
+2026-05-08 10:43:56.140 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea03: {fecha=08-05-2026 10:43:44, VAB=442.29815673828125, VBC=445.21014404296875, PF=0.9943274855613708, PW=55.37200927734375, IA=68.32311248779297, VAC=444.8891906738281, IB=72.56283569335938, IC=75.79822540283203, KWh=336226.15625}
+2026-05-08 10:43:56.141 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea03 | Clientes conectados: 0
+2026-05-08 10:43:56.141 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea03
+2026-05-08 10:43:56.187 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea04: {fecha=08-05-2026 10:43:44, VAB=442.3831787109375, VBC=445.3340148925781, PF=0.93274986743927, PW=40.015377044677734, IA=47.461265563964844, VAC=444.9925231933594, IB=54.23410415649414, IC=67.56080627441406, KWh=340025.21875}
+2026-05-08 10:43:56.188 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea04 | Clientes conectados: 0
+2026-05-08 10:43:56.191 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea04
+2026-05-08 10:43:56.246 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea09: {fecha=08-05-2026 10:43:44, VAB=442.6161804199219, VBC=445.5465087890625, PF=1.005723476409912, PW=69.85633087158203, IA=96.71804809570312, VAC=445.19757080078125, IB=96.71804809570312, IC=96.6170425415039, KWh=435869.90625}
+2026-05-08 10:43:56.246 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea09 | Clientes conectados: 0
+2026-05-08 10:43:56.248 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea09
+2026-05-08 10:43:56.320 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea18: {fecha=08-05-2026 10:43:44, VAB=429.7029113769531, VBC=425.39251708984375, PF=0.9635741114616394, PW=73.19853210449219, IA=129.46835327148438, VAC=428.7695007324219, IB=113.14234161376953, IC=112.55484008789062, KWh=746215.8125}
+2026-05-08 10:43:56.322 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea18 | Clientes conectados: 0
+2026-05-08 10:43:56.322 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea18
+2026-05-08 10:43:56.411 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea34: {fecha=08-05-2026 10:43:44, VAB=211.51904296875, VBC=210.0523223876953, PF=1.076396107673645, PW=7.998302936553955, IA=26.686235427856445, VAC=210.23304748535156, IB=25.107337951660156, IC=17.979324340820312, KWh=91118.921875}
+2026-05-08 10:43:56.412 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea34 | Clientes conectados: 0
+2026-05-08 10:43:56.413 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea34
+2026-05-08 10:43:56.559 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para OrientadoraL3: {fecha=08-05-2026 10:43:44, VAB=212.6228485107422, VBC=211.45455932617188, PF=0.5320081114768982, PW=27.82183265686035, IA=136.6513214111328, VAC=212.4073486328125, IB=152.35166931152344, IC=135.02694702148438, KWh=236456.46875}
+2026-05-08 10:43:56.560 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: OrientadoraL3 | Clientes conectados: 0
+2026-05-08 10:43:56.560 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL3
+2026-05-08 10:43:56.682 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para CabezalXTR2: {fecha=08-05-2026 10:43:44, VAB=442.281005859375, VBC=445.1979064941406, PF=0.9035322666168213, PW=37.107765197753906, IA=45.54590606689453, VAC=444.8189697265625, IB=46.73251724243164, IC=42.59628677368164, KWh=271504.71875}
+2026-05-08 10:43:56.683 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: CabezalXTR2 | Clientes conectados: 0
+2026-05-08 10:43:56.685 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CabezalXTR2
+2026-05-08 10:43:56.756 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer01: {fecha=08-05-2026 10:43:44, VAB=442.250244140625, VBC=444.6340026855469, PF=0.30813461542129517, PW=28.458988189697266, IA=120.0494384765625, VAC=444.2237243652344, IB=116.77452850341797, IC=123.16094970703125, KWh=288303.875}
+2026-05-08 10:43:56.756 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer01 | Clientes conectados: 0
+2026-05-08 10:43:56.756 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer01
+2026-05-08 10:43:56.799 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer02: {fecha=08-05-2026 10:43:44, VAB=442.4934387207031, VBC=444.3714599609375, PF=1.0224509239196777, PW=53.22150802612305, IA=72.32457733154297, VAC=444.8537902832031, IB=76.3797378540039, IC=71.38394165039062, KWh=421131.0625}
+2026-05-08 10:43:56.800 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer02 | Clientes conectados: 0
+2026-05-08 10:43:56.800 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer02
+2026-05-08 10:43:56.885 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer03: {fecha=08-05-2026 10:43:44, VAB=442.1822814941406, VBC=444.9986572265625, PF=0.8168758153915405, PW=85.15021514892578, IA=131.83253479003906, VAC=444.64654541015625, IB=129.10556030273438, IC=140.97581481933594, KWh=242766.125}
+2026-05-08 10:43:56.887 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer03 | Clientes conectados: 0
+2026-05-08 10:43:56.889 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer03
+2026-05-08 10:43:56.967 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer04: {fecha=08-05-2026 10:43:44, VAB=200.47030639648438, VBC=200.58981323242188, PF=1.042768955230713, PW=11.847624778747559, IA=51.71271514892578, VAC=200.8134765625, IB=35.118934631347656, IC=30.619140625, KWh=144834.015625}
+2026-05-08 10:43:56.967 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer04 | Clientes conectados: 0
+2026-05-08 10:43:56.967 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer04
+2026-05-08 10:43:57.059 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Molino: {fecha=08-05-2026 10:43:44, VAB=442.27410888671875, VBC=445.1223449707031, PF=0.4891616404056549, PW=0.9944980144500732, IA=2.61995792388916, VAC=444.7505187988281, IB=2.6356983184814453, IC=2.6400375366210938, KWh=105507.8515625}
+2026-05-08 10:43:57.060 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Molino | Clientes conectados: 0
+2026-05-08 10:43:57.060 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Molino
+2026-05-08 10:43:57.116 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Pulverizador: {fecha=08-05-2026 10:43:44, VAB=442.14654541015625, VBC=445.0143127441406, PF=1.0, PW=4.0605082511901855, IA=5.603891372680664, VAC=444.6825866699219, IB=8.719914436340332, IC=8.919264793395996, KWh=34023.4765625}
+2026-05-08 10:43:57.117 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Pulverizador | Clientes conectados: 0
+2026-05-08 10:43:57.117 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Pulverizador
+2026-05-08 10:43:57.134 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para ServicioAux: {fecha=08-05-2026 10:43:44, VAB=212.55274963378906, VBC=211.606201171875, PF=0.4283393621444702, PW=9.21849250793457, IA=55.534000396728516, VAC=212.77491760253906, IB=61.6524772644043, IC=58.42353820800781, KWh=39166.83984375}
+2026-05-08 10:43:57.134 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: ServicioAux | Clientes conectados: 0
+2026-05-08 10:43:57.134 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServicioAux
+2026-05-08 10:43:57.189 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Ribloc: {fecha=08-05-2026 10:43:44, VAB=209.39984130859375, VBC=208.5313720703125, PF=0.567006528377533, PW=8.087332725524902, IA=38.15803909301758, VAC=208.2168731689453, IB=43.45294189453125, IC=36.27312469482422, KWh=32653.99609375}
+2026-05-08 10:43:57.189 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Ribloc | Clientes conectados: 0
+2026-05-08 10:43:57.189 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Ribloc
+2026-05-08 10:43:57.206 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Sauer: {fecha=08-05-2026 10:43:44, VAB=442.1661376953125, VBC=445.09423828125, PF=0.9458546042442322, PW=39.7652473449707, IA=54.17278289794922, VAC=444.6084899902344, IB=54.18415832519531, IC=56.37113952636719, KWh=30148.30078125}
+2026-05-08 10:43:57.206 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Sauer | Clientes conectados: 0
+2026-05-08 10:43:57.206 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Sauer
+2026-05-08 10:43:57.206 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - Reading PLC: PLC2 (192.168.0.2)
+2026-05-08 10:43:57.429 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea01 - Primer dato (esperando próximo ciclo): 568342.5625
+2026-05-08 10:43:57.429 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea02 - Primer dato (esperando próximo ciclo): 444937
+2026-05-08 10:43:57.431 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea05 - Primer dato (esperando próximo ciclo): 512949.40625
+2026-05-08 10:43:57.431 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea08 - Primer dato (esperando próximo ciclo): 416723
+2026-05-08 10:43:57.431 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea10 - Primer dato (esperando próximo ciclo): 524892.8125
+2026-05-08 10:43:57.431 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea17 - Primer dato (esperando próximo ciclo): 316055.21875
+2026-05-08 10:43:57.432 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea31 - Primer dato (esperando próximo ciclo): 192984.65625
+2026-05-08 10:43:57.432 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Linea32 - Primer dato (esperando próximo ciclo): 176414.234375
+2026-05-08 10:43:57.432 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Chiller1 - Primer dato (esperando próximo ciclo): 23040.404296875
+2026-05-08 10:43:57.432 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Chiller5 - Primer dato (esperando próximo ciclo): 6388766.5
+2026-05-08 10:43:57.433 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Chiller6 - Primer dato (esperando próximo ciclo): 1230274.125
+2026-05-08 10:43:57.433 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh GA751 - Primer dato (esperando próximo ciclo): 301646.4375
+2026-05-08 10:43:57.433 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh OrientadoraL1 - Primer dato (esperando próximo ciclo): 4873848.5
+2026-05-08 10:43:57.434 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh CompAP - Primer dato (esperando próximo ciclo): 143386.4375
+2026-05-08 10:43:57.434 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Trafo1 - Primer dato (esperando próximo ciclo): 205832.890625
+2026-05-08 10:43:57.434 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Trafo2 - Primer dato (esperando próximo ciclo): 192472.546875
+2026-05-08 10:43:57.434 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Inyeccion - Primer dato (esperando próximo ciclo): 257834.234375
+2026-05-08 10:43:57.435 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh BombasCisterna - Primer dato (esperando próximo ciclo): 119077.96875
+2026-05-08 10:43:57.460 INFO  [core-1] c.e.d.service.LecturaRepository - DEV MODE: salteando insert de 180 lecturas (persist-readings=false)
+2026-05-08 10:43:57.626 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea01: {fecha=08-05-2026 10:43:45, VAB=444.7516784667969, VBC=442.6224670410156, PF=0.9106432199478149, PW=74.48617553710938, IA=118.9132308959961, VAC=444.7605285644531, IB=64.1220474243164, IC=134.35458374023438, KWh=568342.0}
+2026-05-08 10:43:57.627 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea01 | Clientes conectados: 0
+2026-05-08 10:43:57.627 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea01
+2026-05-08 10:43:57.744 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea02: {fecha=08-05-2026 10:43:45, VAB=443.6260681152344, VBC=441.8993835449219, PF=0.8471159338951111, PW=60.936302185058594, IA=93.88550567626953, VAC=443.84783935546875, IB=103.15541076660156, IC=88.42138671875, KWh=444936.4375}
+2026-05-08 10:43:57.745 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea02 | Clientes conectados: 0
+2026-05-08 10:43:57.745 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea02
+2026-05-08 10:43:57.796 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea05: {fecha=08-05-2026 10:43:45, VAB=443.9252624511719, VBC=442.1714782714844, PF=0.8195721507072449, PW=60.40266799926758, IA=95.4262924194336, VAC=444.1518249511719, IB=99.22370910644531, IC=93.43022155761719, KWh=512948.96875}
+2026-05-08 10:43:57.797 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea05 | Clientes conectados: 0
+2026-05-08 10:43:57.797 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea05
+2026-05-08 10:43:57.845 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea08: {fecha=08-05-2026 10:43:45, VAB=443.838623046875, VBC=442.0901184082031, PF=0.8826435804367065, PW=48.748233795166016, IA=69.0157470703125, VAC=444.0503845214844, IB=72.10653686523438, IC=73.40518951416016, KWh=416722.65625}
+2026-05-08 10:43:57.845 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea08 | Clientes conectados: 0
+2026-05-08 10:43:57.845 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea08
+2026-05-08 10:43:57.930 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea10: {fecha=08-05-2026 10:43:45, VAB=443.39990234375, VBC=441.4554138183594, PF=0.9218065142631531, PW=46.76716613769531, IA=62.831302642822266, VAC=443.7724304199219, IB=64.21253967285156, IC=63.444549560546875, KWh=524892.375}
+2026-05-08 10:43:57.930 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea10 | Clientes conectados: 0
+2026-05-08 10:43:57.930 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea10
+2026-05-08 10:43:58.006 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea17: {fecha=08-05-2026 10:43:45, VAB=443.8974914550781, VBC=441.8738098144531, PF=0.9424535036087036, PW=45.47929382324219, IA=61.874576568603516, VAC=444.1451416015625, IB=71.596435546875, IC=58.02471923828125, KWh=316054.875}
+2026-05-08 10:43:58.006 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea17 | Clientes conectados: 0
+2026-05-08 10:43:58.006 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea17
+2026-05-08 10:43:58.056 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea31: {fecha=08-05-2026 10:43:45, VAB=443.6706237792969, VBC=441.55511474609375, PF=0.8317824006080627, PW=36.375335693359375, IA=39.63296127319336, VAC=443.8597717285156, IB=48.10134506225586, IC=48.08274459838867, KWh=192984.453125}
+2026-05-08 10:43:58.058 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea31 | Clientes conectados: 0
+2026-05-08 10:43:58.058 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea31
+2026-05-08 10:43:58.142 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea32: {fecha=08-05-2026 10:43:45, VAB=443.5030212402344, VBC=441.5396728515625, PF=0.41414695978164673, PW=0.5708208680152893, IA=1.81297767162323, VAC=443.6861267089844, IB=1.568782925605774, IC=1.9959840774536133, KWh=176414.234375}
+2026-05-08 10:43:58.143 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea32 | Clientes conectados: 0
+2026-05-08 10:43:58.143 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea32
+2026-05-08 10:43:58.184 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller1: {fecha=08-05-2026 10:43:45, VAB=441.04046630859375, VBC=443.7422790527344, PF=0.8802528381347656, PW=25.139406204223633, IA=37.665008544921875, VAC=443.1243591308594, IB=36.83805465698242, IC=37.472991943359375, KWh=23040.22265625}
+2026-05-08 10:43:58.186 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller1 | Clientes conectados: 0
+2026-05-08 10:43:58.186 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller1
+2026-05-08 10:43:58.268 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller5: {fecha=08-05-2026 10:43:45, VAB=446.4501953125, VBC=446.799072265625, PF=0.9770383238792419, PW=809.3005981445312, IA=1134.526611328125, VAC=444.0340881347656, IB=1045.4034423828125, IC=1061.90771484375, KWh=6388760.5}
+2026-05-08 10:43:58.269 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller5 | Clientes conectados: 0
+2026-05-08 10:43:58.269 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller5
+2026-05-08 10:43:58.344 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller6: {fecha=08-05-2026 10:43:45, VAB=446.5773010253906, VBC=446.9659729003906, PF=0.9800385236740112, PW=161.7353057861328, IA=216.7097625732422, VAC=444.33111572265625, IB=182.8689727783203, IC=212.75482177734375, KWh=1230273.0}
+2026-05-08 10:43:58.345 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller6 | Clientes conectados: 0
+2026-05-08 10:43:58.345 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller6
+2026-05-08 10:43:58.371 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para GA751: {fecha=08-05-2026 10:43:45, VAB=444.6155700683594, VBC=442.6590881347656, PF=0.8922632932662964, PW=38.65253829956055, IA=56.46883010864258, VAC=444.705322265625, IB=57.16794967651367, IC=55.58550262451172, KWh=301646.15625}
+2026-05-08 10:43:58.371 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: GA751 | Clientes conectados: 0
+2026-05-08 10:43:58.371 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para GA751
+2026-05-08 10:43:58.399 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para OrientadoraL1: {fecha=08-05-2026 10:43:45, VAB=440.4183044433594, VBC=439.87701416015625, PF=0.9538337588310242, PW=767.3619995117188, IA=1055.1715087890625, VAC=443.9113464355469, IB=1109.6739501953125, IC=982.1829833984375, KWh=4873842.5}
+2026-05-08 10:43:58.399 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: OrientadoraL1 | Clientes conectados: 0
+2026-05-08 10:43:58.399 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL1
+2026-05-08 10:43:58.416 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para CompAP: {fecha=08-05-2026 10:43:45, VAB=443.9088134765625, VBC=441.830322265625, PF=0.8992816805839539, PW=24.931367874145508, IA=38.46104431152344, VAC=443.9764404296875, IB=41.202003479003906, IC=29.533954620361328, KWh=143386.1875}
+2026-05-08 10:43:58.416 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: CompAP | Clientes conectados: 0
+2026-05-08 10:43:58.416 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CompAP
+2026-05-08 10:43:58.504 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Trafo1: {fecha=08-05-2026 10:43:45, VAB=443.5479431152344, VBC=443.4913024902344, PF=0.7430900931358337, PW=6.342479705810547, IA=11.290875434875488, VAC=441.77337646484375, IB=11.066978454589844, IC=11.029804229736328, KWh=205832.84375}
+2026-05-08 10:43:58.504 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Trafo1 | Clientes conectados: 0
+2026-05-08 10:43:58.504 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo1
+2026-05-08 10:43:58.523 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Trafo2: {fecha=08-05-2026 10:43:45, VAB=443.20684814453125, VBC=443.7547912597656, PF=0.8867863416671753, PW=36.85719680786133, IA=60.830482482910156, VAC=441.2505187988281, IB=64.69853210449219, IC=62.44043731689453, KWh=192472.234375}
+2026-05-08 10:43:58.523 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Trafo2 | Clientes conectados: 0
+2026-05-08 10:43:58.524 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo2
+2026-05-08 10:43:58.544 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Inyeccion: {fecha=08-05-2026 10:43:45, VAB=443.23345947265625, VBC=443.70318603515625, PF=0.9906041622161865, PW=48.18121337890625, IA=63.762115478515625, VAC=441.2476501464844, IB=68.30033111572266, IC=61.382843017578125, KWh=257833.890625}
+2026-05-08 10:43:58.545 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Inyeccion | Clientes conectados: 0
+2026-05-08 10:43:58.546 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Inyeccion
+2026-05-08 10:43:58.560 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para BombasCisterna: {fecha=08-05-2026 10:43:45, VAB=443.1758728027344, VBC=443.7352294921875, PF=0.925934910774231, PW=50.57358932495117, IA=67.83911895751953, VAC=441.1797790527344, IB=69.17376708984375, IC=62.76829147338867, KWh=119077.6796875}
+2026-05-08 10:43:58.561 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: BombasCisterna | Clientes conectados: 0
+2026-05-08 10:43:58.563 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para BombasCisterna
+2026-05-08 10:43:58.564 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - Reading PLC: PLC3 (192.168.0.3)
+2026-05-08 10:43:58.932 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Chiller3 - Primer dato (esperando próximo ciclo): 189195.078125
+2026-05-08 10:43:58.933 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh Chiller4 - Primer dato (esperando próximo ciclo): 868791
+2026-05-08 10:43:58.933 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh ServAuxP3LabCalid - Primer dato (esperando próximo ciclo): 72892.34375
+2026-05-08 10:43:58.934 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh KWhPlanta1 - Primer dato (esperando próximo ciclo): 2076027.0
+2026-05-08 10:43:58.934 INFO  [core-1] c.e.d.service.KWhDifferenceService - ⏳ KWh TDGeneradorSA - Primer dato (esperando próximo ciclo): 166536.016
+2026-05-08 10:43:58.952 INFO  [core-1] c.e.d.service.LecturaRepository - DEV MODE: salteando insert de 50 lecturas (persist-readings=false)
+2026-05-08 10:43:59.037 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller3: {fecha=08-05-2026 10:43:47, VAB=442.779052734375, VBC=441.81817626953125, PF=0.8143313527107239, PW=9.526971817016602, IA=16.497915267944336, VAC=443.45123291015625, IB=14.961233139038086, IC=14.648515701293945, KWh=189195.015625}
+2026-05-08 10:43:59.037 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller3 | Clientes conectados: 0
+2026-05-08 10:43:59.038 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller3
+2026-05-08 10:43:59.111 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller4: {fecha=08-05-2026 10:43:47, VAB=441.32952880859375, VBC=440.24273681640625, PF=0.8494017720222473, PW=166.05801391601562, IA=252.12979125976562, VAC=441.9770202636719, IB=257.7307434082031, IC=253.86187744140625, KWh=868789.75}
+2026-05-08 10:43:59.113 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller4 | Clientes conectados: 0
+2026-05-08 10:43:59.113 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller4
+2026-05-08 10:43:59.177 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para ServAuxP3LabCalid: {fecha=08-05-2026 10:43:47, VAB=445.0478820800781, VBC=443.806396484375, PF=0.8348675966262817, PW=10.479596138000488, IA=20.712251663208008, VAC=444.8114929199219, IB=55.43832778930664, IC=9.457076072692871, KWh=72892.25}
+2026-05-08 10:43:59.178 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: ServAuxP3LabCalid | Clientes conectados: 0
+2026-05-08 10:43:59.178 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServAuxP3LabCalid
+2026-05-08 10:43:59.261 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para KWhPlanta1: {fecha=08-05-2026 10:43:47, VAB=12526.0, VBC=12476.0, PF=-95.91999816894531, PW=1628611.0, IA=48.400001525878906, VAC=12529.0, IB=45.20000076293945, IC=43.79999923706055, KWh=2076015.0}
+2026-05-08 10:43:59.261 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: KWhPlanta1 | Clientes conectados: 0
+2026-05-08 10:43:59.261 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para KWhPlanta1
+2026-05-08 10:43:59.310 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para TDGeneradorSA: {fecha=08-05-2026 10:43:47, VAB=444.1363525390625, VBC=443.8798828125, PF=0.9104635119438171, PW=14708.9853515625, IA=78.55670166015625, VAC=444.5238952636719, IB=54.4994010925293, IC=36.02400207519531, KWh=166535.76}
+2026-05-08 10:43:59.312 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: TDGeneradorSA | Clientes conectados: 0
+2026-05-08 10:43:59.312 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para TDGeneradorSA
+2026-05-08 10:43:59.312 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - Reading PLC: GteWay01 (0.0.0.0)
+2026-05-08 10:44:01.355 ERROR [core-1] c.e.d.s.PLCDataAcquisitionService - Failed to read PLC GteWay01 at 0.0.0.0: Connection refused: connect
+2026-05-08 10:44:01.355 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - === COMPLETED PLC READ CYCLE ===
+2026-05-08 10:44:01.355 INFO  [core-1] c.e.d.service.PASReaderService - Reading PAS600L meter...
+2026-05-08 10:44:02.735 INFO  [http-nio-8081-exec-5] o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-05-08 10:44:02.738 INFO  [http-nio-8081-exec-5] o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-05-08 10:44:02.834 INFO  [http-nio-8081-exec-5] o.s.web.servlet.DispatcherServlet - Completed initialization in 90 ms
+2026-05-08 10:44:03.561 WARN  [http-nio-8081-exec-5] o.a.c.util.SessionIdGeneratorBase - Creation of SecureRandom instance for session ID generation using [SHA1PRNG] took [293] milliseconds.
+2026-05-08 10:44:24.589 INFO  [http-nio-8081-exec-9] c.e.d.controller.PLCDataController - Request for latest VIP data: BombasCisterna
+2026-05-08 10:44:24.800 INFO  [http-nio-8081-exec-10] c.e.d.controller.PLCDataController - Request for latest KWh data: BombasCisterna
+2026-05-08 10:44:24.893 INFO  [http-nio-8081-exec-6] c.e.d.controller.PLCDataController - Request for today KWh data: BombasCisterna
+2026-05-08 10:44:25.248 INFO  [http-nio-8081-exec-5] c.e.d.controller.KWhStreamController - Cliente conectado para stream de KWh: BombasCisterna
+2026-05-08 10:44:39.002 INFO  [http-nio-8081-exec-1] c.e.d.controller.PLCDataController - Request for latest VIP data: Chiller5
+2026-05-08 10:44:39.069 INFO  [http-nio-8081-exec-9] c.e.d.controller.PLCDataController - Request for latest KWh data: Chiller5
+2026-05-08 10:44:39.110 INFO  [http-nio-8081-exec-10] c.e.d.controller.PLCDataController - Request for today KWh data: Chiller5
+2026-05-08 10:44:39.317 INFO  [http-nio-8081-exec-6] c.e.d.controller.KWhStreamController - Cliente conectado para stream de KWh: Chiller5
+2026-05-08 10:44:55.130 INFO  [core-2] c.e.d.service.DataAcquisitionTask - >>> READING CYCLE (every 60 seconds) <<<
+2026-05-08 10:44:55.132 INFO  [core-2] c.e.d.s.PLCDataAcquisitionService - === STARTING PLC READ CYCLE ===
+2026-05-08 10:44:55.133 INFO  [core-2] c.e.d.s.PLCDataAcquisitionService - Reading PLC: PLC1 (192.168.0.5)
+2026-05-08 10:44:55.463 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea03 - Anterior: 336226.4375 | Actual: 336227.125 | Diferencia: 0.6875 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.469 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea03 | Clientes conectados: 0
+2026-05-08 10:44:55.469 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea03
+2026-05-08 10:44:55.469 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea03
+2026-05-08 10:44:55.469 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea04 - Anterior: 340025.5 | Actual: 340026.21875 | Diferencia: 0.71875 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.469 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea04 | Clientes conectados: 0
+2026-05-08 10:44:55.469 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea04
+2026-05-08 10:44:55.469 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea04
+2026-05-08 10:44:55.469 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea09 - Anterior: 435870.4375 | Actual: 435871.625 | Diferencia: 1.1875 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.469 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea09 | Clientes conectados: 0
+2026-05-08 10:44:55.469 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea09
+2026-05-08 10:44:55.469 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea09
+2026-05-08 10:44:55.469 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea18 - Anterior: 746216.375 | Actual: 746217.75 | Diferencia: 1.375 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea18 | Clientes conectados: 0
+2026-05-08 10:44:55.470 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea18
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea18
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea34 - Anterior: 91119.0078125 | Actual: 91119.2109375 | Diferencia: 0.203125 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea34 | Clientes conectados: 0
+2026-05-08 10:44:55.470 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea34
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea34
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA OrientadoraL3 - Anterior: 236456.671875 | Actual: 236457.109375 | Diferencia: 0.4375 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: OrientadoraL3 | Clientes conectados: 0
+2026-05-08 10:44:55.470 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL3
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: OrientadoraL3
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA CabezalXTR2 - Anterior: 271504.96875 | Actual: 271505.59375 | Diferencia: 0.625 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: CabezalXTR2 | Clientes conectados: 0
+2026-05-08 10:44:55.470 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CabezalXTR2
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: CabezalXTR2
+2026-05-08 10:44:55.470 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Mixer01 - Anterior: 288304.0625 | Actual: 288304.53125 | Diferencia: 0.46875 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.471 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Mixer01 | Clientes conectados: 0
+2026-05-08 10:44:55.471 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer01
+2026-05-08 10:44:55.471 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Mixer01
+2026-05-08 10:44:55.471 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Mixer02 - Anterior: 421131.46875 | Actual: 421132.40625 | Diferencia: 0.9375 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.471 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Mixer02 | Clientes conectados: 0
+2026-05-08 10:44:55.473 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer02
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Mixer02
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Mixer03 - Anterior: 242766.75 | Actual: 242768.296875 | Diferencia: 1.546875 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Mixer03 | Clientes conectados: 0
+2026-05-08 10:44:55.473 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer03
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Mixer03
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Mixer04 - Anterior: 144834.109375 | Actual: 144834.359375 | Diferencia: 0.25 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Mixer04 | Clientes conectados: 0
+2026-05-08 10:44:55.473 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer04
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Mixer04
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Molino - Anterior: 105507.859375 | Actual: 105507.859375 | Diferencia: 0.0 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Molino | Clientes conectados: 0
+2026-05-08 10:44:55.473 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Molino
+2026-05-08 10:44:55.473 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Molino
+2026-05-08 10:44:55.474 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Pulverizador - Anterior: 34023.51953125 | Actual: 34023.6171875 | Diferencia: 0.09765625 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.474 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Pulverizador | Clientes conectados: 0
+2026-05-08 10:44:55.474 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Pulverizador
+2026-05-08 10:44:55.475 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Pulverizador
+2026-05-08 10:44:55.476 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA ServicioAux - Anterior: 39166.90234375 | Actual: 39167.0625 | Diferencia: 0.16015625 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.476 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: ServicioAux | Clientes conectados: 0
+2026-05-08 10:44:55.476 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServicioAux
+2026-05-08 10:44:55.476 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: ServicioAux
+2026-05-08 10:44:55.479 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Ribloc - Anterior: 32654.033203125 | Actual: 32654.171875 | Diferencia: 0.138671875 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.479 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Ribloc | Clientes conectados: 0
+2026-05-08 10:44:55.479 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Ribloc
+2026-05-08 10:44:55.479 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Ribloc
+2026-05-08 10:44:55.479 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Sauer - Anterior: 30148.591796875 | Actual: 30149.294921875 | Diferencia: 0.703125 | Fecha: 08-05-2026 10:44:55
+2026-05-08 10:44:55.479 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Sauer | Clientes conectados: 0
+2026-05-08 10:44:55.479 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Sauer
+2026-05-08 10:44:55.479 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Sauer
+2026-05-08 10:44:55.536 INFO  [core-2] c.e.d.service.LecturaRepository - DEV MODE: salteando insert de 160 lecturas (persist-readings=false)
+2026-05-08 10:44:55.662 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea03: {fecha=08-05-2026 10:44:44, VAB=443.3183898925781, VBC=446.2516174316406, PF=0.917872428894043, PW=40.257591247558594, IA=57.708160400390625, VAC=445.3839111328125, IB=72.45066833496094, IC=50.5662841796875, KWh=336226.84375}
+2026-05-08 10:44:55.662 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea03 | Clientes conectados: 0
+2026-05-08 10:44:55.662 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea03
+2026-05-08 10:44:55.709 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea04: {fecha=08-05-2026 10:44:44, VAB=443.3962097167969, VBC=446.3830261230469, PF=0.9270001649856567, PW=42.706417083740234, IA=55.170955657958984, VAC=445.4543151855469, IB=52.77619934082031, IC=67.49476623535156, KWh=340025.875}
+2026-05-08 10:44:55.710 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea04 | Clientes conectados: 0
+2026-05-08 10:44:55.710 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea04
+2026-05-08 10:44:55.756 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea09: {fecha=08-05-2026 10:44:44, VAB=443.6410217285156, VBC=446.5918884277344, PF=0.9763990044593811, PW=84.43125915527344, IA=91.34796142578125, VAC=445.68951416015625, IB=91.34796142578125, IC=119.11531066894531, KWh=435871.09375}
+2026-05-08 10:44:55.756 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea09 | Clientes conectados: 0
+2026-05-08 10:44:55.757 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea09
+2026-05-08 10:44:55.839 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea18: {fecha=08-05-2026 10:44:44, VAB=427.8674621582031, VBC=426.7588806152344, PF=0.9250243902206421, PW=80.90035247802734, IA=112.95564270019531, VAC=427.6859130859375, IB=106.98889923095703, IC=114.98047637939453, KWh=746217.125}
+2026-05-08 10:44:55.840 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea18 | Clientes conectados: 0
+2026-05-08 10:44:55.840 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea18
+2026-05-08 10:44:55.882 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea34: {fecha=08-05-2026 10:44:44, VAB=211.61843872070312, VBC=210.5321807861328, PF=1.0, PW=8.093382835388184, IA=23.879732131958008, VAC=210.5657958984375, IB=24.018505096435547, IC=19.192522048950195, KWh=91119.125}
+2026-05-08 10:44:55.884 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea34 | Clientes conectados: 0
+2026-05-08 10:44:55.884 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea34
+2026-05-08 10:44:55.969 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para OrientadoraL3: {fecha=08-05-2026 10:44:44, VAB=213.21334838867188, VBC=212.17987060546875, PF=0.5180622935295105, PW=25.38178062438965, IA=128.30941772460938, VAC=213.02816772460938, IB=145.42550659179688, IC=127.54669952392578, KWh=236456.921875}
+2026-05-08 10:44:55.969 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: OrientadoraL3 | Clientes conectados: 0
+2026-05-08 10:44:55.970 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL3
+2026-05-08 10:44:56.052 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para CabezalXTR2: {fecha=08-05-2026 10:44:44, VAB=443.2927551269531, VBC=446.25146484375, PF=0.8438565135002136, PW=35.26781463623047, IA=54.57405471801758, VAC=445.86029052734375, IB=59.06260681152344, IC=41.90503692626953, KWh=271505.34375}
+2026-05-08 10:44:56.052 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: CabezalXTR2 | Clientes conectados: 0
+2026-05-08 10:44:56.053 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CabezalXTR2
+2026-05-08 10:44:56.137 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer01: {fecha=08-05-2026 10:44:44, VAB=443.1367492675781, VBC=445.6837463378906, PF=0.30214864015579224, PW=27.966794967651367, IA=119.43173217773438, VAC=445.2386779785156, IB=117.36885833740234, IC=122.86872100830078, KWh=288304.3125}
+2026-05-08 10:44:56.137 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer01 | Clientes conectados: 0
+2026-05-08 10:44:56.137 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer01
+2026-05-08 10:44:56.178 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer02: {fecha=08-05-2026 10:44:44, VAB=443.35186767578125, VBC=445.3143005371094, PF=1.0168170928955078, PW=59.765506744384766, IA=74.81024932861328, VAC=445.85723876953125, IB=78.56842803955078, IC=77.32438659667969, KWh=421132.0}
+2026-05-08 10:44:56.178 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer02 | Clientes conectados: 0
+2026-05-08 10:44:56.178 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer02
+2026-05-08 10:44:56.269 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer03: {fecha=08-05-2026 10:44:44, VAB=443.2011413574219, VBC=446.05755615234375, PF=0.8312703967094421, PW=93.12260437011719, IA=142.68267822265625, VAC=445.6868591308594, IB=143.26585388183594, IC=148.6811981201172, KWh=242767.625}
+2026-05-08 10:44:56.269 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer03 | Clientes conectados: 0
+2026-05-08 10:44:56.269 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer03
+2026-05-08 10:44:56.314 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer04: {fecha=08-05-2026 10:44:44, VAB=200.5669708251953, VBC=201.1558380126953, PF=1.0248432159423828, PW=13.70217514038086, IA=57.48653030395508, VAC=201.26852416992188, IB=41.627784729003906, IC=24.821395874023438, KWh=144834.25}
+2026-05-08 10:44:56.315 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer04 | Clientes conectados: 0
+2026-05-08 10:44:56.315 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer04
+2026-05-08 10:44:56.381 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Molino: {fecha=08-05-2026 10:44:44, VAB=443.2961120605469, VBC=446.1752624511719, PF=0.6288126111030579, PW=0.2203356921672821, IA=0.40127331018447876, VAC=445.79132080078125, IB=0.5649121403694153, IC=0.3936083912849426, KWh=105507.859375}
+2026-05-08 10:44:56.382 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Molino | Clientes conectados: 0
+2026-05-08 10:44:56.382 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Molino
+2026-05-08 10:44:56.454 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Pulverizador: {fecha=08-05-2026 10:44:44, VAB=443.16290283203125, VBC=446.06072998046875, PF=1.0, PW=5.839074611663818, IA=7.907632350921631, VAC=445.71124267578125, IB=8.501137733459473, IC=7.85345458984375, KWh=34023.57421875}
+2026-05-08 10:44:56.454 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Pulverizador | Clientes conectados: 0
+2026-05-08 10:44:56.454 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Pulverizador
+2026-05-08 10:44:56.535 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para ServicioAux: {fecha=08-05-2026 10:44:44, VAB=213.21115112304688, VBC=212.32308959960938, PF=0.4250686466693878, PW=9.172369956970215, IA=55.302913665771484, VAC=213.48854064941406, IB=62.043365478515625, IC=58.07356643676758, KWh=39166.9921875}
+2026-05-08 10:44:56.535 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: ServicioAux | Clientes conectados: 0
+2026-05-08 10:44:56.535 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServicioAux
+2026-05-08 10:44:56.627 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Ribloc: {fecha=08-05-2026 10:44:44, VAB=209.7717742919922, VBC=208.98585510253906, PF=0.5465993881225586, PW=7.61516809463501, IA=37.15846252441406, VAC=208.66326904296875, IB=42.64646530151367, IC=35.49494171142578, KWh=32654.111328125}
+2026-05-08 10:44:56.629 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Ribloc | Clientes conectados: 0
+2026-05-08 10:44:56.629 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Ribloc
+2026-05-08 10:44:56.705 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Sauer: {fecha=08-05-2026 10:44:44, VAB=443.1961669921875, VBC=446.16302490234375, PF=0.9473188519477844, PW=41.72462463378906, IA=56.29319763183594, VAC=445.6754150390625, IB=56.95325469970703, IC=58.608089447021484, KWh=30148.9921875}
+2026-05-08 10:44:56.706 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Sauer | Clientes conectados: 0
+2026-05-08 10:44:56.707 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Sauer
+2026-05-08 10:44:56.707 INFO  [core-2] c.e.d.s.PLCDataAcquisitionService - Reading PLC: PLC2 (192.168.0.2)
+2026-05-08 10:44:56.926 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea01 - Anterior: 568342.5625 | Actual: 568344 | Diferencia: 1.4375 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.926 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea01 | Clientes conectados: 0
+2026-05-08 10:44:56.926 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea01
+2026-05-08 10:44:56.926 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea01
+2026-05-08 10:44:56.926 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea02 - Anterior: 444937 | Actual: 444938.28125 | Diferencia: 1.28125 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.926 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea02 | Clientes conectados: 0
+2026-05-08 10:44:56.926 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea02
+2026-05-08 10:44:56.926 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea02
+2026-05-08 10:44:56.927 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea05 - Anterior: 512949.40625 | Actual: 512950.40625 | Diferencia: 1.0 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.927 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea05 | Clientes conectados: 0
+2026-05-08 10:44:56.927 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea05
+2026-05-08 10:44:56.927 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea05
+2026-05-08 10:44:56.927 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea08 - Anterior: 416723 | Actual: 416723.8125 | Diferencia: 0.8125 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.927 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea08 | Clientes conectados: 0
+2026-05-08 10:44:56.927 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea08
+2026-05-08 10:44:56.927 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea08
+2026-05-08 10:44:56.927 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea10 - Anterior: 524892.8125 | Actual: 524893.8125 | Diferencia: 1.0 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.927 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea10 | Clientes conectados: 0
+2026-05-08 10:44:56.928 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea10
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea10
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea17 - Anterior: 316055.21875 | Actual: 316056.15625 | Diferencia: 0.9375 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea17 | Clientes conectados: 0
+2026-05-08 10:44:56.928 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea17
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea17
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea31 - Anterior: 192984.65625 | Actual: 192985.203125 | Diferencia: 0.546875 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea31 | Clientes conectados: 0
+2026-05-08 10:44:56.928 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea31
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea31
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea32 - Anterior: 176414.234375 | Actual: 176414.25 | Diferencia: 0.015625 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea32 | Clientes conectados: 0
+2026-05-08 10:44:56.928 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea32
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea32
+2026-05-08 10:44:56.928 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller1 - Anterior: 23040.404296875 | Actual: 23040.84375 | Diferencia: 0.439453125 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.930 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller1 | Clientes conectados: 0
+2026-05-08 10:44:56.930 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller1
+2026-05-08 10:44:56.930 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller1
+2026-05-08 10:44:56.930 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller5 - Anterior: 6388766.5 | Actual: 6388781.5 | Diferencia: 15.0 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.930 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller5 | Clientes conectados: 1
+2026-05-08 10:44:56.930 INFO  [core-2] c.e.d.controller.KWhStreamController - 📡 Enviando evento SSE a 1 clientes de Chiller5: diferencia=15.0
+2026-05-08 10:44:56.935 INFO  [core-2] c.e.d.controller.KWhStreamController - ✅ Evento SSE enviado correctamente a cliente de Chiller5
+2026-05-08 10:44:56.935 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller5
+2026-05-08 10:44:56.935 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller6 - Anterior: 1230274.125 | Actual: 1230277.25 | Diferencia: 3.125 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.935 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller6 | Clientes conectados: 0
+2026-05-08 10:44:56.935 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller6
+2026-05-08 10:44:56.935 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller6
+2026-05-08 10:44:56.935 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA GA751 - Anterior: 301646.4375 | Actual: 301647.09375 | Diferencia: 0.65625 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.935 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: GA751 | Clientes conectados: 0
+2026-05-08 10:44:56.935 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para GA751
+2026-05-08 10:44:56.936 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: GA751
+2026-05-08 10:44:56.936 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA OrientadoraL1 - Anterior: 4873848.5 | Actual: 4873862.5 | Diferencia: 14.0 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.936 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: OrientadoraL1 | Clientes conectados: 0
+2026-05-08 10:44:56.936 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL1
+2026-05-08 10:44:56.936 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: OrientadoraL1
+2026-05-08 10:44:56.936 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA CompAP - Anterior: 143386.4375 | Actual: 143387.046875 | Diferencia: 0.609375 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.936 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: CompAP | Clientes conectados: 0
+2026-05-08 10:44:56.936 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CompAP
+2026-05-08 10:44:56.946 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: CompAP
+2026-05-08 10:44:56.946 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Trafo1 - Anterior: 205832.890625 | Actual: 205833.015625 | Diferencia: 0.125 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.947 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Trafo1 | Clientes conectados: 0
+2026-05-08 10:44:56.947 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo1
+2026-05-08 10:44:56.947 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Trafo1
+2026-05-08 10:44:56.947 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Trafo2 - Anterior: 192472.546875 | Actual: 192473.359375 | Diferencia: 0.8125 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.947 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Trafo2 | Clientes conectados: 0
+2026-05-08 10:44:56.947 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo2
+2026-05-08 10:44:56.947 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Trafo2
+2026-05-08 10:44:56.947 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Inyeccion - Anterior: 257834.234375 | Actual: 257835.109375 | Diferencia: 0.875 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.948 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Inyeccion | Clientes conectados: 0
+2026-05-08 10:44:56.948 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Inyeccion
+2026-05-08 10:44:56.948 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Inyeccion
+2026-05-08 10:44:56.948 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA BombasCisterna - Anterior: 119077.96875 | Actual: 119078.6484375 | Diferencia: 0.6796875 | Fecha: 08-05-2026 10:44:56
+2026-05-08 10:44:56.948 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: BombasCisterna | Clientes conectados: 1
+2026-05-08 10:44:56.948 INFO  [core-2] c.e.d.controller.KWhStreamController - 📡 Enviando evento SSE a 1 clientes de BombasCisterna: diferencia=0.6796875
+2026-05-08 10:44:56.950 INFO  [core-2] c.e.d.controller.KWhStreamController - ✅ Evento SSE enviado correctamente a cliente de BombasCisterna
+2026-05-08 10:44:56.950 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: BombasCisterna
+2026-05-08 10:44:56.965 INFO  [core-2] c.e.d.service.LecturaRepository - DEV MODE: salteando insert de 180 lecturas (persist-readings=false)
+2026-05-08 10:44:57.147 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea01: {fecha=08-05-2026 10:44:45, VAB=445.48187255859375, VBC=443.033203125, PF=0.9248719811439514, PW=84.35336303710938, IA=155.3716278076172, VAC=445.81732177734375, IB=65.59607696533203, IC=152.55540466308594, KWh=568343.4375}
+2026-05-08 10:44:57.148 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea01 | Clientes conectados: 0
+2026-05-08 10:44:57.148 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea01
+2026-05-08 10:44:57.223 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea02: {fecha=08-05-2026 10:44:45, VAB=444.1294860839844, VBC=442.2137756347656, PF=0.8829875588417053, PW=66.65526580810547, IA=90.83094024658203, VAC=445.3361511230469, IB=106.74851989746094, IC=93.71549224853516, KWh=444937.71875}
+2026-05-08 10:44:57.224 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea02 | Clientes conectados: 0
+2026-05-08 10:44:57.224 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea02
+2026-05-08 10:44:57.276 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea05: {fecha=08-05-2026 10:44:45, VAB=444.429931640625, VBC=442.4745178222656, PF=0.8092882037162781, PW=60.61222839355469, IA=95.35400390625, VAC=445.6391296386719, IB=99.46995544433594, IC=93.38978576660156, KWh=512950.03125}
+2026-05-08 10:44:57.277 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea05 | Clientes conectados: 0
+2026-05-08 10:44:57.277 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea05
+2026-05-08 10:44:57.312 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea08: {fecha=08-05-2026 10:44:45, VAB=444.3397216796875, VBC=442.4136962890625, PF=0.8743973970413208, PW=44.977237701416016, IA=65.51617431640625, VAC=445.5404052734375, IB=67.60128784179688, IC=67.92338562011719, KWh=416723.53125}
+2026-05-08 10:44:57.313 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea08 | Clientes conectados: 0
+2026-05-08 10:44:57.313 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea08
+2026-05-08 10:44:57.335 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea10: {fecha=08-05-2026 10:44:45, VAB=444.55181884765625, VBC=442.029296875, PF=0.8775685429573059, PW=46.916263580322266, IA=87.35332489013672, VAC=445.2535400390625, IB=75.76617431640625, IC=67.61398315429688, KWh=524893.375}
+2026-05-08 10:44:57.335 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea10 | Clientes conectados: 0
+2026-05-08 10:44:57.335 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea10
+2026-05-08 10:44:57.388 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea17: {fecha=08-05-2026 10:44:45, VAB=445.03240966796875, VBC=442.4435729980469, PF=0.9315934777259827, PW=56.591495513916016, IA=71.21147155761719, VAC=445.63787841796875, IB=79.00747680664062, IC=79.8692626953125, KWh=316055.78125}
+2026-05-08 10:44:57.388 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea17 | Clientes conectados: 0
+2026-05-08 10:44:57.388 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea17
+2026-05-08 10:44:57.445 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea31: {fecha=08-05-2026 10:44:45, VAB=444.8155212402344, VBC=442.1419677734375, PF=0.9703143239021301, PW=32.34816360473633, IA=42.064979553222656, VAC=445.34490966796875, IB=61.9189338684082, IC=59.067237854003906, KWh=192984.953125}
+2026-05-08 10:44:57.445 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea31 | Clientes conectados: 0
+2026-05-08 10:44:57.449 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea31
+2026-05-08 10:44:57.533 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea32: {fecha=08-05-2026 10:44:45, VAB=444.6296691894531, VBC=442.3475341796875, PF=0.41596707701683044, PW=0.5757161974906921, IA=1.8239874839782715, VAC=445.1761169433594, IB=1.5830152034759521, IC=2.00282883644104, KWh=176414.234375}
+2026-05-08 10:44:57.534 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea32 | Clientes conectados: 0
+2026-05-08 10:44:57.534 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea32
+2026-05-08 10:44:57.589 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller1: {fecha=08-05-2026 10:44:45, VAB=441.1905517578125, VBC=444.0210876464844, PF=0.8751437664031982, PW=24.835237503051758, IA=37.2135009765625, VAC=442.9985046386719, IB=36.62345504760742, IC=37.113128662109375, KWh=23040.658203125}
+2026-05-08 10:44:57.589 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller1 | Clientes conectados: 0
+2026-05-08 10:44:57.589 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller1
+2026-05-08 10:44:57.666 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller5: {fecha=08-05-2026 10:44:45, VAB=446.98199462890625, VBC=447.36663818359375, PF=0.977773904800415, PW=847.1102905273438, IA=1116.5625, VAC=444.86346435546875, IB=1038.6304931640625, IC=1146.2496337890625, KWh=6388775.5}
+2026-05-08 10:44:57.666 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller5 | Clientes conectados: 1
+2026-05-08 10:44:57.666 INFO  [core-2] c.e.d.controller.KWhStreamController - 📡 Enviando datos actualizados vía SSE a 1 clientes de Chiller5
+2026-05-08 10:44:57.667 INFO  [core-2] c.e.d.controller.KWhStreamController - ✅ Evento de datos SSE enviado correctamente a cliente de Chiller5
+2026-05-08 10:44:57.717 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller6: {fecha=08-05-2026 10:44:45, VAB=447.0659484863281, VBC=447.5279235839844, PF=0.979706346988678, PW=174.5447235107422, IA=227.2693634033203, VAC=445.1748046875, IB=212.84803771972656, IC=244.03875732421875, KWh=1230276.0}
+2026-05-08 10:44:57.717 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller6 | Clientes conectados: 0
+2026-05-08 10:44:57.717 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller6
+2026-05-08 10:44:57.757 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para GA751: {fecha=08-05-2026 10:44:45, VAB=445.681640625, VBC=443.5459289550781, PF=0.8931076526641846, PW=38.73453140258789, IA=56.335357666015625, VAC=446.0968933105469, IB=57.21922302246094, IC=55.28083419799805, KWh=301646.8125}
+2026-05-08 10:44:57.757 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: GA751 | Clientes conectados: 0
+2026-05-08 10:44:57.757 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para GA751
+2026-05-08 10:44:57.841 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para OrientadoraL1: {fecha=08-05-2026 10:44:45, VAB=441.4800109863281, VBC=440.7462158203125, PF=0.9586071968078613, PW=775.4715576171875, IA=1125.3939208984375, VAC=445.2928466796875, IB=1141.935302734375, IC=1000.8873291015625, KWh=4873857.0}
+2026-05-08 10:44:57.841 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: OrientadoraL1 | Clientes conectados: 0
+2026-05-08 10:44:57.841 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL1
+2026-05-08 10:44:57.884 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para CompAP: {fecha=08-05-2026 10:44:45, VAB=444.9117126464844, VBC=442.6510009765625, PF=0.9224710464477539, PW=28.516199111938477, IA=55.03709411621094, VAC=445.460205078125, IB=45.110809326171875, IC=40.53740692138672, KWh=143386.765625}
+2026-05-08 10:44:57.884 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: CompAP | Clientes conectados: 0
+2026-05-08 10:44:57.884 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CompAP
+2026-05-08 10:44:57.935 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Trafo1: {fecha=08-05-2026 10:44:45, VAB=444.5866394042969, VBC=444.37127685546875, PF=0.7459391355514526, PW=6.433371067047119, IA=11.340045928955078, VAC=442.5708312988281, IB=11.11395263671875, IC=11.057845115661621, KWh=205832.953125}
+2026-05-08 10:44:57.935 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Trafo1 | Clientes conectados: 0
+2026-05-08 10:44:57.935 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo1
+2026-05-08 10:44:58.020 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Trafo2: {fecha=08-05-2026 10:44:45, VAB=443.20330810546875, VBC=444.1646728515625, PF=0.657162606716156, PW=28.40032386779785, IA=65.54264831542969, VAC=441.1104431152344, IB=55.55145263671875, IC=54.27715301513672, KWh=192472.984375}
+2026-05-08 10:44:58.020 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Trafo2 | Clientes conectados: 0
+2026-05-08 10:44:58.020 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo2
+2026-05-08 10:44:58.110 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Inyeccion: {fecha=08-05-2026 10:44:45, VAB=443.1958312988281, VBC=444.0663146972656, PF=0.9650132060050964, PW=45.78699493408203, IA=69.55195617675781, VAC=441.9028625488281, IB=83.35972595214844, IC=58.69493865966797, KWh=257834.734375}
+2026-05-08 10:44:58.111 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Inyeccion | Clientes conectados: 0
+2026-05-08 10:44:58.111 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Inyeccion
+2026-05-08 10:44:58.186 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para BombasCisterna: {fecha=08-05-2026 10:44:45, VAB=443.21466064453125, VBC=444.1011657714844, PF=0.8709908127784729, PW=41.46739959716797, IA=49.86278533935547, VAC=441.7969665527344, IB=41.313453674316406, IC=46.37017822265625, KWh=119078.3515625}
+2026-05-08 10:44:58.186 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: BombasCisterna | Clientes conectados: 1
+2026-05-08 10:44:58.186 INFO  [core-2] c.e.d.controller.KWhStreamController - 📡 Enviando datos actualizados vía SSE a 1 clientes de BombasCisterna
+2026-05-08 10:44:58.188 ERROR [core-2] c.e.d.controller.KWhStreamController - ❌ Error enviando evento SSE a BombasCisterna: ServletResponse failed to flushBuffer: java.io.IOException: Se ha anulado una conexión establecida por el software en su equipo host.
+2026-05-08 10:44:58.188 INFO  [core-2] c.e.d.s.PLCDataAcquisitionService - Reading PLC: PLC3 (192.168.0.3)
+2026-05-08 10:44:58.189 ERROR [http-nio-8081-exec-2] c.e.d.controller.KWhStreamController - Error en stream para BombasCisterna: Servlet container error notification for disconnected client
+2026-05-08 10:44:58.206 INFO  [http-nio-8081-exec-2] c.e.d.controller.KWhStreamController - Stream completado para BombasCisterna
+2026-05-08 10:44:58.550 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller3 - Anterior: 189195.078125 | Actual: 189195.234375 | Diferencia: 0.15625 | Fecha: 08-05-2026 10:44:58
+2026-05-08 10:44:58.550 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller3 | Clientes conectados: 0
+2026-05-08 10:44:58.550 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller3
+2026-05-08 10:44:58.550 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller3
+2026-05-08 10:44:58.550 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller4 - Anterior: 868791 | Actual: 868793.8125 | Diferencia: 2.8125 | Fecha: 08-05-2026 10:44:58
+2026-05-08 10:44:58.550 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller4 | Clientes conectados: 0
+2026-05-08 10:44:58.550 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller4
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller4
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA ServAuxP3LabCalid - Anterior: 72892.34375 | Actual: 72892.5390625 | Diferencia: 0.1953125 | Fecha: 08-05-2026 10:44:58
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: ServAuxP3LabCalid | Clientes conectados: 0
+2026-05-08 10:44:58.551 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServAuxP3LabCalid
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: ServAuxP3LabCalid
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA KWhPlanta1 - Anterior: 2076027.0 | Actual: 2076054.0 | Diferencia: 27.0 | Fecha: 08-05-2026 10:44:58
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: KWhPlanta1 | Clientes conectados: 0
+2026-05-08 10:44:58.551 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para KWhPlanta1
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: KWhPlanta1
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA TDGeneradorSA - Anterior: 166536.016 | Actual: 166536.576 | Diferencia: 0.56 | Fecha: 08-05-2026 10:44:58
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: TDGeneradorSA | Clientes conectados: 0
+2026-05-08 10:44:58.551 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para TDGeneradorSA
+2026-05-08 10:44:58.551 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: TDGeneradorSA
+2026-05-08 10:44:58.581 INFO  [core-2] c.e.d.service.LecturaRepository - DEV MODE: salteando insert de 50 lecturas (persist-readings=false)
+2026-05-08 10:44:58.670 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller3: {fecha=08-05-2026 10:44:47, VAB=444.2095031738281, VBC=442.6316223144531, PF=0.8116055727005005, PW=9.601789474487305, IA=16.618431091308594, VAC=444.7931823730469, IB=15.187686920166016, IC=14.384708404541016, KWh=189195.171875}
+2026-05-08 10:44:58.671 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller3 | Clientes conectados: 0
+2026-05-08 10:44:58.671 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller3
+2026-05-08 10:44:58.716 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller4: {fecha=08-05-2026 10:44:47, VAB=442.7095947265625, VBC=441.0369567871094, PF=0.850780189037323, PW=169.5128173828125, IA=258.65966796875, VAC=443.291015625, IB=264.95819091796875, IC=256.95574951171875, KWh=868792.5625}
+2026-05-08 10:44:58.716 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller4 | Clientes conectados: 0
+2026-05-08 10:44:58.716 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller4
+2026-05-08 10:44:58.764 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para ServAuxP3LabCalid: {fecha=08-05-2026 10:44:47, VAB=446.1590270996094, VBC=444.55133056640625, PF=0.7183691263198853, PW=8.83017635345459, IA=17.650882720947266, VAC=446.4515380859375, IB=19.758832931518555, IC=10.34646224975586, KWh=72892.453125}
+2026-05-08 10:44:58.765 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: ServAuxP3LabCalid | Clientes conectados: 0
+2026-05-08 10:44:58.765 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServAuxP3LabCalid
+2026-05-08 10:44:58.813 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para KWhPlanta1: {fecha=08-05-2026 10:44:47, VAB=12551.0, VBC=12499.0, PF=-96.0199966430664, PW=1678178.0, IA=48.400001525878906, VAC=12544.0, IB=46.900001525878906, IC=45.400001525878906, KWh=2076042.0}
+2026-05-08 10:44:58.814 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: KWhPlanta1 | Clientes conectados: 0
+2026-05-08 10:44:58.814 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para KWhPlanta1
+2026-05-08 10:44:58.894 INFO  [core-2] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para TDGeneradorSA: {fecha=08-05-2026 10:44:47, VAB=446.3238830566406, VBC=444.425048828125, PF=0.8857001662254333, PW=12469.8583984375, IA=49.753662109375, VAC=446.1670227050781, IB=48.99048614501953, IC=31.880325317382812, KWh=166536.352}
+2026-05-08 10:44:58.894 INFO  [core-2] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: TDGeneradorSA | Clientes conectados: 0
+2026-05-08 10:44:58.894 WARN  [core-2] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para TDGeneradorSA
+2026-05-08 10:44:58.894 INFO  [core-2] c.e.d.s.PLCDataAcquisitionService - Reading PLC: GteWay01 (0.0.0.0)
+2026-05-08 10:45:00.923 ERROR [core-2] c.e.d.s.PLCDataAcquisitionService - Failed to read PLC GteWay01 at 0.0.0.0: Connection refused: connect
+2026-05-08 10:45:00.923 INFO  [core-2] c.e.d.s.PLCDataAcquisitionService - === COMPLETED PLC READ CYCLE ===
+2026-05-08 10:45:00.923 INFO  [core-2] c.e.d.service.PASReaderService - Reading PAS600L meter...
+2026-05-08 10:45:55.130 INFO  [core-1] c.e.d.service.DataAcquisitionTask - >>> READING CYCLE (every 60 seconds) <<<
+2026-05-08 10:45:55.131 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - === STARTING PLC READ CYCLE ===
+2026-05-08 10:45:55.132 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - Reading PLC: PLC1 (192.168.0.5)
+2026-05-08 10:45:55.484 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea03 - Anterior: 336227.125 | Actual: 336227.875 | Diferencia: 0.75 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.488 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea03 | Clientes conectados: 0
+2026-05-08 10:45:55.488 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea03
+2026-05-08 10:45:55.488 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea03
+2026-05-08 10:45:55.488 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea04 - Anterior: 340026.21875 | Actual: 340026.90625 | Diferencia: 0.6875 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.488 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea04 | Clientes conectados: 0
+2026-05-08 10:45:55.488 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea04
+2026-05-08 10:45:55.488 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea04
+2026-05-08 10:45:55.488 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea09 - Anterior: 435871.625 | Actual: 435872.71875 | Diferencia: 1.09375 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea09 | Clientes conectados: 0
+2026-05-08 10:45:55.489 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea09
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea09
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea18 - Anterior: 746217.75 | Actual: 746219.125 | Diferencia: 1.375 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea18 | Clientes conectados: 0
+2026-05-08 10:45:55.489 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea18
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea18
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea34 - Anterior: 91119.2109375 | Actual: 91119.40625 | Diferencia: 0.1953125 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea34 | Clientes conectados: 0
+2026-05-08 10:45:55.489 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea34
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea34
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA OrientadoraL3 - Anterior: 236457.109375 | Actual: 236457.515625 | Diferencia: 0.40625 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: OrientadoraL3 | Clientes conectados: 0
+2026-05-08 10:45:55.489 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL3
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: OrientadoraL3
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA CabezalXTR2 - Anterior: 271505.59375 | Actual: 271506.25 | Diferencia: 0.65625 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: CabezalXTR2 | Clientes conectados: 0
+2026-05-08 10:45:55.489 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CabezalXTR2
+2026-05-08 10:45:55.489 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: CabezalXTR2
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Mixer01 - Anterior: 288304.53125 | Actual: 288305.09375 | Diferencia: 0.5625 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Mixer01 | Clientes conectados: 0
+2026-05-08 10:45:55.491 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer01
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Mixer01
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Mixer02 - Anterior: 421132.40625 | Actual: 421133.40625 | Diferencia: 1.0 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Mixer02 | Clientes conectados: 0
+2026-05-08 10:45:55.491 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer02
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Mixer02
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Mixer03 - Anterior: 242768.296875 | Actual: 242770 | Diferencia: 1.703125 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Mixer03 | Clientes conectados: 0
+2026-05-08 10:45:55.491 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer03
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Mixer03
+2026-05-08 10:45:55.491 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Mixer04 - Anterior: 144834.359375 | Actual: 144834.59375 | Diferencia: 0.234375 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.492 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Mixer04 | Clientes conectados: 0
+2026-05-08 10:45:55.492 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer04
+2026-05-08 10:45:55.492 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Mixer04
+2026-05-08 10:45:55.492 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Molino - Anterior: 105507.859375 | Actual: 105507.859375 | Diferencia: 0.0 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.492 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Molino | Clientes conectados: 0
+2026-05-08 10:45:55.492 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Molino
+2026-05-08 10:45:55.492 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Molino
+2026-05-08 10:45:55.492 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Pulverizador - Anterior: 34023.6171875 | Actual: 34023.70703125 | Diferencia: 0.08984375 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.492 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Pulverizador | Clientes conectados: 0
+2026-05-08 10:45:55.493 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Pulverizador
+2026-05-08 10:45:55.493 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Pulverizador
+2026-05-08 10:45:55.493 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA ServicioAux - Anterior: 39167.0625 | Actual: 39167.23046875 | Diferencia: 0.16796875 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.493 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: ServicioAux | Clientes conectados: 0
+2026-05-08 10:45:55.493 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServicioAux
+2026-05-08 10:45:55.493 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: ServicioAux
+2026-05-08 10:45:55.493 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Ribloc - Anterior: 32654.171875 | Actual: 32654.3671875 | Diferencia: 0.1953125 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.493 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Ribloc | Clientes conectados: 0
+2026-05-08 10:45:55.493 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Ribloc
+2026-05-08 10:45:55.493 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Ribloc
+2026-05-08 10:45:55.493 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Sauer - Anterior: 30149.294921875 | Actual: 30150.4296875 | Diferencia: 1.134765625 | Fecha: 08-05-2026 10:45:55
+2026-05-08 10:45:55.494 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Sauer | Clientes conectados: 0
+2026-05-08 10:45:55.494 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Sauer
+2026-05-08 10:45:55.494 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Sauer
+2026-05-08 10:45:55.526 INFO  [core-1] c.e.d.service.LecturaRepository - DEV MODE: salteando insert de 160 lecturas (persist-readings=false)
+2026-05-08 10:45:55.624 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea03: {fecha=08-05-2026 10:45:44, VAB=442.2835998535156, VBC=444.4835510253906, PF=0.9375006556510925, PW=37.55690002441406, IA=63.71708297729492, VAC=443.9477233886719, IB=49.67523193359375, IC=52.39921569824219, KWh=336227.5625}
+2026-05-08 10:45:55.624 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea03 | Clientes conectados: 0
+2026-05-08 10:45:55.624 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea03
+2026-05-08 10:45:55.729 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea04: {fecha=08-05-2026 10:45:44, VAB=442.38092041015625, VBC=444.6033935546875, PF=0.913337230682373, PW=38.95552444458008, IA=53.16071319580078, VAC=444.0619812011719, IB=48.70231246948242, IC=65.43828582763672, KWh=340026.59375}
+2026-05-08 10:45:55.729 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea04 | Clientes conectados: 0
+2026-05-08 10:45:55.729 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea04
+2026-05-08 10:45:55.835 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea09: {fecha=08-05-2026 10:45:44, VAB=442.6056213378906, VBC=444.8239440917969, PF=0.9643245935440063, PW=65.00985717773438, IA=87.2768325805664, VAC=444.2331848144531, IB=87.2807388305664, IC=87.95117950439453, KWh=435872.21875}
+2026-05-08 10:45:55.836 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea09 | Clientes conectados: 0
+2026-05-08 10:45:55.836 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea09
+2026-05-08 10:45:55.886 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea18: {fecha=08-05-2026 10:45:44, VAB=429.96807861328125, VBC=425.051513671875, PF=0.9398859739303589, PW=81.32957458496094, IA=118.72946166992188, VAC=427.5260314941406, IB=117.25959777832031, IC=115.21100616455078, KWh=746218.5}
+2026-05-08 10:45:55.887 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea18 | Clientes conectados: 0
+2026-05-08 10:45:55.887 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea18
+2026-05-08 10:45:55.950 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea34: {fecha=08-05-2026 10:45:44, VAB=211.7056884765625, VBC=210.1956787109375, PF=1.0, PW=6.6715087890625, IA=18.8599910736084, VAC=210.1967315673828, IB=19.14741325378418, IC=10.641270637512207, KWh=91119.328125}
+2026-05-08 10:45:55.951 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea34 | Clientes conectados: 0
+2026-05-08 10:45:55.951 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea34
+2026-05-08 10:45:55.973 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para OrientadoraL3: {fecha=08-05-2026 10:45:44, VAB=212.994873046875, VBC=211.81591796875, PF=0.5073044896125793, PW=24.558879852294922, IA=128.6894989013672, VAC=212.55892944335938, IB=142.2428436279297, IC=125.88638305664062, KWh=236457.34375}
+2026-05-08 10:45:55.975 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: OrientadoraL3 | Clientes conectados: 0
+2026-05-08 10:45:55.975 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL3
+2026-05-08 10:45:56.019 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para CabezalXTR2: {fecha=08-05-2026 10:45:44, VAB=442.27362060546875, VBC=444.4851989746094, PF=1.0, PW=32.20366668701172, IA=41.390262603759766, VAC=443.9620666503906, IB=42.214019775390625, IC=51.768890380859375, KWh=271505.9375}
+2026-05-08 10:45:56.020 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: CabezalXTR2 | Clientes conectados: 0
+2026-05-08 10:45:56.020 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CabezalXTR2
+2026-05-08 10:45:56.064 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer01: {fecha=08-05-2026 10:45:44, VAB=442.30450439453125, VBC=444.1838684082031, PF=0.2960749864578247, PW=26.579845428466797, IA=117.47551727294922, VAC=443.58477783203125, IB=114.42973327636719, IC=119.20025634765625, KWh=288304.875}
+2026-05-08 10:45:56.064 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer01 | Clientes conectados: 0
+2026-05-08 10:45:56.064 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer01
+2026-05-08 10:45:56.150 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer02: {fecha=08-05-2026 10:45:44, VAB=442.5430603027344, VBC=443.7154235839844, PF=1.02372407913208, PW=55.97209548950195, IA=74.40386199951172, VAC=444.468505859375, IB=77.8880386352539, IC=73.92096710205078, KWh=421132.96875}
+2026-05-08 10:45:56.150 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer02 | Clientes conectados: 0
+2026-05-08 10:45:56.150 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer02
+2026-05-08 10:45:56.238 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer03: {fecha=08-05-2026 10:45:44, VAB=442.17523193359375, VBC=443.8984069824219, PF=0.8451687693595886, PW=100.94407653808594, IA=155.10523986816406, VAC=443.7908630371094, IB=151.8486328125, IC=159.2186737060547, KWh=242769.25}
+2026-05-08 10:45:56.238 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer03 | Clientes conectados: 0
+2026-05-08 10:45:56.238 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer03
+2026-05-08 10:45:56.297 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Mixer04: {fecha=08-05-2026 10:45:44, VAB=200.3292236328125, VBC=200.74020385742188, PF=1.0334784984588623, PW=14.747369766235352, IA=60.66517639160156, VAC=201.0891876220703, IB=43.49993133544922, IC=25.064695358276367, KWh=144834.5}
+2026-05-08 10:45:56.297 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Mixer04 | Clientes conectados: 0
+2026-05-08 10:45:56.297 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Mixer04
+2026-05-08 10:45:56.330 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Molino: {fecha=08-05-2026 10:45:44, VAB=442.2552185058594, VBC=444.0040283203125, PF=0.6384140849113464, PW=0.21729305386543274, IA=0.3969624638557434, VAC=443.8970947265625, IB=0.5690000057220459, IC=0.36837247014045715, KWh=105507.859375}
+2026-05-08 10:45:56.330 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Molino | Clientes conectados: 0
+2026-05-08 10:45:56.330 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Molino
+2026-05-08 10:45:56.417 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Pulverizador: {fecha=08-05-2026 10:45:44, VAB=442.1472473144531, VBC=443.904541015625, PF=0.5324049592018127, PW=5.086908340454102, IA=6.055150985717773, VAC=443.83184814453125, IB=6.325650215148926, IC=12.619735717773438, KWh=34023.671875}
+2026-05-08 10:45:56.418 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Pulverizador | Clientes conectados: 0
+2026-05-08 10:45:56.418 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Pulverizador
+2026-05-08 10:45:56.449 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para ServicioAux: {fecha=08-05-2026 10:45:44, VAB=212.77821350097656, VBC=211.9564666748047, PF=0.42570140957832336, PW=10.040865898132324, IA=61.12166976928711, VAC=213.1772918701172, IB=67.04085540771484, IC=63.761436462402344, KWh=39167.16015625}
+2026-05-08 10:45:56.449 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: ServicioAux | Clientes conectados: 0
+2026-05-08 10:45:56.450 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServicioAux
+2026-05-08 10:45:56.473 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Ribloc: {fecha=08-05-2026 10:45:44, VAB=209.5066375732422, VBC=208.6869354248047, PF=0.5419555306434631, PW=6.421741008758545, IA=36.17737579345703, VAC=208.20294189453125, IB=36.984806060791016, IC=30.419452667236328, KWh=32654.3046875}
+2026-05-08 10:45:56.473 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Ribloc | Clientes conectados: 0
+2026-05-08 10:45:56.473 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Ribloc
+2026-05-08 10:45:56.484 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Sauer: {fecha=08-05-2026 10:45:44, VAB=442.151123046875, VBC=443.96942138671875, PF=0.9353726506233215, PW=84.97933959960938, IA=117.19246673583984, VAC=443.75286865234375, IB=118.05171966552734, IC=118.63585662841797, KWh=30149.81640625}
+2026-05-08 10:45:56.484 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Sauer | Clientes conectados: 0
+2026-05-08 10:45:56.484 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Sauer
+2026-05-08 10:45:56.486 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - Reading PLC: PLC2 (192.168.0.2)
+2026-05-08 10:45:56.722 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea01 - Anterior: 568344 | Actual: 568345.1875 | Diferencia: 1.1875 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.722 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea01 | Clientes conectados: 0
+2026-05-08 10:45:56.722 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea01
+2026-05-08 10:45:56.722 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea01
+2026-05-08 10:45:56.722 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea02 - Anterior: 444938.28125 | Actual: 444939.5 | Diferencia: 1.21875 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.722 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea02 | Clientes conectados: 0
+2026-05-08 10:45:56.723 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea02
+2026-05-08 10:45:56.723 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea02
+2026-05-08 10:45:56.723 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea05 - Anterior: 512950.40625 | Actual: 512951.25 | Diferencia: 0.84375 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.724 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea05 | Clientes conectados: 0
+2026-05-08 10:45:56.727 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea05
+2026-05-08 10:45:56.727 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea05
+2026-05-08 10:45:56.727 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea08 - Anterior: 416723.8125 | Actual: 416724.59375 | Diferencia: 0.78125 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.727 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea08 | Clientes conectados: 0
+2026-05-08 10:45:56.727 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea08
+2026-05-08 10:45:56.727 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea08
+2026-05-08 10:45:56.728 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea10 - Anterior: 524893.8125 | Actual: 524894.625 | Diferencia: 0.8125 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.732 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea10 | Clientes conectados: 0
+2026-05-08 10:45:56.733 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea10
+2026-05-08 10:45:56.733 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea10
+2026-05-08 10:45:56.733 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea17 - Anterior: 316056.15625 | Actual: 316056.96875 | Diferencia: 0.8125 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.733 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea17 | Clientes conectados: 0
+2026-05-08 10:45:56.733 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea17
+2026-05-08 10:45:56.733 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea17
+2026-05-08 10:45:56.733 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea31 - Anterior: 192985.203125 | Actual: 192985.71875 | Diferencia: 0.515625 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.734 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea31 | Clientes conectados: 0
+2026-05-08 10:45:56.734 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea31
+2026-05-08 10:45:56.734 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea31
+2026-05-08 10:45:56.734 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Linea32 - Anterior: 176414.25 | Actual: 176414.25 | Diferencia: 0.0 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.734 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Linea32 | Clientes conectados: 0
+2026-05-08 10:45:56.734 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea32
+2026-05-08 10:45:56.734 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Linea32
+2026-05-08 10:45:56.734 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller1 - Anterior: 23040.84375 | Actual: 23041.244140625 | Diferencia: 0.400390625 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.734 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller1 | Clientes conectados: 0
+2026-05-08 10:45:56.734 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller1
+2026-05-08 10:45:56.734 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller1
+2026-05-08 10:45:56.734 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller5 - Anterior: 6388781.5 | Actual: 6388796 | Diferencia: 14.5 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.736 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller5 | Clientes conectados: 1
+2026-05-08 10:45:56.736 INFO  [core-1] c.e.d.controller.KWhStreamController - 📡 Enviando evento SSE a 1 clientes de Chiller5: diferencia=14.5
+2026-05-08 10:45:56.737 INFO  [core-1] c.e.d.controller.KWhStreamController - ✅ Evento SSE enviado correctamente a cliente de Chiller5
+2026-05-08 10:45:56.737 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller5
+2026-05-08 10:45:56.737 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller6 - Anterior: 1230277.25 | Actual: 1230280.25 | Diferencia: 3.0 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.737 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller6 | Clientes conectados: 0
+2026-05-08 10:45:56.738 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller6
+2026-05-08 10:45:56.738 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller6
+2026-05-08 10:45:56.738 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA GA751 - Anterior: 301647.09375 | Actual: 301647.75 | Diferencia: 0.65625 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.738 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: GA751 | Clientes conectados: 0
+2026-05-08 10:45:56.738 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para GA751
+2026-05-08 10:45:56.738 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: GA751
+2026-05-08 10:45:56.738 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA OrientadoraL1 - Anterior: 4873862.5 | Actual: 4873875.5 | Diferencia: 13.0 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.738 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: OrientadoraL1 | Clientes conectados: 0
+2026-05-08 10:45:56.740 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL1
+2026-05-08 10:45:56.740 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: OrientadoraL1
+2026-05-08 10:45:56.740 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA CompAP - Anterior: 143387.046875 | Actual: 143387.5625 | Diferencia: 0.515625 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.740 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: CompAP | Clientes conectados: 0
+2026-05-08 10:45:56.740 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CompAP
+2026-05-08 10:45:56.740 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: CompAP
+2026-05-08 10:45:56.740 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Trafo1 - Anterior: 205833.015625 | Actual: 205833.125 | Diferencia: 0.109375 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.740 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Trafo1 | Clientes conectados: 0
+2026-05-08 10:45:56.740 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo1
+2026-05-08 10:45:56.740 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Trafo1
+2026-05-08 10:45:56.741 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Trafo2 - Anterior: 192473.359375 | Actual: 192474.0625 | Diferencia: 0.703125 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.741 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Trafo2 | Clientes conectados: 0
+2026-05-08 10:45:56.741 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo2
+2026-05-08 10:45:56.741 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Trafo2
+2026-05-08 10:45:56.741 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Inyeccion - Anterior: 257835.109375 | Actual: 257835.921875 | Diferencia: 0.8125 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.742 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Inyeccion | Clientes conectados: 0
+2026-05-08 10:45:56.742 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Inyeccion
+2026-05-08 10:45:56.742 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Inyeccion
+2026-05-08 10:45:56.742 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA BombasCisterna - Anterior: 119078.6484375 | Actual: 119079.25 | Diferencia: 0.6015625 | Fecha: 08-05-2026 10:45:56
+2026-05-08 10:45:56.753 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: BombasCisterna | Clientes conectados: 0
+2026-05-08 10:45:56.753 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para BombasCisterna
+2026-05-08 10:45:56.754 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: BombasCisterna
+2026-05-08 10:45:56.764 INFO  [core-1] c.e.d.service.LecturaRepository - DEV MODE: salteando insert de 180 lecturas (persist-readings=false)
+2026-05-08 10:45:56.794 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea01: {fecha=08-05-2026 10:45:45, VAB=445.515380859375, VBC=442.9027099609375, PF=0.9448956251144409, PW=99.24767303466797, IA=143.5132293701172, VAC=444.9121398925781, IB=51.74153137207031, IC=172.09329223632812, KWh=568344.6875}
+2026-05-08 10:45:56.794 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea01 | Clientes conectados: 0
+2026-05-08 10:45:56.794 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea01
+2026-05-08 10:45:56.841 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea02: {fecha=08-05-2026 10:45:45, VAB=444.4388427734375, VBC=442.1343994140625, PF=0.8406198620796204, PW=59.39496994018555, IA=122.41647338867188, VAC=444.5528564453125, IB=136.98544311523438, IC=89.23896026611328, KWh=444938.9375}
+2026-05-08 10:45:56.841 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea02 | Clientes conectados: 0
+2026-05-08 10:45:56.841 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea02
+2026-05-08 10:45:56.860 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea05: {fecha=08-05-2026 10:45:45, VAB=444.319580078125, VBC=442.4076843261719, PF=0.8196383714675903, PW=52.10544967651367, IA=82.38424682617188, VAC=444.8544006347656, IB=85.66183471679688, IC=80.03899383544922, KWh=512950.875}
+2026-05-08 10:45:56.860 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea05 | Clientes conectados: 0
+2026-05-08 10:45:56.860 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea05
+2026-05-08 10:45:56.883 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea08: {fecha=08-05-2026 10:45:45, VAB=444.24102783203125, VBC=442.34515380859375, PF=0.8766888976097107, PW=45.77523422241211, IA=65.0983657836914, VAC=444.762451171875, IB=67.65587615966797, IC=70.3960189819336, KWh=416724.21875}
+2026-05-08 10:45:56.883 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea08 | Clientes conectados: 0
+2026-05-08 10:45:56.883 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea08
+2026-05-08 10:45:56.933 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea10: {fecha=08-05-2026 10:45:45, VAB=443.8102722167969, VBC=441.9678955078125, PF=0.9151738882064819, PW=60.61666488647461, IA=78.05657196044922, VAC=444.4888916015625, IB=79.64778137207031, IC=84.44416809082031, KWh=524894.25}
+2026-05-08 10:45:56.934 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea10 | Clientes conectados: 0
+2026-05-08 10:45:56.934 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea10
+2026-05-08 10:45:57.000 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea17: {fecha=08-05-2026 10:45:45, VAB=444.29144287109375, VBC=442.3623962402344, PF=0.9428451657295227, PW=47.83476638793945, IA=61.58637237548828, VAC=444.848876953125, IB=76.31015014648438, IC=70.59589385986328, KWh=316056.5625}
+2026-05-08 10:45:57.000 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea17 | Clientes conectados: 0
+2026-05-08 10:45:57.000 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea17
+2026-05-08 10:45:57.053 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea31: {fecha=08-05-2026 10:45:45, VAB=444.0809020996094, VBC=442.05731201171875, PF=0.8643632531166077, PW=28.101070404052734, IA=44.19364929199219, VAC=444.57220458984375, IB=45.23646926879883, IC=41.762779235839844, KWh=192985.484375}
+2026-05-08 10:45:57.055 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea31 | Clientes conectados: 0
+2026-05-08 10:45:57.055 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea31
+2026-05-08 10:45:57.108 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Linea32: {fecha=08-05-2026 10:45:45, VAB=443.89263916015625, VBC=442.0242004394531, PF=0.4166933000087738, PW=0.5763996839523315, IA=1.8210325241088867, VAC=444.39813232421875, IB=1.5700746774673462, IC=2.015160083770752, KWh=176414.25}
+2026-05-08 10:45:57.108 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Linea32 | Clientes conectados: 0
+2026-05-08 10:45:57.108 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Linea32
+2026-05-08 10:45:57.195 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller1: {fecha=08-05-2026 10:45:45, VAB=440.895751953125, VBC=442.0857238769531, PF=0.8767877817153931, PW=24.842430114746094, IA=37.38508605957031, VAC=441.8072814941406, IB=36.545719146728516, IC=36.98700714111328, KWh=23041.064453125}
+2026-05-08 10:45:57.195 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller1 | Clientes conectados: 0
+2026-05-08 10:45:57.195 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller1
+2026-05-08 10:45:57.247 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller5: {fecha=08-05-2026 10:45:45, VAB=446.1324157714844, VBC=445.7672119140625, PF=0.9865193963050842, PW=876.3128662109375, IA=1190.36474609375, VAC=443.7228698730469, IB=1148.4345703125, IC=1171.40771484375, KWh=6388789.0}
+2026-05-08 10:45:57.247 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller5 | Clientes conectados: 1
+2026-05-08 10:45:57.247 INFO  [core-1] c.e.d.controller.KWhStreamController - 📡 Enviando datos actualizados vía SSE a 1 clientes de Chiller5
+2026-05-08 10:45:57.248 INFO  [core-1] c.e.d.controller.KWhStreamController - ✅ Evento de datos SSE enviado correctamente a cliente de Chiller5
+2026-05-08 10:45:57.300 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller6: {fecha=08-05-2026 10:45:45, VAB=446.2667541503906, VBC=445.9000244140625, PF=1.0, PW=170.34384155273438, IA=220.59132385253906, VAC=443.9752197265625, IB=215.63986206054688, IC=240.98965454101562, KWh=1230278.875}
+2026-05-08 10:45:57.300 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller6 | Clientes conectados: 0
+2026-05-08 10:45:57.301 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller6
+2026-05-08 10:45:57.320 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para GA751: {fecha=08-05-2026 10:45:45, VAB=444.9541931152344, VBC=443.18463134765625, PF=0.8929895162582397, PW=38.72276306152344, IA=56.40949249267578, VAC=445.34124755859375, IB=57.07727813720703, IC=55.69770050048828, KWh=301647.46875}
+2026-05-08 10:45:57.321 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: GA751 | Clientes conectados: 0
+2026-05-08 10:45:57.321 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para GA751
+2026-05-08 10:45:57.328 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para OrientadoraL1: {fecha=08-05-2026 10:45:45, VAB=440.77288818359375, VBC=440.3934326171875, PF=0.9486680030822754, PW=816.8577270507812, IA=1092.8612060546875, VAC=444.2164611816406, IB=1144.220458984375, IC=1047.0430908203125, KWh=4873870.0}
+2026-05-08 10:45:57.328 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: OrientadoraL1 | Clientes conectados: 0
+2026-05-08 10:45:57.328 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para OrientadoraL1
+2026-05-08 10:45:57.412 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para CompAP: {fecha=08-05-2026 10:45:45, VAB=444.1791076660156, VBC=442.33868408203125, PF=0.8327886462211609, PW=37.80791473388672, IA=32.90625, VAC=444.3303527832031, IB=37.75376892089844, IC=33.145660400390625, KWh=143387.328125}
+2026-05-08 10:45:57.413 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: CompAP | Clientes conectados: 0
+2026-05-08 10:45:57.413 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para CompAP
+2026-05-08 10:45:57.476 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Trafo1: {fecha=08-05-2026 10:45:45, VAB=444.0335388183594, VBC=444.12469482421875, PF=0.7475577592849731, PW=6.420825958251953, IA=11.368497848510742, VAC=442.0595397949219, IB=11.127483367919922, IC=11.09963607788086, KWh=205833.078125}
+2026-05-08 10:45:57.476 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Trafo1 | Clientes conectados: 0
+2026-05-08 10:45:57.476 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo1
+2026-05-08 10:45:57.526 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Trafo2: {fecha=08-05-2026 10:45:45, VAB=442.6993103027344, VBC=442.16168212890625, PF=0.6281076073646545, PW=38.316261291503906, IA=75.1792984008789, VAC=440.21575927734375, IB=102.10442352294922, IC=66.0407943725586, KWh=192473.734375}
+2026-05-08 10:45:57.527 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Trafo2 | Clientes conectados: 0
+2026-05-08 10:45:57.527 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Trafo2
+2026-05-08 10:45:57.554 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Inyeccion: {fecha=08-05-2026 10:45:45, VAB=441.8854675292969, VBC=442.05694580078125, PF=0.9909390211105347, PW=51.550758361816406, IA=82.38714599609375, VAC=440.16729736328125, IB=75.10221862792969, IC=67.11769104003906, KWh=257835.546875}
+2026-05-08 10:45:57.555 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Inyeccion | Clientes conectados: 0
+2026-05-08 10:45:57.555 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Inyeccion
+2026-05-08 10:45:57.587 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para BombasCisterna: {fecha=08-05-2026 10:45:45, VAB=441.844482421875, VBC=442.0968322753906, PF=0.8730303645133972, PW=30.67929458618164, IA=79.68409729003906, VAC=440.08453369140625, IB=41.296241760253906, IC=46.6966438293457, KWh=119078.953125}
+2026-05-08 10:45:57.587 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: BombasCisterna | Clientes conectados: 0
+2026-05-08 10:45:57.587 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para BombasCisterna
+2026-05-08 10:45:57.587 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - Reading PLC: PLC3 (192.168.0.3)
+2026-05-08 10:45:57.790 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller3 - Anterior: 189195.234375 | Actual: 189195.390625 | Diferencia: 0.15625 | Fecha: 08-05-2026 10:45:57
+2026-05-08 10:45:57.790 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller3 | Clientes conectados: 0
+2026-05-08 10:45:57.790 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller3
+2026-05-08 10:45:57.790 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller3
+2026-05-08 10:45:57.790 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA Chiller4 - Anterior: 868793.8125 | Actual: 868796.6875 | Diferencia: 2.875 | Fecha: 08-05-2026 10:45:57
+2026-05-08 10:45:57.790 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: Chiller4 | Clientes conectados: 0
+2026-05-08 10:45:57.790 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller4
+2026-05-08 10:45:57.790 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: Chiller4
+2026-05-08 10:45:57.792 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA ServAuxP3LabCalid - Anterior: 72892.5390625 | Actual: 72892.703125 | Diferencia: 0.1640625 | Fecha: 08-05-2026 10:45:57
+2026-05-08 10:45:57.792 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: ServAuxP3LabCalid | Clientes conectados: 0
+2026-05-08 10:45:57.792 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServAuxP3LabCalid
+2026-05-08 10:45:57.792 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: ServAuxP3LabCalid
+2026-05-08 10:45:57.792 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA KWhPlanta1 - Anterior: 2076054.0 | Actual: 2076082.0 | Diferencia: 28.0 | Fecha: 08-05-2026 10:45:57
+2026-05-08 10:45:57.792 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: KWhPlanta1 | Clientes conectados: 0
+2026-05-08 10:45:57.792 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para KWhPlanta1
+2026-05-08 10:45:57.792 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: KWhPlanta1
+2026-05-08 10:45:57.793 INFO  [core-1] c.e.d.service.KWhDifferenceService - ✅ KWh DIFERENCIA TDGeneradorSA - Anterior: 166536.576 | Actual: 166537.104 | Diferencia: 0.528 | Fecha: 08-05-2026 10:45:57
+2026-05-08 10:45:57.793 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento recibido para: TDGeneradorSA | Clientes conectados: 0
+2026-05-08 10:45:57.793 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para TDGeneradorSA
+2026-05-08 10:45:57.793 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📤 Evento publicado para: TDGeneradorSA
+2026-05-08 10:45:57.830 INFO  [core-1] c.e.d.service.LecturaRepository - DEV MODE: salteando insert de 50 lecturas (persist-readings=false)
+2026-05-08 10:45:57.897 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller3: {fecha=08-05-2026 10:45:46, VAB=443.3695983886719, VBC=441.8088684082031, PF=0.8131803870201111, PW=9.671747207641602, IA=16.755916595458984, VAC=443.7202453613281, IB=15.22785758972168, IC=14.520303726196289, KWh=189195.328125}
+2026-05-08 10:45:57.897 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller3 | Clientes conectados: 0
+2026-05-08 10:45:57.897 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller3
+2026-05-08 10:45:57.925 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para Chiller4: {fecha=08-05-2026 10:45:46, VAB=441.88262939453125, VBC=440.2306213378906, PF=0.8511279225349426, PW=168.6294403076172, IA=257.68359375, VAC=442.2352294921875, IB=263.1331481933594, IC=256.5130615234375, KWh=868795.4375}
+2026-05-08 10:45:57.925 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: Chiller4 | Clientes conectados: 0
+2026-05-08 10:45:57.926 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para Chiller4
+2026-05-08 10:45:58.008 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para ServAuxP3LabCalid: {fecha=08-05-2026 10:45:46, VAB=445.4463806152344, VBC=444.21099853515625, PF=0.5607081055641174, PW=15.314576148986816, IA=10.661323547363281, VAC=445.56121826171875, IB=13.4520902633667, IC=33.762916564941406, KWh=72892.640625}
+2026-05-08 10:45:58.008 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: ServAuxP3LabCalid | Clientes conectados: 0
+2026-05-08 10:45:58.008 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para ServAuxP3LabCalid
+2026-05-08 10:45:58.061 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para KWhPlanta1: {fecha=08-05-2026 10:45:46, VAB=12536.0, VBC=12487.0, PF=-95.47000122070312, PW=1775250.0, IA=49.599998474121094, VAC=12528.0, IB=47.5, IC=45.70000076293945, KWh=2076071.0}
+2026-05-08 10:45:58.061 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: KWhPlanta1 | Clientes conectados: 0
+2026-05-08 10:45:58.061 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para KWhPlanta1
+2026-05-08 10:45:58.128 INFO  [core-1] c.e.d.service.KWhDifferenceService - 📢 Publicando datos actualizados para TDGeneradorSA: {fecha=08-05-2026 10:45:46, VAB=445.27508544921875, VBC=444.2369689941406, PF=0.9283401370048523, PW=10852.5078125, IA=70.2363510131836, VAC=445.6264953613281, IB=70.3371810913086, IC=29.625045776367188, KWh=166536.864}
+2026-05-08 10:45:58.128 INFO  [core-1] c.e.d.controller.KWhStreamController - 🔔 Evento de datos recibido para: TDGeneradorSA | Clientes conectados: 0
+2026-05-08 10:45:58.128 WARN  [core-1] c.e.d.controller.KWhStreamController - ⚠️ No hay clientes conectados para TDGeneradorSA
+2026-05-08 10:45:58.130 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - Reading PLC: GteWay01 (0.0.0.0)
+2026-05-08 10:46:00.151 ERROR [core-1] c.e.d.s.PLCDataAcquisitionService - Failed to read PLC GteWay01 at 0.0.0.0: Connection refused: connect
+2026-05-08 10:46:00.151 INFO  [core-1] c.e.d.s.PLCDataAcquisitionService - === COMPLETED PLC READ CYCLE ===
+2026-05-08 10:46:00.151 INFO  [core-1] c.e.d.service.PASReaderService - Reading PAS600L meter...
+2026-05-08 10:46:25.178 INFO  [SpringApplicationShutdownHook] o.s.boot.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete

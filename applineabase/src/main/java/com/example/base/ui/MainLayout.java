@@ -1,0 +1,117 @@
+package com.example.base.ui;
+
+import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.Unit;
+import com.vaadin.flow.component.applayout.AppLayout;
+import com.vaadin.flow.component.avatar.Avatar;
+import com.vaadin.flow.component.avatar.AvatarVariant;
+import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.SvgIcon;
+import com.vaadin.flow.component.orderedlayout.*;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
+import com.vaadin.flow.component.sidenav.SideNav;
+import com.vaadin.flow.component.sidenav.SideNavItem;
+import com.vaadin.flow.router.Layout;
+import com.vaadin.flow.server.menu.MenuConfiguration;
+import com.vaadin.flow.server.menu.MenuEntry;
+
+@Layout
+public final class MainLayout extends AppLayout {
+
+    private Div statusIndicator;
+
+    MainLayout() {
+        setPrimarySection(Section.DRAWER);
+        addToDrawer(createApplicationHeader(), createApplicationDrawer(), createApplicationFooter());
+
+        // Agregar indicador de status en la esquina superior derecha
+        statusIndicator = createStatusIndicator();
+
+        HorizontalLayout statusLayout = new HorizontalLayout(statusIndicator);
+        statusLayout.setAlignItems(Alignment.CENTER);
+        statusLayout.setSpacing(false);
+        statusLayout.setPadding(false);
+        statusLayout.setMargin(false);
+        statusLayout.getStyle()
+            .set("margin-left", "auto")
+            .set("margin-right", "20px");
+
+        addToNavbar(statusLayout);
+    }
+
+    private Component createApplicationHeader() {
+        var appLogo = new Avatar("My Application");
+        appLogo.addClassName("app-logo");
+        appLogo.addThemeVariants(AvatarVariant.AURA_FILLED, AvatarVariant.XSMALL);
+
+        var appName = new Span("My Application");
+        appName.addClassName("app-name");
+
+        var header = new HorizontalLayout(appLogo, appName);
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setPadding(true);
+        return header;
+    }
+
+    private Component createApplicationDrawer() {
+        var scroller = new Scroller(createSideNav());
+        scroller.addThemeVariants(ScrollerVariant.OVERFLOW_INDICATORS);
+        return scroller;
+    }
+
+    private Component createApplicationFooter() {
+        var footer = new VerticalLayout(new Span("Made with ❤️ with Vaadin"));
+        footer.setAlignItems(FlexComponent.Alignment.CENTER);
+        footer.addClassName("app-footer");
+        return footer;
+    }
+
+    private SideNav createSideNav() {
+        var nav = new SideNav();
+        nav.setMinWidth(200, Unit.PIXELS);
+        MenuConfiguration.getMenuEntries().forEach(entry -> nav.addItem(createSideNavItem(entry)));
+
+        nav.addItem(new SideNavItem("Charts", "grafica", new Icon("lumo", "chart")));
+        nav.addItem(new SideNavItem("Consulta de Datos", "query", new Icon("lumo", "list")));
+        nav.addItem(new SideNavItem("Historico", "historico", new Icon("lumo", "clock")));
+        return nav;
+    }
+
+    private SideNavItem createSideNavItem(MenuEntry menuEntry) {
+        if (menuEntry.icon() != null) {
+            Component icon = null;
+            if (menuEntry.icon().contains(".svg")) {
+                icon = new SvgIcon(menuEntry.icon());
+            } else {
+                icon = new Icon(menuEntry.icon());
+            }
+            return new SideNavItem(menuEntry.title(), menuEntry.path(), icon);
+        } else {
+            return new SideNavItem(menuEntry.title(), menuEntry.path());
+        }
+    }
+
+    private Div createStatusIndicator() {
+        Div indicator = new Div();
+        indicator.setId("backend-status-indicator");
+        indicator.getStyle()
+            .set("width", "12px")
+            .set("height", "12px")
+            .set("border-radius", "50%")
+            .set("background-color", "#4CAF50")
+            .set("margin-right", "8px")
+            .set("margin-top", "8px")
+            .set("box-shadow", "0 0 8px rgba(76, 175, 80, 0.6)")
+            .set("animation", "blink-status 1s infinite");
+
+        indicator.getElement().executeJs(
+            "let style = document.createElement('style');" +
+            "style.textContent = '@keyframes blink-status { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.3; } }';" +
+            "document.head.appendChild(style);"
+        );
+
+        return indicator;
+    }
+}
