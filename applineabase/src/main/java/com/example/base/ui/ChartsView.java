@@ -8,10 +8,8 @@ import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.page.Page;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import org.springframework.web.client.RestTemplate;
@@ -90,8 +88,8 @@ public class ChartsView extends VerticalLayout {
         add(mensajeSpan);
 
         if (!maquinas.isEmpty()) {
-            maquinaCombo.setValue(maquinas.get(0));
-            maquinaSeleccionada = maquinas.get(0);
+            maquinaCombo.setValue(maquinas.getFirst());//get(0)
+            maquinaSeleccionada = maquinas.getFirst();
             mostrarInfoMaquina(maquinaSeleccionada);
             cargarDatosActuales(maquinaSeleccionada);
         }

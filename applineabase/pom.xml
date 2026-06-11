@@ -95,11 +95,7 @@
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.46.1.0</version>
         </dependency>
-        <dependency>
-            <groupId>org.webjars.npm</groupId>
-            <artifactId>amcharts5</artifactId>
-            <version>5.10.5</version>
-        </dependency>
+
     </dependencies>
     
     <build>
