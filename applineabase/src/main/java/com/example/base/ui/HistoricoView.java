@@ -23,7 +23,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -184,7 +183,7 @@ public class HistoricoView extends VerticalLayout {
                 if (datos.size() < 2) {
                     mensajeSpan.setText("Insuficientes datos para calcular diferencias");
                     graficaKWh.setSeriesNames(new String[]{"KWh"});
-                    getElement().executeJs(graficaKWh.getInitScript("chartdiv_historico"));
+                    getElement().executeJs(graficaKWh.getInitScript2("chartdiv_historico"));
                     return;
                 }
 
@@ -192,7 +191,7 @@ public class HistoricoView extends VerticalLayout {
                 double maxDif = 0;
                 SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
                 StringBuilder batchScript = new StringBuilder();
-                batchScript.append(graficaKWh.getInitScript("chartdiv_historico"));
+                batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
 
                 int puntosValidos = 0;
                 for (int i = 1; i < datos.size(); i++) {
@@ -231,7 +230,7 @@ public class HistoricoView extends VerticalLayout {
 
                 if (datos.isEmpty()) {
                     mensajeSpan.setText("No hay datos en el rango seleccionado");
-                    getElement().executeJs(graficaActiva.getInitScript("chartdiv_historico"));
+                    getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
                     return;
                 }
 
@@ -249,7 +248,7 @@ public class HistoricoView extends VerticalLayout {
                 double maxVal = 0;
                 SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
                 StringBuilder batchScript = new StringBuilder();
-                batchScript.append(graficaActiva.getInitScript("chartdiv_historico"));
+                batchScript.append(graficaActiva.getInitScript2("chartdiv_historico"));
 
                 for (Map<String, Object> row : datos) {
                     try {
@@ -307,7 +306,7 @@ public class HistoricoView extends VerticalLayout {
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
-        getElement().executeJs(graficaActiva.getInitScript("chartdiv_historico"));
+        getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
     }
 
     private void resetZoom() {

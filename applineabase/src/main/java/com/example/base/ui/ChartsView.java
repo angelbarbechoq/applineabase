@@ -127,10 +127,26 @@ public class ChartsView extends VerticalLayout {
 
                 if (datos.isEmpty()) {
                     mensajeSpan.setText("No hay datos para " + maquina + " en la fecha actual");
-                    getElement().executeJs(graficaModel.getInitScript("chartdiv_industrial"));
+                    getElement().executeJs(graficaModel.getInitScript2("chartdiv_industrial"));
                 } else {
                     mensajeSpan.setText("Se cargaron " + datos.size() + " registros | Escuchando actualizaciones en tiempo real...");
-                    mostrarGrafica(datos);
+                    if ((maquina.contains("Temperatura") || maquina.contains("Psi") || maquina.contains("BarCompHP")))
+                    {
+                        if (maquina.contains("Temperatura")) {
+                            graficaModel.setUnidad("°C");
+                        } else if (maquina.contains("PSI")) {
+                            graficaModel.setUnidad("PSI");
+                        } else if (maquina.contains("BAR")) {
+                            graficaModel.setUnidad("BAR");
+                        } else {
+                            graficaModel.setUnidad("KWh");
+                        }
+                        mostrarGraficaSinDiff(datos);
+                    }
+                    else{
+                        mostrarGrafica(datos);
+                    }
+
                     iniciarSSE(maquina);
                 }
             } else {
@@ -141,8 +157,106 @@ public class ChartsView extends VerticalLayout {
             mensajeSpan.getStyle().set("color", "red");
         }
     }
-
     private void mostrarGrafica(List<Map<String, Object>> datos) {
+        try {
+            if (datos.size() < 2) {
+                mensajeSpan.setText("Se necesitan al menos 2 registros para graficar la diferencia");
+                return;
+            }
+
+            SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+            double maxDiferencia = 0;
+
+            List<Map<String, Object>> datosConDiferencia = new java.util.ArrayList<>();
+            for (int i = 1; i < datos.size(); i++) {
+                double kwhActual = ((Number) datos.get(i).get("kwh")).doubleValue();
+                double kwhAnterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
+                double diferencia = kwhActual - kwhAnterior;
+                maxDiferencia = Math.max(maxDiferencia, diferencia);
+
+                Map<String, Object> registro = new java.util.HashMap<>();
+                registro.put("fecha", datos.get(i).get("fecha"));
+                registro.put("diferencia", diferencia);
+                datosConDiferencia.add(registro);
+            }
+
+            graficaModel.setSeriesNames(new String[]{"KWh"});
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(maxDiferencia * 1.1);
+
+            // Construimos el script base
+            StringBuilder jsBuilder = new StringBuilder();
+            jsBuilder.append(graficaModel.getInitScript2("chartdiv_industrial"));
+
+            // Iteramos en Java para construir los comandos de forma segura
+            for (Map<String, Object> row : datosConDiferencia) {
+                Date date = formatter.parse((String) row.get("fecha"));
+                long timestamp = date.getTime();
+                float dif = ((Number) row.get("diferencia")).floatValue();
+                Float[] values = {dif};
+
+                // Llamamos a tu método original que YA SABEMOS que funciona
+                // y concatenamos el resultado al script que enviamos al navegador
+                jsBuilder.append(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
+            }
+
+            // Ejecutamos todo el bloque de una vez
+            getElement().executeJs(jsBuilder.toString());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            mensajeSpan.setText("Error al graficar: " + e.getMessage());
+        }
+    }
+    private void mostrarGraficaSinDiff(List<Map<String, Object>> datos) {
+        try {
+            if (datos.isEmpty()) {
+                mensajeSpan.setText("No hay registros para graficar");
+                return;
+            }
+
+            SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+            double maxKwh = 0;
+
+            // Calculamos el valor máximo para la escala (eje Y)
+            for (Map<String, Object> registro : datos) {
+                double kwhActual = ((Number) registro.get("kwh")).doubleValue();
+                maxKwh = Math.max(maxKwh, kwhActual);
+            }
+
+            // Configuración inicial de la gráfica
+            graficaModel.setSeriesNames(new String[]{"KWh"});
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(maxKwh * 1.1);
+
+            // Construcción del script batch para una única llamada
+            StringBuilder jsBuilder = new StringBuilder();
+            jsBuilder.append(graficaModel.getInitScript2("chartdiv_industrial"));
+
+            // Iteramos sobre los datos originales recibidos
+            for (Map<String, Object> row : datos) {
+                String fecha = (String) row.get("fecha");
+                double kwh = ((Number) row.get("kwh")).doubleValue();
+
+                if (fecha != null) {
+                    Date date = formatter.parse(fecha);
+                    long timestamp = date.getTime();
+                    Float[] values = {(float) kwh};
+
+                    // Agregamos el comando al bloque de ejecución única
+                    jsBuilder.append(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
+                }
+            }
+
+            // Ejecución optimizada en una sola llamada al cliente
+            getElement().executeJs(jsBuilder.toString());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            mensajeSpan.setText("Error al graficar: " + e.getMessage());
+        }
+    }
+    private void mostrarGrafica2(List<Map<String, Object>> datos) {
         try {
             if (datos.size() < 2) {
                 mensajeSpan.setText("Se necesitan al menos 2 registros para graficar la diferencia");
@@ -173,7 +287,7 @@ public class ChartsView extends VerticalLayout {
             graficaModel.setMinY(0.0);
             graficaModel.setMaxY(maxDiferencia * 1.1);
 
-            getElement().executeJs(graficaModel.getInitScript("chartdiv_industrial"));
+            getElement().executeJs(graficaModel.getInitScript2("chartdiv_industrial"));
 
             for (Map<String, Object> row : datosConDiferencia) {
                 String fecha = (String) row.get("fecha");

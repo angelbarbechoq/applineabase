@@ -293,6 +293,41 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
       "numeroSerie": "null"
+    },
+    {
+      "id": 151,
+      "lineaMaquina": "TemperaturaAgua",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC5",
+      "numeroSerie": "null"
+    },
+    {
+      "id": 202,
+      "lineaMaquina": "PsiAireP1",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC5",
+      "numeroSerie": "null"
+    },
+    {
+      "id": 152,
+      "lineaMaquina": "TemperaturaAmbiente",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC5",
+      "numeroSerie": "null"
+    },
+    {
+      "id": 203,
+      "lineaMaquina": "PsiAgua",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC5",
+      "numeroSerie": "null"
+    },
+    {
+      "id": 204,
+      "lineaMaquina": "BarCompHP",
+      "modeloMedidor": "PM5110",
+      "nombrePLC": "PLC1",
+      "numeroSerie": "null"
     }
   ]
 }

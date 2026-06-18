@@ -14,6 +14,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import jakarta.annotation.PreDestroy;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.IntStream;
 
 /**
  * Consolidated service for reading data from all PLCs.
@@ -40,6 +43,7 @@ public class PLCDataAcquisitionService {
     private final KWhDifferenceService kwhDifferenceService;
     private final PLCDataQueryService plcDataQueryService;
     private final Map<String, BigDecimal> lastKWhValues = new HashMap<>();
+    private final Map<String, ModbusClient> activeConnections = new ConcurrentHashMap<>();
 
     public PLCDataAcquisitionService(ConfigLoaderService configLoaderService, ApplicationEventPublisher eventPublisher,
                                     DatabaseInitializationService databaseInitializationService, KWhDifferenceService kwhDifferenceService,
@@ -92,7 +96,22 @@ public class PLCDataAcquisitionService {
 
         logger.info("=== COMPLETED PLC READ CYCLE ===");
     }
-
+    private ModbusClient getConnectedClient(String ipAddress) {
+        ModbusClient client = activeConnections.get(ipAddress);
+        if (client == null || !client.isConnected()) {
+            try {
+                client = new ModbusClient();
+                client.setipAddress(ipAddress);
+                client.Connect();
+                activeConnections.put(ipAddress, client);
+                logger.info("Conexión persistente establecida con PLC en {}", ipAddress);
+            } catch (Exception e) {
+                logger.error("Error conectando a PLC {}: {}", ipAddress, e.getMessage());
+                return null;
+            }
+        }
+        return client;
+    }
     /**
      * Read data from a single PLC
      * - Filter lines for this PLC
@@ -137,6 +156,13 @@ public class PLCDataAcquisitionService {
                 registrosPLC[lineIndex] = modbusClientPLC.ReadHoldingRegisters(nDispositivos * 2 * lineIndex, lineasDelPLC.size() * 2);
                 datosConvertidosBD[lineIndex] = returnByteToBigDecimal(registrosPLC[lineIndex]);
             }
+            //String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
+            List<String> tablas = List.of( "TemperaturaAmbiente", "PsiAireP1", "TemperaturaAgua", "PsiAgua", "BarCompHP");
+            int[] parametros=null;
+            if(plc.getPlcIPx().equals("192.168.0.3"))
+            {
+                parametros = modbusClientPLC.ReadHoldingRegisters(422,tablas.size()); //readRegister(IpPLC, 422, tablas.size());
+            }
             modbusClientPLC.Disconnect();
             // Unpack converted data into named variables
             BigDecimal[] KWh = datosConvertidosBD[0];
@@ -154,10 +180,29 @@ public class PLCDataAcquisitionService {
             for (int i = 0; i < lineasDelPLC.size(); i++) {
                 nombreTabla[i] = (String) lineasDelPLC.get(i).get("lineaMaquina");
             }
-
-            databaseInitializationService.beginBatch();
-
             String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
+            databaseInitializationService.beginBatch();
+            if(plc.getPlcIPx().equals("192.168.0.3"))
+            {
+                if(parametros!=null)
+                {
+                    final int[] finalParametros = parametros;
+
+                    IntStream.range(0, tablas.size()).forEach(i -> {
+                        String nombreTablax = tablas.get(i);
+                        // Calculamos el valor ajustado antes de decidir el guardado
+                        double valor = nombreTablax.contains("Temperatura")
+                                ? finalParametros[i] / 10.0
+                                : (double) finalParametros[i];
+
+                        Object[] dataDiario = {timestamp, valor};
+                        databaseInitializationService.guardarDatoBatch(dataDiario, nombreTablax, "DAILY");
+                        databaseInitializationService.guardarDatoBatch(dataDiario, nombreTablax, "MONTHLY");
+
+                    });
+                }
+            }
+
             for (int ixy = 0; ixy < nombreTabla.length; ixy++) {
                 if (nombreTabla[ixy].equals("TDGeneradorSA")) {
                     KWh[ixy] = KWh[ixy].divide(BigDecimal.valueOf(1000.0));
