@@ -169,8 +169,90 @@ public class HistoricoView extends VerticalLayout {
                 break;
         }
     }
-
     private void consultarKWh(String maquina, LocalDate desde, LocalDate hasta) {
+        try {
+            String url = getBaseUrl() + "/api/plc/historico/kwh/" + maquina
+                    + "?desde=" + desde + "&hasta=" + hasta;
+            ResponseEntity<List> resp = restTemplate.getForEntity(url, List.class);
+
+            if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> datos = resp.getBody();
+
+                // CONDICIONANTE: elegir si es con diferencia o sin diferencia
+                boolean conDiferencia = true;
+                if ((maquina.contains("Temperatura") || maquina.contains("Psi") || maquina.contains("BarCompHP"))) {
+                    conDiferencia = false;
+
+                    // Setear unidad según máquina
+                    if (maquina.contains("Temperatura")) {
+                        graficaKWh.setUnidad("°C");
+                    } else if (maquina.contains("PSI")) {
+                        graficaKWh.setUnidad("PSI");
+                    } else if (maquina.contains("BAR")) {
+                        graficaKWh.setUnidad("BAR");
+                    }
+                } else {
+                    graficaKWh.setUnidad("KWh");
+                }
+
+                if (datos.size() < (conDiferencia ? 2 : 1)) {
+                    mensajeSpan.setText(conDiferencia ?
+                            "Insuficientes datos para calcular diferencias" :
+                            "No hay registros para graficar");
+                    graficaKWh.setSeriesNames(new String[]{"Datos"});
+                    getElement().executeJs(graficaKWh.getInitScript2("chartdiv_historico"));
+                    return;
+                }
+
+                graficaKWh.setSeriesNames(new String[]{"Datos"});
+                double maxValor = 0;
+                SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+                StringBuilder batchScript = new StringBuilder();
+                batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
+
+                int puntosValidos = 0;
+
+                if (conDiferencia) {
+                    // CON DIFERENCIA
+                    for (int i = 1; i < datos.size(); i++) {
+                        try {
+                            double actual = ((Number) datos.get(i).get("kwh")).doubleValue();
+                            double anterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
+                            double dif = actual - anterior;
+                            if (dif < 0) dif = 0;
+                            maxValor = Math.max(maxValor, dif);
+
+                            long ts = sdf.parse((String) datos.get(i).get("fecha")).getTime();
+                            Float[] values = {(float) dif};
+                            batchScript.append(graficaKWh.getAddDataScript("chartdiv_historico", ts, values, false));
+                            puntosValidos++;
+                        } catch (Exception ignored) {}
+                    }
+                } else {
+                    // SIN DIFERENCIA (valor directo)
+                    for (Map<String, Object> row : datos) {
+                        try {
+                            double valor = ((Number) row.get("kwh")).doubleValue();
+                            maxValor = Math.max(maxValor, valor);
+
+                            long ts = sdf.parse((String) row.get("fecha")).getTime();
+                            Float[] values = {(float) valor};
+                            batchScript.append(graficaKWh.getAddDataScript("chartdiv_historico", ts, values, false));
+                            puntosValidos++;
+                        } catch (Exception ignored) {}
+                    }
+                }
+                graficaKWh.setMinY(0.0);
+                graficaKWh.setMaxY(maxValor * 1.1 == 0 ? 10.0 : maxValor * 1.1);
+                getElement().executeJs(batchScript.toString());
+                mensajeSpan.setText(puntosValidos + " puntos graficados");
+            }
+        } catch (Exception e) {
+            mensajeSpan.setText("Error: " + e.getMessage());
+        }
+    }
+    private void consultarKWh2(String maquina, LocalDate desde, LocalDate hasta) {
         try {
             String url = getBaseUrl() + "/api/plc/historico/kwh/" + maquina
                     + "?desde=" + desde + "&hasta=" + hasta;

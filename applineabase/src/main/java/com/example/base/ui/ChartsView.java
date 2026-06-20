@@ -138,13 +138,14 @@ public class ChartsView extends VerticalLayout {
                             graficaModel.setUnidad("PSI");
                         } else if (maquina.contains("BAR")) {
                             graficaModel.setUnidad("BAR");
-                        } else {
-                            graficaModel.setUnidad("KWh");
                         }
-                        mostrarGraficaSinDiff(datos);
+                        mostrarGrafica(datos, false,maquina);
+
                     }
                     else{
-                        mostrarGrafica(datos);
+                        graficaModel.setUnidad("KWh");
+                        mostrarGrafica(datos, true,maquina);
+
                     }
 
                     iniciarSSE(maquina);
@@ -157,6 +158,84 @@ public class ChartsView extends VerticalLayout {
             mensajeSpan.getStyle().set("color", "red");
         }
     }
+
+    private void mostrarGrafica(List<Map<String, Object>> datos, boolean conDiferencia, String maquina) {
+        try {
+            if (datos.size() < (conDiferencia ? 2 : 1)) {
+                mensajeSpan.setText(conDiferencia ?
+                        "Se necesitan al menos 2 registros para graficar la diferencia" :
+                        "No hay registros para graficar");
+                return;
+            }
+
+            SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+            double maxValor = 0;
+            List<Map<String, Object>> datosProcessados = new java.util.ArrayList<>();
+
+            // CONDICIONANTE: calcula diferencia o toma valor directo
+            if (conDiferencia) {
+                // CON DIFERENCIA
+                for (int i = 1; i < datos.size(); i++) {
+                    double kwhActual = ((Number) datos.get(i).get("kwh")).doubleValue();
+                    double kwhAnterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
+                    double diferencia = kwhActual - kwhAnterior;
+                    maxValor = Math.max(maxValor, diferencia);
+
+                    Map<String, Object> registro = new java.util.HashMap<>();
+                    registro.put("fecha", datos.get(i).get("fecha"));
+                    registro.put("valor", diferencia);
+                    datosProcessados.add(registro);
+                }
+            } else {
+                // SIN DIFERENCIA (valor directo)
+                for (Map<String, Object> registro : datos) {
+                    double kwhActual = ((Number) registro.get("kwh")).doubleValue();
+                    maxValor = Math.max(maxValor, kwhActual);
+
+                    Map<String, Object> registroNuevo = new java.util.HashMap<>();
+                    registroNuevo.put("fecha", registro.get("fecha"));
+                    registroNuevo.put("valor", kwhActual);
+                    datosProcessados.add(registroNuevo);
+                }
+            }
+
+            // Configuración de la gráfica
+            graficaModel.setSeriesNames(new String[]{"KWh"});
+            graficaModel.setMinY(0.0);
+            //graficaModel.setMaxY(maxValor * 1.1);
+            aplicarRangosPredefinidos(maquina);
+
+            // Construcción del script batch
+            StringBuilder jsBuilder = new StringBuilder();
+            jsBuilder.append(graficaModel.getInitScript2("chartdiv_industrial"));
+
+            for (Map<String, Object> row : datosProcessados) {
+                Date date = formatter.parse((String) row.get("fecha"));
+                long timestamp = date.getTime();
+                float valor = ((Number) row.get("valor")).floatValue();
+                Float[] values = {valor};
+
+                jsBuilder.append(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
+            }
+
+            // Ejecución en una sola llamada
+            getElement().executeJs(jsBuilder.toString());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            mensajeSpan.setText("Error al graficar: " + e.getMessage());
+        }
+    }
+/*
+    // Métodos públicos (los que llamas desde UI)
+    public void mostrarGraficaDiferencia(List<Map<String, Object>> datos) {
+        mostrarGrafica(datos, true);
+    }
+
+    public void mostrarGraficaSinDiferencia(List<Map<String, Object>> datos) {
+        mostrarGrafica(datos, false);
+    }
+
     private void mostrarGrafica(List<Map<String, Object>> datos) {
         try {
             if (datos.size() < 2) {
@@ -256,62 +335,7 @@ public class ChartsView extends VerticalLayout {
             mensajeSpan.setText("Error al graficar: " + e.getMessage());
         }
     }
-    private void mostrarGrafica2(List<Map<String, Object>> datos) {
-        try {
-            if (datos.size() < 2) {
-                mensajeSpan.setText("Se necesitan al menos 2 registros para graficar la diferencia");
-                return;
-            }
-
-            SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-            double maxDiferencia = 0;
-            double minDiferencia = Double.MAX_VALUE;
-
-            List<Map<String, Object>> datosConDiferencia = new java.util.ArrayList<>();
-
-            for (int i = 1; i < datos.size(); i++) {
-                double kwhActual = ((Number) datos.get(i).get("kwh")).doubleValue();
-                double kwhAnterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
-                double diferencia = kwhActual - kwhAnterior;
-
-                maxDiferencia = Math.max(maxDiferencia, diferencia);
-                minDiferencia = Math.min(minDiferencia, diferencia);
-
-                Map<String, Object> registro = new java.util.HashMap<>();
-                registro.put("fecha", datos.get(i).get("fecha"));
-                registro.put("diferencia", diferencia);
-                datosConDiferencia.add(registro);
-            }
-
-            graficaModel.setSeriesNames(new String[]{"KWh"});
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(maxDiferencia * 1.1);
-
-            getElement().executeJs(graficaModel.getInitScript2("chartdiv_industrial"));
-
-            for (Map<String, Object> row : datosConDiferencia) {
-                String fecha = (String) row.get("fecha");
-                Object difObj = row.get("diferencia");
-
-                if (fecha != null && difObj != null) {
-                    try {
-                        Date date = formatter.parse(fecha);
-                        long timestamp = date.getTime();
-
-                        float diferencia = ((Number) difObj).floatValue();
-                        Float[] values = {diferencia};
-                        getElement().executeJs(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            mensajeSpan.setText("Error al graficar: " + e.getMessage());
-        }
-    }
+*/
 
     @Override
     protected void onAttach(AttachEvent attachEvent) {
@@ -561,6 +585,42 @@ public class ChartsView extends VerticalLayout {
 
             maquinaInfoCard.add(infoText);
             maquinaInfoCard.setVisible(true);
+        }
+    }
+    private void aplicarRangosPredefinidos(String maquina) {
+        if (maquina.contains("Linea")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(2.0);
+        } else if (maquina.contains("Temperatura")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(30.0);
+        } else if (maquina.contains("Psi")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(140.0);
+        } else if (maquina.contains("Bar")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(40.0);
+        } else if (maquina.contains("Molino")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(4.0);
+        } else if (maquina.contains("Mixer")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(3.0);
+        }else if (maquina.contains("Planta")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(40.0);
+        }else if (maquina.contains("Trafo")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(25.0);
+        }else if (maquina.contains("GA7")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(1.5);
+        }else if (maquina.contains("Chiller4")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(4.0);
+        }else {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(2.5);
         }
     }
 }
