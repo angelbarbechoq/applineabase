@@ -39,143 +39,142 @@ public class GraficaModel {
         }
         seriesNamesJs.append("];");
 
-        return "if (!window.am5Charts) { window.am5Charts = {}; }" +
-                "var id = '" + containerId + "';" +
-                "if (window.am5Charts[id] && window.am5Charts[id].root) {" +
-                "  try { window.am5Charts[id].root.dispose(); } catch(e) {}" +
-                "}" +
-                "var root = am5.Root.new(id);" +
-                "root.setThemes([am5themes_Animated.new(root)]);" +
-                "var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: false, panY: false, wheelX: 'none', wheelY: 'zoomY', pinchZoomX: true, pinchZoomY: true, maxTooltipDistance: 0, cursor: am5xy.XYCursor.new(root, { behavior: 'zoomXY' }) }));" +
-                "var scrollbarX = am5xy.XYChartScrollbar.new(root, { orientation: 'horizontal', height: 15});" +
-                "chart.set('scrollbarX', scrollbarX);" +
-                "chart.bottomAxesContainer.children.push(scrollbarX);" +
-                "var cursor = chart.set('cursor', am5xy.XYCursor.new(root, { yAxis: yAxis, xAxis: xAxis, maxTooltipDistance: 0, behavior: 'zoomXY' }));" +
-                "cursor.lineX.setAll({ visible: true });" +
-                "cursor.lineY.setAll({ visible: true });" +
-                "var xAxis = chart.xAxes.push(am5xy.DateAxis.new(root, { maxDeviation: 0.2, baseInterval: { timeUnit: 'second', count: 1 }, renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 50 }) }));" +
-                "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}), min: " + minY + ", max: " + maxY + ", strictMinMax: false }));" +
-                colors +
-                seriesNamesJs.toString() +
-                "var seriesList = [];" +
-                "for(var i=0; i < " + nGraficas + "; i++) {" +
-                "  var series = chart.series.push(am5xy.LineSeries.new(root, { name: seriesNames[i], xAxis: xAxis, yAxis: yAxis, valueYField: 'value', valueXField: 'date', strokeWidth: 2, snapToTooltip: true }));" +
-                "  series.strokes.template.setAll({ stroke: colors[i % colors.length] });" +
-                "  var tooltip = series.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
-                "  tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}\\n{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
-                "  seriesList.push(series);" +
-                "}" +
-                "var cursorTooltip = cursor.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
-                "cursorTooltip.label.setAll({ text: '{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
-                "if(seriesList.length > 0) { cursor.setAll({ snapToSeries: seriesList, snapToSeriesBy: 'x' }); }"+
-                "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [] };" +
-                "console.log('✓ am5Charts[' + id + '] inicializado con array de marcadores');" +
-                "chart.plotContainer.events.on('click', function(ev) {" +
-                "  var inst = window.am5Charts['" + containerId + "'];" +
-                "  if (!inst) return;" +
-                "  var nowTime = new Date().getTime();" +
-                "  var isDoubleClick = (nowTime - inst.lastClickTime) < 300;" +
-                "  inst.lastClickTime = nowTime;" +
-                "  console.log('Click detectado, isDouble:', isDoubleClick);" +
-                "  if (isDoubleClick) {" +
-                "    inst.tiemposMarcadores = [];" +
-                "    inst.posY = 0;" +
-                "    inst.marcadores.forEach(function(marker) { marker.dispose(); });" +
-                "    inst.marcadores = [];" +
-                "    console.log('🗑️ Chart reset - todas las líneas eliminadas');" +
-                "  } else {" +
-                "    try {" +
-                "      console.log('📍 Procesando click single...');" +
-                "      var timestamp = null;" +
-                "      " +
-                "      if (ev.point) {" +
-                "        var localPoint = chart.plotContainer.toLocal(ev.point);" +
-                "        var axisPosition = inst.xAxis.toAxisPosition(localPoint.x / chart.plotContainer.width());" +
-                "        timestamp = inst.xAxis.positionToValue(axisPosition);" +
-                "      }" +
-                "      " +
-                "      if (!timestamp) {" +
-                "        if (inst.seriesList && inst.seriesList.length > 0) {" +
-                "          for (var s = 0; s < inst.seriesList.length; s++) {" +
-                "            var sTooltip = inst.seriesList[s].get('tooltip');" +
-                "            if (sTooltip && sTooltip.get('dataItem')) {" +
-                "              timestamp = sTooltip.get('dataItem').get('valueX');" +
-                "              if (timestamp) break;" +
-                "            }" +
-                "          }" +
-                "        }" +
-                "      }" +
-                "      if (!timestamp) {" +
-                "        var snapData = inst.cursor.getPrivate(\"dataItem\");" +
-                "        if (snapData && snapData.get(\"valueX\")) {" +
-                "          timestamp = snapData.get(\"valueX\");" +
-                "        } else {" +
-                "          timestamp = inst.xAxis.positionToValue(inst.cursor.getPrivate(\"positionX\"));" +
-                "        }" +
-                "      }" +
-                "      if (timestamp) {" +
-                "        console.log('  - Timestamp calculado:', timestamp);" +
-                "        console.log('  - Fecha/Hora obtenida del cursor21:', new Date(timestamp).toLocaleString('es-ES'));" +
-                "        var fechaCompleta = new Date(timestamp).toLocaleDateString('es-ES') + ' ' + new Date(timestamp).toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit', second: '2-digit'});" +
-                "        console.log('  ✅ Dibujando línea en X sincronizada con el cursor, Fecha/Hora:', fechaCompleta);" +
-                "        " +
-                "        var rangeDataItem = inst.xAxis.makeDataItem({ value: timestamp });" +
-                "        var range = inst.xAxis.createAxisRange(rangeDataItem);" +
-                "        " +
-                "        setTimeout(function() {" +
-                "          if (range.get('grid')) {" +
-                "            range.get('grid').setAll({" +
-                "              stroke: am5.color(0xd32f2f)," +
-                "              strokeWidth: 1," +
-                "              strokeDasharray: [3, 3]," +
-                "              visible: true" +
-                "            });" +
-                "          }" +
-                "        }, 0);" +
-                "        " +
-                "        var offsetUp = inst.tiemposMarcadores.length * -21;" +
-                "        " +
-                "        inst.marcadores.push(rangeDataItem);" +
-                "        var tiempoStr = '';" +
-                "        var labelText = 'Click #' + (inst.tiemposMarcadores.length + 1) + ' - ' + fechaCompleta;" +
-                "        var textoFinalLabel = \"[bold #d32f2f]\" + fechaCompleta + \"[/]\";" +
-                "        " +
-                "        if (inst.tiemposMarcadores.length > 0) {" +
-                "          var tiempoAnterior = inst.tiemposMarcadores[inst.tiemposMarcadores.length - 1];" +
-                "          var diff = Math.floor((timestamp - tiempoAnterior) / 1000);" +
-                "          var horas = Math.floor(diff / 3600);" +
-                "          var minutos = Math.floor((diff % 3600) / 60);" +
-                "          var segundos = diff % 60;" +
-                "          tiempoStr = String(horas).padStart(2, '0') + ':' + String(minutos).padStart(2, '0') + ':' + String(segundos).padStart(2, '0');" +
-                "          labelText = 'Δ ' + tiempoStr + ' desde anterior';" +
-                "          textoFinalLabel += \"\\n[bold #4a6572]Δ \" + tiempoStr + \"[/]\";" +
-                "        }" +
-                "        " +
-                "        range.get('label').setAll({" +
-                "          text: textoFinalLabel," +
-                "          fontWeight: 'bold'," +
-                "          fontSize: '10px'," +
-                "          visible: true," +
-                "          inside: true," +
-                "          centerX: am5.p0," +
-                "          centerY: am5.p100," +
-                "          dy: offsetUp - 25," +
-                "          dx: 5" +
-                "        });" +
-                "        " +
-                "        console.log('✓ Marca #' + (inst.tiemposMarcadores.length + 1) + ':', labelText);" +
-                "        inst.tiemposMarcadores.push(timestamp);" +
-                "        $0.$server.registrarClickEnGrafica(timestamp);" +
-                "      } else {" +
-                "        console.log('⚠️ No se pudo determinar una fecha válida en esta posición.');" +
-                "      }" +
-                "    } catch(e) {" +
-                "      console.error('❌ Error en click handler:', e);" +
-                "      console.error('Stack:', e.stack);" +
-                "    }" +
-                "  }" +
-                "});" +
-                "chart.appear(1000, 100);";
+        return
+                // PASO 0: Validar/Inicializar contenedor global
+                "if (!window.am5Charts) { window.am5Charts = {}; }" +
+                        "var id = '" + containerId + "';" +
+                        "if (window.am5Charts[id] && window.am5Charts[id].root) {" +
+                        "  try { window.am5Charts[id].root.dispose(); } catch(e) {}" +
+                        "}" +
+
+                        // PASO 1: Root y temas
+                        "var root = am5.Root.new(id);" +
+                        "root.setThemes([am5themes_Animated.new(root)]);" +
+
+                        // PASO 2: Chart SIN cursor inicial
+                        "var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: false, panY: false, wheelX: 'none', wheelY: 'zoomY', pinchZoomX: true, pinchZoomY: true, maxTooltipDistance: 0 }));" +
+
+                        // PASO 3: Scrollbar
+                        "var scrollbarX = am5xy.XYChartScrollbar.new(root, { orientation: 'horizontal', height: 15});" +
+                        "chart.set('scrollbarX', scrollbarX);" +
+                        "chart.bottomAxesContainer.children.push(scrollbarX);" +
+
+                        // PASO 4: Crear EJES PRIMERO
+                        "var xAxis = chart.xAxes.push(am5xy.DateAxis.new(root, { maxDeviation: 0.2, baseInterval: { timeUnit: 'second', count: 1 }, renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 50 }) }));" +
+                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}), min: " + minY + ", max: " + maxY + ", strictMinMax: false }));" +
+
+                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}), min: " + minY + ", max: " + maxY + ", strictMinMax: false }));" +
+                        "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
+                        "console.log('✓ Eje Y creado con tooltip. Rango: " + minY + " - " + maxY + "');" +
+                        // PASO 5: Crear CURSOR con ejes (pero sin snapToSeries aún)
+                        "var cursor = chart.set('cursor', am5xy.XYCursor.new(root, { yAxis: yAxis, xAxis: xAxis, maxTooltipDistance: 0, behavior: 'zoomXY' }));" +
+                        "cursor.lineX.setAll({ visible: true });" +
+                        "cursor.lineY.setAll({ visible: true });" +
+
+                        // PASO 6: Definir colores y nombres
+                        colors +
+                        seriesNamesJs.toString() +
+
+                        // PASO 7: CREAR SERIES con tooltips individuales
+                        "var seriesList = [];" +
+                        "console.log('🔍 Iniciando loop. nGraficas: " + nGraficas + "');" +
+                        "for(var i=0; i < " + nGraficas + "; i++) {" +
+                        "  console.log('  📍 Iteración ' + i + ' de " + nGraficas + "');" +
+                        "  var series = chart.series.push(am5xy.LineSeries.new(root, { name: seriesNames[i], xAxis: xAxis, yAxis: yAxis, valueYField: 'value', valueXField: 'date', strokeWidth: 2, snapToTooltip: true }));" +
+                        "  series.strokes.template.setAll({ stroke: colors[i % colors.length] });" +
+                        "  var tooltip = series.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
+                        "  tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}\\n{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
+                        "  seriesList.push(series);" +
+                        "  console.log('    ✅ Serie ' + i + ' agregada. Total: ' + seriesList.length);" +
+                        "}" +
+                        "console.log('✅ Loop finalizado. Total de series: ' + seriesList.length);" +
+
+                        // PASO 8: ASIGNAR snapToSeries al cursor DESPUÉS de tener series
+                        "console.log('🔴 ANTES, snapToSeries:', cursor.get('snapToSeries'));" +
+                        "cursor.setAll({ snapToSeries: seriesList, snapToSeriesBy: 'x' });" +
+                        "console.log('🟢 DESPUÉS, snapToSeries.length:', cursor.get('snapToSeries').length);" +
+
+                        // PASO 9: AGREGAR tooltip separado del cursor (para mostrar fecha/hora al pasar el ratón)
+                        "var cursorTooltip = cursor.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
+                        "cursorTooltip.label.setAll({ text: '{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
+                        "console.log('✓ Cursor tooltip configurado');" +
+
+                        // PASO 10: Almacenar referencias globales
+                        "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [] };" +
+                        "console.log('✓ am5Charts inicializado');" +
+
+                        // PASO 11: Event listener para clicks
+                        "chart.plotContainer.events.on('click', function(ev) {" +
+                        "  var inst = window.am5Charts['" + containerId + "'];" +
+                        "  if (!inst) return;" +
+                        "  var nowTime = new Date().getTime();" +
+                        "  var isDoubleClick = (nowTime - inst.lastClickTime) < 300;" +
+                        "  inst.lastClickTime = nowTime;" +
+                        "  if (isDoubleClick) {" +
+                        "    inst.tiemposMarcadores = [];" +
+                        "    inst.posY = 0;" +
+                        "    inst.marcadores.forEach(function(marker) { marker.dispose(); });" +
+                        "    inst.marcadores = [];" +
+                        "  } else {" +
+                        "    try {" +
+                        "      var timestamp = null;" +
+                        "      if (ev.point) {" +
+                        "        var localPoint = chart.plotContainer.toLocal(ev.point);" +
+                        "        var axisPosition = inst.xAxis.toAxisPosition(localPoint.x / chart.plotContainer.width());" +
+                        "        timestamp = inst.xAxis.positionToValue(axisPosition);" +
+                        "      }" +
+                        "      if (!timestamp) {" +
+                        "        if (inst.seriesList && inst.seriesList.length > 0) {" +
+                        "          for (var s = 0; s < inst.seriesList.length; s++) {" +
+                        "            var sTooltip = inst.seriesList[s].get('tooltip');" +
+                        "            if (sTooltip && sTooltip.get('dataItem')) {" +
+                        "              timestamp = sTooltip.get('dataItem').get('valueX');" +
+                        "              if (timestamp) break;" +
+                        "            }" +
+                        "          }" +
+                        "        }" +
+                        "      }" +
+                        "      if (!timestamp) {" +
+                        "        var snapData = inst.cursor.getPrivate(\"dataItem\");" +
+                        "        if (snapData && snapData.get(\"valueX\")) {" +
+                        "          timestamp = snapData.get(\"valueX\");" +
+                        "        } else {" +
+                        "          timestamp = inst.xAxis.positionToValue(inst.cursor.getPrivate(\"positionX\"));" +
+                        "        }" +
+                        "      }" +
+                        "      if (timestamp) {" +
+                        "        var fechaCompleta = new Date(timestamp).toLocaleDateString('es-ES') + ' ' + new Date(timestamp).toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit', second: '2-digit'});" +
+                        "        var rangeDataItem = inst.xAxis.makeDataItem({ value: timestamp });" +
+                        "        var range = inst.xAxis.createAxisRange(rangeDataItem);" +
+                        "        setTimeout(function() {" +
+                        "          if (range.get('grid')) {" +
+                        "            range.get('grid').setAll({ stroke: am5.color(0xd32f2f), strokeWidth: 1, strokeDasharray: [3, 3], visible: true });" +
+                        "          }" +
+                        "        }, 0);" +
+                        "        var offsetUp = inst.tiemposMarcadores.length * -21;" +
+                        "        inst.marcadores.push(rangeDataItem);" +
+                        "        var textoFinalLabel = \"[bold #d32f2f]\" + fechaCompleta + \"[/]\";" +
+                        "        if (inst.tiemposMarcadores.length > 0) {" +
+                        "          var tiempoAnterior = inst.tiemposMarcadores[inst.tiemposMarcadores.length - 1];" +
+                        "          var diff = Math.floor((timestamp - tiempoAnterior) / 1000);" +
+                        "          var horas = Math.floor(diff / 3600);" +
+                        "          var minutos = Math.floor((diff % 3600) / 60);" +
+                        "          var segundos = diff % 60;" +
+                        "          var tiempoStr = String(horas).padStart(2, '0') + ':' + String(minutos).padStart(2, '0') + ':' + String(segundos).padStart(2, '0');" +
+                        "          textoFinalLabel += \"\\n[bold #4a6572]Δ \" + tiempoStr + \"[/]\";" +
+                        "        }" +
+                        "        range.get('label').setAll({ text: textoFinalLabel, fontWeight: 'bold', fontSize: '10px', visible: true, inside: true, centerX: am5.p0, centerY: am5.p100, dy: offsetUp - 25, dx: 5 });" +
+                        "        inst.tiemposMarcadores.push(timestamp);" +
+                        "        $0.$server.registrarClickEnGrafica(timestamp);" +
+                        "      }" +
+                        "    } catch(e) {" +
+                        "      console.error('Error:', e);" +
+                        "    }" +
+                        "  }" +
+                        "});" +
+
+                        // PASO 12: Animar aparición
+                        "chart.appear(1000, 100);";
     }
 
 
