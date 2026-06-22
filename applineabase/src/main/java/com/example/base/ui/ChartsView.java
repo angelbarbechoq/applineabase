@@ -217,7 +217,6 @@ public class ChartsView extends VerticalLayout {
 
                 jsBuilder.append(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
             }
-
             // Ejecución en una sola llamada
             getElement().executeJs(jsBuilder.toString());
 
@@ -614,10 +613,13 @@ public class ChartsView extends VerticalLayout {
             graficaModel.setMaxY(25.0);
         }else if (maquina.contains("GA7")) {
             graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(1.5);
+            graficaModel.setMaxY(2.2);
         }else if (maquina.contains("Chiller4")) {
             graficaModel.setMinY(0.0);
             graficaModel.setMaxY(4.0);
+        }else if (maquina.contains("Inyeccion")) {
+            graficaModel.setMinY(0.0);
+            graficaModel.setMaxY(6.0);
         }else {
             graficaModel.setMinY(0.0);
             graficaModel.setMaxY(2.5);

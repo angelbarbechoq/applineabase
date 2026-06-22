@@ -1,14 +1,17 @@
 package com.example.base.ui;
 
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.applayout.AppLayout;
+import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.avatar.AvatarVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.SvgIcon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.*;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.sidenav.SideNav;
@@ -24,8 +27,53 @@ public final class MainLayout extends AppLayout {
 
     MainLayout() {
         setPrimarySection(Section.DRAWER);
+        setDrawerOpened(true);  // ← Abierto inicialmente
+
+        // ← Agregar esta línea
+        getElement().getStyle().set("--vaadin-app-layout-drawer-overlay", "true");
+
+        // ← Agregar esto (el icono de 3 líneas)
+        DrawerToggle toggle = new DrawerToggle();
+        addToNavbar(toggle);
+
         addToDrawer(createApplicationHeader(), createApplicationDrawer(), createApplicationFooter());
 
+        // ← CSS para animaciones suaves
+        getElement().executeJs(
+                "const style = document.createElement('style'); " +
+                        "style.textContent = `" +
+                        "  [part=\"drawer\"] { " +
+                        "    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out !important; " +
+                        "  } " +
+                        "`; " +
+                        "document.head.appendChild(style);"
+        );
+
+        // ← Auto-cierre y cierre por click fuera
+        getElement().executeJs(
+                "let closeTimeout; " +
+                        "const appLayout = $0; " +
+                        "const drawer = this.shadowRoot.querySelector('[part=\"drawer\"]'); " +
+                        "const backdrop = this.shadowRoot.querySelector('[part=\"overlay\"]'); " +
+                        "" +
+                        "if (backdrop) { " +
+                        "  backdrop.addEventListener('click', () => { " +
+                        "    appLayout.setDrawerOpened(false); " +
+                        "  }); " +
+                        "} " +
+                        "" +
+                        "const observer = new MutationObserver(() => { " +
+                        "  if (appLayout.drawerOpened) { " +
+                        "    clearTimeout(closeTimeout); " +
+                        "    closeTimeout = setTimeout(() => { " +
+                        "      appLayout.setDrawerOpened(false); " +
+                        "    }, 4000); " +
+                        "  } " +
+                        "}); " +
+                        "" +
+                        "observer.observe(appLayout, { attributes: true, attributeFilter: ['drawer-opened'] });",
+                this.getElement()
+        );
         // Agregar indicador de status en la esquina superior derecha
         statusIndicator = createStatusIndicator();
 
@@ -73,9 +121,10 @@ public final class MainLayout extends AppLayout {
         nav.setMinWidth(200, Unit.PIXELS);
         MenuConfiguration.getMenuEntries().forEach(entry -> nav.addItem(createSideNavItem(entry)));
 
-        nav.addItem(new SideNavItem("Charts", "grafica", new Icon("lumo", "chart")));
-        nav.addItem(new SideNavItem("Consulta de Datos", "query", new Icon("lumo", "list")));
-        nav.addItem(new SideNavItem("Historico", "historico", new Icon("lumo", "clock")));
+        nav.addItem(new SideNavItem("Charts", "grafica", VaadinIcon.CHART.create()));
+        nav.addItem(new SideNavItem("Consulta de Datos", "query", VaadinIcon.LIST.create()));
+        nav.addItem(new SideNavItem("Historico", "historico", VaadinIcon.CLOCK.create()));
+        //nav.addSelectionListener(e -> setDrawerOpened(false));
         return nav;
     }
 

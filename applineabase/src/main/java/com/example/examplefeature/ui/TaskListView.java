@@ -22,10 +22,10 @@ import java.time.format.FormatStyle;
 import java.util.Optional;
 
 import static com.vaadin.flow.spring.data.VaadinSpringDataHelpers.toSpringPageRequest;
-
-@Route(value = "")
-@PageTitle("Task List")
-@Menu(order = 0, icon = "icons/clipboard-check.svg", title = "Task List")
+@Deprecated
+//@Route(value = "")
+//@PageTitle("Task List")
+//@Menu(order = 0, icon = "icons/clipboard-check.svg", title = "Task List")
 class TaskListView extends VerticalLayout {
 
     private final TaskService taskService;
