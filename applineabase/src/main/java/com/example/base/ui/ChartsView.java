@@ -40,6 +40,7 @@ public class ChartsView extends VerticalLayout {
     private List<Map<String, Object>> lineas;
     private Div maquinaInfoCard;
     private Div datosActualesCard;
+    private Div ultimoClickCard;
 
     public ChartsView(ConfigLoaderService configLoaderService) {
         this.graficaModel = new GraficaModel(1);
@@ -71,14 +72,38 @@ public class ChartsView extends VerticalLayout {
             .set("padding", "0px")
             .set("margin-bottom", "0px")
             .set("flex-wrap", "wrap");
+        //para ver los datos al hacer click.
+        ultimoClickCard = new Div();
+        ultimoClickCard.setVisible(true);
+        ultimoClickCard.getStyle()
+                .set("padding", "0px")
+                .set("margin-bottom", "0px")
+                .set("margin-left", "16px")
+                .set("margin-right", "auto");
 
+
+        this.addAttachListener(event -> {
+            com.vaadin.flow.component.UI.getCurrent().getChildren()
+                    .filter(c -> c instanceof com.vaadin.flow.component.applayout.AppLayout)
+                    .findFirst()
+                    .ifPresent(layout -> {
+                        ((com.vaadin.flow.component.applayout.AppLayout) layout).addToNavbar(ultimoClickCard);
+                    });
+        });
         com.vaadin.flow.component.button.Button resetZoomBtn = new com.vaadin.flow.component.button.Button("Reset Zoom", e -> resetZoom());
         resetZoomBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
 
         com.vaadin.flow.component.button.Button resetMarcadoresBtn = new com.vaadin.flow.component.button.Button("Reset Marcadores", e -> resetearMarcadores());
         resetMarcadoresBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
 
-        HorizontalLayout selectorLayout = new HorizontalLayout(maquinaCombo, maquinaInfoCard, datosActualesCard, resetZoomBtn, resetMarcadoresBtn);
+        //HorizontalLayout selectorLayout = new HorizontalLayout(maquinaCombo, maquinaInfoCard, datosActualesCard, resetZoomBtn, resetMarcadoresBtn);
+        HorizontalLayout selectorLayout = new HorizontalLayout(
+                maquinaCombo,
+                maquinaInfoCard,
+                datosActualesCard,
+                resetZoomBtn,
+                resetMarcadoresBtn
+        );
         selectorLayout.setAlignItems(Alignment.CENTER);
         selectorLayout.setSpacing(true);
         selectorLayout.getStyle().set("flex-wrap", "wrap");
@@ -101,6 +126,12 @@ public class ChartsView extends VerticalLayout {
                 mostrarInfoMaquina(maquinaSeleccionada);
                 cargarDatosActuales(maquinaSeleccionada);
                 cargarDatos(maquinaSeleccionada);
+                this.getUI().ifPresent(ui -> {
+                    ui.access(() -> {
+                        long ahora = System.currentTimeMillis();
+                        actualizarTarjetaUltimoClick(ahora);
+                    });
+                });
             }
         });
 
@@ -111,6 +142,30 @@ public class ChartsView extends VerticalLayout {
 
         add(chartContainer);
         setFlexGrow(1, chartContainer);
+        this.addDetachListener(event -> {
+            this.getUI().ifPresent(ui -> {
+                ui.getChildren()
+                        .filter(c -> c instanceof MainLayout)
+                        .findFirst()
+                        .ifPresent(layout -> {
+                            ((MainLayout) layout).getUltimoClickCard().setVisible(false);
+                        });
+            });
+        });
+        this.addAttachListener(event -> {
+            // Hacer visible la tarjeta
+            this.getUI().ifPresent(ui -> {
+                ui.getChildren()
+                        .filter(c -> c instanceof MainLayout)
+                        .findFirst()
+                        .ifPresent(layout -> {
+                            ((MainLayout) layout).getUltimoClickCard().setVisible(true);
+                        });
+            });
+
+            long ahora = System.currentTimeMillis();
+            actualizarTarjetaUltimoClick(ahora);
+        });
     }
 
     private void cargarDatos(String maquina) {
@@ -469,8 +524,69 @@ public class ChartsView extends VerticalLayout {
     @ClientCallable
     public void registrarClickEnGrafica(long timestamp) {
         graficaModel.registrarClick(timestamp);
+        // Actualizar tarjeta con el nuevo click
+        actualizarTarjetaUltimoClick(timestamp);
     }
+    private void actualizarTarjetaUltimoClick(long timestamp) {
+        ultimoClickCard.removeAll();
 
+        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+        Date fecha = new Date(timestamp);
+
+        String fechaStr = dateFormat.format(fecha);
+        String horaStr = timeFormat.format(fecha);
+
+        List<Long> marcadores = graficaModel.obtenerMarcadores();
+        String deltaStr = "";
+        if (marcadores.size() > 1) {
+            int ultimoIdx = marcadores.size() - 1;
+            int penultimoIdx = ultimoIdx - 1;
+            deltaStr = graficaModel.obtenerTiempoTranscurrido(penultimoIdx, ultimoIdx);
+        }
+
+        StringBuilder htmlBuilder = new StringBuilder();
+        htmlBuilder.append("<div style='" +
+                "background: #4a4a4a; " +
+                "border-radius: 8px; " +
+                "padding: 10px 14px; " +
+                "color: #ffffff; " +
+                "display: flex; " +
+                "gap: 12px; " +
+                "align-items: center; " +
+                "font-size: 12px; " +
+                "'>" +
+
+                "  <div style='text-align: center;'>" +
+                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Fecha</div>" +
+                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + fechaStr + "</div>" +
+                "  </div>" +
+
+                "  <div style='text-align: center;'>" +
+                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Hora</div>" +
+                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + horaStr + "</div>" +
+                "  </div>");
+
+        if (!deltaStr.isEmpty()) {
+            htmlBuilder.append("  <div style='text-align: center;'>" +
+                    "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Δ</div>" +
+                    "    <div style='font-size: 11px; font-weight: bold; color: #ffd700;'>" + deltaStr + "</div>" +
+                    "  </div>");
+        }
+
+        final String html = htmlBuilder.append("</div>").toString();
+
+// Obtener ultimoClickCard de MainLayout y actualizar
+        this.getUI().ifPresent(ui -> {
+            ui.getChildren()
+                    .filter(c -> c instanceof MainLayout)
+                    .findFirst()
+                    .ifPresent(layout -> {
+                        ((MainLayout) layout).getUltimoClickCard()
+                                .getElement().setProperty("innerHTML", html);
+                    });
+        });
+    }
     private void cargarDatosActuales(String maquina) {
         try {
             String baseUrl = getBaseUrl();

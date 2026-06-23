@@ -61,7 +61,8 @@ public class GraficaModel {
 
                         // PASO 4: Crear EJES PRIMERO
                         "var xAxis = chart.xAxes.push(am5xy.DateAxis.new(root, { maxDeviation: 0.2, baseInterval: { timeUnit: 'second', count: 1 }, renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 50 }) }));" +
-                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}), min: " + minY + ", max: " + maxY + ", strictMinMax: false }));" +
+                        "xAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
+                        "console.log('✓ Eje X creado con tooltip');" +
 
                         "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}), min: " + minY + ", max: " + maxY + ", strictMinMax: false }));" +
                         "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
@@ -83,7 +84,9 @@ public class GraficaModel {
                         "  var series = chart.series.push(am5xy.LineSeries.new(root, { name: seriesNames[i], xAxis: xAxis, yAxis: yAxis, valueYField: 'value', valueXField: 'date', strokeWidth: 2, snapToTooltip: true }));" +
                         "  series.strokes.template.setAll({ stroke: colors[i % colors.length] });" +
                         "  var tooltip = series.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
-                        "  tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}\\n{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
+                        //"  tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}\\n{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
+                        //"  tooltip.set(\"getFillFromSprite\", false); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}' });" +
+                        "  tooltip.setAll({ autoTextColor: false, getFillFromSprite: false }); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ fill: am5.color(0x999999), text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}' });" +
                         "  seriesList.push(series);" +
                         "  console.log('    ✅ Serie ' + i + ' agregada. Total: ' + seriesList.length);" +
                         "}" +
@@ -95,9 +98,9 @@ public class GraficaModel {
                         "console.log('🟢 DESPUÉS, snapToSeries.length:', cursor.get('snapToSeries').length);" +
 
                         // PASO 9: AGREGAR tooltip separado del cursor (para mostrar fecha/hora al pasar el ratón)
-                        "var cursorTooltip = cursor.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
-                        "cursorTooltip.label.setAll({ text: '{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
-                        "console.log('✓ Cursor tooltip configurado');" +
+//                        "var cursorTooltip = cursor.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
+//                        "cursorTooltip.label.setAll({ text: '{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
+//                        "console.log('✓ Cursor tooltip configurado');" +
 
                         // PASO 10: Almacenar referencias globales
                         "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [] };" +
@@ -148,7 +151,7 @@ public class GraficaModel {
                         "        var range = inst.xAxis.createAxisRange(rangeDataItem);" +
                         "        setTimeout(function() {" +
                         "          if (range.get('grid')) {" +
-                        "            range.get('grid').setAll({ stroke: am5.color(0xd32f2f), strokeWidth: 1, strokeDasharray: [3, 3], visible: true });" +
+                        "            range.get('grid').setAll({ stroke: am5.color(0xd32f2f), strokeWidth: 1, strokeDasharray: [3, 3], strokeOpacity: 0.6, visible: true });" +
                         "          }" +
                         "        }, 0);" +
                         "        var offsetUp = inst.tiemposMarcadores.length * -21;" +

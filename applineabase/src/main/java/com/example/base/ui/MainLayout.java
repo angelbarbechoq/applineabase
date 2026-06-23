@@ -24,10 +24,10 @@ import com.vaadin.flow.server.menu.MenuEntry;
 public final class MainLayout extends AppLayout {
 
     private Div statusIndicator;
-
+    private Div ultimoClickCard;
     MainLayout() {
         setPrimarySection(Section.DRAWER);
-        setDrawerOpened(true);  // ← Abierto inicialmente
+        setDrawerOpened(false);  // ← Abierto inicialmente
 
         // ← Agregar esta línea
         getElement().getStyle().set("--vaadin-app-layout-drawer-overlay", "true");
@@ -75,6 +75,12 @@ public final class MainLayout extends AppLayout {
                 this.getElement()
         );
         // Agregar indicador de status en la esquina superior derecha
+        ultimoClickCard = new Div();
+        ultimoClickCard.setVisible(true);
+        ultimoClickCard.getStyle()
+                .set("padding", "0px")
+                .set("margin-bottom", "0px")
+                .set("margin-left", "16px");
         statusIndicator = createStatusIndicator();
 
         HorizontalLayout statusLayout = new HorizontalLayout(statusIndicator);
@@ -85,7 +91,7 @@ public final class MainLayout extends AppLayout {
         statusLayout.getStyle()
             .set("margin-left", "auto")
             .set("margin-right", "20px");
-
+        addToNavbar(ultimoClickCard);
         addToNavbar(statusLayout);
     }
 
@@ -162,5 +168,8 @@ public final class MainLayout extends AppLayout {
         );
 
         return indicator;
+    }
+    public Div getUltimoClickCard() {
+        return ultimoClickCard;
     }
 }
