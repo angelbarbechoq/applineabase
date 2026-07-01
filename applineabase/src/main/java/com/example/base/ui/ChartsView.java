@@ -82,14 +82,14 @@ public class ChartsView extends VerticalLayout {
                 .set("margin-right", "auto");
 
 
-        this.addAttachListener(event -> {
-            com.vaadin.flow.component.UI.getCurrent().getChildren()
-                    .filter(c -> c instanceof com.vaadin.flow.component.applayout.AppLayout)
-                    .findFirst()
-                    .ifPresent(layout -> {
-                        ((com.vaadin.flow.component.applayout.AppLayout) layout).addToNavbar(ultimoClickCard);
-                    });
-        });
+//        this.addAttachListener(event -> {
+//            com.vaadin.flow.component.UI.getCurrent().getChildren()
+//                    .filter(c -> c instanceof com.vaadin.flow.component.applayout.AppLayout)
+//                    .findFirst()
+//                    .ifPresent(layout -> {
+//                        ((com.vaadin.flow.component.applayout.AppLayout) layout).addToNavbar(ultimoClickCard);
+//                    });
+//        });
         com.vaadin.flow.component.button.Button resetZoomBtn = new com.vaadin.flow.component.button.Button("Reset Zoom", e -> resetZoom());
         resetZoomBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
 
@@ -184,14 +184,14 @@ public class ChartsView extends VerticalLayout {
                     mensajeSpan.setText("No hay datos para " + maquina + " en la fecha actual");
                     getElement().executeJs(graficaModel.getInitScript2("chartdiv_industrial"));
                 } else {
-                    mensajeSpan.setText("Se cargaron " + datos.size() + " registros | Escuchando actualizaciones en tiempo real...");
+                    //mensajeSpan.setText("Se cargaron " + datos.size() + " registros | Escuchando actualizaciones en tiempo real...");
                     if ((maquina.contains("Temperatura") || maquina.contains("Psi") || maquina.contains("BarCompHP")))
                     {
                         if (maquina.contains("Temperatura")) {
                             graficaModel.setUnidad("°C");
-                        } else if (maquina.contains("PSI")) {
+                        } else if (maquina.contains("Psi")) {
                             graficaModel.setUnidad("PSI");
-                        } else if (maquina.contains("BAR")) {
+                        } else if (maquina.contains("Bar")) {
                             graficaModel.setUnidad("BAR");
                         }
                         mostrarGrafica(datos, false,maquina);
@@ -258,7 +258,7 @@ public class ChartsView extends VerticalLayout {
             graficaModel.setSeriesNames(new String[]{"KWh"});
             graficaModel.setMinY(0.0);
             //graficaModel.setMaxY(maxValor * 1.1);
-            aplicarRangosPredefinidos(maquina);
+            graficaModel.aplicarRangosPredefinidos(maquina);
 
             // Construcción del script batch
             StringBuilder jsBuilder = new StringBuilder();
@@ -280,116 +280,6 @@ public class ChartsView extends VerticalLayout {
             mensajeSpan.setText("Error al graficar: " + e.getMessage());
         }
     }
-/*
-    // Métodos públicos (los que llamas desde UI)
-    public void mostrarGraficaDiferencia(List<Map<String, Object>> datos) {
-        mostrarGrafica(datos, true);
-    }
-
-    public void mostrarGraficaSinDiferencia(List<Map<String, Object>> datos) {
-        mostrarGrafica(datos, false);
-    }
-
-    private void mostrarGrafica(List<Map<String, Object>> datos) {
-        try {
-            if (datos.size() < 2) {
-                mensajeSpan.setText("Se necesitan al menos 2 registros para graficar la diferencia");
-                return;
-            }
-
-            SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-            double maxDiferencia = 0;
-
-            List<Map<String, Object>> datosConDiferencia = new java.util.ArrayList<>();
-            for (int i = 1; i < datos.size(); i++) {
-                double kwhActual = ((Number) datos.get(i).get("kwh")).doubleValue();
-                double kwhAnterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
-                double diferencia = kwhActual - kwhAnterior;
-                maxDiferencia = Math.max(maxDiferencia, diferencia);
-
-                Map<String, Object> registro = new java.util.HashMap<>();
-                registro.put("fecha", datos.get(i).get("fecha"));
-                registro.put("diferencia", diferencia);
-                datosConDiferencia.add(registro);
-            }
-
-            graficaModel.setSeriesNames(new String[]{"KWh"});
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(maxDiferencia * 1.1);
-
-            // Construimos el script base
-            StringBuilder jsBuilder = new StringBuilder();
-            jsBuilder.append(graficaModel.getInitScript2("chartdiv_industrial"));
-
-            // Iteramos en Java para construir los comandos de forma segura
-            for (Map<String, Object> row : datosConDiferencia) {
-                Date date = formatter.parse((String) row.get("fecha"));
-                long timestamp = date.getTime();
-                float dif = ((Number) row.get("diferencia")).floatValue();
-                Float[] values = {dif};
-
-                // Llamamos a tu método original que YA SABEMOS que funciona
-                // y concatenamos el resultado al script que enviamos al navegador
-                jsBuilder.append(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
-            }
-
-            // Ejecutamos todo el bloque de una vez
-            getElement().executeJs(jsBuilder.toString());
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            mensajeSpan.setText("Error al graficar: " + e.getMessage());
-        }
-    }
-    private void mostrarGraficaSinDiff(List<Map<String, Object>> datos) {
-        try {
-            if (datos.isEmpty()) {
-                mensajeSpan.setText("No hay registros para graficar");
-                return;
-            }
-
-            SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-            double maxKwh = 0;
-
-            // Calculamos el valor máximo para la escala (eje Y)
-            for (Map<String, Object> registro : datos) {
-                double kwhActual = ((Number) registro.get("kwh")).doubleValue();
-                maxKwh = Math.max(maxKwh, kwhActual);
-            }
-
-            // Configuración inicial de la gráfica
-            graficaModel.setSeriesNames(new String[]{"KWh"});
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(maxKwh * 1.1);
-
-            // Construcción del script batch para una única llamada
-            StringBuilder jsBuilder = new StringBuilder();
-            jsBuilder.append(graficaModel.getInitScript2("chartdiv_industrial"));
-
-            // Iteramos sobre los datos originales recibidos
-            for (Map<String, Object> row : datos) {
-                String fecha = (String) row.get("fecha");
-                double kwh = ((Number) row.get("kwh")).doubleValue();
-
-                if (fecha != null) {
-                    Date date = formatter.parse(fecha);
-                    long timestamp = date.getTime();
-                    Float[] values = {(float) kwh};
-
-                    // Agregamos el comando al bloque de ejecución única
-                    jsBuilder.append(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
-                }
-            }
-
-            // Ejecución optimizada en una sola llamada al cliente
-            getElement().executeJs(jsBuilder.toString());
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            mensajeSpan.setText("Error al graficar: " + e.getMessage());
-        }
-    }
-*/
 
     @Override
     protected void onAttach(AttachEvent attachEvent) {
@@ -508,6 +398,68 @@ public class ChartsView extends VerticalLayout {
 
     private void resetearMarcadores() {
         graficaModel.resetearMarcadores();
+
+        // Limpiar tarjetas
+        if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
+            MainLayout layout = (MainLayout) this.getParent().get();
+
+            String htmlVacio = "<div style='" +
+                    "background: #4a4a4a; " +
+                    "border-radius: 8px; " +
+                    "padding: 10px 14px; " +
+                    "color: #ffffff; " +
+                    "display: flex; " +
+                    "gap: 12px; " +
+                    "align-items: center; " +
+                    "font-size: 12px; " +
+                    "'>" +
+                    "  <div style='text-align: center; color: #999;'>---</div>" +
+                    "</div>";
+
+            layout.getUltimoClickCard().getElement().setProperty("innerHTML", htmlVacio);
+            layout.getClickAnteriorCard().getElement().setProperty("innerHTML", htmlVacio);
+        }
+    }
+    @ClientCallable
+    public void limpiarTarjetas() {
+        if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
+            MainLayout layout = (MainLayout) this.getParent().get();
+
+            String htmlVacio = "<div style='" +
+                    "background: #4a4a4a; " +
+                    "border-radius: 8px; " +
+                    "padding: 10px 14px; " +
+                    "color: #ffffff; " +
+                    "display: flex; " +
+                    "gap: 12px; " +
+                    "align-items: center; " +
+                    "font-size: 12px; " +
+                    "'>" +
+
+                    "  <div style='text-align: center;'>" +
+                    "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Fecha</div>" +
+                    "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>00-00-00</div>" +
+                    "  </div>" +
+
+                    "  <div style='text-align: center;'>" +
+                    "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Hora</div>" +
+                    "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>00:00:00</div>" +
+                    "  </div>" +
+
+                    "  <div style='text-align: center;'>" +
+                    "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>KWh</div>" +
+                    "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>0.0</div>" +
+                    "  </div>" +
+
+                    "</div>";
+
+            layout.getUltimoClickCard().getElement().setProperty("innerHTML", htmlVacio);
+            layout.getClickAnteriorCard().getElement().setProperty("innerHTML", htmlVacio);
+        }
+    }
+
+    private void resetearMarcadores1() {
+        graficaModel.resetearMarcadores();
         getElement().executeJs("if(window.am5Charts && window.am5Charts['chartdiv_industrial']) {" +
                 "  var inst = window.am5Charts['chartdiv_industrial'];" +
                 "  inst.tiemposMarcadores = [];" +
@@ -527,15 +479,31 @@ public class ChartsView extends VerticalLayout {
         // Actualizar tarjeta con el nuevo click
         actualizarTarjetaUltimoClick(timestamp);
     }
-    private void actualizarTarjetaUltimoClick(long timestamp) {
-        ultimoClickCard.removeAll();
 
+    private void actualizarTarjetaUltimoClick(long timestamp) {
         SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
         SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
         Date fecha = new Date(timestamp);
 
         String fechaStr = dateFormat.format(fecha);
         String horaStr = timeFormat.format(fecha);
+
+        // Llamada REST para obtener KWh
+        String valorStr = "";
+        try {
+            String baseUrl = getBaseUrl();
+            String url = baseUrl + "/api/plc/latest/kwh/" + maquinaSeleccionada + "/" + fechaStr + " " + horaStr;
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> data = response.getBody();
+                if (data.containsKey("kwh")) {
+                    valorStr = String.format("%.2f", data.get("kwh"));
+                }
+            }
+        } catch (Exception e) {
+            valorStr = "Error";
+        }
 
         List<Long> marcadores = graficaModel.obtenerMarcadores();
         String deltaStr = "";
@@ -565,28 +533,36 @@ public class ChartsView extends VerticalLayout {
                 "  <div style='text-align: center;'>" +
                 "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Hora</div>" +
                 "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + horaStr + "</div>" +
-                "  </div>");
+                "  </div>" +
 
+                "  <div style='text-align: center;'>" +
+                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>KWh</div>" +
+                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + valorStr + "</div>" +
+                "  </div>");
+/*
         if (!deltaStr.isEmpty()) {
             htmlBuilder.append("  <div style='text-align: center;'>" +
                     "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Δ</div>" +
                     "    <div style='font-size: 11px; font-weight: bold; color: #ffd700;'>" + deltaStr + "</div>" +
                     "  </div>");
         }
-
+*/
         final String html = htmlBuilder.append("</div>").toString();
 
-// Obtener ultimoClickCard de MainLayout y actualizar
-        this.getUI().ifPresent(ui -> {
-            ui.getChildren()
-                    .filter(c -> c instanceof MainLayout)
-                    .findFirst()
-                    .ifPresent(layout -> {
-                        ((MainLayout) layout).getUltimoClickCard()
-                                .getElement().setProperty("innerHTML", html);
-                    });
-        });
+        if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
+            MainLayout layout = (MainLayout) this.getParent().get();
+
+            // Guardar HTML anterior
+            String htmlAnterior = layout.getUltimoClickCard().getElement().getProperty("innerHTML");
+
+            // Pasar a tarjeta anterior
+            layout.getClickAnteriorCard().getElement().setProperty("innerHTML", htmlAnterior);
+
+            // Actualizar tarjeta actual
+            layout.getUltimoClickCard().getElement().setProperty("innerHTML", html);
+        }
     }
+
     private void cargarDatosActuales(String maquina) {
         try {
             String baseUrl = getBaseUrl();
@@ -700,45 +676,6 @@ public class ChartsView extends VerticalLayout {
 
             maquinaInfoCard.add(infoText);
             maquinaInfoCard.setVisible(true);
-        }
-    }
-    private void aplicarRangosPredefinidos(String maquina) {
-        if (maquina.contains("Linea")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(2.0);
-        } else if (maquina.contains("Temperatura")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(30.0);
-        } else if (maquina.contains("Psi")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(140.0);
-        } else if (maquina.contains("Bar")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(40.0);
-        } else if (maquina.contains("Molino")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(4.0);
-        } else if (maquina.contains("Mixer")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(3.0);
-        }else if (maquina.contains("Planta")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(40.0);
-        }else if (maquina.contains("Trafo")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(25.0);
-        }else if (maquina.contains("GA7")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(2.2);
-        }else if (maquina.contains("Chiller4")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(4.0);
-        }else if (maquina.contains("Inyeccion")) {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(6.0);
-        }else {
-            graficaModel.setMinY(0.0);
-            graficaModel.setMaxY(2.5);
         }
     }
 }

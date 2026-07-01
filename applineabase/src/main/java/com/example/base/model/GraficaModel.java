@@ -33,6 +33,7 @@ public class GraficaModel {
     public String getInitScript2(String containerId) {
         String colors = "var colors = [am5.color(0xc83830), am5.color(0x4472c4), am5.color(0x70ad47)];";
         StringBuilder seriesNamesJs = new StringBuilder("var seriesNames = [");
+        String unidadJs = "var unidad = '" + unidad + "';";
         for (int i = 0; i < seriesNames.length; i++) {
             seriesNamesJs.append("'").append(seriesNames[i]).append("'");
             if (i < seriesNames.length - 1) seriesNamesJs.append(", ");
@@ -75,7 +76,7 @@ public class GraficaModel {
                         // PASO 6: Definir colores y nombres
                         colors +
                         seriesNamesJs.toString() +
-
+                        unidadJs +
                         // PASO 7: CREAR SERIES con tooltips individuales
                         "var seriesList = [];" +
                         "console.log('🔍 Iniciando loop. nGraficas: " + nGraficas + "');" +
@@ -86,7 +87,8 @@ public class GraficaModel {
                         "  var tooltip = series.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
                         //"  tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}\\n{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
                         //"  tooltip.set(\"getFillFromSprite\", false); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}' });" +
-                        "  tooltip.setAll({ autoTextColor: false, getFillFromSprite: false }); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ fill: am5.color(0x999999), text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}' });" +
+                        //"  tooltip.setAll({ autoTextColor: false, getFillFromSprite: false }); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ fill: am5.color(0x999999), text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}' });" +
+                        "  tooltip.setAll({ autoTextColor: false, getFillFromSprite: false }); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ fill: am5.color(0x999999), text: '{valueY.formatNumber(\\u0022#.##\\u0022)} ' + unidad });" +
                         "  seriesList.push(series);" +
                         "  console.log('    ✅ Serie ' + i + ' agregada. Total: ' + seriesList.length);" +
                         "}" +
@@ -118,6 +120,7 @@ public class GraficaModel {
                         "    inst.posY = 0;" +
                         "    inst.marcadores.forEach(function(marker) { marker.dispose(); });" +
                         "    inst.marcadores = [];" +
+                        "    $0.$server.limpiarTarjetas();"+
                         "  } else {" +
                         "    try {" +
                         "      var timestamp = null;" +
@@ -242,7 +245,45 @@ public class GraficaModel {
         long segundos = (diferencia % (1000 * 60)) / 1000;
         return String.format("%02d:%02d:%02d", horas, minutos, segundos);
     }
-
+    public void aplicarRangosPredefinidos(String maquina) {
+        if (maquina.contains("Linea")) {
+            setMinY(0.0);
+            this.setMaxY(2.0);
+        } else if (maquina.contains("Temperatura")) {
+            this.setMinY(0.0);
+            this.setMaxY(30.0);
+        } else if (maquina.contains("Psi")) {
+            this.setMinY(0.0);
+            this.setMaxY(140.0);
+        } else if (maquina.contains("Bar")) {
+            this.setMinY(0.0);
+            this.setMaxY(40.0);
+        } else if (maquina.contains("Molino")) {
+            this.setMinY(0.0);
+            this.setMaxY(4.0);
+        } else if (maquina.contains("Mixer")) {
+            this.setMinY(0.0);
+            this.setMaxY(3.0);
+        }else if (maquina.contains("Planta")) {
+            this.setMinY(0.0);
+            this.setMaxY(40.0);
+        }else if (maquina.contains("Trafo")) {
+            this.setMinY(0.0);
+            this.setMaxY(25.0);
+        }else if (maquina.contains("GA7")) {
+            this.setMinY(0.0);
+            this.setMaxY(2.2);
+        }else if (maquina.contains("Chiller4")) {
+            this.setMinY(0.0);
+            this.setMaxY(4.0);
+        }else if (maquina.contains("Inyeccion")) {
+            this.setMinY(0.0);
+            this.setMaxY(6.0);
+        }else {
+            this.setMinY(0.0);
+            this.setMaxY(2.5);
+        }
+    }
 
     public Double getMinY() { return minY; }
     public Double getMaxY() { return maxY; }

@@ -259,4 +259,37 @@ public class PLCDataQueryService {
         }
         return result;
     }
+    public Map<String, Object> getKWhByFechaExacta(String maquina, String fechaStr) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // Buscar sin segundos: "dd-MM-yyyy HH:mm"
+            String fechaBusqueda = fechaStr.substring(0, 16);
+
+            logger.info("Buscando KWh para {} con fecha: {}", maquina, fechaBusqueda);
+
+            String dbPath = databaseInitializationService.getDailyPath();
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+                 PreparedStatement pstmt = conn.prepareStatement(
+                         "SELECT kwh FROM " + maquina + " WHERE fecha LIKE ? LIMIT 1");
+            ) {
+                pstmt.setString(1, fechaBusqueda + "%");
+                ResultSet rs = pstmt.executeQuery();
+
+                if (rs.next()) {
+                    double kwh = rs.getDouble("kwh");
+                    logger.info("✅ ENCONTRADO KWh: {}", kwh);
+                    result.put("kwh", kwh);
+                } else {
+                    logger.warn("❌ NO ENCONTRADO para fecha: {}", fechaBusqueda);
+                    result.put("kwh", 0.0);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("❌ ERROR: {}", e.getMessage());
+            result.put("kwh", 0.0);
+        }
+
+        return result;
+    }
 }

@@ -244,7 +244,8 @@ public class HistoricoView extends VerticalLayout {
                     }
                 }
                 graficaKWh.setMinY(0.0);
-                graficaKWh.setMaxY(maxValor * 1.1 == 0 ? 10.0 : maxValor * 1.1);
+                //graficaKWh.setMaxY(maxValor * 1.1 == 0 ? 10.0 : maxValor * 1.1);
+                //ChartsView.aplicarRangosPredefinidos(maquina);
                 getElement().executeJs(batchScript.toString());
                 mensajeSpan.setText(puntosValidos + " puntos graficados");
             }

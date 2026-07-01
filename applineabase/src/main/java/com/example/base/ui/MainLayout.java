@@ -25,6 +25,7 @@ public final class MainLayout extends AppLayout {
 
     private Div statusIndicator;
     private Div ultimoClickCard;
+    private Div clickAnteriorCard;
     MainLayout() {
         setPrimarySection(Section.DRAWER);
         setDrawerOpened(false);  // ← Abierto inicialmente
@@ -75,12 +76,19 @@ public final class MainLayout extends AppLayout {
                 this.getElement()
         );
         // Agregar indicador de status en la esquina superior derecha
+        clickAnteriorCard = new Div();
+        clickAnteriorCard.setVisible(true);
+        clickAnteriorCard.getStyle()
+                .set("padding", "0px")
+                .set("margin-bottom", "0px")
+                .set("margin-left", "8px");
         ultimoClickCard = new Div();
         ultimoClickCard.setVisible(true);
         ultimoClickCard.getStyle()
                 .set("padding", "0px")
                 .set("margin-bottom", "0px")
                 .set("margin-left", "16px");
+
         statusIndicator = createStatusIndicator();
 
         HorizontalLayout statusLayout = new HorizontalLayout(statusIndicator);
@@ -91,6 +99,7 @@ public final class MainLayout extends AppLayout {
         statusLayout.getStyle()
             .set("margin-left", "auto")
             .set("margin-right", "20px");
+        addToNavbar(clickAnteriorCard);
         addToNavbar(ultimoClickCard);
         addToNavbar(statusLayout);
     }
@@ -171,5 +180,8 @@ public final class MainLayout extends AppLayout {
     }
     public Div getUltimoClickCard() {
         return ultimoClickCard;
+    }
+    public Div getClickAnteriorCard() {
+        return clickAnteriorCard;
     }
 }

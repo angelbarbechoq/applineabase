@@ -23,7 +23,13 @@ public class PLCDataController {
     public PLCDataController(PLCDataQueryService plcDataQueryService) {
         this.plcDataQueryService = plcDataQueryService;
     }
-
+    @GetMapping("/latest/kwh/{maquina}/{fecha}")
+    public Map<String, Object> getKWhByFecha(
+            @PathVariable String maquina,
+            @PathVariable String fecha) {
+        logger.info("Request for KWh data: {} on {}", maquina, fecha);
+        return plcDataQueryService.getKWhByFechaExacta(maquina, fecha);
+    }
     @GetMapping("/latest/vip/{maquina}")
     public Map<String, Object> getLatestVIPData(@PathVariable String maquina) {
         logger.info("Request for latest VIP data: {}", maquina);
