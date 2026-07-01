@@ -25,10 +25,13 @@ jobs:
       - name: Compilar a nativo con GraalVM
         run: mvn -Pnative -DskipTests native:compile
 
-      - name: Crear Release con EXE
+      - name: Listar archivos generados
+        run: dir /s target\native\
+
+      - name: Crear Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: target/applineabase
+          files: target/native/nativeCompile/applineabase.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
