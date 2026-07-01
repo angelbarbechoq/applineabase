@@ -3,7 +3,7 @@ name: Compilar EXE Portable con GraalVM
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   build:
