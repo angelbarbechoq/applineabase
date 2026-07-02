@@ -106,6 +106,57 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.1</version>
+                <executions>
+                    <execution>
+                        <id>create-app-image</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${java.home}/bin/jpackage</executable>
+                            <arguments>
+                                <argument>--name</argument>
+                                <argument>applineabase</argument>
+                                <argument>--input</argument>
+                                <argument>${project.build.directory}</argument>
+                                <argument>--main-jar</argument>
+                                <argument>applineabase-1.0-SNAPSHOT.jar</argument>
+                                <argument>--dest</argument>
+                                <argument>${project.build.directory}/dist</argument>
+                                <argument>--type</argument>
+                                <argument>app-image</argument>
+                                <argument>--win-console</argument>
+                                <argument>--java-options</argument>
+                                <argument>-Dloader.main=com.example.Application</argument>
+                                <argument>--java-options</argument>
+                                <argument>-cp</argument>
+                                <argument>--java-options</argument>
+                                <argument>$APPDIR/applineabase-1.0-SNAPSHOT.jar</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <includeSystemScope>true</includeSystemScope>
+                    <mainClass>com.example.Application</mainClass>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <includeSystemScope>true</includeSystemScope>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>com.vaadin</groupId>
                 <artifactId>vaadin-maven-plugin</artifactId>
                 <version>${vaadin.version}</version>
