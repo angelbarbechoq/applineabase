@@ -1,0 +1,36 @@
+name: Compilar EXE Portable con GraalVM
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Setup GraalVM JDK 21
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm-community'
+
+      - name: Compilar con Maven (JAR)
+        run: mvn clean package -DskipTests
+
+      - name: Compilar a nativo con GraalVM
+        run: mvn -Pnative -DskipTests native:compile
+
+      - name: Listar archivos generados
+        run: dir /s target\native\
+
+      - name: Crear Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/native/nativeCompile/applineabase.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
