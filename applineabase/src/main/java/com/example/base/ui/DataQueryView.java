@@ -1,6 +1,7 @@
 package com.example.base.ui;
 
 import com.example.dataacquisition.service.ConfigLoaderService;
+import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
@@ -11,6 +12,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import jakarta.annotation.security.PermitAll;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.ResponseEntity;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 
 @PageTitle("Consulta de Datos | LineaBase")
 @Route(value = "query", layout = MainLayout.class)
+@PermitAll
 public class DataQueryView extends VerticalLayout {
 
     private final ConfigLoaderService configLoaderService;
@@ -34,7 +37,7 @@ public class DataQueryView extends VerticalLayout {
     private List<Map<String, Object>> lineas;
     private Div maquinaInfoCard;
 
-    public DataQueryView(ConfigLoaderService configLoaderService) {
+    public DataQueryView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService) {
         this.configLoaderService = configLoaderService;
 
         setSizeFull();
@@ -44,7 +47,7 @@ public class DataQueryView extends VerticalLayout {
         H3 title = new H3("Consulta de Datos PLC - Fecha Actual");
         add(title);
 
-        lineas = configLoaderService.loadLineaIDConfig();
+        lineas = lineaAccessService.getLineasPermitidas();
         List<String> maquinas = lineas.stream()
                 .map(m -> (String) m.get("lineaMaquina"))
                 .distinct()

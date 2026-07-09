@@ -2,6 +2,7 @@ package com.example.base.ui;
 
 import com.example.base.model.GraficaModel;
 import com.example.dataacquisition.service.ConfigLoaderService;
+import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -15,6 +16,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import jakarta.annotation.security.PermitAll;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.ResponseEntity;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,10 +27,10 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @PageTitle("Historico de Graficas | LineaBase")
 @Route(value = "historico", layout = MainLayout.class)
+@PermitAll
 public class HistoricoView extends VerticalLayout {
 
     private final GraficaModel graficaKWh = new GraficaModel(1);
@@ -40,6 +42,7 @@ public class HistoricoView extends VerticalLayout {
     private GraficaModel graficaActiva;
 
     private final ConfigLoaderService configLoaderService;
+    private final LineaAccessService lineaAccessService;
     private final RestTemplate restTemplate = new RestTemplate();
 
     private ComboBox<String> maquinaCombo;
@@ -50,8 +53,9 @@ public class HistoricoView extends VerticalLayout {
     private Span mensajeSpan;
     private Div chartContainer;
 
-    public HistoricoView(ConfigLoaderService configLoaderService) {
+    public HistoricoView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService) {
         this.configLoaderService = configLoaderService;
+        this.lineaAccessService = lineaAccessService;
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -84,11 +88,7 @@ public class HistoricoView extends VerticalLayout {
     }
 
     private HorizontalLayout buildFiltrosLayout() {
-        List<String> maquinas = configLoaderService.loadLineaIDConfig().stream()
-                .map(m -> (String) m.get("lineaMaquina"))
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
+        List<String> maquinas = lineaAccessService.getMaquinasPermitidas();
 
         maquinaCombo = new ComboBox<>("Maquina");
         maquinaCombo.setItems(maquinas);

@@ -2,6 +2,7 @@ package com.example.base.ui;
 
 import com.example.base.model.GraficaModel;
 import com.example.dataacquisition.service.ConfigLoaderService;
+import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -12,6 +13,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import jakarta.annotation.security.PermitAll;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.ResponseEntity;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,10 +28,12 @@ import java.util.stream.Collectors;
 
 @PageTitle("Gráficas KWh - LineaBase")
 @Route(value = "grafica", layout = MainLayout.class)
+@PermitAll
 public class ChartsView extends VerticalLayout {
     //modificado para comit
     private final GraficaModel graficaModel;
     private final ConfigLoaderService configLoaderService;
+    private final LineaAccessService lineaAccessService;
     private final RestTemplate restTemplate = new RestTemplate();
 
     private ComboBox<String> maquinaCombo;
@@ -42,9 +46,10 @@ public class ChartsView extends VerticalLayout {
     private Div datosActualesCard;
     private Div ultimoClickCard;
 
-    public ChartsView(ConfigLoaderService configLoaderService) {
+    public ChartsView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService) {
         this.graficaModel = new GraficaModel(1);
         this.configLoaderService = configLoaderService;
+        this.lineaAccessService = lineaAccessService;
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -52,7 +57,7 @@ public class ChartsView extends VerticalLayout {
         H3 title = new H3("Gráfica de KWh - Fecha Actual");
         add(title);
 
-        lineas = configLoaderService.loadLineaIDConfig();
+        lineas = lineaAccessService.getLineasPermitidas();
         List<String> maquinas = lineas.stream()
                 .map(m -> (String) m.get("lineaMaquina"))
                 .distinct()

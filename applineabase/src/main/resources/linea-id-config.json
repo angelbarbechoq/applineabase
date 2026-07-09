@@ -5,329 +5,376 @@
       "lineaMaquina": "Linea02",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060660837"
+      "numeroSerie": "540060660837",
+      "zona": "Extrusión"
     },
     {
       "id": 103,
       "lineaMaquina": "Linea03",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060710699"
+      "numeroSerie": "540060710699",
+      "zona": "Extrusión"
     },
     {
       "id": 104,
       "lineaMaquina": "Linea04",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060710706"
+      "numeroSerie": "540060710706",
+      "zona": "Extrusión"
     },
     {
       "id": 105,
       "lineaMaquina": "Linea05",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060645965"
+      "numeroSerie": "540060645965",
+      "zona": "Extrusión"
     },
     {
       "id": 113,
       "lineaMaquina": "Chiller3",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC3",
-      "numeroSerie": "540060642863"
+      "numeroSerie": "540060642863",
+      "zona": "Mantenimiento"
     },
     {
       "id": 116,
       "lineaMaquina": "Chiller6",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060642867"
+      "numeroSerie": "540060642867",
+      "zona": "Mantenimiento"
     },
     {
       "id": 120,
       "lineaMaquina": "GA751",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060660822"
+      "numeroSerie": "540060660822",
+      "zona": "Mantenimiento"
     },
     {
       "id": 110,
       "lineaMaquina": "Linea10",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060698920"
+      "numeroSerie": "540060698920",
+      "zona": "Extrusión"
     },
     {
       "id": 108,
       "lineaMaquina": "Linea08",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060651558"
+      "numeroSerie": "540060651558",
+      "zona": "Extrusión"
     },
     {
       "id": 118,
       "lineaMaquina": "Linea18",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060677916"
+      "numeroSerie": "540060677916",
+      "zona": "Extrusión"
     },
     {
       "id": 145,
       "lineaMaquina": "OrientadoraL1",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060698926"
+      "numeroSerie": "540060698926",
+      "zona": "Extrusión"
     },
     {
       "id": 133,
       "lineaMaquina": "CompAP",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060701264"
+      "numeroSerie": "540060701264",
+      "zona": "Mantenimiento"
     },
     {
       "id": 109,
       "lineaMaquina": "Linea09",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060677917"
+      "numeroSerie": "540060677917",
+      "zona": "Extrusión"
     },
     {
       "id": 114,
       "lineaMaquina": "Chiller4",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC3",
-      "numeroSerie": "540060701227"
+      "numeroSerie": "540060701227",
+      "zona": "Mantenimiento"
     },
     {
       "id": 115,
       "lineaMaquina": "Chiller5",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060701270"
+      "numeroSerie": "540060701270",
+      "zona": "Mantenimiento"
     },
     {
       "id": 147,
       "lineaMaquina": "ServAuxP3LabCalid",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC3",
-      "numeroSerie": "540060642870"
+      "numeroSerie": "540060642870",
+      "zona": "Mantenimiento"
     },
     {
       "id": 101,
       "lineaMaquina": "CabezalXTR2",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060660837"
+      "numeroSerie": "540060660837",
+      "zona": "Extrusión"
     },
     {
       "id": 122,
       "lineaMaquina": "Mixer01",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060642871"
+      "numeroSerie": "540060642871",
+      "zona": "Mezcla"
     },
     {
       "id": 144,
       "lineaMaquina": "Trafo2",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060677915"
+      "numeroSerie": "540060677915",
+      "zona": "Mantenimiento"
     },
     {
       "id": 134,
       "lineaMaquina": "Linea34",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060698953"
+      "numeroSerie": "540060698953",
+      "zona": "Extrusión"
     },
     {
       "id": 143,
       "lineaMaquina": "Inyeccion",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060642869"
+      "numeroSerie": "540060642869",
+      "zona": "Mantenimiento"
     },
     {
       "id": 121,
       "lineaMaquina": "GA752",
       "modeloMedidor": "PM5110",
       "nombrePLC": "GteWay01",
-      "numeroSerie": "4C3DF472"
+      "numeroSerie": "4C3DF472",
+      "zona": "Mantenimiento"
     },
     {
       "id": 126,
       "lineaMaquina": "Molino",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060659388"
+      "numeroSerie": "540060659388",
+      "zona": "Mezcla"
     },
     {
       "id": 127,
       "lineaMaquina": "Pulverizador",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "54006066145"
+      "numeroSerie": "54006066145",
+      "zona": "Mezcla"
     },
     {
       "id": 123,
       "lineaMaquina": "Mixer02",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060666051"
+      "numeroSerie": "540060666051",
+      "zona": "Mezcla"
     },
     {
       "id": 119,
       "lineaMaquina": "ServicioAux",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060677697"
+      "numeroSerie": "540060677697",
+      "zona": "Mantenimiento"
     },
     {
       "id": 128,
       "lineaMaquina": "BombasCisterna",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060651544"
+      "numeroSerie": "540060651544",
+      "zona": "Mantenimiento"
     },
     {
       "id": 148,
       "lineaMaquina": "OrientadoraL2",
       "modeloMedidor": "PM710",
       "nombrePLC": "GteWay01",
-      "numeroSerie": "4C3DF191"
+      "numeroSerie": "4C3DF191",
+      "zona": "Extrusión"
     },
     {
       "id": 150,
       "lineaMaquina": "Trafo1",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060666058"
+      "numeroSerie": "540060666058",
+      "zona": "Mantenimiento"
     },
     {
       "id": 146,
       "lineaMaquina": "HornoL3",
       "modeloMedidor": "PM710",
       "nombrePLC": "GteWay01",
-      "numeroSerie": "4C3DF337"
+      "numeroSerie": "4C3DF337",
+      "zona": "Mantenimiento"
     },
     {
       "id": 131,
       "lineaMaquina": "Linea31",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "5400607O2258"
+      "numeroSerie": "5400607O2258",
+      "zona": "Extrusión"
     },
     {
       "id": 124,
       "lineaMaquina": "Mixer03",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060714113"
+      "numeroSerie": "540060714113",
+      "zona": "Mezcla"
     },
     {
       "id": 112,
       "lineaMaquina": "Chiller1",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060710700"
+      "numeroSerie": "540060710700",
+      "zona": "Mantenimiento"
     },
     {
       "id": 111,
       "lineaMaquina": "Linea01",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060702311"
+      "numeroSerie": "540060702311",
+      "zona": "Extrusión"
     },
     {
       "id": 132,
       "lineaMaquina": "Linea32",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060701446"
+      "numeroSerie": "540060701446",
+      "zona": "Extrusión"
     },
     {
       "id": 137,
       "lineaMaquina": "OrientadoraL3",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060713814"
+      "numeroSerie": "540060713814",
+      "zona": "Extrusión"
     },
     {
       "id": 125,
       "lineaMaquina": "Mixer04",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060708396"
+      "numeroSerie": "540060708396",
+      "zona": "Mezcla"
     },
     {
       "id": 142,
       "lineaMaquina": "Ribloc",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "540060710702"
+      "numeroSerie": "540060710702",
+      "zona": "Extrusión"
     },
     {
       "id": 117,
       "lineaMaquina": "Linea17",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
-      "numeroSerie": "540060708283"
+      "numeroSerie": "540060708283",
+      "zona": "Extrusión"
     },
     {
       "id": 201,
       "lineaMaquina": "KWhPlanta1",
       "modeloMedidor": "ION8600",
       "nombrePLC": "PLC3",
-      "numeroSerie": "PT-0610A041-01"
+      "numeroSerie": "PT-0610A041-01",
+      "zona": "Mantenimiento"
     },
     {
       "id": 153,
       "lineaMaquina": "TDGeneradorSA",
       "modeloMedidor": "PAC1020",
       "nombrePLC": "PLC3",
-      "numeroSerie": "240616810470"
+      "numeroSerie": "240616810470",
+      "zona": "Mantenimiento"
     },
     {
       "id": 149,
       "lineaMaquina": "Sauer",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "null"
+      "numeroSerie": "null",
+      "zona": "Mantenimiento"
     },
     {
       "id": 151,
       "lineaMaquina": "TemperaturaAgua",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC5",
-      "numeroSerie": "null"
+      "numeroSerie": "null",
+      "zona": "Mantenimiento"
     },
     {
       "id": 202,
       "lineaMaquina": "PsiAireP1",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC5",
-      "numeroSerie": "null"
+      "numeroSerie": "null",
+      "zona": "Mantenimiento"
     },
     {
       "id": 152,
       "lineaMaquina": "TemperaturaAmbiente",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC5",
-      "numeroSerie": "null"
+      "numeroSerie": "null",
+      "zona": "Mantenimiento"
     },
     {
       "id": 203,
       "lineaMaquina": "PsiAgua",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC5",
-      "numeroSerie": "null"
+      "numeroSerie": "null",
+      "zona": "Mantenimiento"
     },
     {
       "id": 204,
       "lineaMaquina": "BarCompHP",
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
-      "numeroSerie": "null"
+      "numeroSerie": "null",
+      "zona": "Mantenimiento"
     }
   ]
 }

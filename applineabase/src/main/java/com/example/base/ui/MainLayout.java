@@ -1,5 +1,6 @@
 package com.example.base.ui;
 
+import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
@@ -7,6 +8,8 @@ import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.avatar.AvatarVariant;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
@@ -19,6 +22,7 @@ import com.vaadin.flow.component.sidenav.SideNavItem;
 import com.vaadin.flow.router.Layout;
 import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
+import com.vaadin.flow.spring.security.AuthenticationContext;
 
 @Layout
 public final class MainLayout extends AppLayout {
@@ -26,7 +30,12 @@ public final class MainLayout extends AppLayout {
     private Div statusIndicator;
     private Div ultimoClickCard;
     private Div clickAnteriorCard;
-    MainLayout() {
+    private final AuthenticationContext authenticationContext;
+    private final LineaAccessService lineaAccessService;
+
+    MainLayout(AuthenticationContext authenticationContext, LineaAccessService lineaAccessService) {
+        this.authenticationContext = authenticationContext;
+        this.lineaAccessService = lineaAccessService;
         setPrimarySection(Section.DRAWER);
         setDrawerOpened(false);  // ← Abierto inicialmente
 
@@ -91,7 +100,13 @@ public final class MainLayout extends AppLayout {
 
         statusIndicator = createStatusIndicator();
 
-        HorizontalLayout statusLayout = new HorizontalLayout(statusIndicator);
+        Span userSpan = new Span(nombreUsuarioActual());
+        userSpan.getStyle().set("font-size", "12px").set("color", "#666").set("margin-right", "8px");
+
+        Button logoutBtn = new Button("Salir", e -> authenticationContext.logout());
+        logoutBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+
+        HorizontalLayout statusLayout = new HorizontalLayout(statusIndicator, userSpan, logoutBtn);
         statusLayout.setAlignItems(Alignment.CENTER);
         statusLayout.setSpacing(false);
         statusLayout.setPadding(false);
@@ -102,6 +117,13 @@ public final class MainLayout extends AppLayout {
         addToNavbar(clickAnteriorCard);
         addToNavbar(ultimoClickCard);
         addToNavbar(statusLayout);
+    }
+
+    private String nombreUsuarioActual() {
+        return authenticationContext.getAuthenticatedUser(org.springframework.security.core.userdetails.UserDetails.class)
+                .map(org.springframework.security.core.userdetails.UserDetails::getUsername)
+                .map(u -> lineaAccessService.esAdmin() ? u + " (Admin)" : u + " (" + lineaAccessService.zonaUsuarioActual() + ")")
+                .orElse("");
     }
 
     private Component createApplicationHeader() {
@@ -139,6 +161,9 @@ public final class MainLayout extends AppLayout {
         nav.addItem(new SideNavItem("Charts", "grafica", VaadinIcon.CHART.create()));
         nav.addItem(new SideNavItem("Consulta de Datos", "query", VaadinIcon.LIST.create()));
         nav.addItem(new SideNavItem("Historico", "historico", VaadinIcon.CLOCK.create()));
+        if (lineaAccessService.esAdmin()) {
+            nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
+        }
         //nav.addSelectionListener(e -> setDrawerOpened(false));
         return nav;
     }
