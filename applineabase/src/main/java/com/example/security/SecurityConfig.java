@@ -21,7 +21,12 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.with(VaadinSecurityConfigurer.vaadin(), configurer -> configurer.loginView(LoginView.class));
+        http.with(VaadinSecurityConfigurer.vaadin(), configurer -> {
+            configurer.loginView(LoginView.class);
+            // Las rutas propias (/api/plc/**, incluido el stream SSE) solo requieren
+            // estar autenticado; por defecto Vaadin las deniega al no reconocerlas.
+            configurer.anyRequest(authorizedUrl -> authorizedUrl.authenticated());
+        });
         return http.build();
     }
 }
