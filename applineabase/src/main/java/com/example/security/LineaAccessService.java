@@ -11,10 +11,13 @@ import java.util.stream.Collectors;
 
 /**
  * Filtra la lista de líneas/máquinas (linea-id-config.json) según la zona
- * asignada al usuario autenticado. Un ADMIN ve todas las líneas.
+ * asignada al usuario autenticado. Un ADMIN ve todas las líneas, y la zona
+ * "Mantenimiento" también ve todas (mantenimiento da soporte a toda la planta).
  */
 @Service
 public class LineaAccessService {
+
+    private static final String ZONA_MANTENIMIENTO = "Mantenimiento";
 
     private final ConfigLoaderService configLoaderService;
 
@@ -25,11 +28,11 @@ public class LineaAccessService {
     public List<Map<String, Object>> getLineasPermitidas() {
         List<Map<String, Object>> todas = configLoaderService.loadLineaIDConfig();
 
-        if (esAdmin()) {
+        String zona = zonaUsuarioActual();
+        if (esAdmin() || ZONA_MANTENIMIENTO.equalsIgnoreCase(zona)) {
             return todas;
         }
 
-        String zona = zonaUsuarioActual();
         if (zona == null) {
             return List.of();
         }
