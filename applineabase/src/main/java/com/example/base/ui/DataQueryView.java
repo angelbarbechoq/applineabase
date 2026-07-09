@@ -1,6 +1,7 @@
 package com.example.base.ui;
 
 import com.example.dataacquisition.service.ConfigLoaderService;
+import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.grid.Grid;
@@ -13,11 +14,6 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.ResponseEntity;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Map;
@@ -29,7 +25,8 @@ import java.util.stream.Collectors;
 public class DataQueryView extends VerticalLayout {
 
     private final ConfigLoaderService configLoaderService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final LineaAccessService lineaAccessService;
+    private final PLCDataQueryService plcDataQueryService;
 
     private ComboBox<String> maquinaCombo;
     private Grid<Map<String, Object>> dataGrid;
@@ -37,8 +34,11 @@ public class DataQueryView extends VerticalLayout {
     private List<Map<String, Object>> lineas;
     private Div maquinaInfoCard;
 
-    public DataQueryView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService) {
+    public DataQueryView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
+                          PLCDataQueryService plcDataQueryService) {
         this.configLoaderService = configLoaderService;
+        this.lineaAccessService = lineaAccessService;
+        this.plcDataQueryService = plcDataQueryService;
 
         setSizeFull();
         setPadding(true);
@@ -94,46 +94,23 @@ public class DataQueryView extends VerticalLayout {
         setFlexGrow(1, dataGrid);
     }
 
-    private String getBaseUrl() {
-        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs != null) {
-            HttpServletRequest request = attrs.getRequest();
-            String scheme = request.getScheme();
-            String serverName = request.getServerName();
-            int port = request.getServerPort();
-            String contextPath = request.getContextPath();
-
-            if ((scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443)) {
-                return scheme + "://" + serverName + contextPath;
-            } else {
-                return scheme + "://" + serverName + ":" + port + contextPath;
-            }
-        }
-        return "http://localhost:8080";
-    }
-
     private void cargarDatos(String maquina) {
         mensajeSpan.setText("Cargando datos...");
         dataGrid.setItems(List.of());
 
         try {
-            String baseUrl = getBaseUrl();
-            String url = baseUrl + "/api/plc/today/" + maquina;
-            ResponseEntity<List> response = restTemplate.getForEntity(url, List.class);
+            if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
+                mensajeSpan.setText("Sin acceso a esta máquina");
+                return;
+            }
+            List<Map<String, Object>> datos = plcDataQueryService.getTodayDataByMaquina(maquina);
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> datos = response.getBody();
-
-                if (datos.isEmpty()) {
-                    mensajeSpan.setText("No hay datos para esta máquina en la fecha actual");
-                    dataGrid.setItems(List.of());
-                } else {
-                    mensajeSpan.setText("Se encontraron " + datos.size() + " registros");
-                    dataGrid.setItems(datos);
-                }
+            if (datos.isEmpty()) {
+                mensajeSpan.setText("No hay datos para esta máquina en la fecha actual");
+                dataGrid.setItems(List.of());
             } else {
-                mensajeSpan.setText("Error en la consulta al servidor");
+                mensajeSpan.setText("Se encontraron " + datos.size() + " registros");
+                dataGrid.setItems(datos);
             }
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());

@@ -2,6 +2,7 @@ package com.example.base.ui;
 
 import com.example.base.model.GraficaModel;
 import com.example.dataacquisition.service.ConfigLoaderService;
+import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ClientCallable;
@@ -15,8 +16,6 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import jakarta.annotation.security.PermitAll;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.ResponseEntity;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -36,7 +35,7 @@ public class ChartsView extends VerticalLayout {
     private final GraficaModel graficaModel;
     private final ConfigLoaderService configLoaderService;
     private final LineaAccessService lineaAccessService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final PLCDataQueryService plcDataQueryService;
 
     private ComboBox<String> maquinaCombo;
     private Span mensajeSpan;
@@ -48,10 +47,12 @@ public class ChartsView extends VerticalLayout {
     private Div datosActualesCard;
     private Div ultimoClickCard;
 
-    public ChartsView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService) {
+    public ChartsView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
+                       PLCDataQueryService plcDataQueryService) {
         this.graficaModel = new GraficaModel(1);
         this.configLoaderService = configLoaderService;
         this.lineaAccessService = lineaAccessService;
+        this.plcDataQueryService = plcDataQueryService;
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -179,41 +180,36 @@ public class ChartsView extends VerticalLayout {
         mensajeSpan.setText("Cargando gráfica para " + maquina + "...");
 
         try {
-            String baseUrl = getBaseUrl();
-            String url = baseUrl + "/api/plc/today-kwh/" + maquina;
-            ResponseEntity<List> response = restTemplate.getForEntity(url, List.class);
+            if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
+                mensajeSpan.setText("Sin acceso a esta máquina");
+                return;
+            }
+            List<Map<String, Object>> datos = plcDataQueryService.getTodayKWhDataByMaquina(maquina);
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> datos = response.getBody();
-
-                if (datos.isEmpty()) {
-                    mensajeSpan.setText("No hay datos para " + maquina + " en la fecha actual");
-                    getElement().executeJs(graficaModel.getInitScript2("chartdiv_industrial"));
-                } else {
-                    //mensajeSpan.setText("Se cargaron " + datos.size() + " registros | Escuchando actualizaciones en tiempo real...");
-                    if ((maquina.contains("Temperatura") || maquina.contains("Psi") || maquina.contains("BarCompHP")))
-                    {
-                        if (maquina.contains("Temperatura")) {
-                            graficaModel.setUnidad("°C");
-                        } else if (maquina.contains("Psi")) {
-                            graficaModel.setUnidad("PSI");
-                        } else if (maquina.contains("Bar")) {
-                            graficaModel.setUnidad("BAR");
-                        }
-                        mostrarGrafica(datos, false,maquina);
-
-                    }
-                    else{
-                        graficaModel.setUnidad("KWh");
-                        mostrarGrafica(datos, true,maquina);
-
-                    }
-
-                    iniciarSSE(maquina);
-                }
+            if (datos.isEmpty()) {
+                mensajeSpan.setText("No hay datos para " + maquina + " en la fecha actual");
+                getElement().executeJs(graficaModel.getInitScript2("chartdiv_industrial"));
             } else {
-                mensajeSpan.setText("Error en la consulta al servidor");
+                //mensajeSpan.setText("Se cargaron " + datos.size() + " registros | Escuchando actualizaciones en tiempo real...");
+                if ((maquina.contains("Temperatura") || maquina.contains("Psi") || maquina.contains("BarCompHP")))
+                {
+                    if (maquina.contains("Temperatura")) {
+                        graficaModel.setUnidad("°C");
+                    } else if (maquina.contains("Psi")) {
+                        graficaModel.setUnidad("PSI");
+                    } else if (maquina.contains("Bar")) {
+                        graficaModel.setUnidad("BAR");
+                    }
+                    mostrarGrafica(datos, false,maquina);
+
+                }
+                else{
+                    graficaModel.setUnidad("KWh");
+                    mostrarGrafica(datos, true,maquina);
+
+                }
+
+                iniciarSSE(maquina);
             }
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());
@@ -495,15 +491,11 @@ public class ChartsView extends VerticalLayout {
         String fechaStr = dateFormat.format(fecha);
         String horaStr = timeFormat.format(fecha);
 
-        // Llamada REST para obtener KWh
+        // Obtener KWh directamente del servicio
         String valorStr = "";
         try {
-            String baseUrl = getBaseUrl();
-            String url = baseUrl + "/api/plc/latest/kwh/" + maquinaSeleccionada + "/" + fechaStr + " " + horaStr;
-            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                Map<String, Object> data = response.getBody();
+            if (lineaAccessService.tieneAccesoAMaquina(maquinaSeleccionada)) {
+                Map<String, Object> data = plcDataQueryService.getKWhByFechaExacta(maquinaSeleccionada, fechaStr + " " + horaStr);
                 if (data.containsKey("kwh")) {
                     valorStr = String.format("%.2f", data.get("kwh"));
                 }
@@ -572,24 +564,18 @@ public class ChartsView extends VerticalLayout {
 
     private void cargarDatosActuales(String maquina) {
         try {
-            String baseUrl = getBaseUrl();
+            if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
+                datosActualesCard.setVisible(false);
+                return;
+            }
 
-            ResponseEntity<Map> responseVIP = restTemplate.getForEntity(baseUrl + "/api/plc/latest/vip/" + maquina, Map.class);
-            ResponseEntity<Map> responseKWh = restTemplate.getForEntity(baseUrl + "/api/plc/latest/kwh/" + maquina, Map.class);
+            Map<String, Object> datosVIP = plcDataQueryService.getLatestVIPDataByMaquina(maquina);
+            Map<String, Object> datosKWh = plcDataQueryService.getLatestKWhDataByMaquina(maquina);
 
-            if (responseVIP.getStatusCode().is2xxSuccessful() && responseVIP.getBody() != null &&
-                responseKWh.getStatusCode().is2xxSuccessful() && responseKWh.getBody() != null) {
-
-                @SuppressWarnings("unchecked")
-                Map<String, Object> datosVIP = responseVIP.getBody();
-                @SuppressWarnings("unchecked")
-                Map<String, Object> datosKWh = responseKWh.getBody();
-
-                if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
-                    mostrarTarjetaDatos(datosVIP, datosKWh);
-                } else {
-                    datosActualesCard.setVisible(false);
-                }
+            if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
+                mostrarTarjetaDatos(datosVIP, datosKWh);
+            } else {
+                datosActualesCard.setVisible(false);
             }
         } catch (Exception e) {
             datosActualesCard.setVisible(false);
