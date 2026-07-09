@@ -13,6 +13,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.router.RouteAlias;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 
 @PageTitle("Gráficas KWh - LineaBase")
 @Route(value = "grafica", layout = MainLayout.class)
+@RouteAlias(value = "", layout = MainLayout.class)
 @PermitAll
 public class ChartsView extends VerticalLayout {
     //modificado para comit
