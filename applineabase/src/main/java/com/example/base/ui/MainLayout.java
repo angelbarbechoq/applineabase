@@ -23,8 +23,10 @@ import com.vaadin.flow.router.Layout;
 import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.spring.security.AuthenticationContext;
+import jakarta.annotation.security.PermitAll;
 
 @Layout
+@PermitAll
 public final class MainLayout extends AppLayout {
 
     private Div statusIndicator;
