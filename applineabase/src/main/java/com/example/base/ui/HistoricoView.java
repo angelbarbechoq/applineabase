@@ -183,9 +183,9 @@ public class HistoricoView extends VerticalLayout {
                     // Setear unidad según máquina
                     if (maquina.contains("Temperatura")) {
                         graficaKWh.setUnidad("°C");
-                    } else if (maquina.contains("PSI")) {
+                    } else if (maquina.contains("Psi")) {
                         graficaKWh.setUnidad("PSI");
-                    } else if (maquina.contains("BAR")) {
+                    } else if (maquina.contains("Bar")) {
                         graficaKWh.setUnidad("BAR");
                     }
                 } else {
