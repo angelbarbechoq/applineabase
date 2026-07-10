@@ -36,7 +36,10 @@ import java.util.List;
 @PermitAll
 public final class MainLayout extends AppLayout {
 
-    private static final int ALARMA_POLL_INTERVAL_MS = 5000;
+    // Los datos se leen cada 60s (DataAcquisitionTask.CYCLE_INTERVAL), así que revisar
+    // más seguido que eso no aporta nada nuevo; 30s da como máximo esa misma latencia
+    // sin duplicar las peticiones del cliente en cada ciclo de lectura.
+    private static final int ALARMA_POLL_INTERVAL_MS = 30000;
 
     private Div statusIndicator;
     private Div ultimoClickCard;
