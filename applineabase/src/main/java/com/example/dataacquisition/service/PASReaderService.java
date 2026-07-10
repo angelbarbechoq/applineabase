@@ -19,12 +19,13 @@ import java.util.*;
  * Service for reading data from Schneider PAS600L meters via Modbus TCP/IP.
  *
  * Handles:
- * - Loading gateway configuration
+ * - Loading gateway configuration (dynamic scaling for multiple gateways)
  * - Maintaining ArrayList of PAS600Lx devices (gateways)
  * - Reading Modbus data from each meter (Unit ID) within each gateway
  * - Filtering data by line using linea-id-config
  * - Storing data in device arrays
  * - Persisting to SQLite (same tables as PLCs)
+ * - Publishing KWh difference events for Vaadin UI updates
  */
 @Service
 public class PASReaderService {
