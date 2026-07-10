@@ -1,11 +1,14 @@
 package com.example.dataacquisition.controller;
 
 import com.example.dataacquisition.service.PLCDataQueryService;
+import com.example.security.LineaAccessService;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,37 +22,51 @@ public class PLCDataController {
     private static final Logger logger = LoggerFactory.getLogger(PLCDataController.class);
 
     private final PLCDataQueryService plcDataQueryService;
+    private final LineaAccessService lineaAccessService;
 
-    public PLCDataController(PLCDataQueryService plcDataQueryService) {
+    public PLCDataController(PLCDataQueryService plcDataQueryService, LineaAccessService lineaAccessService) {
         this.plcDataQueryService = plcDataQueryService;
+        this.lineaAccessService = lineaAccessService;
     }
+
+    private void verificarAcceso(String maquina) {
+        if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Sin acceso a la máquina " + maquina);
+        }
+    }
+
     @GetMapping("/latest/kwh/{maquina}/{fecha}")
     public Map<String, Object> getKWhByFecha(
             @PathVariable String maquina,
             @PathVariable String fecha) {
+        verificarAcceso(maquina);
         logger.info("Request for KWh data: {} on {}", maquina, fecha);
         return plcDataQueryService.getKWhByFechaExacta(maquina, fecha);
     }
     @GetMapping("/latest/vip/{maquina}")
     public Map<String, Object> getLatestVIPData(@PathVariable String maquina) {
+        verificarAcceso(maquina);
         logger.info("Request for latest VIP data: {}", maquina);
         return plcDataQueryService.getLatestVIPDataByMaquina(maquina);
     }
 
     @GetMapping("/latest/kwh/{maquina}")
     public Map<String, Object> getLatestKWhData(@PathVariable String maquina) {
+        verificarAcceso(maquina);
         logger.info("Request for latest KWh data: {}", maquina);
         return plcDataQueryService.getLatestKWhDataByMaquina(maquina);
     }
 
     @GetMapping("/today/{maquina}")
     public java.util.List<Map<String, Object>> getTodayData(@PathVariable String maquina) {
+        verificarAcceso(maquina);
         logger.info("Request for today data: {}", maquina);
         return plcDataQueryService.getTodayDataByMaquina(maquina);
     }
 
     @GetMapping("/today-kwh/{maquina}")
     public java.util.List<Map<String, Object>> getTodayKWhData(@PathVariable String maquina) {
+        verificarAcceso(maquina);
         logger.info("Request for today KWh data: {}", maquina);
         return plcDataQueryService.getTodayKWhDataByMaquina(maquina);
     }
@@ -59,6 +76,7 @@ public class PLCDataController {
             @PathVariable String maquina,
             @RequestParam String desde,
             @RequestParam String hasta) {
+        verificarAcceso(maquina);
         LocalDate dDesde = LocalDate.parse(desde);
         LocalDate dHasta = LocalDate.parse(hasta);
         logger.info("Historico VIP {} desde {} hasta {}", maquina, dDesde, dHasta);
@@ -70,6 +88,7 @@ public class PLCDataController {
             @PathVariable String maquina,
             @RequestParam String desde,
             @RequestParam String hasta) {
+        verificarAcceso(maquina);
         LocalDate dDesde = LocalDate.parse(desde);
         LocalDate dHasta = LocalDate.parse(hasta);
         logger.info("Historico KWh {} desde {} hasta {}", maquina, dDesde, dHasta);

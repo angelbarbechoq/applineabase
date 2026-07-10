@@ -44,4 +44,16 @@ public class ConfigLoaderService {
             return List.of();
         }
     }
+
+    public List<Map<String, Object>> loadGatewayConfig() {
+        try {
+            InputStream inputStream = getClass().getResourceAsStream("/plc-config.json");
+            Map<String, Object> config = objectMapper.readValue(inputStream, new TypeReference<Map<String, Object>>() {});
+            List<Map<String, Object>> gateways = (List<Map<String, Object>>) config.get("gateways");
+            return gateways != null ? gateways : List.of();
+        } catch (Exception e) {
+            logger.error("Error loading Gateway config", e);
+            return List.of();
+        }
+    }
 }

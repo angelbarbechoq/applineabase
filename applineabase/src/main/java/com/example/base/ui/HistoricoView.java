@@ -2,6 +2,8 @@ package com.example.base.ui;
 
 import com.example.base.model.GraficaModel;
 import com.example.dataacquisition.service.ConfigLoaderService;
+import com.example.dataacquisition.service.PLCDataQueryService;
+import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -15,20 +17,16 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.ResponseEntity;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+import jakarta.annotation.security.PermitAll;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @PageTitle("Historico de Graficas | LineaBase")
 @Route(value = "historico", layout = MainLayout.class)
+@PermitAll
 public class HistoricoView extends VerticalLayout {
 
     private final GraficaModel graficaKWh = new GraficaModel(1);
@@ -40,7 +38,8 @@ public class HistoricoView extends VerticalLayout {
     private GraficaModel graficaActiva;
 
     private final ConfigLoaderService configLoaderService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final LineaAccessService lineaAccessService;
+    private final PLCDataQueryService plcDataQueryService;
 
     private ComboBox<String> maquinaCombo;
     private DatePicker desdeDate;
@@ -50,8 +49,11 @@ public class HistoricoView extends VerticalLayout {
     private Span mensajeSpan;
     private Div chartContainer;
 
-    public HistoricoView(ConfigLoaderService configLoaderService) {
+    public HistoricoView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
+                          PLCDataQueryService plcDataQueryService) {
         this.configLoaderService = configLoaderService;
+        this.lineaAccessService = lineaAccessService;
+        this.plcDataQueryService = plcDataQueryService;
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -84,11 +86,7 @@ public class HistoricoView extends VerticalLayout {
     }
 
     private HorizontalLayout buildFiltrosLayout() {
-        List<String> maquinas = configLoaderService.loadLineaIDConfig().stream()
-                .map(m -> (String) m.get("lineaMaquina"))
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
+        List<String> maquinas = lineaAccessService.getMaquinasPermitidas();
 
         maquinaCombo = new ComboBox<>("Maquina");
         maquinaCombo.setItems(maquinas);
@@ -171,15 +169,13 @@ public class HistoricoView extends VerticalLayout {
     }
     private void consultarKWh(String maquina, LocalDate desde, LocalDate hasta) {
         try {
-            String url = getBaseUrl() + "/api/plc/historico/kwh/" + maquina
-                    + "?desde=" + desde + "&hasta=" + hasta;
-            ResponseEntity<List> resp = restTemplate.getForEntity(url, List.class);
+            if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
+                mensajeSpan.setText("Sin acceso a esta máquina");
+                return;
+            }
+            List<Map<String, Object>> datos = plcDataQueryService.getHistoricoKWhByRango(maquina, desde, hasta);
 
-            if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> datos = resp.getBody();
-
-                // CONDICIONANTE: elegir si es con diferencia o sin diferencia
+            // CONDICIONANTE: elegir si es con diferencia o sin diferencia
                 boolean conDiferencia = true;
                 if ((maquina.contains("Temperatura") || maquina.contains("Psi") || maquina.contains("BarCompHP"))) {
                     conDiferencia = false;
@@ -187,9 +183,9 @@ public class HistoricoView extends VerticalLayout {
                     // Setear unidad según máquina
                     if (maquina.contains("Temperatura")) {
                         graficaKWh.setUnidad("°C");
-                    } else if (maquina.contains("PSI")) {
+                    } else if (maquina.contains("Psi")) {
                         graficaKWh.setUnidad("PSI");
-                    } else if (maquina.contains("BAR")) {
+                    } else if (maquina.contains("Bar")) {
                         graficaKWh.setUnidad("BAR");
                     }
                 } else {
@@ -248,54 +244,6 @@ public class HistoricoView extends VerticalLayout {
                 //ChartsView.aplicarRangosPredefinidos(maquina);
                 getElement().executeJs(batchScript.toString());
                 mensajeSpan.setText(puntosValidos + " puntos graficados");
-            }
-        } catch (Exception e) {
-            mensajeSpan.setText("Error: " + e.getMessage());
-        }
-    }
-    private void consultarKWh2(String maquina, LocalDate desde, LocalDate hasta) {
-        try {
-            String url = getBaseUrl() + "/api/plc/historico/kwh/" + maquina
-                    + "?desde=" + desde + "&hasta=" + hasta;
-            ResponseEntity<List> resp = restTemplate.getForEntity(url, List.class);
-
-            if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> datos = resp.getBody();
-
-                if (datos.size() < 2) {
-                    mensajeSpan.setText("Insuficientes datos para calcular diferencias");
-                    graficaKWh.setSeriesNames(new String[]{"KWh"});
-                    getElement().executeJs(graficaKWh.getInitScript2("chartdiv_historico"));
-                    return;
-                }
-
-                graficaKWh.setSeriesNames(new String[]{"KWh"});
-                double maxDif = 0;
-                SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-                StringBuilder batchScript = new StringBuilder();
-                batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
-
-                int puntosValidos = 0;
-                for (int i = 1; i < datos.size(); i++) {
-                    try {
-                        double actual = ((Number) datos.get(i).get("kwh")).doubleValue();
-                        double anterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
-                        double dif = actual - anterior;
-                        if (dif < 0) dif = 0;
-                        maxDif = Math.max(maxDif, dif);
-
-                        long ts = sdf.parse((String) datos.get(i).get("fecha")).getTime();
-                        Float[] values = {(float) dif};
-                        batchScript.append(graficaKWh.getAddDataScript("chartdiv_historico", ts, values, false));
-                        puntosValidos++;
-                    } catch (Exception ignored) {}
-                }
-
-                graficaKWh.setMaxY(maxDif * 1.1 == 0 ? 10.0 : maxDif * 1.1);
-                getElement().executeJs(batchScript.toString());
-                mensajeSpan.setText(puntosValidos + " puntos graficados");
-            }
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());
         }
@@ -303,61 +251,58 @@ public class HistoricoView extends VerticalLayout {
 
     private void consultarVIP(String maquina, LocalDate desde, LocalDate hasta, String tipoVar) {
         try {
-            String url = getBaseUrl() + "/api/plc/historico/vip/" + maquina
-                    + "?desde=" + desde + "&hasta=" + hasta;
-            ResponseEntity<List> resp = restTemplate.getForEntity(url, List.class);
-
-            if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> datos = resp.getBody();
-
-                if (datos.isEmpty()) {
-                    mensajeSpan.setText("No hay datos en el rango seleccionado");
-                    getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
-                    return;
-                }
-
-                // Setear nombres de series según variable
-                if (tipoVar.equals("Voltajes")) {
-                    graficaVoltajes.setSeriesNames(new String[]{"VAB", "VAC", "VBC"});
-                } else if (tipoVar.equals("Corrientes")) {
-                    graficaCorrientes.setSeriesNames(new String[]{"IA", "IB", "IC"});
-                } else if (tipoVar.equals("PW")) {
-                    graficaPW.setSeriesNames(new String[]{"PW"});
-                } else if (tipoVar.equals("PF")) {
-                    graficaPF.setSeriesNames(new String[]{"PF"});
-                }
-
-                double maxVal = 0;
-                SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-                StringBuilder batchScript = new StringBuilder();
-                batchScript.append(graficaActiva.getInitScript2("chartdiv_historico"));
-
-                for (Map<String, Object> row : datos) {
-                    try {
-                        Float[] values = extractValues(row, tipoVar);
-                        for (Float v : values) {
-                            if (v != null && v > 0) maxVal = Math.max(maxVal, v);
-                        }
-                        long ts = sdf.parse((String) row.get("fecha")).getTime();
-                        batchScript.append(graficaActiva.getAddDataScript("chartdiv_historico", ts, values, false));
-                    } catch (Exception ignored) {}
-                }
-
-                // Establecer maxY dinámico
-                if (tipoVar.equals("Voltajes")) {
-                    graficaVoltajes.setMaxY(maxVal * 1.1 > 0 ? maxVal * 1.1 : 500.0);
-                } else if (tipoVar.equals("Corrientes")) {
-                    graficaCorrientes.setMaxY(maxVal * 1.1 > 0 ? maxVal * 1.1 : 300.0);
-                } else if (tipoVar.equals("PW")) {
-                    graficaPW.setMaxY(maxVal * 1.1 > 0 ? maxVal * 1.1 : 200.0);
-                } else if (tipoVar.equals("PF")) {
-                    graficaPF.setMaxY(1.0);
-                }
-
-                getElement().executeJs(batchScript.toString());
-                mensajeSpan.setText(datos.size() + " puntos graficados para " + tipoVar);
+            if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
+                mensajeSpan.setText("Sin acceso a esta máquina");
+                return;
             }
+            List<Map<String, Object>> datos = plcDataQueryService.getHistoricoVIPByRango(maquina, desde, hasta);
+
+            if (datos.isEmpty()) {
+                mensajeSpan.setText("No hay datos en el rango seleccionado");
+                getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
+                return;
+            }
+
+            // Setear nombres de series según variable
+            if (tipoVar.equals("Voltajes")) {
+                graficaVoltajes.setSeriesNames(new String[]{"VAB", "VAC", "VBC"});
+            } else if (tipoVar.equals("Corrientes")) {
+                graficaCorrientes.setSeriesNames(new String[]{"IA", "IB", "IC"});
+            } else if (tipoVar.equals("PW")) {
+                graficaPW.setSeriesNames(new String[]{"PW"});
+            } else if (tipoVar.equals("PF")) {
+                graficaPF.setSeriesNames(new String[]{"PF"});
+            }
+
+            double maxVal = 0;
+            SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+            StringBuilder batchScript = new StringBuilder();
+            batchScript.append(graficaActiva.getInitScript2("chartdiv_historico"));
+
+            for (Map<String, Object> row : datos) {
+                try {
+                    Float[] values = extractValues(row, tipoVar);
+                    for (Float v : values) {
+                        if (v != null && v > 0) maxVal = Math.max(maxVal, v);
+                    }
+                    long ts = sdf.parse((String) row.get("fecha")).getTime();
+                    batchScript.append(graficaActiva.getAddDataScript("chartdiv_historico", ts, values, false));
+                } catch (Exception ignored) {}
+            }
+
+            // Establecer maxY dinámico
+            if (tipoVar.equals("Voltajes")) {
+                graficaVoltajes.setMaxY(maxVal * 1.1 > 0 ? maxVal * 1.1 : 500.0);
+            } else if (tipoVar.equals("Corrientes")) {
+                graficaCorrientes.setMaxY(maxVal * 1.1 > 0 ? maxVal * 1.1 : 300.0);
+            } else if (tipoVar.equals("PW")) {
+                graficaPW.setMaxY(maxVal * 1.1 > 0 ? maxVal * 1.1 : 200.0);
+            } else if (tipoVar.equals("PF")) {
+                graficaPF.setMaxY(1.0);
+            }
+
+            getElement().executeJs(batchScript.toString());
+            mensajeSpan.setText(datos.size() + " puntos graficados para " + tipoVar);
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());
         }
@@ -415,19 +360,4 @@ public class HistoricoView extends VerticalLayout {
                 "}");
     }
 
-    private String getBaseUrl() {
-        ServletRequestAttributes attrs =
-                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs != null) {
-            HttpServletRequest req = attrs.getRequest();
-            String scheme = req.getScheme();
-            String host = req.getServerName();
-            int port = req.getServerPort();
-            String ctx = req.getContextPath();
-            if ((scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443))
-                return scheme + "://" + host + ctx;
-            return scheme + "://" + host + ":" + port + ctx;
-        }
-        return "http://localhost:8080";
-    }
 }
