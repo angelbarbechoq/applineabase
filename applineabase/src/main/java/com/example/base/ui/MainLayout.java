@@ -1,5 +1,7 @@
 package com.example.base.ui;
 
+import com.example.alarmas.model.AlarmaEvento;
+import com.example.alarmas.repository.AlarmaEventoRepository;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
@@ -15,6 +17,8 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.SvgIcon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.*;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.sidenav.SideNav;
@@ -25,19 +29,28 @@ import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 import jakarta.annotation.security.PermitAll;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 @Layout
 @PermitAll
 public final class MainLayout extends AppLayout {
+
+    private static final int ALARMA_POLL_INTERVAL_MS = 5000;
 
     private Div statusIndicator;
     private Div ultimoClickCard;
     private Div clickAnteriorCard;
     private final AuthenticationContext authenticationContext;
     private final LineaAccessService lineaAccessService;
+    private final AlarmaEventoRepository alarmaEventoRepository;
+    private LocalDateTime ultimaRevisionAlarmas = LocalDateTime.now();
 
-    MainLayout(AuthenticationContext authenticationContext, LineaAccessService lineaAccessService) {
+    MainLayout(AuthenticationContext authenticationContext, LineaAccessService lineaAccessService,
+               AlarmaEventoRepository alarmaEventoRepository) {
         this.authenticationContext = authenticationContext;
         this.lineaAccessService = lineaAccessService;
+        this.alarmaEventoRepository = alarmaEventoRepository;
         setPrimarySection(Section.DRAWER);
         setDrawerOpened(false);  // ← Abierto inicialmente
 
@@ -119,6 +132,25 @@ public final class MainLayout extends AppLayout {
         addToNavbar(clickAnteriorCard);
         addToNavbar(ultimoClickCard);
         addToNavbar(statusLayout);
+
+        if (lineaAccessService.puedeVerAlarmas()) {
+            addAttachListener(e -> {
+                UI ui = e.getUI();
+                ui.setPollInterval(ALARMA_POLL_INTERVAL_MS);
+                ui.addPollListener(pollEvent -> revisarAlarmasNuevas());
+            });
+        }
+    }
+
+    private void revisarAlarmasNuevas() {
+        LocalDateTime desde = ultimaRevisionAlarmas;
+        ultimaRevisionAlarmas = LocalDateTime.now();
+
+        List<AlarmaEvento> nuevas = alarmaEventoRepository.findByFechaInicioAfterOrderByFechaInicioDesc(desde);
+        for (AlarmaEvento alarma : nuevas) {
+            Notification.show("🚨 " + alarma.getMensaje(), 8000, Notification.Position.TOP_END)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
     }
 
     private String nombreUsuarioActual() {
@@ -163,7 +195,11 @@ public final class MainLayout extends AppLayout {
         nav.addItem(new SideNavItem("Charts", "grafica", VaadinIcon.CHART.create()));
         nav.addItem(new SideNavItem("Consulta de Datos", "query", VaadinIcon.LIST.create()));
         nav.addItem(new SideNavItem("Historico", "historico", VaadinIcon.CLOCK.create()));
+        if (lineaAccessService.puedeVerAlarmas()) {
+            nav.addItem(new SideNavItem("Alarmas", "alarmas", VaadinIcon.BELL.create()));
+        }
         if (lineaAccessService.esAdmin()) {
+            nav.addItem(new SideNavItem("Config. Alarmas", "alarmas/config", VaadinIcon.COG.create()));
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
         }
         //nav.addSelectionListener(e -> setDrawerOpened(false));

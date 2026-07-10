@@ -57,6 +57,11 @@ public class LineaAccessService {
         return getMaquinasPermitidas().contains(maquina);
     }
 
+    /** Las alarmas solo son visibles para ADMIN y usuarios de la zona Mantenimiento. */
+    public boolean puedeVerAlarmas() {
+        return esAdmin() || ZONA_MANTENIMIENTO.equalsIgnoreCase(zonaUsuarioActual());
+    }
+
     public boolean esAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {

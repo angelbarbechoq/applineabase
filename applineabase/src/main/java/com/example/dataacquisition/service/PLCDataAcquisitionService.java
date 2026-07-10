@@ -1,5 +1,6 @@
 package com.example.dataacquisition.service;
 
+import com.example.dataacquisition.event.SensorDataUpdateEvent;
 import com.example.dataacquisition.model.PLCS7200x;
 import de.re.easymodbus.modbusclient.ModbusClient;
 import org.springframework.context.ApplicationEventPublisher;
@@ -199,6 +200,7 @@ public class PLCDataAcquisitionService {
                         databaseInitializationService.guardarDatoBatch(dataDiario, nombreTablax, "DAILY");
                         databaseInitializationService.guardarDatoBatch(dataDiario, nombreTablax, "MONTHLY");
 
+                        eventPublisher.publishEvent(new SensorDataUpdateEvent(this, nombreTablax, valor, timestamp));
                     });
                 }
             }
