@@ -190,9 +190,8 @@ public class PLCDataAcquisitionService {
 
                     IntStream.range(0, tablas.size()).forEach(i -> {
                         String nombreTablax = tablas.get(i);
-                        // El PLC S7-200 escala los valores analogicos (temperatura y presion) x10
-                        // para representar un decimal (ej: 825 = 82.5 PSI)
-                        double valor = (nombreTablax.contains("Temperatura") || nombreTablax.contains("Psi"))
+                        // Calculamos el valor ajustado antes de decidir el guardado
+                        double valor = nombreTablax.contains("Temperatura")
                                 ? finalParametros[i] / 10.0
                                 : (double) finalParametros[i];
 
