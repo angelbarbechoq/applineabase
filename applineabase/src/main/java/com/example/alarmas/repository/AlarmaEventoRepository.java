@@ -13,4 +13,5 @@ public interface AlarmaEventoRepository extends JpaRepository<AlarmaEvento, Long
     List<AlarmaEvento> findAllByOrderByFechaInicioDesc();
     List<AlarmaEvento> findByFechaInicioAfterOrderByFechaInicioDesc(LocalDateTime fechaInicio);
     List<AlarmaEvento> findByActivaTrueOrderByFechaInicioDesc();
+    List<AlarmaEvento> findByLineaMaquinaOrderByFechaInicioDesc(String lineaMaquina);
 }
