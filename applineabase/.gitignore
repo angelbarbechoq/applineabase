@@ -12,3 +12,9 @@
 node_modules/
 src/main/frontend/generated/
 vite.generated.ts
+
+# H2 (data/) y el path de SQLite hardcodeado para Windows (DatabaseInitializationService.BASE_PATH).
+# En Linux la barra invertida no es separador de carpetas, así que "C:\LineaBaseX\..." se crea
+# como un solo nombre de archivo/carpeta literal (con backslashes adentro) al correr la app/tests.
+/data/
+C:*
