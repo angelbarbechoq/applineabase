@@ -9,26 +9,40 @@ import com.example.base.ui.MainLayout;
 import com.example.horometro.service.HorometroService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
+import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.PermitAll;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Dashboard con todas las máquinas a la vez: estado ON/OFF, PW en vivo junto al umbral
- * configurado (para facilitar el ajuste por máquina desde AlarmasConfigView), y horas
- * de funcionamiento en tres granularidades (hoy, mes, sin límite de tiempo).
+ * configurado (para facilitar el ajuste por máquina desde AlarmasConfigView), horas de
+ * funcionamiento (hoy, mes, sin límite de tiempo) y, solo para ADMIN, exportación CSV
+ * semanal (lunes-domingo) para comparar contra el horómetro físico de la máquina.
  *
  * Se refresca con el mismo mecanismo de poll que ya usan MainLayout/AlarmasHistorialView
  * (cada 30s) en vez de empujar datos por SSE hacia el Grid — como los datos de origen
@@ -62,6 +76,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         add(new H3("Horómetro de Máquinas"));
         if (lineaAccessService.esAdmin()) {
             add(new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class));
+            add(crearExportadorCsv());
         }
 
         grid.addColumn(HorometroRow::maquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
@@ -113,6 +128,71 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
                 .set("background-color", COLOR_ADVERTENCIA_FONDO)
                 .set("color", COLOR_ADVERTENCIA_TEXTO);
         return badge;
+    }
+
+    /**
+     * Exportador CSV semanal, solo ADMIN. Ancla las 4 columnas al domingo de la semana
+     * elegida (por defecto el último domingo completo), para que el reporte coincida con
+     * la rutina real: cada lunes se toma el horómetro físico de la semana que acaba de
+     * terminar. "Horas totales" se reconstruye histórico hasta esa fecha, no es el valor
+     * actual — así sirve para comparar contra la lectura física de cualquier semana pasada.
+     */
+    private HorizontalLayout crearExportadorCsv() {
+        DatePicker fechaSemanaPicker = new DatePicker("Semana a reportar (cualquier día de esa semana)");
+        fechaSemanaPicker.setValue(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)));
+        fechaSemanaPicker.setWidth("300px");
+        fechaSemanaPicker.setHelperText("El reporte usa el domingo de la semana que contiene esta fecha");
+
+        StreamResource recurso = new StreamResource("horometro-semanal.csv",
+                () -> generarCsv(fechaSemanaPicker.getValue()));
+        recurso.setContentType("text/csv; charset=UTF-8");
+
+        Anchor descargarLink = new Anchor(recurso, "Descargar CSV semanal");
+        descargarLink.getElement().setAttribute("download", true);
+        descargarLink.getElement().getThemeList().add("button");
+        descargarLink.getElement().getThemeList().add("primary");
+
+        HorizontalLayout layout = new HorizontalLayout(fechaSemanaPicker, descargarLink);
+        layout.setAlignItems(Alignment.END);
+        return layout;
+    }
+
+    private InputStream generarCsv(LocalDate fechaSeleccionada) {
+        LocalDate fecha = fechaSeleccionada != null ? fechaSeleccionada : LocalDate.now();
+        StringBuilder sb = new StringBuilder();
+        sb.append('﻿'); // BOM UTF-8, para que Excel muestre bien tildes/ñ
+        sb.append("Linea;Lunes;Domingo;Horas domingo;Horas semana;Horas mes;Horas totales\r\n");
+
+        for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
+            boolean aplicaHorometro = alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.DETENCION).isPresent()
+                    || alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.CICLO_COMPRESOR).isPresent();
+            if (!aplicaHorometro) {
+                continue;
+            }
+            HorometroService.ReporteSemanal r = horometroService.generarReporte(maquina, fecha);
+            sb.append(csvEscape(maquina)).append(';')
+                    .append(r.lunes().format(FORMATO_FECHA_CORTA)).append(';')
+                    .append(r.domingo().format(FORMATO_FECHA_CORTA)).append(';')
+                    .append(formatoDecimalExcel(r.horasDomingo())).append(';')
+                    .append(formatoDecimalExcel(r.horasSemana())).append(';')
+                    .append(formatoDecimalExcel(r.horasMes())).append(';')
+                    .append(formatoDecimalExcel(r.horasTotal())).append("\r\n");
+        }
+        return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static final Locale LOCALE_ES = Locale.of("es", "ES");
+    private static final DateTimeFormatter FORMATO_FECHA_CORTA = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
+    private String formatoDecimalExcel(double valor) {
+        return String.format(LOCALE_ES, "%.1f", valor);
+    }
+
+    private String csvEscape(String valor) {
+        if (valor.contains(";") || valor.contains("\"") || valor.contains("\n")) {
+            return "\"" + valor.replace("\"", "\"\"") + "\"";
+        }
+        return valor;
     }
 
     private void refrescarGrid() {

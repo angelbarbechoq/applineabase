@@ -5,23 +5,28 @@ import com.example.dataacquisition.event.MaquinaEstadoCambioEvent;
 import com.example.horometro.event.HorometroUpdateEvent;
 import com.example.horometro.model.HorometroDiario;
 import com.example.horometro.model.HorometroMensual;
+import com.example.horometro.model.HorometroSemanal;
 import com.example.horometro.model.HorometroTotal;
 import com.example.horometro.repository.HorometroDiarioRepository;
 import com.example.horometro.repository.HorometroMensualRepository;
+import com.example.horometro.repository.HorometroSemanalRepository;
 import com.example.horometro.repository.HorometroTotalRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.IsoFields;
+import java.time.temporal.TemporalAdjusters;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Acumula horas de funcionamiento por máquina en tres granularidades (día, mes, sin
- * límite de tiempo), a partir de los cambios de estado ON/OFF que publica
+ * Acumula horas de funcionamiento por máquina en cuatro granularidades (día, semana ISO,
+ * mes, sin límite de tiempo), a partir de los cambios de estado ON/OFF que publica
  * AlarmaEvaluatorService (regla DETENCION o CICLO_COMPRESOR, según la máquina).
  *
  * Dos caminos escriben aquí:
@@ -36,6 +41,7 @@ public class HorometroService {
 
     private final HorometroTotalRepository totalRepository;
     private final HorometroDiarioRepository diarioRepository;
+    private final HorometroSemanalRepository semanalRepository;
     private final HorometroMensualRepository mensualRepository;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -46,9 +52,11 @@ public class HorometroService {
     private final ConcurrentHashMap<String, Double> ultimoPwPorLinea = new ConcurrentHashMap<>();
 
     public HorometroService(HorometroTotalRepository totalRepository, HorometroDiarioRepository diarioRepository,
-                             HorometroMensualRepository mensualRepository, ApplicationEventPublisher eventPublisher) {
+                             HorometroSemanalRepository semanalRepository, HorometroMensualRepository mensualRepository,
+                             ApplicationEventPublisher eventPublisher) {
         this.totalRepository = totalRepository;
         this.diarioRepository = diarioRepository;
+        this.semanalRepository = semanalRepository;
         this.mensualRepository = mensualRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -114,7 +122,7 @@ public class HorometroService {
                 .orElseGet(() -> new HorometroDiario(linea, fecha, 0));
         diario.setHoras(diario.getHoras() + horas);
         diarioRepository.save(diario);
-        sumarAMensualYTotal(linea, fecha, horas);
+        sumarASemanaMesYTotal(linea, fecha, horas);
     }
 
     /**
@@ -130,11 +138,17 @@ public class HorometroService {
         diario.setHoras(horasCalculadas);
         diarioRepository.save(diario);
         if (delta != 0) {
-            sumarAMensualYTotal(linea, fecha, delta);
+            sumarASemanaMesYTotal(linea, fecha, delta);
         }
     }
 
-    private void sumarAMensualYTotal(String linea, LocalDate fecha, double horas) {
+    private void sumarASemanaMesYTotal(String linea, LocalDate fecha, double horas) {
+        String semanaId = semanaId(fecha);
+        HorometroSemanal semanal = semanalRepository.findByLineaMaquinaAndSemanaId(linea, semanaId)
+                .orElseGet(() -> new HorometroSemanal(linea, semanaId, 0));
+        semanal.setHoras(semanal.getHoras() + horas);
+        semanalRepository.save(semanal);
+
         String anioMes = anioMes(fecha);
         HorometroMensual mensual = mensualRepository.findByLineaMaquinaAndAnioMes(linea, anioMes)
                 .orElseGet(() -> new HorometroMensual(linea, anioMes, 0));
@@ -222,7 +236,39 @@ public class HorometroService {
         return String.format("%04d-%02d", fecha.getYear(), fecha.getMonthValue());
     }
 
+    /** Semana ISO (lunes a domingo): "yyyy-Www". */
+    private String semanaId(LocalDate fecha) {
+        int anioSemana = fecha.get(IsoFields.WEEK_BASED_YEAR);
+        int semana = fecha.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+        return String.format("%04d-W%02d", anioSemana, semana);
+    }
+
+    /**
+     * Reporte histórico anclado al domingo de la semana pedida: horas de ese domingo, de esa
+     * semana completa, del mes que contiene ese domingo, y el total acumulado hasta esa fecha
+     * (reconstruido sumando el histórico diario, ya que el total ya no se reinicia nunca).
+     * Usado para el CSV semanal — no depende del estado en vivo, es 100% histórico/reproducible.
+     */
+    public ReporteSemanal generarReporte(String linea, LocalDate cualquierDiaDeLaSemana) {
+        LocalDate domingo = cualquierDiaDeLaSemana.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        LocalDate lunes = domingo.minusDays(6);
+
+        double horasDomingo = diarioRepository.findByLineaMaquinaAndFecha(linea, domingo)
+                .map(HorometroDiario::getHoras).orElse(0.0);
+        double horasSemana = semanalRepository.findByLineaMaquinaAndSemanaId(linea, semanaId(domingo))
+                .map(HorometroSemanal::getHoras).orElse(0.0);
+        double horasMes = mensualRepository.findByLineaMaquinaAndAnioMes(linea, anioMes(domingo))
+                .map(HorometroMensual::getHoras).orElse(0.0);
+        double horasTotal = diarioRepository.sumHorasHastaFecha(linea, domingo);
+
+        return new ReporteSemanal(linea, lunes, domingo, horasDomingo, horasSemana, horasMes, horasTotal);
+    }
+
     public record HorometroSnapshot(String linea, boolean encendida, double horasHoy, double horasMes,
                                      double horasTotal, LocalDateTime desdeCuandoCuentaTotal) {
+    }
+
+    public record ReporteSemanal(String linea, LocalDate lunes, LocalDate domingo, double horasDomingo,
+                                  double horasSemana, double horasMes, double horasTotal) {
     }
 }
