@@ -32,8 +32,8 @@ public class AlarmaConfig {
     @Column(nullable = false)
     private boolean habilitada = true;
 
-    /** Umbral "cercano a cero" para diferencia de KWh (DETENCION y CICLO_COMPRESOR). */
-    private Double epsilonKwh;
+    /** Potencia mínima en kW para considerar la máquina encendida (DETENCION y CICLO_COMPRESOR). */
+    private Double umbralMinimoKw;
 
     /** Ciclos de lectura consecutivos con diferencia bajo epsilon antes de disparar (DETENCION). */
     private Integer ventanaCiclos;
@@ -78,12 +78,12 @@ public class AlarmaConfig {
         this.habilitada = habilitada;
     }
 
-    public Double getEpsilonKwh() {
-        return epsilonKwh;
+    public Double getUmbralMinimoKw() {
+        return umbralMinimoKw;
     }
 
-    public void setEpsilonKwh(Double epsilonKwh) {
-        this.epsilonKwh = epsilonKwh;
+    public void setUmbralMinimoKw(Double umbralMinimoKw) {
+        this.umbralMinimoKw = umbralMinimoKw;
     }
 
     public Integer getVentanaCiclos() {

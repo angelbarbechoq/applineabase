@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
@@ -16,6 +17,7 @@ import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -190,6 +192,50 @@ public class DatabaseInitializationService {
         String[] months = {"enero", "febrero", "marzo", "abril", "mayo", "junio",
                           "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"};
         return months[month - 1];
+    }
+
+    /**
+     * Lista los meses (año+mes) para los que existe una carpeta de datos en BASE_PATH,
+     * ordenados de más antiguo a más reciente. Usado por el backfill del horómetro para
+     * saber desde cuándo hay histórico disponible, sin asumir una fecha de inicio fija.
+     */
+    public List<YearMonth> listarMesesDisponibles() {
+        List<YearMonth> meses = new ArrayList<>();
+        File[] carpetasAnio = new File(BASE_PATH).listFiles(File::isDirectory);
+        if (carpetasAnio == null) {
+            return meses;
+        }
+        for (File carpetaAnio : carpetasAnio) {
+            int anio;
+            try {
+                anio = Integer.parseInt(carpetaAnio.getName());
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            File[] carpetasMes = carpetaAnio.listFiles(File::isDirectory);
+            if (carpetasMes == null) {
+                continue;
+            }
+            for (File carpetaMes : carpetasMes) {
+                int numeroMes = mesNumeroDesdeNombre(carpetaMes.getName());
+                if (numeroMes > 0) {
+                    meses.add(YearMonth.of(anio, numeroMes));
+                }
+            }
+        }
+        Collections.sort(meses);
+        return meses;
+    }
+
+    private int mesNumeroDesdeNombre(String nombreMes) {
+        String[] months = {"enero", "febrero", "marzo", "abril", "mayo", "junio",
+                          "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"};
+        for (int i = 0; i < months.length; i++) {
+            if (months[i].equalsIgnoreCase(nombreMes)) {
+                return i + 1;
+            }
+        }
+        return -1;
     }
 
     public String getDailyPath() { return dailyPath; }

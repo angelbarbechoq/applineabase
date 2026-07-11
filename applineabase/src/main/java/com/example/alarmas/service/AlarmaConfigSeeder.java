@@ -7,6 +7,7 @@ import com.example.dataacquisition.service.ConfigLoaderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -16,11 +17,23 @@ import java.util.Set;
  * Crea las filas de configuración de alarma por defecto la primera vez que arranca
  * la aplicación (o cuando aparece una línea nueva en linea-id-config.json). No
  * sobrescribe filas ya existentes, para no pisar ajustes hechos por el ADMIN.
+ *
+ * Corre con prioridad alta (@Order(1)) porque el backfill del horómetro depende de
+ * que las reglas de alarma (umbralMinimoKw, ventanaCiclos) ya existan.
  */
 @Component
+@Order(1)
 public class AlarmaConfigSeeder implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(AlarmaConfigSeeder.class);
+
+    /**
+     * Default de arranque en kW. El registro PW no viene en la misma escala en todas
+     * las máquinas (medidores PM5110 vs ION8600 vs PAC1020), así que este valor es solo
+     * un punto de partida: el ADMIN debe ajustarlo por línea desde AlarmasConfigView /
+     * HorometroView observando el PW real de cada una antes de confiar en la alarma.
+     */
+    private static final double UMBRAL_MINIMO_KW_DEFAULT = 0.5;
 
     private static final Set<String> COMPRESORES_CICLICOS = Set.of("CompAP", "Sauer");
     private static final Set<String> SENSORES_SIN_KWH = Set.of(
@@ -46,12 +59,12 @@ public class AlarmaConfigSeeder implements CommandLineRunner {
 
             if (COMPRESORES_CICLICOS.contains(nombre)) {
                 seedSiNoExiste(nombre, TipoAlarma.CICLO_COMPRESOR, config -> {
-                    config.setEpsilonKwh(0.01);
+                    config.setUmbralMinimoKw(UMBRAL_MINIMO_KW_DEFAULT);
                     config.setMinutosMaxEncendido(15);
                 });
             } else if (!SENSORES_SIN_KWH.contains(nombre)) {
                 seedSiNoExiste(nombre, TipoAlarma.DETENCION, config -> {
-                    config.setEpsilonKwh(0.01);
+                    config.setUmbralMinimoKw(UMBRAL_MINIMO_KW_DEFAULT);
                     config.setVentanaCiclos(5);
                 });
             }

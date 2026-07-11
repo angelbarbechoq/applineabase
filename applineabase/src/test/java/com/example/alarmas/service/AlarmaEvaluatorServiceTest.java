@@ -4,16 +4,21 @@ import com.example.alarmas.model.AlarmaConfig;
 import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.repository.AlarmaEventoRepository;
-import com.example.dataacquisition.event.KWhDifferenceEvent;
 import com.example.dataacquisition.event.MaquinaDataUpdateEvent;
+import com.example.dataacquisition.event.MaquinaEstadoCambioEvent;
 import com.example.dataacquisition.event.SensorDataUpdateEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.event.EventListener;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,26 +46,42 @@ class AlarmaEvaluatorServiceTest {
     @Autowired
     AlarmaEventoRepository eventoRepository;
 
+    @Autowired
+    CapturadorEstadoCambio capturador;
+
+    private static Map<String, Object> datosPW(double pw) {
+        Map<String, Object> datos = new HashMap<>();
+        datos.put("PW", pw);
+        return datos;
+    }
+
     @Test
     void detencion_se_dispara_tras_la_ventana_de_ciclos_y_se_resuelve_al_reanudar() {
-        String linea = "Linea02"; // sembrada por AlarmaConfigSeeder como DETENCION (epsilon=0.01, ventana=5)
+        String linea = "Linea02"; // sembrada por AlarmaConfigSeeder como DETENCION (umbral=0.5 kW, ventana=5)
+        capturador.eventos.clear();
 
         for (int i = 0; i < 4; i++) {
-            eventPublisher.publishEvent(new KWhDifferenceEvent(this, linea, 0.0, "fecha"));
+            eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(0.0)));
         }
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DETENCION))
                 .as("no debe dispararse antes de completar la ventana")
                 .isEmpty();
 
-        eventPublisher.publishEvent(new KWhDifferenceEvent(this, linea, 0.0, "fecha"));
+        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(0.0)));
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DETENCION))
-                .as("debe dispararse al 5to ciclo consecutivo bajo epsilon")
+                .as("debe dispararse al 5to ciclo consecutivo bajo el umbral")
                 .isPresent();
+        assertThat(capturador.eventos)
+                .as("debe publicar el cambio de estado a apagada")
+                .anyMatch(e -> e.getNombreMaquina().equals(linea) && !e.isEncendida());
 
-        eventPublisher.publishEvent(new KWhDifferenceEvent(this, linea, 5.0, "fecha"));
+        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(5.0)));
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DETENCION))
-                .as("debe resolverse en cuanto vuelve a consumir")
+                .as("debe resolverse en cuanto vuelve a consumir por encima del umbral")
                 .isEmpty();
+        assertThat(capturador.eventos)
+                .as("debe publicar el cambio de estado a encendida")
+                .anyMatch(e -> e.getNombreMaquina().equals(linea) && e.isEncendida());
     }
 
     @Test
@@ -70,12 +91,12 @@ class AlarmaEvaluatorServiceTest {
         config.setMinutosMaxEncendido(0); // dispara en cuanto transcurre >= 0 minutos, sin esperar en tiempo real
         configRepository.save(config);
 
-        eventPublisher.publishEvent(new KWhDifferenceEvent(this, linea, 5.0, "fecha"));
+        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(5.0)));
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.CICLO_COMPRESOR))
                 .as("con minutosMax=0 debe dispararse en el primer ciclo encendido")
                 .isPresent();
 
-        eventPublisher.publishEvent(new KWhDifferenceEvent(this, linea, 0.0, "fecha"));
+        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(0.0)));
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.CICLO_COMPRESOR))
                 .as("debe resolverse cuando el compresor se apaga")
                 .isEmpty();
@@ -113,5 +134,23 @@ class AlarmaEvaluatorServiceTest {
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(sensor, TipoAlarma.TEMPERATURA_ALTA))
                 .as("9.0 <= 13.0 debe resolver la alarma")
                 .isEmpty();
+    }
+
+    @TestConfiguration
+    static class HorometroEventosTestConfig {
+        @Bean
+        CapturadorEstadoCambio capturador() {
+            return new CapturadorEstadoCambio();
+        }
+    }
+
+    /** Captura los MaquinaEstadoCambioEvent publicados durante el test para poder verificarlos. */
+    static class CapturadorEstadoCambio {
+        final List<MaquinaEstadoCambioEvent> eventos = new ArrayList<>();
+
+        @EventListener
+        void onEstadoCambio(MaquinaEstadoCambioEvent event) {
+            eventos.add(event);
+        }
     }
 }

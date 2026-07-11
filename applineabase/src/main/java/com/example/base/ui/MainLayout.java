@@ -198,6 +198,7 @@ public final class MainLayout extends AppLayout {
         nav.addItem(new SideNavItem("Charts", "grafica", VaadinIcon.CHART.create()));
         nav.addItem(new SideNavItem("Consulta de Datos", "query", VaadinIcon.LIST.create()));
         nav.addItem(new SideNavItem("Historico", "historico", VaadinIcon.CLOCK.create()));
+        nav.addItem(new SideNavItem("Horómetro", "horometro", VaadinIcon.TIMER.create()));
         if (lineaAccessService.puedeVerAlarmas()) {
             nav.addItem(new SideNavItem("Alarmas Activas", "alarmas", VaadinIcon.BELL.create()));
             nav.addItem(new SideNavItem("Historial Alarmas", "alarmas/historial", VaadinIcon.CLOCK.create()));

@@ -45,7 +45,7 @@ public class AlarmasConfigView extends VerticalLayout {
     private final ComboBox<String> lineaCombo = new ComboBox<>("Línea/Máquina");
     private final Select<TipoAlarma> tipoSelect = new Select<>();
     private final Checkbox habilitadaCheckbox = new Checkbox("Habilitada", true);
-    private final NumberField epsilonField = new NumberField("Epsilon KWh (~0)");
+    private final NumberField umbralMinimoKwField = new NumberField("Umbral mínimo (kW)");
     private final NumberField ventanaField = new NumberField("Ventana (ciclos)");
     private final NumberField minutosField = new NumberField("Máx. minutos encendido");
     private final NumberField temperaturaField = new NumberField("Temperatura máxima (°C)");
@@ -85,10 +85,10 @@ public class AlarmasConfigView extends VerticalLayout {
         grid.asSingleSelect().addValueChangeListener(e -> cargarEnFormulario(e.getValue()));
         grid.setSizeFull();
 
-        epsilonField.setStep(0.001);
+        umbralMinimoKwField.setStep(0.1);
         temperaturaField.setStep(0.1);
         factorPotenciaField.setStep(0.01);
-        for (NumberField field : new NumberField[]{epsilonField, ventanaField, minutosField, temperaturaField, factorPotenciaField}) {
+        for (NumberField field : new NumberField[]{umbralMinimoKwField, ventanaField, minutosField, temperaturaField, factorPotenciaField}) {
             field.setWidth("190px");
         }
 
@@ -103,7 +103,7 @@ public class AlarmasConfigView extends VerticalLayout {
         eliminarBtn.setEnabled(false);
 
         HorizontalLayout formLayout = new HorizontalLayout(
-                lineaCombo, tipoSelect, habilitadaCheckbox, epsilonField, ventanaField, minutosField,
+                lineaCombo, tipoSelect, habilitadaCheckbox, umbralMinimoKwField, ventanaField, minutosField,
                 temperaturaField, factorPotenciaField, guardarBtn, nuevaBtn, eliminarBtn
         );
         formLayout.setAlignItems(Alignment.END);
@@ -118,10 +118,10 @@ public class AlarmasConfigView extends VerticalLayout {
 
     private String resumenUmbral(AlarmaConfig c) {
         return switch (c.getTipoAlarma()) {
-            case DETENCION -> String.format("epsilon=%.3f kWh, ventana=%d ciclos",
-                    valor(c.getEpsilonKwh()), c.getVentanaCiclos() == null ? 0 : c.getVentanaCiclos());
-            case CICLO_COMPRESOR -> String.format("epsilon=%.3f kWh, máx=%d min",
-                    valor(c.getEpsilonKwh()), c.getMinutosMaxEncendido() == null ? 0 : c.getMinutosMaxEncendido());
+            case DETENCION -> String.format("umbral=%.2f kW, ventana=%d ciclos",
+                    valor(c.getUmbralMinimoKw()), c.getVentanaCiclos() == null ? 0 : c.getVentanaCiclos());
+            case CICLO_COMPRESOR -> String.format("umbral=%.2f kW, máx=%d min",
+                    valor(c.getUmbralMinimoKw()), c.getMinutosMaxEncendido() == null ? 0 : c.getMinutosMaxEncendido());
             case TEMPERATURA_ALTA -> String.format("máx=%.1f°C", valor(c.getTemperaturaMaxima()));
             case FACTOR_POTENCIA_BAJO -> String.format("mín=%.3f", valor(c.getFactorPotenciaMinimo()));
         };
@@ -143,7 +143,7 @@ public class AlarmasConfigView extends VerticalLayout {
         tipoSelect.setValue(config.getTipoAlarma());
         tipoSelect.setEnabled(false);
         habilitadaCheckbox.setValue(config.isHabilitada());
-        epsilonField.setValue(config.getEpsilonKwh());
+        umbralMinimoKwField.setValue(config.getUmbralMinimoKw());
         ventanaField.setValue(config.getVentanaCiclos() == null ? null : config.getVentanaCiclos().doubleValue());
         minutosField.setValue(config.getMinutosMaxEncendido() == null ? null : config.getMinutosMaxEncendido().doubleValue());
         temperaturaField.setValue(config.getTemperaturaMaxima());
@@ -154,7 +154,7 @@ public class AlarmasConfigView extends VerticalLayout {
 
     private void actualizarVisibilidadCampos(TipoAlarma tipo) {
         boolean esDetencionOCiclo = tipo == TipoAlarma.DETENCION || tipo == TipoAlarma.CICLO_COMPRESOR;
-        epsilonField.setVisible(esDetencionOCiclo);
+        umbralMinimoKwField.setVisible(esDetencionOCiclo);
         ventanaField.setVisible(tipo == TipoAlarma.DETENCION);
         minutosField.setVisible(tipo == TipoAlarma.CICLO_COMPRESOR);
         temperaturaField.setVisible(tipo == TipoAlarma.TEMPERATURA_ALTA);
@@ -170,12 +170,12 @@ public class AlarmasConfigView extends VerticalLayout {
         tipoSelect.clear();
         tipoSelect.setEnabled(true);
         habilitadaCheckbox.setValue(true);
-        epsilonField.clear();
+        umbralMinimoKwField.clear();
         ventanaField.clear();
         minutosField.clear();
         temperaturaField.clear();
         factorPotenciaField.clear();
-        for (NumberField field : new NumberField[]{epsilonField, ventanaField, minutosField, temperaturaField, factorPotenciaField}) {
+        for (NumberField field : new NumberField[]{umbralMinimoKwField, ventanaField, minutosField, temperaturaField, factorPotenciaField}) {
             field.setVisible(false);
         }
         eliminarBtn.setEnabled(false);
@@ -201,7 +201,7 @@ public class AlarmasConfigView extends VerticalLayout {
         }
 
         config.setHabilitada(habilitadaCheckbox.getValue());
-        config.setEpsilonKwh(epsilonField.getValue());
+        config.setUmbralMinimoKw(umbralMinimoKwField.getValue());
         config.setVentanaCiclos(ventanaField.getValue() == null ? null : ventanaField.getValue().intValue());
         config.setMinutosMaxEncendido(minutosField.getValue() == null ? null : minutosField.getValue().intValue());
         config.setTemperaturaMaxima(temperaturaField.getValue());
