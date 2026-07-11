@@ -173,10 +173,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     }
 
     private String formatoHoras(double horas) {
-        long totalMinutos = Math.round(horas * 60);
-        long h = totalMinutos / 60;
-        long m = totalMinutos % 60;
-        return String.format("%d:%02d", h, m);
+        return String.format("%.1f h", horas);
     }
 
     private record HorometroRow(String maquina, boolean encendida, double pwActual, double umbralKw,
