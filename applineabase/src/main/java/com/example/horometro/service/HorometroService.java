@@ -20,6 +20,7 @@ import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.temporal.IsoFields;
 import java.time.temporal.TemporalAdjusters;
 import java.util.concurrent.ConcurrentHashMap;
@@ -196,6 +197,12 @@ public class HorometroService {
 
     public HorometroSnapshot obtenerSnapshot(String linea) {
         return calcularSnapshot(linea, LocalDateTime.now());
+    }
+
+    /** Horas acumuladas de un mes calendario puntual, sin importar la fecha de hoy. */
+    public double horasDelMes(String linea, YearMonth mes) {
+        String anioMes = String.format("%04d-%02d", mes.getYear(), mes.getMonthValue());
+        return mensualRepository.findByLineaMaquinaAndAnioMes(linea, anioMes).map(HorometroMensual::getHoras).orElse(0.0);
     }
 
     private void publicarActualizacion(String linea) {

@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
@@ -159,9 +160,22 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
 
     private InputStream generarCsv(LocalDate fechaSeleccionada) {
         LocalDate fecha = fechaSeleccionada != null ? fechaSeleccionada : LocalDate.now();
+        LocalDate domingo = fecha.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        LocalDate lunes = domingo.minusDays(6);
+        YearMonth mesDeLunes = YearMonth.from(lunes);
+        YearMonth mesDeDomingo = YearMonth.from(domingo);
+        boolean semanaCruzaMes = !mesDeLunes.equals(mesDeDomingo);
+
         StringBuilder sb = new StringBuilder();
         sb.append('﻿'); // BOM UTF-8, para que Excel muestre bien tildes/ñ
-        sb.append("Linea;Lunes;Domingo;Horas domingo;Horas semana;Horas mes;Horas totales\r\n");
+        sb.append("Linea;Lunes;Domingo;Horas domingo;Horas semana;");
+        if (semanaCruzaMes) {
+            sb.append("Horas ").append(nombreMes(mesDeLunes)).append(';')
+                    .append("Horas ").append(nombreMes(mesDeDomingo)).append(';');
+        } else {
+            sb.append("Horas ").append(nombreMes(mesDeDomingo)).append(';');
+        }
+        sb.append("Horas totales\r\n");
 
         for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
             boolean aplicaHorometro = alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.DETENCION).isPresent()
@@ -174,15 +188,26 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
                     .append(r.lunes().format(FORMATO_FECHA_CORTA)).append(';')
                     .append(r.domingo().format(FORMATO_FECHA_CORTA)).append(';')
                     .append(formatoDecimalExcel(r.horasDomingo())).append(';')
-                    .append(formatoDecimalExcel(r.horasSemana())).append(';')
-                    .append(formatoDecimalExcel(r.horasMes())).append(';')
-                    .append(formatoDecimalExcel(r.horasTotal())).append("\r\n");
+                    .append(formatoDecimalExcel(r.horasSemana())).append(';');
+            if (semanaCruzaMes) {
+                double horasMesInicio = horometroService.horasDelMes(maquina, mesDeLunes);
+                sb.append(formatoDecimalExcel(horasMesInicio)).append(';')
+                        .append(formatoDecimalExcel(r.horasMes())).append(';');
+            } else {
+                sb.append(formatoDecimalExcel(r.horasMes())).append(';');
+            }
+            sb.append(formatoDecimalExcel(r.horasTotal())).append("\r\n");
         }
         return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     private static final Locale LOCALE_ES = Locale.of("es", "ES");
     private static final DateTimeFormatter FORMATO_FECHA_CORTA = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+    private static final DateTimeFormatter FORMATO_MES = DateTimeFormatter.ofPattern("MMMM yyyy", LOCALE_ES);
+
+    private String nombreMes(YearMonth mes) {
+        return mes.atDay(1).format(FORMATO_MES);
+    }
 
     private String formatoDecimalExcel(double valor) {
         return String.format(LOCALE_ES, "%.1f", valor);
