@@ -98,8 +98,9 @@ public class HorometroBackfillRunner implements ApplicationRunner {
             return;
         }
 
+        boolean esDetencion = config.getTipoAlarma() == TipoAlarma.DETENCION;
         double umbral = config.getUmbralMinimoKw() != null ? config.getUmbralMinimoKw() : UMBRAL_MINIMO_KW_DEFAULT;
-        int ventana = config.getTipoAlarma() == TipoAlarma.DETENCION
+        int ventana = esDetencion
                 ? (config.getVentanaCiclos() != null ? config.getVentanaCiclos() : VENTANA_CICLOS_DEFAULT)
                 : 1; // CICLO_COMPRESOR no tiene ventana de confirmación: es inmediato en ambas direcciones
 
@@ -107,18 +108,24 @@ public class HorometroBackfillRunner implements ApplicationRunner {
         Map<LocalDate, List<Muestra>> porDia = agruparPorDia(filas);
 
         LocalDate hoy = LocalDate.now();
+        Boolean encendidaAlCerrarUltimoDiaProcesado = null;
         for (Map.Entry<LocalDate, List<Muestra>> diaEntry : porDia.entrySet()) {
             LocalDate fecha = diaEntry.getKey();
             boolean esHoy = fecha.equals(hoy);
             if (!esHoy && diarioRepository.existsByLineaMaquinaAndFecha(linea, fecha)) {
                 continue; // día ya cerrado y calculado en un arranque anterior
             }
-            double horas = calcularHorasEncendidaEnDia(diaEntry.getValue(), umbral, ventana);
-            horometroService.fijarHorasDia(linea, fecha, horas);
+            ResultadoDia resultado = calcularHorasEncendidaEnDia(diaEntry.getValue(), umbral, ventana);
+            horometroService.fijarHorasDia(linea, fecha, resultado.horas());
+            encendidaAlCerrarUltimoDiaProcesado = resultado.terminoEncendida();
         }
 
-        boolean apagadaAhora = eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DETENCION).isPresent()
-                || eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.CICLO_COMPRESOR).isPresent();
+        // DETENCION ya no genera AlarmaEvento (es advertencia del horómetro, no alarma), así que
+        // el estado actual se deriva del propio cálculo batch, no de la tabla de alarmas.
+        // CICLO_COMPRESOR sigue generando AlarmaEvento normalmente, sin cambios.
+        boolean apagadaAhora = esDetencion
+                ? Boolean.FALSE.equals(encendidaAlCerrarUltimoDiaProcesado)
+                : eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.CICLO_COMPRESOR).isPresent();
         horometroService.inicializarEstadoEnVivo(linea, !apagadaAhora, LocalDateTime.now());
     }
 
@@ -148,7 +155,7 @@ public class HorometroBackfillRunner implements ApplicationRunner {
      * inmediato. Así un dato corrupto o un hueco de transmisión seguido de una lectura alta
      * no le resta horas al horómetro, tal como en vivo.
      */
-    private double calcularHorasEncendidaEnDia(List<Muestra> muestras, double umbral, int ventana) {
+    private ResultadoDia calcularHorasEncendidaEnDia(List<Muestra> muestras, double umbral, int ventana) {
         muestras.sort(Comparator.comparing(Muestra::fecha));
 
         double horas = 0.0;
@@ -177,7 +184,7 @@ public class HorometroBackfillRunner implements ApplicationRunner {
         if (inicioEncendido != null && !muestras.isEmpty()) {
             horas += horasEntre(inicioEncendido, muestras.get(muestras.size() - 1).fecha());
         }
-        return horas;
+        return new ResultadoDia(horas, inicioEncendido != null);
     }
 
     private double horasEntre(LocalDateTime desde, LocalDateTime hasta) {
@@ -188,5 +195,9 @@ public class HorometroBackfillRunner implements ApplicationRunner {
     }
 
     private record Muestra(LocalDateTime fecha, double pw) {
+    }
+
+    /** horas: total encendida en el día. terminoEncendida: si el día cerró sin confirmar apagado. */
+    private record ResultadoDia(double horas, boolean terminoEncendida) {
     }
 }

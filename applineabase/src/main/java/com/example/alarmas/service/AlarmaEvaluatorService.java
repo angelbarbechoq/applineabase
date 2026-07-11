@@ -30,13 +30,17 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   confirma que la máquina está apagada. La confirmación se reporta retroactivamente
  *   desde el primer ciclo de la racha (no desde el momento en que se confirma), para
  *   que el horómetro no pierda ni gane minutos por la ventana de confirmación.
+ *   A propósito NO genera AlarmaEvento ni notificación: "máquina parada" no se trata
+ *   como alarma, solo alimenta el estado ON/OFF del horómetro (ver HorometroView, que
+ *   lo muestra como advertencia amarilla, no como alarma roja).
  * - CICLO_COMPRESOR: PW por encima del umbral mínimo (encendido) de forma continua
- *   por más del máximo de minutos esperado (Sauer, CompAP).
+ *   por más del máximo de minutos esperado (Sauer, CompAP). Esta sí sigue siendo una
+ *   alarma normal (AlarmaEvento + notificación), sin cambios.
  * - TEMPERATURA_ALTA: valor de sensor por encima del máximo (TemperaturaAgua).
  * - FACTOR_POTENCIA_BAJO: |PF| bajo el mínimo (KWhPlanta1, Trafo1, Trafo2).
  *
- * Cada confirmación/resolución de DETENCION publica un MaquinaEstadoCambioEvent,
- * que es lo que consume HorometroService para acumular horas de funcionamiento.
+ * DETENCION y CICLO_COMPRESOR publican MaquinaEstadoCambioEvent en cada transición
+ * real de estado, que es lo que consume HorometroService para acumular horas.
  */
 @Service
 public class AlarmaEvaluatorService {
@@ -56,6 +60,7 @@ public class AlarmaEvaluatorService {
 
     private final ConcurrentHashMap<String, AtomicInteger> ciclosBajoUmbral = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LocalDateTime> inicioRachaBajoUmbral = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Boolean> detenidaConfirmada = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LocalDateTime> inicioEncendido = new ConcurrentHashMap<>();
 
     public AlarmaEvaluatorService(AlarmaConfigRepository configRepository, AlarmaEventoRepository eventoRepository,
@@ -91,17 +96,18 @@ public class AlarmaEvaluatorService {
             LocalDateTime inicioRacha = inicioRachaBajoUmbral.computeIfAbsent(linea, k -> fecha);
             int ciclos = ciclosBajoUmbral.computeIfAbsent(linea, k -> new AtomicInteger()).incrementAndGet();
             if (ciclos >= ventana) {
-                boolean disparada = dispararAlarma(linea, TipoAlarma.DETENCION, inicioRacha,
-                        String.format("%s detenida: PW %.2f kW bajo el umbral %.2f kW durante %d ciclos", linea, pw, umbral, ciclos));
-                if (disparada) {
+                boolean eraNuevaConfirmacion = !Boolean.TRUE.equals(detenidaConfirmada.put(linea, true));
+                if (eraNuevaConfirmacion) {
+                    logger.info("⏸️ {} parada: PW {} kW bajo el umbral {} kW durante {} ciclos (advertencia, sin alarma)",
+                            linea, pw, umbral, ciclos);
                     eventPublisher.publishEvent(new MaquinaEstadoCambioEvent(this, linea, false, inicioRacha));
                 }
             }
         } else {
             ciclosBajoUmbral.remove(linea);
             inicioRachaBajoUmbral.remove(linea);
-            boolean resuelta = resolverAlarma(linea, TipoAlarma.DETENCION, fecha);
-            if (resuelta) {
+            boolean estabaDetenida = Boolean.TRUE.equals(detenidaConfirmada.remove(linea));
+            if (estabaDetenida) {
                 eventPublisher.publishEvent(new MaquinaEstadoCambioEvent(this, linea, true, fecha));
             }
         }

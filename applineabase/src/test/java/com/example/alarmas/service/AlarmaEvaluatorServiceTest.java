@@ -56,32 +56,32 @@ class AlarmaEvaluatorServiceTest {
     }
 
     @Test
-    void detencion_se_dispara_tras_la_ventana_de_ciclos_y_se_resuelve_al_reanudar() {
+    void detencion_confirma_tras_la_ventana_de_ciclos_sin_generar_alarma_y_se_resuelve_al_reanudar() {
         String linea = "Linea02"; // sembrada por AlarmaConfigSeeder como DETENCION (umbral=0.5 kW, ventana=5)
         capturador.eventos.clear();
 
         for (int i = 0; i < 4; i++) {
             eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(0.0)));
         }
-        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DETENCION))
-                .as("no debe dispararse antes de completar la ventana")
-                .isEmpty();
+        assertThat(capturador.eventos)
+                .as("no debe confirmar el apagado antes de completar la ventana")
+                .noneMatch(e -> e.getNombreMaquina().equals(linea) && !e.isEncendida());
 
         eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(0.0)));
-        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DETENCION))
-                .as("debe dispararse al 5to ciclo consecutivo bajo el umbral")
-                .isPresent();
         assertThat(capturador.eventos)
-                .as("debe publicar el cambio de estado a apagada")
+                .as("debe publicar el cambio de estado a apagada al 5to ciclo consecutivo bajo el umbral")
                 .anyMatch(e -> e.getNombreMaquina().equals(linea) && !e.isEncendida());
+        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DETENCION))
+                .as("DETENCION ya no debe generar AlarmaEvento: es una advertencia del horómetro, no una alarma")
+                .isEmpty();
 
         eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(5.0)));
-        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DETENCION))
-                .as("debe resolverse en cuanto vuelve a consumir por encima del umbral")
-                .isEmpty();
         assertThat(capturador.eventos)
-                .as("debe publicar el cambio de estado a encendida")
+                .as("debe publicar el cambio de estado a encendida en cuanto vuelve a consumir por encima del umbral")
                 .anyMatch(e -> e.getNombreMaquina().equals(linea) && e.isEncendida());
+        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DETENCION))
+                .as("sigue sin haber ningún AlarmaEvento de DETENCION")
+                .isEmpty();
     }
 
     @Test

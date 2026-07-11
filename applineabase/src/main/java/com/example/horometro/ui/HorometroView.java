@@ -104,10 +104,23 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         }
     }
 
+    // "Parada" ya no es una alarma (a pedido: no queremos que dispare alarma/notificación),
+    // así que se muestra como advertencia amarilla, no en rojo como el resto de las alarmas.
+    private static final String COLOR_ADVERTENCIA_FONDO = "#fff3cd";
+    private static final String COLOR_ADVERTENCIA_TEXTO = "#856404";
+
     private Span estadoBadge(HorometroRow r) {
-        Span badge = new Span(r.encendida() ? "ON" : "OFF");
+        if (r.encendida()) {
+            Span badge = new Span("ENCENDIDA");
+            badge.getElement().getThemeList().add("badge");
+            badge.getElement().getThemeList().add("success");
+            return badge;
+        }
+        Span badge = new Span("⚠ PARADA");
         badge.getElement().getThemeList().add("badge");
-        badge.getElement().getThemeList().add(r.encendida() ? "success" : "error");
+        badge.getStyle()
+                .set("background-color", COLOR_ADVERTENCIA_FONDO)
+                .set("color", COLOR_ADVERTENCIA_TEXTO);
         return badge;
     }
 
