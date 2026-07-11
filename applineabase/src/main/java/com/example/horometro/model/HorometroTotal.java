@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /**
  * Horas acumuladas sin límite de tiempo por máquina. Una fila por línea/máquina.
- * Solo se pone en cero mediante un reinicio manual desde la UI (ver HorometroResetLog).
+ * Es permanente: no existe forma de ponerlo en cero, igual que un horómetro físico.
  */
 @Entity
 @Table(name = "horometro_total")
@@ -27,8 +27,6 @@ public class HorometroTotal {
 
     /** Último instante de datos ya incorporado al acumulado (checkpoint del backfill incremental). */
     private LocalDateTime fechaUltimoProcesado;
-
-    private LocalDateTime fechaUltimoReset;
 
     public HorometroTotal() {
     }
@@ -68,13 +66,5 @@ public class HorometroTotal {
 
     public void setFechaUltimoProcesado(LocalDateTime fechaUltimoProcesado) {
         this.fechaUltimoProcesado = fechaUltimoProcesado;
-    }
-
-    public LocalDateTime getFechaUltimoReset() {
-        return fechaUltimoReset;
-    }
-
-    public void setFechaUltimoReset(LocalDateTime fechaUltimoReset) {
-        this.fechaUltimoReset = fechaUltimoReset;
     }
 }

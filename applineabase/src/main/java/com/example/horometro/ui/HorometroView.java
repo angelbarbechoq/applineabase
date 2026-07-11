@@ -9,9 +9,6 @@ import com.example.base.ui.MainLayout;
 import com.example.horometro.service.HorometroService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
@@ -23,9 +20,7 @@ import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
-import com.vaadin.flow.spring.security.AuthenticationContext;
 import jakarta.annotation.security.PermitAll;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,16 +46,14 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private final HorometroService horometroService;
     private final LineaAccessService lineaAccessService;
     private final AlarmaConfigRepository alarmaConfigRepository;
-    private final AuthenticationContext authenticationContext;
 
     private final Grid<HorometroRow> grid = new Grid<>(HorometroRow.class, false);
 
     public HorometroView(HorometroService horometroService, LineaAccessService lineaAccessService,
-                          AlarmaConfigRepository alarmaConfigRepository, AuthenticationContext authenticationContext) {
+                          AlarmaConfigRepository alarmaConfigRepository) {
         this.horometroService = horometroService;
         this.lineaAccessService = lineaAccessService;
         this.alarmaConfigRepository = alarmaConfigRepository;
-        this.authenticationContext = authenticationContext;
 
         setSizeFull();
         setPadding(true);
@@ -79,9 +72,6 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         grid.addColumn(r -> formatoHoras(r.horasMes())).setHeader("Horas del mes").setAutoWidth(true).setSortable(true);
         grid.addColumn(r -> formatoHoras(r.horasTotal())).setHeader("Horas totales").setAutoWidth(true).setSortable(true);
         grid.addColumn(r -> formatoFechaDesde(r.desdeCuandoCuentaTotal())).setHeader("Total desde").setAutoWidth(true).setSortable(true);
-        if (lineaAccessService.esAdmin()) {
-            grid.addComponentColumn(this::botonReiniciar).setHeader("Reiniciar total").setAutoWidth(true);
-        }
         grid.setSizeFull();
 
         add(grid);
@@ -123,36 +113,6 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
                 .set("background-color", COLOR_ADVERTENCIA_FONDO)
                 .set("color", COLOR_ADVERTENCIA_TEXTO);
         return badge;
-    }
-
-    private Button botonReiniciar(HorometroRow r) {
-        Button btn = new Button("Reiniciar", e -> confirmarReinicio(r.maquina()));
-        btn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
-        return btn;
-    }
-
-    private void confirmarReinicio(String maquina) {
-        ConfirmDialog dialog = new ConfirmDialog();
-        dialog.setHeader("Reiniciar horómetro total de " + maquina);
-        dialog.setText("Esto pone en cero las horas acumuladas sin límite de tiempo. Queda registrado en el "
-                + "historial de reinicios (con las horas que tenía justo antes) para trazabilidad de mantenimiento. "
-                + "Esta acción no se puede deshacer.");
-        dialog.setCancelable(true);
-        dialog.setConfirmText("Reiniciar");
-        dialog.setConfirmButtonTheme("error primary");
-        dialog.addConfirmListener(e -> {
-            horometroService.reiniciarHorometroTotal(maquina, nombreUsuarioActual());
-            Notification.show("Horómetro de " + maquina + " reiniciado", 2500, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            refrescarGrid();
-        });
-        dialog.open();
-    }
-
-    private String nombreUsuarioActual() {
-        return authenticationContext.getAuthenticatedUser(UserDetails.class)
-                .map(UserDetails::getUsername)
-                .orElse("desconocido");
     }
 
     private void refrescarGrid() {

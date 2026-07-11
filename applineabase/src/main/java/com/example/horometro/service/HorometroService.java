@@ -5,14 +5,10 @@ import com.example.dataacquisition.event.MaquinaEstadoCambioEvent;
 import com.example.horometro.event.HorometroUpdateEvent;
 import com.example.horometro.model.HorometroDiario;
 import com.example.horometro.model.HorometroMensual;
-import com.example.horometro.model.HorometroResetLog;
 import com.example.horometro.model.HorometroTotal;
 import com.example.horometro.repository.HorometroDiarioRepository;
 import com.example.horometro.repository.HorometroMensualRepository;
-import com.example.horometro.repository.HorometroResetLogRepository;
 import com.example.horometro.repository.HorometroTotalRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -38,12 +34,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class HorometroService {
 
-    private static final Logger logger = LoggerFactory.getLogger(HorometroService.class);
-
     private final HorometroTotalRepository totalRepository;
     private final HorometroDiarioRepository diarioRepository;
     private final HorometroMensualRepository mensualRepository;
-    private final HorometroResetLogRepository resetLogRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     /** Línea -> instante en que se confirmó que está encendida (tramo en curso, aún no cerrado). */
@@ -53,12 +46,10 @@ public class HorometroService {
     private final ConcurrentHashMap<String, Double> ultimoPwPorLinea = new ConcurrentHashMap<>();
 
     public HorometroService(HorometroTotalRepository totalRepository, HorometroDiarioRepository diarioRepository,
-                             HorometroMensualRepository mensualRepository, HorometroResetLogRepository resetLogRepository,
-                             ApplicationEventPublisher eventPublisher) {
+                             HorometroMensualRepository mensualRepository, ApplicationEventPublisher eventPublisher) {
         this.totalRepository = totalRepository;
         this.diarioRepository = diarioRepository;
         this.mensualRepository = mensualRepository;
-        this.resetLogRepository = resetLogRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -189,17 +180,6 @@ public class HorometroService {
         }
     }
 
-    @Transactional
-    public void reiniciarHorometroTotal(String linea, String usuario) {
-        HorometroTotal total = obtenerOCrearTotal(linea);
-        resetLogRepository.save(new HorometroResetLog(linea, LocalDateTime.now(), total.getHorasAcumuladas(), usuario));
-        total.setHorasAcumuladas(0.0);
-        total.setFechaUltimoReset(LocalDateTime.now());
-        totalRepository.save(total);
-        logger.info("Horómetro total reiniciado para {} por {}", linea, usuario);
-        publicarActualizacion(linea);
-    }
-
     public HorometroSnapshot obtenerSnapshot(String linea) {
         return calcularSnapshot(linea, LocalDateTime.now());
     }
@@ -217,8 +197,7 @@ public class HorometroService {
         double horasMes = mensualRepository.findByLineaMaquinaAndAnioMes(linea, anioMes(ahora.toLocalDate()))
                 .map(HorometroMensual::getHoras).orElse(0.0);
         double horasTotal = total == null ? 0.0 : total.getHorasAcumuladas();
-        LocalDateTime desdeCuandoCuentaTotal = total == null ? null
-                : (total.getFechaUltimoReset() != null ? total.getFechaUltimoReset() : total.getFechaInicio());
+        LocalDateTime desdeCuandoCuentaTotal = total == null ? null : total.getFechaInicio();
 
         LocalDateTime inicioActual = inicioEncendidoActual.get(linea);
         boolean encendida = inicioActual != null;
