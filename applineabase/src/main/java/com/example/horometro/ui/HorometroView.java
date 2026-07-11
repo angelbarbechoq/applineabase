@@ -78,6 +78,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         grid.addColumn(r -> formatoHoras(r.horasHoy())).setHeader("Horas hoy").setAutoWidth(true).setSortable(true);
         grid.addColumn(r -> formatoHoras(r.horasMes())).setHeader("Horas del mes").setAutoWidth(true).setSortable(true);
         grid.addColumn(r -> formatoHoras(r.horasTotal())).setHeader("Horas totales").setAutoWidth(true).setSortable(true);
+        grid.addColumn(r -> formatoFechaDesde(r.desdeCuandoCuentaTotal())).setHeader("Total desde").setAutoWidth(true).setSortable(true);
         if (lineaAccessService.esAdmin()) {
             grid.addComponentColumn(this::botonReiniciar).setHeader("Reiniciar total").setAutoWidth(true);
         }
@@ -167,7 +168,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
             Double pw = horometroService.getUltimoPw(maquina);
             double umbral = config.getUmbralMinimoKw() != null ? config.getUmbralMinimoKw() : 0.0;
             filas.add(new HorometroRow(maquina, snap.encendida(), pw == null ? 0.0 : pw, umbral,
-                    snap.horasHoy(), snap.horasMes(), snap.horasTotal()));
+                    snap.horasHoy(), snap.horasMes(), snap.horasTotal(), snap.desdeCuandoCuentaTotal()));
         }
         grid.setItems(filas);
     }
@@ -176,7 +177,15 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         return String.format("%.1f h", horas);
     }
 
+    private String formatoFechaDesde(java.time.LocalDateTime fecha) {
+        return fecha == null ? "-" : fecha.format(FORMATO_FECHA_DESDE);
+    }
+
+    private static final java.time.format.DateTimeFormatter FORMATO_FECHA_DESDE =
+            java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+
     private record HorometroRow(String maquina, boolean encendida, double pwActual, double umbralKw,
-                                 double horasHoy, double horasMes, double horasTotal) {
+                                 double horasHoy, double horasMes, double horasTotal,
+                                 java.time.LocalDateTime desdeCuandoCuentaTotal) {
     }
 }

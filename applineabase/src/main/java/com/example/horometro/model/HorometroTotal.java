@@ -22,6 +22,9 @@ public class HorometroTotal {
     @Column(nullable = false)
     private double horasAcumuladas;
 
+    /** Fecha del dato más antiguo incorporado al acumulado (desde cuándo cuenta este total). */
+    private LocalDateTime fechaInicio;
+
     /** Último instante de datos ya incorporado al acumulado (checkpoint del backfill incremental). */
     private LocalDateTime fechaUltimoProcesado;
 
@@ -49,6 +52,14 @@ public class HorometroTotal {
 
     public void setHorasAcumuladas(double horasAcumuladas) {
         this.horasAcumuladas = horasAcumuladas;
+    }
+
+    public LocalDateTime getFechaInicio() {
+        return fechaInicio;
+    }
+
+    public void setFechaInicio(LocalDateTime fechaInicio) {
+        this.fechaInicio = fechaInicio;
     }
 
     public LocalDateTime getFechaUltimoProcesado() {

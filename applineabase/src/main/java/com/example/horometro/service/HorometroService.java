@@ -166,6 +166,20 @@ public class HorometroService {
         return totalRepository.findById(linea).orElseGet(() -> totalRepository.save(new HorometroTotal(linea)));
     }
 
+    /**
+     * Fija desde cuándo cuenta el total, solo si todavía no tiene una (no la pisa en
+     * arranques posteriores). Llamado por el backfill con la fecha del dato más antiguo
+     * que encontró para esa máquina.
+     */
+    @Transactional
+    public void marcarFechaInicioSiNoExiste(String linea, LocalDateTime fechaInicio) {
+        HorometroTotal total = obtenerOCrearTotal(linea);
+        if (total.getFechaInicio() == null) {
+            total.setFechaInicio(fechaInicio);
+            totalRepository.save(total);
+        }
+    }
+
     /** Llamado por el backfill al terminar, para que la acumulación en vivo continúe desde ahí. */
     public void inicializarEstadoEnVivo(String linea, boolean encendidaAhora, LocalDateTime desde) {
         if (encendidaAhora) {
@@ -197,11 +211,14 @@ public class HorometroService {
     }
 
     private HorometroSnapshot calcularSnapshot(String linea, LocalDateTime ahora) {
+        HorometroTotal total = totalRepository.findById(linea).orElse(null);
         double horasHoy = diarioRepository.findByLineaMaquinaAndFecha(linea, ahora.toLocalDate())
                 .map(HorometroDiario::getHoras).orElse(0.0);
         double horasMes = mensualRepository.findByLineaMaquinaAndAnioMes(linea, anioMes(ahora.toLocalDate()))
                 .map(HorometroMensual::getHoras).orElse(0.0);
-        double horasTotal = totalRepository.findById(linea).map(HorometroTotal::getHorasAcumuladas).orElse(0.0);
+        double horasTotal = total == null ? 0.0 : total.getHorasAcumuladas();
+        LocalDateTime desdeCuandoCuentaTotal = total == null ? null
+                : (total.getFechaUltimoReset() != null ? total.getFechaUltimoReset() : total.getFechaInicio());
 
         LocalDateTime inicioActual = inicioEncendidoActual.get(linea);
         boolean encendida = inicioActual != null;
@@ -212,7 +229,7 @@ public class HorometroService {
             horasMes += horasEntre(inicioActual, ahora);
             horasTotal += horasEntre(inicioActual, ahora);
         }
-        return new HorometroSnapshot(linea, encendida, horasHoy, horasMes, horasTotal);
+        return new HorometroSnapshot(linea, encendida, horasHoy, horasMes, horasTotal, desdeCuandoCuentaTotal);
     }
 
     private double horasEntre(LocalDateTime desde, LocalDateTime hasta) {
@@ -226,6 +243,7 @@ public class HorometroService {
         return String.format("%04d-%02d", fecha.getYear(), fecha.getMonthValue());
     }
 
-    public record HorometroSnapshot(String linea, boolean encendida, double horasHoy, double horasMes, double horasTotal) {
+    public record HorometroSnapshot(String linea, boolean encendida, double horasHoy, double horasMes,
+                                     double horasTotal, LocalDateTime desdeCuandoCuentaTotal) {
     }
 }

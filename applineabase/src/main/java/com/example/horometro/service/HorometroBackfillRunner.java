@@ -107,6 +107,9 @@ public class HorometroBackfillRunner implements ApplicationRunner {
         List<Map<String, Object>> filas = plcDataQueryService.getHistoricoVIPByRango(linea, desde, hasta);
         Map<LocalDate, List<Muestra>> porDia = agruparPorDia(filas);
 
+        porDia.values().stream().findFirst().flatMap(muestras -> muestras.stream().map(Muestra::fecha).min(LocalDateTime::compareTo))
+                .ifPresent(primeraFecha -> horometroService.marcarFechaInicioSiNoExiste(linea, primeraFecha));
+
         LocalDate hoy = LocalDate.now();
         Boolean encendidaAlCerrarUltimoDiaProcesado = null;
         for (Map.Entry<LocalDate, List<Muestra>> diaEntry : porDia.entrySet()) {
