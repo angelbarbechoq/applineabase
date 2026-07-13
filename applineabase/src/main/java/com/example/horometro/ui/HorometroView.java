@@ -6,9 +6,12 @@ import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.ui.AlarmasConfigView;
 import com.example.base.ui.ChartsView;
 import com.example.base.ui.MainLayout;
+import com.example.horometro.service.HorometroBackfillRunner;
 import com.example.horometro.service.HorometroService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Anchor;
@@ -59,14 +62,16 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private static final int POLL_INTERVAL_MS = 30000;
 
     private final HorometroService horometroService;
+    private final HorometroBackfillRunner horometroBackfillRunner;
     private final LineaAccessService lineaAccessService;
     private final AlarmaConfigRepository alarmaConfigRepository;
 
     private final Grid<HorometroRow> grid = new Grid<>(HorometroRow.class, false);
 
-    public HorometroView(HorometroService horometroService, LineaAccessService lineaAccessService,
-                          AlarmaConfigRepository alarmaConfigRepository) {
+    public HorometroView(HorometroService horometroService, HorometroBackfillRunner horometroBackfillRunner,
+                          LineaAccessService lineaAccessService, AlarmaConfigRepository alarmaConfigRepository) {
         this.horometroService = horometroService;
+        this.horometroBackfillRunner = horometroBackfillRunner;
         this.lineaAccessService = lineaAccessService;
         this.alarmaConfigRepository = alarmaConfigRepository;
 
@@ -88,6 +93,9 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         grid.addColumn(r -> formatoHoras(r.horasMes())).setHeader("Horas del mes").setAutoWidth(true).setSortable(true);
         grid.addColumn(r -> formatoHoras(r.horasTotal())).setHeader("Horas totales").setAutoWidth(true).setSortable(true);
         grid.addColumn(r -> formatoFechaDesde(r.desdeCuandoCuentaTotal())).setHeader("Total desde").setAutoWidth(true).setSortable(true);
+        if (lineaAccessService.esAdmin()) {
+            grid.addComponentColumn(this::botonRecalcular).setHeader("Recalcular").setAutoWidth(true);
+        }
         grid.setSizeFull();
 
         add(grid);
@@ -129,6 +137,24 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
                 .set("background-color", COLOR_ADVERTENCIA_FONDO)
                 .set("color", COLOR_ADVERTENCIA_TEXTO);
         return badge;
+    }
+
+    /**
+     * Fuerza el recálculo completo del histórico de una máquina con el umbral vigente en
+     * este momento. Necesario porque el backfill normal se salta los días ya calculados —
+     * si acabas de ajustar el umbral en AlarmasConfigView, los días viejos quedarían con el
+     * cálculo hecho con el umbral anterior hasta el próximo reinicio de la app, a menos que
+     * uses este botón.
+     */
+    private Button botonRecalcular(HorometroRow r) {
+        Button btn = new Button("Recalcular", e -> {
+            horometroBackfillRunner.recalcularLinea(r.maquina());
+            Notification.show("Horas de " + r.maquina() + " recalculadas con el umbral actual",
+                    3000, Notification.Position.BOTTOM_END).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            refrescarGrid();
+        });
+        btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+        return btn;
     }
 
     /**

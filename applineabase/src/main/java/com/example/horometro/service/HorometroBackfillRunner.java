@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 
 /**
@@ -39,6 +40,10 @@ import java.util.TreeMap;
  *
  * Corre después de AlarmaConfigSeeder (@Order(1)) porque necesita que las reglas de
  * alarma (umbralMinimoKw, ventanaCiclos) ya existan.
+ *
+ * También expone recalcularLinea(linea), invocable desde HorometroView (ADMIN) para
+ * forzar el recálculo completo de una máquina con el umbral vigente, sin esperar al
+ * próximo reinicio — útil mientras se está calibrando el umbral de una línea.
  */
 @Component
 @Order(2)
@@ -84,7 +89,7 @@ public class HorometroBackfillRunner implements ApplicationRunner {
         logger.info("Backfill de horómetro: {} líneas, rango {} a {}", lineasTrackeables.size(), desde, hasta);
         for (Map.Entry<String, AlarmaConfig> entry : lineasTrackeables.entrySet()) {
             try {
-                backfillLinea(entry.getKey(), entry.getValue(), desde, hasta);
+                backfillLinea(entry.getKey(), entry.getValue(), desde, hasta, false);
             } catch (Exception e) {
                 logger.error("Error en backfill de horómetro para {}: {}", entry.getKey(), e.getMessage(), e);
             }
@@ -92,7 +97,26 @@ public class HorometroBackfillRunner implements ApplicationRunner {
         logger.info("Backfill de horómetro completado");
     }
 
-    private void backfillLinea(String linea, AlarmaConfig config, LocalDate desde, LocalDate hasta) {
+    /**
+     * Recalcula TODO el histórico de una línea con el umbral/ventana que tenga configurado
+     * en este momento, ignorando los días ya calculados. Para cuando el ADMIN ajusta el
+     * umbral en AlarmasConfigView y quiere ver el efecto en las horas sin esperar al
+     * próximo reinicio de la app.
+     */
+    public void recalcularLinea(String linea) {
+        Optional<AlarmaConfig> config = configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.DETENCION)
+                .or(() -> configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.CICLO_COMPRESOR));
+        if (config.isEmpty()) {
+            return;
+        }
+        List<YearMonth> meses = databaseInitializationService.listarMesesDisponibles();
+        LocalDate hasta = LocalDate.now();
+        LocalDate desde = meses.isEmpty() ? hasta : meses.get(0).atDay(1);
+        logger.info("Recálculo manual de horómetro para {}, rango {} a {}", linea, desde, hasta);
+        backfillLinea(linea, config.get(), desde, hasta, true);
+    }
+
+    private void backfillLinea(String linea, AlarmaConfig config, LocalDate desde, LocalDate hasta, boolean forzarTodo) {
         horometroService.obtenerOCrearTotal(linea);
         if (desde.isAfter(hasta)) {
             return;
@@ -115,7 +139,7 @@ public class HorometroBackfillRunner implements ApplicationRunner {
         for (Map.Entry<LocalDate, List<Muestra>> diaEntry : porDia.entrySet()) {
             LocalDate fecha = diaEntry.getKey();
             boolean esHoy = fecha.equals(hoy);
-            if (!esHoy && diarioRepository.existsByLineaMaquinaAndFecha(linea, fecha)) {
+            if (!forzarTodo && !esHoy && diarioRepository.existsByLineaMaquinaAndFecha(linea, fecha)) {
                 continue; // día ya cerrado y calculado en un arranque anterior
             }
             ResultadoDia resultado = calcularHorasEncendidaEnDia(diaEntry.getValue(), umbral, ventana);
