@@ -51,7 +51,7 @@ public class HorometroBackfillRunner implements ApplicationRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(HorometroBackfillRunner.class);
     private static final DateTimeFormatter FECHA_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-    private static final double UMBRAL_MINIMO_KW_DEFAULT = 0.5;
+    private static final double UMBRAL_MINIMO_KW_DEFAULT = 15.0;
     private static final int VENTANA_CICLOS_DEFAULT = 5;
 
     private final AlarmaConfigRepository configRepository;

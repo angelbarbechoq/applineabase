@@ -47,7 +47,7 @@ public class AlarmaEvaluatorService {
 
     private static final Logger logger = LoggerFactory.getLogger(AlarmaEvaluatorService.class);
 
-    private static final double UMBRAL_MINIMO_KW_DEFAULT = 0.5;
+    private static final double UMBRAL_MINIMO_KW_DEFAULT = 15.0;
     private static final int VENTANA_CICLOS_DEFAULT = 5;
     private static final int MINUTOS_MAX_DEFAULT = 15;
     private static final double TEMPERATURA_MAX_DEFAULT = 13.0;

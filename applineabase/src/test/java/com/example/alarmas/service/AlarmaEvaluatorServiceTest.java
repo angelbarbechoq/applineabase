@@ -57,7 +57,7 @@ class AlarmaEvaluatorServiceTest {
 
     @Test
     void detencion_confirma_tras_la_ventana_de_ciclos_sin_generar_alarma_y_se_resuelve_al_reanudar() {
-        String linea = "Linea02"; // sembrada por AlarmaConfigSeeder como DETENCION (umbral=0.5 kW, ventana=5)
+        String linea = "Linea02"; // sembrada por AlarmaConfigSeeder como DETENCION (umbral=15 kW, ventana=5)
         capturador.eventos.clear();
 
         for (int i = 0; i < 4; i++) {
@@ -75,7 +75,7 @@ class AlarmaEvaluatorServiceTest {
                 .as("DETENCION ya no debe generar AlarmaEvento: es una advertencia del horómetro, no una alarma")
                 .isEmpty();
 
-        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(5.0)));
+        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(20.0)));
         assertThat(capturador.eventos)
                 .as("debe publicar el cambio de estado a encendida en cuanto vuelve a consumir por encima del umbral")
                 .anyMatch(e -> e.getNombreMaquina().equals(linea) && e.isEncendida());
@@ -91,7 +91,7 @@ class AlarmaEvaluatorServiceTest {
         config.setMinutosMaxEncendido(0); // dispara en cuanto transcurre >= 0 minutos, sin esperar en tiempo real
         configRepository.save(config);
 
-        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(5.0)));
+        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(20.0)));
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.CICLO_COMPRESOR))
                 .as("con minutosMax=0 debe dispararse en el primer ciclo encendido")
                 .isPresent();

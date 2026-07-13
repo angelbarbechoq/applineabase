@@ -33,7 +33,7 @@ public class AlarmaConfigSeeder implements CommandLineRunner {
      * un punto de partida: el ADMIN debe ajustarlo por línea desde AlarmasConfigView /
      * HorometroView observando el PW real de cada una antes de confiar en la alarma.
      */
-    private static final double UMBRAL_MINIMO_KW_DEFAULT = 0.5;
+    private static final double UMBRAL_MINIMO_KW_DEFAULT = 15.0;
 
     private static final Set<String> COMPRESORES_CICLICOS = Set.of("CompAP", "Sauer");
     private static final Set<String> SENSORES_SIN_KWH = Set.of(
