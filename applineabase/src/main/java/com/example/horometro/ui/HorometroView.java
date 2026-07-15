@@ -82,6 +82,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         add(new H3("Horómetro de Máquinas"));
         if (lineaAccessService.esAdmin()) {
             add(new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class));
+            add(crearBotonRecalcularTodos());
             add(crearExportadorCsv());
         }
 
@@ -154,6 +155,34 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
             refrescarGrid();
         });
         btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+        return btn;
+    }
+
+    /**
+     * Recalcula TODAS las máquinas visibles, una por una. Es notoriamente más lento que
+     * el botón individual — cada línea implica volver a leer sus archivos SQLite mensuales
+     * completos, y ese costo no se comparte entre líneas (cada una vive en su propia tabla).
+     * Útil después de reparar la base de energía completa (ver "Reparar VIP Mensual") en vez
+     * de tener que entrar línea por línea.
+     */
+    private Button crearBotonRecalcularTodos() {
+        Button btn = new Button("Recalcular todas las máquinas", e -> {
+            int total = 0;
+            for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
+                boolean aplicaHorometro = alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.DETENCION).isPresent()
+                        || alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.CICLO_COMPRESOR).isPresent();
+                if (!aplicaHorometro) {
+                    continue;
+                }
+                horometroBackfillRunner.recalcularLinea(maquina);
+                total++;
+            }
+            Notification.show(total + " máquinas recalculadas con el umbral actual",
+                            3000, Notification.Position.BOTTOM_END)
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            refrescarGrid();
+        });
+        btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         return btn;
     }
 
