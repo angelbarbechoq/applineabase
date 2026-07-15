@@ -206,6 +206,7 @@ public final class MainLayout extends AppLayout {
         if (lineaAccessService.esAdmin()) {
             nav.addItem(new SideNavItem("Config. Alarmas", "alarmas/config", VaadinIcon.COG.create()));
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
+            nav.addItem(new SideNavItem("Reparar VIP Mensual", "admin/reparar-vip", VaadinIcon.WRENCH.create()));
         }
         //nav.addSelectionListener(e -> setDrawerOpened(false));
         return nav;
