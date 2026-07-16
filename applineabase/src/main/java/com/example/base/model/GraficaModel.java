@@ -132,7 +132,7 @@ public class GraficaModel {
                         "    inst.marcadores = [];" +
                         "    inst.xAxis.zoom(0, 1);" +
                         "    inst.yAxis.zoomToValues(" + minY + ", " + maxY + ");" +
-                        "    $0.$server.limpiarTarjetas();"+
+                        "    if ($0.$server && $0.$server.limpiarTarjetas) { $0.$server.limpiarTarjetas(); }"+
                         "  } else {" +
                         "    try {" +
                         "      var timestamp = null;" +
@@ -183,7 +183,7 @@ public class GraficaModel {
                         "        }" +
                         "        range.get('label').setAll({ text: textoFinalLabel, fontWeight: 'bold', fontSize: '10px', visible: true, inside: true, centerX: am5.p0, centerY: am5.p100, dy: offsetUp - 25, dx: 5 });" +
                         "        inst.tiemposMarcadores.push(timestamp);" +
-                        "        $0.$server.registrarClickEnGrafica(timestamp);" +
+                        "        if ($0.$server && $0.$server.registrarClickEnGrafica) { $0.$server.registrarClickEnGrafica(timestamp); }" +
                         "      }" +
                         "    } catch(e) {" +
                         "      console.error('Error:', e);" +
