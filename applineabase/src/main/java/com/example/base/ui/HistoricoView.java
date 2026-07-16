@@ -208,7 +208,6 @@ public class HistoricoView extends VerticalLayout {
                 }
 
                 graficaKWh.setSeriesNames(new String[]{"Datos"});
-                double maxValor = 0;
                 SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
                 List<Long> timestamps = new java.util.ArrayList<>();
                 List<Float> valores = new java.util.ArrayList<>();
@@ -221,7 +220,6 @@ public class HistoricoView extends VerticalLayout {
                             double anterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
                             double dif = actual - anterior;
                             if (dif < 0) dif = 0;
-                            maxValor = Math.max(maxValor, dif);
 
                             long ts = sdf.parse((String) datos.get(i).get("fecha")).getTime();
                             timestamps.add(ts);
@@ -233,7 +231,6 @@ public class HistoricoView extends VerticalLayout {
                     for (Map<String, Object> row : datos) {
                         try {
                             double valor = ((Number) row.get("kwh")).doubleValue();
-                            maxValor = Math.max(maxValor, valor);
 
                             long ts = sdf.parse((String) row.get("fecha")).getTime();
                             timestamps.add(ts);
@@ -243,8 +240,11 @@ public class HistoricoView extends VerticalLayout {
                 }
 
                 graficaKWh.setMinY(0.0);
-                // El piso (KWH_MAX_Y_DEFAULT) se amplía si los datos reales lo superan
-                graficaKWh.setMaxY(Math.max(KWH_MAX_Y_DEFAULT, maxValor * 1.1));
+                // El piso (KWH_MAX_Y_DEFAULT) se amplía si los datos reales lo superan.
+                // Se usa el percentil 95 en vez del máximo crudo para que un pico atípico
+                // (p.ej. por una falla de comunicación) no infle toda la escala.
+                double p95 = GraficaModel.percentil(valores, 0.95);
+                graficaKWh.setMaxY(Math.max(KWH_MAX_Y_DEFAULT, p95 * 1.1));
 
                 StringBuilder batchScript = new StringBuilder();
                 batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
@@ -285,16 +285,16 @@ public class HistoricoView extends VerticalLayout {
                 graficaPF.setSeriesNames(new String[]{"PF"});
             }
 
-            double maxVal = 0;
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
             List<Long> timestamps = new java.util.ArrayList<>();
             List<Float[]> valoresPorFila = new java.util.ArrayList<>();
+            List<Float> valoresParaEscala = new java.util.ArrayList<>();
 
             for (Map<String, Object> row : datos) {
                 try {
                     Float[] values = extractValues(row, tipoVar);
                     for (Float v : values) {
-                        if (v != null && v > 0) maxVal = Math.max(maxVal, v);
+                        if (v != null && v > 0) valoresParaEscala.add(v);
                     }
                     long ts = sdf.parse((String) row.get("fecha")).getTime();
                     timestamps.add(ts);
@@ -303,13 +303,16 @@ public class HistoricoView extends VerticalLayout {
             }
 
             // Establecer maxY dinámico ANTES de generar el script de inicialización:
-            // el piso por defecto se amplía si los datos reales lo superan
+            // el piso por defecto se amplía si los datos reales lo superan. Se usa el
+            // percentil 95 en vez del máximo crudo para que un pico atípico (p.ej. por
+            // una falla de comunicación) no infle toda la escala.
+            double p95 = GraficaModel.percentil(valoresParaEscala, 0.95);
             if (tipoVar.equals("Voltajes")) {
-                graficaVoltajes.setMaxY(Math.max(VOLTAJES_MAX_Y_DEFAULT, maxVal * 1.1));
+                graficaVoltajes.setMaxY(Math.max(VOLTAJES_MAX_Y_DEFAULT, p95 * 1.1));
             } else if (tipoVar.equals("Corrientes")) {
-                graficaCorrientes.setMaxY(Math.max(CORRIENTES_MAX_Y_DEFAULT, maxVal * 1.1));
+                graficaCorrientes.setMaxY(Math.max(CORRIENTES_MAX_Y_DEFAULT, p95 * 1.1));
             } else if (tipoVar.equals("PW")) {
-                graficaPW.setMaxY(Math.max(PW_MAX_Y_DEFAULT, maxVal * 1.1));
+                graficaPW.setMaxY(Math.max(PW_MAX_Y_DEFAULT, p95 * 1.1));
             } else if (tipoVar.equals("PF")) {
                 graficaPF.setMaxY(1.0);
             }

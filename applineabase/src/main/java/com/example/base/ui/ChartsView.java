@@ -227,8 +227,8 @@ public class ChartsView extends VerticalLayout {
             }
 
             SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-            double maxValor = 0;
             List<Map<String, Object>> datosProcessados = new java.util.ArrayList<>();
+            List<Float> valoresParaEscala = new java.util.ArrayList<>();
 
             // CONDICIONANTE: calcula diferencia o toma valor directo
             if (conDiferencia) {
@@ -237,7 +237,7 @@ public class ChartsView extends VerticalLayout {
                     double kwhActual = ((Number) datos.get(i).get("kwh")).doubleValue();
                     double kwhAnterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
                     double diferencia = kwhActual - kwhAnterior;
-                    maxValor = Math.max(maxValor, diferencia);
+                    valoresParaEscala.add((float) diferencia);
 
                     Map<String, Object> registro = new java.util.HashMap<>();
                     registro.put("fecha", datos.get(i).get("fecha"));
@@ -248,7 +248,7 @@ public class ChartsView extends VerticalLayout {
                 // SIN DIFERENCIA (valor directo)
                 for (Map<String, Object> registro : datos) {
                     double kwhActual = ((Number) registro.get("kwh")).doubleValue();
-                    maxValor = Math.max(maxValor, kwhActual);
+                    valoresParaEscala.add((float) kwhActual);
 
                     Map<String, Object> registroNuevo = new java.util.HashMap<>();
                     registroNuevo.put("fecha", registro.get("fecha"));
@@ -261,8 +261,11 @@ public class ChartsView extends VerticalLayout {
             graficaModel.setSeriesNames(new String[]{"KWh"});
             graficaModel.setMinY(0.0);
             graficaModel.aplicarRangosPredefinidos(maquina);
-            // El preset actúa como piso; si los datos reales lo superan, se amplía el eje
-            double maxConMargen = maxValor * 1.1;
+            // El preset actúa como piso; si los datos reales lo superan, se amplía el eje.
+            // Se usa el percentil 95 en vez del máximo crudo para que un pico atípico
+            // (p.ej. por una falla de comunicación) no infle toda la escala.
+            double p95 = GraficaModel.percentil(valoresParaEscala, 0.95);
+            double maxConMargen = p95 * 1.1;
             if (maxConMargen > graficaModel.getMaxY()) {
                 graficaModel.setMaxY(maxConMargen);
             }

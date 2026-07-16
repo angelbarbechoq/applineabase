@@ -2,6 +2,7 @@ package com.example.base.model;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -283,6 +284,20 @@ public class GraficaModel {
             this.setMinY(0.0);
             this.setMaxY(2.5);
         }
+    }
+
+    /**
+     * Percentil p (0-1) de una lista de valores. Se usa en vez del máximo crudo
+     * para fijar el techo del eje Y, así un solo pico atípico (por ejemplo, por
+     * una falla de comunicación) no infla la escala completa del gráfico.
+     */
+    public static double percentil(List<Float> valores, double p) {
+        if (valores == null || valores.isEmpty()) return 0.0;
+        List<Float> ordenado = new ArrayList<>(valores);
+        Collections.sort(ordenado);
+        int idx = (int) Math.ceil(p * ordenado.size()) - 1;
+        idx = Math.max(0, Math.min(idx, ordenado.size() - 1));
+        return ordenado.get(idx);
     }
 
     public Double getMinY() { return minY; }
