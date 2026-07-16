@@ -260,8 +260,12 @@ public class ChartsView extends VerticalLayout {
             // Configuración de la gráfica
             graficaModel.setSeriesNames(new String[]{"KWh"});
             graficaModel.setMinY(0.0);
-            //graficaModel.setMaxY(maxValor * 1.1);
             graficaModel.aplicarRangosPredefinidos(maquina);
+            // El preset actúa como piso; si los datos reales lo superan, se amplía el eje
+            double maxConMargen = maxValor * 1.1;
+            if (maxConMargen > graficaModel.getMaxY()) {
+                graficaModel.setMaxY(maxConMargen);
+            }
 
             // Construcción del script batch
             StringBuilder jsBuilder = new StringBuilder();

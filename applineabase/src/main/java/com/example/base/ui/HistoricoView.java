@@ -29,6 +29,12 @@ import java.util.Map;
 @PermitAll
 public class HistoricoView extends VerticalLayout {
 
+    // Pisos por defecto del eje Y: el eje se amplía si los datos reales los superan
+    private static final double KWH_MAX_Y_DEFAULT = 50.0;
+    private static final double VOLTAJES_MAX_Y_DEFAULT = 500.0;
+    private static final double CORRIENTES_MAX_Y_DEFAULT = 300.0;
+    private static final double PW_MAX_Y_DEFAULT = 200.0;
+
     private final GraficaModel graficaKWh = new GraficaModel(1);
     private final GraficaModel graficaVoltajes = new GraficaModel(3);
     private final GraficaModel graficaCorrientes = new GraficaModel(3);
@@ -59,13 +65,13 @@ public class HistoricoView extends VerticalLayout {
         setSpacing(true);
 
         graficaKWh.setMinY(0.0);
-        graficaKWh.setMaxY(50.0);
+        graficaKWh.setMaxY(KWH_MAX_Y_DEFAULT);
         graficaVoltajes.setMinY(0.0);
-        graficaVoltajes.setMaxY(500.0);
+        graficaVoltajes.setMaxY(VOLTAJES_MAX_Y_DEFAULT);
         graficaCorrientes.setMinY(0.0);
-        graficaCorrientes.setMaxY(300.0);
+        graficaCorrientes.setMaxY(CORRIENTES_MAX_Y_DEFAULT);
         graficaPW.setMinY(0.0);
-        graficaPW.setMaxY(200.0);
+        graficaPW.setMaxY(PW_MAX_Y_DEFAULT);
         graficaPF.setMinY(0.0);
         graficaPF.setMaxY(1.0);
 
@@ -204,10 +210,8 @@ public class HistoricoView extends VerticalLayout {
                 graficaKWh.setSeriesNames(new String[]{"Datos"});
                 double maxValor = 0;
                 SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-                StringBuilder batchScript = new StringBuilder();
-                batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
-
-                int puntosValidos = 0;
+                List<Long> timestamps = new java.util.ArrayList<>();
+                List<Float> valores = new java.util.ArrayList<>();
 
                 if (conDiferencia) {
                     // CON DIFERENCIA
@@ -220,9 +224,8 @@ public class HistoricoView extends VerticalLayout {
                             maxValor = Math.max(maxValor, dif);
 
                             long ts = sdf.parse((String) datos.get(i).get("fecha")).getTime();
-                            Float[] values = {(float) dif};
-                            batchScript.append(graficaKWh.getAddDataScript("chartdiv_historico", ts, values, false));
-                            puntosValidos++;
+                            timestamps.add(ts);
+                            valores.add((float) dif);
                         } catch (Exception ignored) {}
                     }
                 } else {
@@ -233,17 +236,25 @@ public class HistoricoView extends VerticalLayout {
                             maxValor = Math.max(maxValor, valor);
 
                             long ts = sdf.parse((String) row.get("fecha")).getTime();
-                            Float[] values = {(float) valor};
-                            batchScript.append(graficaKWh.getAddDataScript("chartdiv_historico", ts, values, false));
-                            puntosValidos++;
+                            timestamps.add(ts);
+                            valores.add((float) valor);
                         } catch (Exception ignored) {}
                     }
                 }
+
                 graficaKWh.setMinY(0.0);
-                //graficaKWh.setMaxY(maxValor * 1.1 == 0 ? 10.0 : maxValor * 1.1);
-                //ChartsView.aplicarRangosPredefinidos(maquina);
+                // El piso (KWH_MAX_Y_DEFAULT) se amplía si los datos reales lo superan
+                graficaKWh.setMaxY(Math.max(KWH_MAX_Y_DEFAULT, maxValor * 1.1));
+
+                StringBuilder batchScript = new StringBuilder();
+                batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
+                for (int i = 0; i < timestamps.size(); i++) {
+                    batchScript.append(graficaKWh.getAddDataScript(
+                            "chartdiv_historico", timestamps.get(i), new Float[]{valores.get(i)}, false));
+                }
+
                 getElement().executeJs(batchScript.toString());
-                mensajeSpan.setText(puntosValidos + " puntos graficados");
+                mensajeSpan.setText(timestamps.size() + " puntos graficados");
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());
         }
@@ -276,8 +287,8 @@ public class HistoricoView extends VerticalLayout {
 
             double maxVal = 0;
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-            StringBuilder batchScript = new StringBuilder();
-            batchScript.append(graficaActiva.getInitScript2("chartdiv_historico"));
+            List<Long> timestamps = new java.util.ArrayList<>();
+            List<Float[]> valoresPorFila = new java.util.ArrayList<>();
 
             for (Map<String, Object> row : datos) {
                 try {
@@ -286,19 +297,28 @@ public class HistoricoView extends VerticalLayout {
                         if (v != null && v > 0) maxVal = Math.max(maxVal, v);
                     }
                     long ts = sdf.parse((String) row.get("fecha")).getTime();
-                    batchScript.append(graficaActiva.getAddDataScript("chartdiv_historico", ts, values, false));
+                    timestamps.add(ts);
+                    valoresPorFila.add(values);
                 } catch (Exception ignored) {}
             }
 
-            // Establecer maxY dinámico
+            // Establecer maxY dinámico ANTES de generar el script de inicialización:
+            // el piso por defecto se amplía si los datos reales lo superan
             if (tipoVar.equals("Voltajes")) {
-                graficaVoltajes.setMaxY(maxVal * 1.1 > 0 ? maxVal * 1.1 : 500.0);
+                graficaVoltajes.setMaxY(Math.max(VOLTAJES_MAX_Y_DEFAULT, maxVal * 1.1));
             } else if (tipoVar.equals("Corrientes")) {
-                graficaCorrientes.setMaxY(maxVal * 1.1 > 0 ? maxVal * 1.1 : 300.0);
+                graficaCorrientes.setMaxY(Math.max(CORRIENTES_MAX_Y_DEFAULT, maxVal * 1.1));
             } else if (tipoVar.equals("PW")) {
-                graficaPW.setMaxY(maxVal * 1.1 > 0 ? maxVal * 1.1 : 200.0);
+                graficaPW.setMaxY(Math.max(PW_MAX_Y_DEFAULT, maxVal * 1.1));
             } else if (tipoVar.equals("PF")) {
                 graficaPF.setMaxY(1.0);
+            }
+
+            StringBuilder batchScript = new StringBuilder();
+            batchScript.append(graficaActiva.getInitScript2("chartdiv_historico"));
+            for (int i = 0; i < timestamps.size(); i++) {
+                batchScript.append(graficaActiva.getAddDataScript(
+                        "chartdiv_historico", timestamps.get(i), valoresPorFila.get(i), false));
             }
 
             getElement().executeJs(batchScript.toString());
