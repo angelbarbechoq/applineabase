@@ -240,11 +240,15 @@ public class HistoricoView extends VerticalLayout {
                 }
 
                 graficaKWh.setMinY(0.0);
-                // El piso (KWH_MAX_Y_DEFAULT) se amplía si los datos reales lo superan.
-                // Se usa el percentil 95 en vez del máximo crudo para que un pico atípico
-                // (p.ej. por una falla de comunicación) no infle toda la escala.
+                graficaKWh.aplicarRangosPredefinidos(maquina);
+                // El preset por máquina actúa como piso; se amplía si los datos reales lo
+                // superan. Se usa el percentil 95 en vez del máximo crudo para que un pico
+                // atípico (p.ej. por una falla de comunicación) no infle toda la escala.
                 double p95 = GraficaModel.percentil(valores, 0.95);
-                graficaKWh.setMaxY(Math.max(KWH_MAX_Y_DEFAULT, p95 * 1.1));
+                double maxConMargen = p95 * 1.1;
+                if (maxConMargen > graficaKWh.getMaxY()) {
+                    graficaKWh.setMaxY(maxConMargen);
+                }
 
                 StringBuilder batchScript = new StringBuilder();
                 batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
