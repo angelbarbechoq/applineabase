@@ -19,6 +19,7 @@ import jakarta.annotation.security.RolesAllowed;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.function.Function;
 
 /**
  * Corre MergeVipMensualTool desde la app, sin tener que abrir IntelliJ. Solo ADMIN,
@@ -41,17 +42,20 @@ public class ReparacionVipView extends VerticalLayout {
         setSpacing(true);
 
         add(new H3("Reparar VIP Mensual"));
-        add(new Paragraph("Copia hacia el archivo VIP mensual los datos de todos los archivos VIP diarios "
+        add(new Paragraph("Copia hacia el archivo mensual los datos de todos los archivos diarios "
                 + "que existan en disco para el mes elegido. Útil cuando el mensual quedó incompleto pero "
                 + "el diario sí tiene los datos. Es seguro correrlo varias veces: no duplica filas."));
 
         mesPicker.setValue(LocalDate.now());
         mesPicker.setWidth("280px");
 
-        Button repararBtn = new Button("Reparar mes", e -> ejecutarReparacion());
-        repararBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        Button repararVipBtn = new Button("Reparar VIP mensual", e -> ejecutarReparacion(herramienta::reparar));
+        repararVipBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        HorizontalLayout controles = new HorizontalLayout(mesPicker, repararBtn);
+        Button repararKwhBtn = new Button("Reparar KWh mensual", e -> ejecutarReparacion(herramienta::repararNormal));
+        repararKwhBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+        HorizontalLayout controles = new HorizontalLayout(mesPicker, repararVipBtn, repararKwhBtn);
         controles.setAlignItems(Alignment.END);
 
         resultado.setWidthFull();
@@ -63,7 +67,7 @@ public class ReparacionVipView extends VerticalLayout {
         setFlexGrow(1, resultado);
     }
 
-    private void ejecutarReparacion() {
+    private void ejecutarReparacion(Function<YearMonth, MergeVipMensualTool.ResultadoReparacion> accion) {
         LocalDate fecha = mesPicker.getValue();
         if (fecha == null) {
             Notification.show("Selecciona una fecha", 3000, Notification.Position.MIDDLE)
@@ -73,7 +77,7 @@ public class ReparacionVipView extends VerticalLayout {
         YearMonth mes = YearMonth.from(fecha);
         resultado.setValue("Procesando " + mes + "...");
 
-        MergeVipMensualTool.ResultadoReparacion r = herramienta.reparar(mes);
+        MergeVipMensualTool.ResultadoReparacion r = accion.apply(mes);
         resultado.setValue(String.join("\n", r.log()));
 
         if (r.ok()) {

@@ -17,10 +17,15 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Reconstruye el VIP mensual a partir de los VIP diarios, que suelen quedar completos
- * aunque el mensual no. Es un bean de Spring (@Service) para poder invocarse desde la UI
+ * Reconstruye el mensual a partir de los diarios, que suelen quedar completos aunque
+ * el mensual no. Es un bean de Spring (@Service) para poder invocarse desde la UI
  * (ver com.example.tools.ui.ReparacionVipView, solo ADMIN); también se puede seguir
  * corriendo suelto desde IntelliJ con el método main().
+ *
+ * Sirve tanto para los archivos VIP ({@link #reparar}) como para los normales de KWh
+ * ({@link #repararNormal}) — la única diferencia entre ambos es el sufijo "VIP" en el
+ * nombre de archivo; la fusión en sí (SELECT * / INSERT OR REPLACE) no depende de las
+ * columnas de cada tabla.
  *
  * Detecta solo los archivos diarios que realmente existen en el disco (no asume un
  * rango de días fijo), así que sirve igual hoy que dentro de tres semanas sin tocarlo.
@@ -42,23 +47,34 @@ public class MergeVipMensualTool {
         resultado.log().forEach(System.out::println);
     }
 
+    /** Repara el mensual VIP (VAB, VAC, VBC, IA, IB, IC, PW, PF, KWhR) a partir de los VIP diarios. */
     public ResultadoReparacion reparar(YearMonth mes) {
+        return reparar(mes, "VIP");
+    }
+
+    /** Repara el mensual normal (columna kwh) a partir de los diarios normales, sin sufijo VIP. */
+    public ResultadoReparacion repararNormal(YearMonth mes) {
+        return reparar(mes, "");
+    }
+
+    private ResultadoReparacion reparar(YearMonth mes, String sufijo) {
         List<String> log = new ArrayList<>();
         String nombreMes = NOMBRES_MES[mes.getMonthValue() - 1];
         String carpetaMes = BASE_PATH + "\\" + mes.getYear() + "\\" + nombreMes;
-        String mensualPath = carpetaMes + "\\" + nombreMes + "VIP";
+        String mensualPath = carpetaMes + "\\" + nombreMes + sufijo;
+        String etiqueta = sufijo.isEmpty() ? "normal (KWh)" : sufijo;
 
         log.add("Mes: " + mes + " (" + nombreMes + ")");
-        log.add("Mensual VIP: " + mensualPath);
+        log.add("Mensual " + etiqueta + ": " + mensualPath);
 
         if (!new File(mensualPath).exists()) {
-            log.add("No existe el archivo mensual VIP, nada que hacer: " + mensualPath);
+            log.add("No existe el archivo mensual " + etiqueta + ", nada que hacer: " + mensualPath);
             return new ResultadoReparacion(log, 0, false);
         }
 
-        List<File> diarios = listarArchivosDiariosVip(carpetaMes, nombreMes);
+        List<File> diarios = listarArchivosDiarios(carpetaMes, nombreMes, sufijo);
         if (diarios.isEmpty()) {
-            log.add("No se encontraron archivos VIP diarios en " + carpetaMes);
+            log.add("No se encontraron archivos " + etiqueta + " diarios en " + carpetaMes);
             return new ResultadoReparacion(log, 0, false);
         }
         log.add("Archivos diarios encontrados: " + diarios.size());
@@ -106,8 +122,8 @@ public class MergeVipMensualTool {
         }
     }
 
-    private List<File> listarArchivosDiariosVip(String carpetaMes, String nombreMes) {
-        Pattern patron = Pattern.compile("\\d{2}" + Pattern.quote(nombreMes) + "VIP");
+    private List<File> listarArchivosDiarios(String carpetaMes, String nombreMes, String sufijo) {
+        Pattern patron = Pattern.compile("\\d{2}" + Pattern.quote(nombreMes) + Pattern.quote(sufijo));
         File[] archivos = new File(carpetaMes).listFiles(
                 (dir, name) -> patron.matcher(name).matches());
         List<File> resultado = new ArrayList<>();
