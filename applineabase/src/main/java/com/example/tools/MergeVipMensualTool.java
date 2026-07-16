@@ -39,6 +39,8 @@ public class MergeVipMensualTool {
             "enero", "febrero", "marzo", "abril", "mayo", "junio",
             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
     };
+    private static final String[] CAMPOS_NORMAL = {"kwh"};
+    private static final String[] CAMPOS_VIP = {"VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF", "KWhR"};
 
     /** Uso desde IntelliJ (clic derecho -> Run): sin argumentos usa el mes actual; con "yyyy-MM" procesa ese mes. */
     public static void main(String[] args) throws Exception {
@@ -67,11 +69,6 @@ public class MergeVipMensualTool {
         log.add("Mes: " + mes + " (" + nombreMes + ")");
         log.add("Mensual " + etiqueta + ": " + mensualPath);
 
-        if (!new File(mensualPath).exists()) {
-            log.add("No existe el archivo mensual " + etiqueta + ", nada que hacer: " + mensualPath);
-            return new ResultadoReparacion(log, 0, false);
-        }
-
         List<File> diarios = listarArchivosDiarios(carpetaMes, nombreMes, sufijo);
         if (diarios.isEmpty()) {
             log.add("No se encontraron archivos " + etiqueta + " diarios en " + carpetaMes);
@@ -88,6 +85,16 @@ public class MergeVipMensualTool {
         }
         log.add("Lineas a procesar: " + lineas.size());
 
+        if (!new File(mensualPath).exists()) {
+            log.add("No existe el archivo mensual " + etiqueta + ", se crea: " + mensualPath);
+            try {
+                crearArchivoMensual(mensualPath, lineas, sufijo);
+            } catch (SQLException e) {
+                log.add("Error creando el archivo mensual: " + e.getMessage());
+                return new ResultadoReparacion(log, diarios.size(), false);
+            }
+        }
+
         try (Connection mensualConn = DriverManager.getConnection("jdbc:sqlite:" + mensualPath)) {
             for (File diario : diarios) {
                 procesarDia(mensualConn, diario, lineas, log);
@@ -98,6 +105,22 @@ public class MergeVipMensualTool {
         }
         log.add("Listo.");
         return new ResultadoReparacion(log, diarios.size(), true);
+    }
+
+    private void crearArchivoMensual(String mensualPath, List<String> lineas, String sufijo) throws SQLException {
+        String[] campos = sufijo.isEmpty() ? CAMPOS_NORMAL : CAMPOS_VIP;
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + mensualPath);
+             Statement st = conn.createStatement()) {
+            for (String linea : lineas) {
+                StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ").append(linea)
+                        .append(" (fecha TEXT PRIMARY KEY NOT NULL");
+                for (String campo : campos) {
+                    sql.append(", ").append(campo).append(" FLOAT NOT NULL");
+                }
+                sql.append(")");
+                st.execute(sql.toString());
+            }
+        }
     }
 
     private void procesarDia(Connection mensualConn, File diario, List<String> lineas, List<String> log) {
