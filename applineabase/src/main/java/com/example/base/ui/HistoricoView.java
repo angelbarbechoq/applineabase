@@ -368,7 +368,7 @@ public class HistoricoView extends VerticalLayout {
         getElement().executeJs("if(window.am5Charts && window.am5Charts['chartdiv_historico']) {" +
                 "  var inst = window.am5Charts['chartdiv_historico'];" +
                 "  inst.xAxis.zoom(0, 1);" +
-                "  inst.yAxis.zoom(0, 1);" +
+                "  inst.yAxis.zoomToValues(" + graficaActiva.getMinY() + ", " + graficaActiva.getMaxY() + ");" +
                 "  console.log('🔄 Zoom reseteado');" +
                 "}");
     }
