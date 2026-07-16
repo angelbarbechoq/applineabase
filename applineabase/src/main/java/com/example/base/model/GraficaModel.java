@@ -66,9 +66,9 @@ public class GraficaModel {
                         "xAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
                         "console.log('✓ Eje X creado con tooltip');" +
 
-                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}), min: " + minY + ", max: " + maxY + ", strictMinMax: false }));" +
+                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));" +
                         "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
-                        "console.log('✓ Eje Y creado con tooltip. Rango: " + minY + " - " + maxY + "');" +
+                        "console.log('✓ Eje Y creado con tooltip. Zoom inicial: " + minY + " - " + maxY + "');" +
                         // PASO 5: Crear CURSOR con ejes (pero sin snapToSeries aún)
                         "var cursor = chart.set('cursor', am5xy.XYCursor.new(root, { yAxis: yAxis, xAxis: xAxis, maxTooltipDistance: 0, behavior: 'zoomXY' }));" +
                         "cursor.lineX.setAll({ visible: true });" +
@@ -99,6 +99,15 @@ public class GraficaModel {
                         "console.log('🔴 ANTES, snapToSeries:', cursor.get('snapToSeries'));" +
                         "cursor.setAll({ snapToSeries: seriesList, snapToSeriesBy: 'x' });" +
                         "console.log('🟢 DESPUÉS, snapToSeries.length:', cursor.get('snapToSeries').length);" +
+
+                        // PASO 8.1: Zoom inicial al rango calculado (piso/percentil), sin fijar
+                        // min/max del eje — así el eje sigue auto-ajustable y el zoom manual
+                        // con el mouse (zoomXY del cursor) funciona con normalidad después.
+                        "if (seriesList.length > 0) {" +
+                        "  seriesList[0].events.once('datavalidated', function() {" +
+                        "    yAxis.zoomToValues(" + minY + ", " + maxY + ");" +
+                        "  });" +
+                        "}" +
 
                         // PASO 9: AGREGAR tooltip separado del cursor (para mostrar fecha/hora al pasar el ratón)
 //                        "var cursorTooltip = cursor.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
