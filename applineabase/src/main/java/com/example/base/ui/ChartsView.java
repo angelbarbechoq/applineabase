@@ -282,6 +282,7 @@ public class ChartsView extends VerticalLayout {
 
                 jsBuilder.append(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
             }
+            jsBuilder.append(graficaModel.getAplicarZoomInicialScript("chartdiv_industrial"));
             // Ejecución en una sola llamada
             getElement().executeJs(jsBuilder.toString());
 

@@ -256,6 +256,7 @@ public class HistoricoView extends VerticalLayout {
                     batchScript.append(graficaKWh.getAddDataScript(
                             "chartdiv_historico", timestamps.get(i), new Float[]{valores.get(i)}, false));
                 }
+                batchScript.append(graficaKWh.getAplicarZoomInicialScript("chartdiv_historico"));
 
                 getElement().executeJs(batchScript.toString());
                 mensajeSpan.setText(timestamps.size() + " puntos graficados");
@@ -327,6 +328,7 @@ public class HistoricoView extends VerticalLayout {
                 batchScript.append(graficaActiva.getAddDataScript(
                         "chartdiv_historico", timestamps.get(i), valoresPorFila.get(i), false));
             }
+            batchScript.append(graficaActiva.getAplicarZoomInicialScript("chartdiv_historico"));
 
             getElement().executeJs(batchScript.toString());
             mensajeSpan.setText(datos.size() + " puntos graficados para " + tipoVar);

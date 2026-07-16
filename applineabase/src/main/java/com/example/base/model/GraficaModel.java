@@ -100,14 +100,6 @@ public class GraficaModel {
                         "cursor.setAll({ snapToSeries: seriesList, snapToSeriesBy: 'x' });" +
                         "console.log('🟢 DESPUÉS, snapToSeries.length:', cursor.get('snapToSeries').length);" +
 
-                        // PASO 8.1: Zoom inicial al rango calculado (piso/percentil), sin fijar
-                        // min/max del eje — así el eje sigue auto-ajustable y el zoom manual
-                        // con el mouse (zoomXY del cursor) funciona con normalidad después.
-                        "if (seriesList.length > 0) {" +
-                        "  seriesList[0].events.once('datavalidated', function() {" +
-                        "    yAxis.zoomToValues(" + minY + ", " + maxY + ");" +
-                        "  });" +
-                        "}" +
 
                         // PASO 9: AGREGAR tooltip separado del cursor (para mostrar fecha/hora al pasar el ratón)
 //                        "var cursorTooltip = cursor.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
@@ -194,6 +186,24 @@ public class GraficaModel {
                         "chart.appear(1000, 100);";
     }
 
+    /**
+     * Aplica el zoom inicial (piso + percentil) al eje Y. Se debe llamar DESPUÉS de haber
+     * agregado todos los puntos con getAddDataScript, no antes: como el eje no tiene min/max
+     * fijo (para que el zoom manual del usuario funcione), cada dato agregado dispara el
+     * auto-ajuste nativo de amCharts, que iría pisando cualquier zoom que se aplique antes de
+     * tiempo. El doble requestAnimationFrame espera a que amCharts termine de procesar todos
+     * los datos ya cargados antes de forzar este zoom.
+     */
+    public String getAplicarZoomInicialScript(String containerId) {
+        return
+                "requestAnimationFrame(function() {" +
+                "  requestAnimationFrame(function() {" +
+                "    if (window.am5Charts && window.am5Charts['" + containerId + "']) {" +
+                "      window.am5Charts['" + containerId + "'].yAxis.zoomToValues(" + minY + ", " + maxY + ");" +
+                "    }" +
+                "  });" +
+                "});";
+    }
 
     public String getAddDataScript(String containerId, long timestamp, Float[] dato, boolean limit) {
         int maxPoints = 1440; // 24 horas a 1 punto/minuto
