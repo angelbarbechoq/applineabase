@@ -401,7 +401,8 @@ public class ChartsView extends VerticalLayout {
     private void resetZoom() {
         getElement().executeJs("if(window.am5Charts && window.am5Charts['chartdiv_industrial']) {" +
                 "  var inst = window.am5Charts['chartdiv_industrial'];" +
-                "  inst.chart.zoomOut();" +
+                "  inst.xAxis.zoom(0, 1);" +
+                "  inst.yAxis.zoom(0, 1);" +
                 "  console.log('🔄 Zoom reseteado');" +
                 "}");
     }
