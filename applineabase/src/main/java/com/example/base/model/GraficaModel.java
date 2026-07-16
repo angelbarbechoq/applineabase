@@ -130,7 +130,6 @@ public class GraficaModel {
                         "    inst.posY = 0;" +
                         "    inst.marcadores.forEach(function(marker) { marker.dispose(); });" +
                         "    inst.marcadores = [];" +
-                        "    inst.xAxis.zoom(0, 1);" +
                         "    inst.yAxis.zoomToValues(" + minY + ", " + maxY + ");" +
                         "    if ($0.$server && $0.$server.limpiarTarjetas) { $0.$server.limpiarTarjetas(); }"+
                         "  } else {" +
