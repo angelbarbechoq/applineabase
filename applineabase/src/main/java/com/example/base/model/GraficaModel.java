@@ -323,6 +323,57 @@ public class GraficaModel {
         return ordenado.get(idx);
     }
 
+    /** Un valor se considera atípico si supera este múltiplo del percentil 90 de la serie. */
+    public static final double FACTOR_ATIPICO = 10.0;
+
+    /**
+     * Reemplaza los valores atípicos (mayores a FACTOR_ATIPICO veces el percentil 90 de la
+     * propia serie) por una interpolación de sus vecinos válidos más cercanos, para que un
+     * pico por falla de comunicación no aparezca en el gráfico ni infle el auto-ajuste
+     * nativo del eje Y al hacer zoom. Se usa el percentil 90 (no la mediana) como referencia
+     * porque en series con muchos ceros legítimos (máquina detenida) la mediana puede ser 0,
+     * lo que rompería la detección.
+     */
+    public static List<Float> limpiarAtipicos(List<Float> valores, double factor) {
+        if (valores == null || valores.isEmpty()) return valores;
+
+        double referencia = percentil(valores, 0.9);
+        if (referencia <= 0) {
+            return new ArrayList<>(valores); // no hay una base confiable para detectar atípicos
+        }
+        double umbral = referencia * factor;
+
+        int n = valores.size();
+        boolean[] esAtipico = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            Float v = valores.get(i);
+            esAtipico[i] = v != null && v > umbral;
+        }
+
+        List<Float> limpio = new ArrayList<>(valores);
+        for (int i = 0; i < n; i++) {
+            if (!esAtipico[i]) continue;
+
+            Float anterior = null;
+            for (int j = i - 1; j >= 0; j--) {
+                if (!esAtipico[j] && valores.get(j) != null) { anterior = valores.get(j); break; }
+            }
+            Float siguiente = null;
+            for (int j = i + 1; j < n; j++) {
+                if (!esAtipico[j] && valores.get(j) != null) { siguiente = valores.get(j); break; }
+            }
+
+            float reemplazo;
+            if (anterior != null && siguiente != null) reemplazo = (anterior + siguiente) / 2f;
+            else if (anterior != null) reemplazo = anterior;
+            else if (siguiente != null) reemplazo = siguiente;
+            else reemplazo = (float) referencia;
+
+            limpio.set(i, reemplazo);
+        }
+        return limpio;
+    }
+
     public Double getMinY() { return minY; }
     public Double getMaxY() { return maxY; }
     public void setMinY(Double minY) { this.minY = minY; }

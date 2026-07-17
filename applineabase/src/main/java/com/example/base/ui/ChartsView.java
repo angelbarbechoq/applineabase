@@ -257,14 +257,17 @@ public class ChartsView extends VerticalLayout {
                 }
             }
 
+            // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
+            // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
+            List<Float> valoresLimpios = GraficaModel.limpiarAtipicos(valoresParaEscala, GraficaModel.FACTOR_ATIPICO);
+
             // Configuración de la gráfica
             graficaModel.setSeriesNames(new String[]{"KWh"});
             graficaModel.setMinY(0.0);
             graficaModel.aplicarRangosPredefinidos(maquina);
             // El preset actúa como piso; si los datos reales lo superan, se amplía el eje.
-            // Se usa el percentil 95 en vez del máximo crudo para que un pico atípico
-            // (p.ej. por una falla de comunicación) no infle toda la escala.
-            double p95 = GraficaModel.percentil(valoresParaEscala, 0.95);
+            // Se usa el percentil 95 en vez del máximo crudo como margen adicional de seguridad.
+            double p95 = GraficaModel.percentil(valoresLimpios, 0.95);
             double maxConMargen = p95 * 1.1;
             if (maxConMargen > graficaModel.getMaxY()) {
                 graficaModel.setMaxY(maxConMargen);
@@ -274,11 +277,11 @@ public class ChartsView extends VerticalLayout {
             StringBuilder jsBuilder = new StringBuilder();
             jsBuilder.append(graficaModel.getInitScript2("chartdiv_industrial"));
 
-            for (Map<String, Object> row : datosProcessados) {
+            for (int i = 0; i < datosProcessados.size(); i++) {
+                Map<String, Object> row = datosProcessados.get(i);
                 Date date = formatter.parse((String) row.get("fecha"));
                 long timestamp = date.getTime();
-                float valor = ((Number) row.get("valor")).floatValue();
-                Float[] values = {valor};
+                Float[] values = {valoresLimpios.get(i)};
 
                 jsBuilder.append(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
             }

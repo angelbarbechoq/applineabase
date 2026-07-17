@@ -239,12 +239,16 @@ public class HistoricoView extends VerticalLayout {
                     }
                 }
 
+                // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
+                // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
+                List<Float> valoresLimpios = GraficaModel.limpiarAtipicos(valores, GraficaModel.FACTOR_ATIPICO);
+
                 graficaKWh.setMinY(0.0);
                 graficaKWh.aplicarRangosPredefinidos(maquina);
                 // El preset por máquina actúa como piso; se amplía si los datos reales lo
-                // superan. Se usa el percentil 95 en vez del máximo crudo para que un pico
-                // atípico (p.ej. por una falla de comunicación) no infle toda la escala.
-                double p95 = GraficaModel.percentil(valores, 0.95);
+                // superan. Se usa el percentil 95 en vez del máximo crudo como margen
+                // adicional de seguridad.
+                double p95 = GraficaModel.percentil(valoresLimpios, 0.95);
                 double maxConMargen = p95 * 1.1;
                 if (maxConMargen > graficaKWh.getMaxY()) {
                     graficaKWh.setMaxY(maxConMargen);
@@ -254,7 +258,7 @@ public class HistoricoView extends VerticalLayout {
                 batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
                 for (int i = 0; i < timestamps.size(); i++) {
                     batchScript.append(graficaKWh.getAddDataScript(
-                            "chartdiv_historico", timestamps.get(i), new Float[]{valores.get(i)}, false));
+                            "chartdiv_historico", timestamps.get(i), new Float[]{valoresLimpios.get(i)}, false));
                 }
                 batchScript.append(graficaKWh.getAplicarZoomInicialScript("chartdiv_historico"));
 
@@ -293,24 +297,41 @@ public class HistoricoView extends VerticalLayout {
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
             List<Long> timestamps = new java.util.ArrayList<>();
             List<Float[]> valoresPorFila = new java.util.ArrayList<>();
-            List<Float> valoresParaEscala = new java.util.ArrayList<>();
 
             for (Map<String, Object> row : datos) {
                 try {
                     Float[] values = extractValues(row, tipoVar);
-                    for (Float v : values) {
-                        if (v != null && v > 0) valoresParaEscala.add(v);
-                    }
                     long ts = sdf.parse((String) row.get("fecha")).getTime();
                     timestamps.add(ts);
                     valoresPorFila.add(values);
                 } catch (Exception ignored) {}
             }
 
+            // Se limpia el atípico de cada serie por separado (VAB, VAC, VBC, etc. pueden
+            // tener picos por falla de comunicación en momentos distintos), reemplazándolo
+            // por una interpolación de sus vecinos.
+            int nSeries = graficaActiva.getnGraficas();
+            List<List<Float>> columnasLimpias = new java.util.ArrayList<>();
+            List<Float> valoresParaEscala = new java.util.ArrayList<>();
+            for (int s = 0; s < nSeries; s++) {
+                List<Float> columna = new java.util.ArrayList<>();
+                for (Float[] fila : valoresPorFila) columna.add(fila[s]);
+                List<Float> columnaLimpia = GraficaModel.limpiarAtipicos(columna, GraficaModel.FACTOR_ATIPICO);
+                columnasLimpias.add(columnaLimpia);
+                for (Float v : columnaLimpia) {
+                    if (v != null && v > 0) valoresParaEscala.add(v);
+                }
+            }
+            List<Float[]> valoresPorFilaLimpio = new java.util.ArrayList<>();
+            for (int i = 0; i < valoresPorFila.size(); i++) {
+                Float[] filaLimpia = new Float[nSeries];
+                for (int s = 0; s < nSeries; s++) filaLimpia[s] = columnasLimpias.get(s).get(i);
+                valoresPorFilaLimpio.add(filaLimpia);
+            }
+
             // Establecer maxY dinámico ANTES de generar el script de inicialización:
             // el piso por defecto se amplía si los datos reales lo superan. Se usa el
-            // percentil 95 en vez del máximo crudo para que un pico atípico (p.ej. por
-            // una falla de comunicación) no infle toda la escala.
+            // percentil 95 en vez del máximo crudo como margen adicional de seguridad.
             double p95 = GraficaModel.percentil(valoresParaEscala, 0.95);
             if (tipoVar.equals("Voltajes")) {
                 graficaVoltajes.setMaxY(Math.max(VOLTAJES_MAX_Y_DEFAULT, p95 * 1.1));
@@ -326,7 +347,7 @@ public class HistoricoView extends VerticalLayout {
             batchScript.append(graficaActiva.getInitScript2("chartdiv_historico"));
             for (int i = 0; i < timestamps.size(); i++) {
                 batchScript.append(graficaActiva.getAddDataScript(
-                        "chartdiv_historico", timestamps.get(i), valoresPorFila.get(i), false));
+                        "chartdiv_historico", timestamps.get(i), valoresPorFilaLimpio.get(i), false));
             }
             batchScript.append(graficaActiva.getAplicarZoomInicialScript("chartdiv_historico"));
 
