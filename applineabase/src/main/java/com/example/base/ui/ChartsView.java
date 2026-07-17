@@ -403,7 +403,7 @@ public class ChartsView extends VerticalLayout {
         getElement().executeJs("if(window.am5Charts && window.am5Charts['chartdiv_industrial']) {" +
                 "  var inst = window.am5Charts['chartdiv_industrial'];" +
                 "  inst.xAxis.zoom(0, 1);" +
-                "  inst.yAxis.zoomToValues(" + graficaModel.getMinY() + ", " + graficaModel.getMaxY() + ");" +
+                "  inst.aplicarZoomCalculado();" +
                 "  console.log('🔄 Zoom reseteado');" +
                 "}");
     }

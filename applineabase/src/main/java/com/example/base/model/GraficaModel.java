@@ -106,8 +106,12 @@ public class GraficaModel {
 //                        "cursorTooltip.label.setAll({ text: '{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
 //                        "console.log('✓ Cursor tooltip configurado');" +
 
-                        // PASO 10: Almacenar referencias globales
-                        "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [] };" +
+                        // PASO 10: Almacenar referencias globales.
+                        // aplicarZoomCalculado es la ÚNICA función que aplica el zoom piso+percentil
+                        // al eje Y. Doble-click, "Reset Zoom" y la carga inicial la llaman a ella
+                        // (nunca repiten la lógica de zoomToValues por su cuenta), para que las tres
+                        // formas de "resetear el zoom" hagan siempre exactamente lo mismo.
+                        "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [], aplicarZoomCalculado: function() { yAxis.zoomToValues(" + minY + ", " + maxY + "); } };" +
                         "console.log('✓ am5Charts inicializado');" +
 
                         // PASO 11: Event listener para clicks
@@ -122,7 +126,7 @@ public class GraficaModel {
                         "    inst.posY = 0;" +
                         "    inst.marcadores.forEach(function(marker) { marker.dispose(); });" +
                         "    inst.marcadores = [];" +
-                        "    inst.yAxis.zoomToValues(" + minY + ", " + maxY + ");" +
+                        "    inst.aplicarZoomCalculado();" +
                         "    if ($0.$server && $0.$server.limpiarTarjetas) { $0.$server.limpiarTarjetas(); }"+
                         "  } else {" +
                         "    try {" +
@@ -198,9 +202,8 @@ public class GraficaModel {
         return
                 "requestAnimationFrame(function() {" +
                 "  requestAnimationFrame(function() {" +
-                "    if (window.am5Charts && window.am5Charts['" + containerId + "']) {" +
-                "      window.am5Charts['" + containerId + "'].yAxis.zoomToValues(" + minY + ", " + maxY + ");" +
-                "    }" +
+                "    var inst = window.am5Charts['" + containerId + "'];" +
+                "    if (inst) { inst.aplicarZoomCalculado(); }" +
                 "  });" +
                 "});";
     }
