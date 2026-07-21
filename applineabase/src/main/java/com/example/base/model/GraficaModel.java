@@ -69,13 +69,7 @@ public class GraficaModel {
                         "xAxis.set('tooltipDateFormat', 'dd-MM-yyyy\\nHH:mm:ss');" +
                         "console.log('✓ Eje X creado con tooltip');" +
 
-                        // autoZoom:false evita que el eje Y recalcule su propio min/max para
-                        // ajustarse solo a los datos visibles cada vez que hay zoom/pan en X;
-                        // eso era lo que hacía que el piso en cero (aplicarZoomCalculado) se
-                        // perdiera apenas se interactuaba con la grafica. El zoom manual con el
-                        // raton (wheelY/cursor) sigue funcionando igual, ya que es una acción
-                        // directa del usuario sobre el eje Y, no el autoajuste que se desactiva.
-                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { autoZoom: false, renderer: am5xy.AxisRendererY.new(root, {}) }));" +
+                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));" +
                         "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
                         "console.log('✓ Eje Y creado con tooltip. Zoom inicial: " + minY + " - " + maxY + "');" +
                         // PASO 5: Crear CURSOR con ejes (pero sin snapToSeries aún)
@@ -118,10 +112,20 @@ public class GraficaModel {
                         // PASO 10: Almacenar referencias globales.
                         // aplicarZoomCalculado es la ÚNICA función que aplica el zoom piso+percentil
                         // al eje Y. Doble-click, "Reset Zoom" y la carga inicial la llaman a ella
-                        // (nunca repiten la lógica de zoomToValues por su cuenta), para que las tres
+                        // (nunca repiten la lógica de fijar min/max por su cuenta), para que las tres
                         // formas de "resetear el zoom" hagan siempre exactamente lo mismo.
-                        "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [], aplicarZoomCalculado: function() { yAxis.zoomToValues(" + minY + ", " + maxY + "); } };" +
+                        // Se fija min/max directamente (no con zoomToValues, que es conocido por
+                        // no aplicar nada si el eje aún no calculó su min/max privado la primera vez)
+                        // para forzar de forma confiable el piso en cero + techo calculado.
+                        "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [], aplicarZoomCalculado: function() { yAxis.set('min', " + minY + "); yAxis.set('max', " + maxY + "); } };" +
                         "console.log('✓ am5Charts inicializado');" +
+
+                        // PASO 10b: en cuanto el usuario interactúa manualmente con el eje Y
+                        // (rueda del ratón o arrastre de zoom), se libera el piso/techo fijado
+                        // por aplicarZoomCalculado, para que el eje vuelva a autoajustarse
+                        // libremente a los datos visibles (autoZoom nativo, activo por defecto).
+                        "chart.plotContainer.events.on('wheel', function() { yAxis.remove('min'); yAxis.remove('max'); });" +
+                        "cursor.events.on('selectended', function() { yAxis.remove('min'); yAxis.remove('max'); });" +
 
                         // PASO 11: Event listener para clicks
                         "chart.plotContainer.events.on('click', function(ev) {" +
