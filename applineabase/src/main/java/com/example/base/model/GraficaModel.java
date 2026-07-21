@@ -140,7 +140,11 @@ public class GraficaModel {
                         "      inst.posY = 0;" +
                         "      inst.marcadores.forEach(function(marker) { marker.dispose(); });" +
                         "      inst.marcadores = [];" +
-                        "      inst.aplicarZoomCalculado();" +
+                        // setTimeout en 0: el doble-click también dispara 'selectended' en el
+                        // cursor (aunque sea un click sin arrastre), que libera min/max del eje
+                        // Y (ver PASO 10b). Se difiere para que aplicarZoomCalculado corra
+                        // después de eso en el mismo ciclo, y el cero+techo quede fijado al final.
+                        "      setTimeout(function() { inst.aplicarZoomCalculado(); }, 0);" +
                         "      if ($0.$server && $0.$server.limpiarTarjetas) { $0.$server.limpiarTarjetas(); }"+
                         "    } catch(e) {" +
                         "      console.error('Error en doble-click:', e);" +
