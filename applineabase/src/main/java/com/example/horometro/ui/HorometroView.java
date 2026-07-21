@@ -41,6 +41,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * Dashboard con todas las máquinas a la vez: estado ON/OFF, PW en vivo junto al umbral
@@ -169,9 +170,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         Button btn = new Button("Recalcular todas las máquinas", e -> {
             int total = 0;
             for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
-                boolean aplicaHorometro = alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.DETENCION).isPresent()
-                        || alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.CICLO_COMPRESOR).isPresent();
-                if (!aplicaHorometro) {
+                if (buscarConfigHorometro(maquina).isEmpty()) {
                     continue;
                 }
                 horometroBackfillRunner.recalcularLinea(maquina);
@@ -233,9 +232,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         sb.append("Horas totales\r\n");
 
         for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
-            boolean aplicaHorometro = alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.DETENCION).isPresent()
-                    || alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.CICLO_COMPRESOR).isPresent();
-            if (!aplicaHorometro) {
+            if (buscarConfigHorometro(maquina).isEmpty()) {
                 continue;
             }
             HorometroService.ReporteSemanal r = horometroService.generarReporte(maquina, fecha);
@@ -268,6 +265,17 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         return String.format(LOCALE_ES, "%.1f", valor);
     }
 
+    /**
+     * Busca la regla de alarma (DETENCION o CICLO_COMPRESOR) que hace que el horómetro
+     * aplique a esta máquina. Única función para esta decisión: la usan tanto el botón de
+     * recalcular todas, la exportación CSV, como la tabla, para que las tres coincidan
+     * siempre en qué máquinas tienen horómetro.
+     */
+    private Optional<AlarmaConfig> buscarConfigHorometro(String maquina) {
+        return alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.DETENCION)
+                .or(() -> alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.CICLO_COMPRESOR));
+    }
+
     private String csvEscape(String valor) {
         if (valor.contains(";") || valor.contains("\"") || valor.contains("\n")) {
             return "\"" + valor.replace("\"", "\"\"") + "\"";
@@ -278,9 +286,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private void refrescarGrid() {
         List<HorometroRow> filas = new ArrayList<>();
         for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
-            AlarmaConfig config = alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.DETENCION)
-                    .or(() -> alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.CICLO_COMPRESOR))
-                    .orElse(null);
+            AlarmaConfig config = buscarConfigHorometro(maquina).orElse(null);
             if (config == null) {
                 continue; // línea sin regla de encendido/apagado configurada: el horómetro no aplica
             }
