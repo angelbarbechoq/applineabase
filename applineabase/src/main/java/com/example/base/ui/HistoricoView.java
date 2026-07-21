@@ -312,9 +312,9 @@ public class HistoricoView extends VerticalLayout {
                 toFloatAbs(row.get("IA")), toFloatAbs(row.get("IB")), toFloatAbs(row.get("IC"))
             };
             case "PW" -> new Float[]{toFloatAbs(row.get("PW"))};
-            // El factor de potencia sí puede ser negativo en el medidor principal: se
-            // conserva tal cual, sin valor absoluto.
-            case "PF" -> new Float[]{toFloat(row.get("PF"))};
+            // El factor de potencia es el que da negativo en el medidor principal: se
+            // toma en valor absoluto igual que el resto.
+            case "PF" -> new Float[]{toFloatAbs(row.get("PF"))};
             default -> new Float[]{0f};
         };
     }
