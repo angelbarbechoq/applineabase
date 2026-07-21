@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public class GraficaModel {
 
@@ -249,12 +250,6 @@ public class GraficaModel {
         }
     }
 
-    public void resetearMarcadores() {
-        this.tiemposMarcadores.clear();
-        this.posY = 0;
-        System.out.println("Marcadores reset");
-    }
-
     public List<Long> obtenerMarcadores() {
         return new ArrayList<>(tiemposMarcadores);
     }
@@ -269,6 +264,72 @@ public class GraficaModel {
         long segundos = (diferencia % (1000 * 60)) / 1000;
         return String.format("%02d:%02d:%02d", horas, minutos, segundos);
     }
+    /**
+     * Clasifica la máquina y fija la unidad correspondiente en el modelo. Devuelve true si
+     * corresponde graficar la diferencia entre lecturas consecutivas de kwh (máquinas de
+     * energía), o false si se grafica el valor directo (Temperatura/Psi/Bar).
+     *
+     * Única función para esta decisión: la usan tanto la gráfica en vivo como el histórico,
+     * para que ambas clasifiquen la máquina exactamente igual.
+     */
+    public boolean clasificarYFijarUnidad(String maquina) {
+        if (maquina.contains("Temperatura")) {
+            setUnidad("°C");
+            return false;
+        }
+        if (maquina.contains("Psi")) {
+            setUnidad("PSI");
+            return false;
+        }
+        if (maquina.contains("Bar")) {
+            setUnidad("BAR");
+            return false;
+        }
+        setUnidad("KWh");
+        return true;
+    }
+
+    public record SerieKWh(List<Long> timestamps, List<Float> valores) {
+    }
+
+    /**
+     * Calcula la serie de KWh a graficar: diferencia entre lecturas consecutivas si
+     * esDiferencia es true, o el valor directo si es false. No recorta diferencias
+     * negativas (p.ej. por un reinicio de contador): se grafican tal cual, igual en
+     * cualquier pantalla. Una fila con fecha o valor inválido se salta sin interrumpir
+     * el resto de la serie.
+     *
+     * Única función para este cálculo: la usan tanto la gráfica en vivo como el
+     * histórico, para que ambas grafiquen exactamente lo mismo a partir de los mismos datos.
+     */
+    public static SerieKWh calcularSerieKWh(List<Map<String, Object>> datos, boolean esDiferencia) {
+        SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+        List<Long> timestamps = new ArrayList<>();
+        List<Float> valores = new ArrayList<>();
+
+        if (esDiferencia) {
+            for (int i = 1; i < datos.size(); i++) {
+                try {
+                    double actual = ((Number) datos.get(i).get("kwh")).doubleValue();
+                    double anterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
+                    long ts = formatter.parse((String) datos.get(i).get("fecha")).getTime();
+                    timestamps.add(ts);
+                    valores.add((float) (actual - anterior));
+                } catch (Exception ignored) {}
+            }
+        } else {
+            for (Map<String, Object> row : datos) {
+                try {
+                    double valor = ((Number) row.get("kwh")).doubleValue();
+                    long ts = formatter.parse((String) row.get("fecha")).getTime();
+                    timestamps.add(ts);
+                    valores.add((float) valor);
+                } catch (Exception ignored) {}
+            }
+        }
+        return new SerieKWh(timestamps, valores);
+    }
+
     public void aplicarRangosPredefinidos(String maquina) {
         if (maquina.contains("Linea")) {
             setMinY(0.0);

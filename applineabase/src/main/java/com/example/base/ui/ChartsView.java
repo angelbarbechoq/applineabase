@@ -101,16 +101,11 @@ public class ChartsView extends VerticalLayout {
         com.vaadin.flow.component.button.Button resetZoomBtn = new com.vaadin.flow.component.button.Button("Reset Zoom", e -> resetZoom());
         resetZoomBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
 
-        com.vaadin.flow.component.button.Button resetMarcadoresBtn = new com.vaadin.flow.component.button.Button("Reset Marcadores", e -> resetearMarcadores());
-        resetMarcadoresBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
-
-        //HorizontalLayout selectorLayout = new HorizontalLayout(maquinaCombo, maquinaInfoCard, datosActualesCard, resetZoomBtn, resetMarcadoresBtn);
         HorizontalLayout selectorLayout = new HorizontalLayout(
                 maquinaCombo,
                 maquinaInfoCard,
                 datosActualesCard,
-                resetZoomBtn,
-                resetMarcadoresBtn
+                resetZoomBtn
         );
         selectorLayout.setAlignItems(Alignment.CENTER);
         selectorLayout.setSpacing(true);
@@ -190,25 +185,8 @@ public class ChartsView extends VerticalLayout {
                 mensajeSpan.setText("No hay datos para " + maquina + " en la fecha actual");
                 getElement().executeJs(graficaModel.getInitScript2("chartdiv_industrial"));
             } else {
-                //mensajeSpan.setText("Se cargaron " + datos.size() + " registros | Escuchando actualizaciones en tiempo real...");
-                if ((maquina.contains("Temperatura") || maquina.contains("Psi") || maquina.contains("BarCompHP")))
-                {
-                    if (maquina.contains("Temperatura")) {
-                        graficaModel.setUnidad("°C");
-                    } else if (maquina.contains("Psi")) {
-                        graficaModel.setUnidad("PSI");
-                    } else if (maquina.contains("Bar")) {
-                        graficaModel.setUnidad("BAR");
-                    }
-                    mostrarGrafica(datos, false,maquina);
-
-                }
-                else{
-                    graficaModel.setUnidad("KWh");
-                    mostrarGrafica(datos, true,maquina);
-
-                }
-
+                boolean conDiferencia = graficaModel.clasificarYFijarUnidad(maquina);
+                mostrarGrafica(datos, conDiferencia, maquina);
                 iniciarSSE(maquina);
             }
         } catch (Exception e) {
@@ -226,40 +204,11 @@ public class ChartsView extends VerticalLayout {
                 return;
             }
 
-            SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-            List<Map<String, Object>> datosProcessados = new java.util.ArrayList<>();
-            List<Float> valoresParaEscala = new java.util.ArrayList<>();
-
-            // CONDICIONANTE: calcula diferencia o toma valor directo
-            if (conDiferencia) {
-                // CON DIFERENCIA
-                for (int i = 1; i < datos.size(); i++) {
-                    double kwhActual = ((Number) datos.get(i).get("kwh")).doubleValue();
-                    double kwhAnterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
-                    double diferencia = kwhActual - kwhAnterior;
-                    valoresParaEscala.add((float) diferencia);
-
-                    Map<String, Object> registro = new java.util.HashMap<>();
-                    registro.put("fecha", datos.get(i).get("fecha"));
-                    registro.put("valor", diferencia);
-                    datosProcessados.add(registro);
-                }
-            } else {
-                // SIN DIFERENCIA (valor directo)
-                for (Map<String, Object> registro : datos) {
-                    double kwhActual = ((Number) registro.get("kwh")).doubleValue();
-                    valoresParaEscala.add((float) kwhActual);
-
-                    Map<String, Object> registroNuevo = new java.util.HashMap<>();
-                    registroNuevo.put("fecha", registro.get("fecha"));
-                    registroNuevo.put("valor", kwhActual);
-                    datosProcessados.add(registroNuevo);
-                }
-            }
+            GraficaModel.SerieKWh serie = GraficaModel.calcularSerieKWh(datos, conDiferencia);
 
             // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
             // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
-            List<Float> valoresLimpios = GraficaModel.limpiarAtipicos(valoresParaEscala, GraficaModel.FACTOR_ATIPICO);
+            List<Float> valoresLimpios = GraficaModel.limpiarAtipicos(serie.valores(), GraficaModel.FACTOR_ATIPICO);
 
             // Configuración de la gráfica
             graficaModel.setSeriesNames(new String[]{"KWh"});
@@ -277,13 +226,10 @@ public class ChartsView extends VerticalLayout {
             StringBuilder jsBuilder = new StringBuilder();
             jsBuilder.append(graficaModel.getInitScript2("chartdiv_industrial"));
 
-            for (int i = 0; i < datosProcessados.size(); i++) {
-                Map<String, Object> row = datosProcessados.get(i);
-                Date date = formatter.parse((String) row.get("fecha"));
-                long timestamp = date.getTime();
+            for (int i = 0; i < serie.timestamps().size(); i++) {
                 Float[] values = {valoresLimpios.get(i)};
-
-                jsBuilder.append(graficaModel.getAddDataScript("chartdiv_industrial", timestamp, values, true));
+                jsBuilder.append(graficaModel.getAddDataScript(
+                        "chartdiv_industrial", serie.timestamps().get(i), values, true));
             }
             jsBuilder.append(graficaModel.getAplicarZoomInicialScript("chartdiv_industrial"));
             // Ejecución en una sola llamada
@@ -411,30 +357,6 @@ public class ChartsView extends VerticalLayout {
                 "}");
     }
 
-    private void resetearMarcadores() {
-        graficaModel.resetearMarcadores();
-
-        // Limpiar tarjetas
-        if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
-            MainLayout layout = (MainLayout) this.getParent().get();
-
-            String htmlVacio = "<div style='" +
-                    "background: #4a4a4a; " +
-                    "border-radius: 8px; " +
-                    "padding: 10px 14px; " +
-                    "color: #ffffff; " +
-                    "display: flex; " +
-                    "gap: 12px; " +
-                    "align-items: center; " +
-                    "font-size: 12px; " +
-                    "'>" +
-                    "  <div style='text-align: center; color: #999;'>---</div>" +
-                    "</div>";
-
-            layout.getUltimoClickCard().getElement().setProperty("innerHTML", htmlVacio);
-            layout.getClickAnteriorCard().getElement().setProperty("innerHTML", htmlVacio);
-        }
-    }
     @ClientCallable
     public void limpiarTarjetas() {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
@@ -471,21 +393,6 @@ public class ChartsView extends VerticalLayout {
             layout.getUltimoClickCard().getElement().setProperty("innerHTML", htmlVacio);
             layout.getClickAnteriorCard().getElement().setProperty("innerHTML", htmlVacio);
         }
-    }
-
-    private void resetearMarcadores1() {
-        graficaModel.resetearMarcadores();
-        getElement().executeJs("if(window.am5Charts && window.am5Charts['chartdiv_industrial']) {" +
-                "  var inst = window.am5Charts['chartdiv_industrial'];" +
-                "  inst.tiemposMarcadores = [];" +
-                "  inst.posY = 0;" +
-                "  if(inst.seriesList && inst.seriesList[0]) {" +
-                "    while(inst.seriesList[0].bullets.length > 0) {" +
-                "      inst.seriesList[0].bullets.pop().dispose();" +
-                "    }" +
-                "  }" +
-                "  console.log('🗑️ Marcadores eliminados');" +
-                "}");
     }
 
     @ClientCallable

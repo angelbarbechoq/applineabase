@@ -118,11 +118,8 @@ public class HistoricoView extends VerticalLayout {
         Button resetZoomBtn = new Button("Reset Zoom", e -> resetZoom());
         resetZoomBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
-        Button resetMarcadoresBtn = new Button("Reset Marcadores", e -> resetearMarcadores());
-        resetMarcadoresBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-
         HorizontalLayout layout = new HorizontalLayout(
-                maquinaCombo, desdeDate, hastaDate, variableCombo, consultarBtn, resetZoomBtn, resetMarcadoresBtn);
+                maquinaCombo, desdeDate, hastaDate, variableCombo, consultarBtn, resetZoomBtn);
         layout.setAlignItems(FlexComponent.Alignment.END);
         layout.setSpacing(true);
         return layout;
@@ -181,89 +178,45 @@ public class HistoricoView extends VerticalLayout {
             }
             List<Map<String, Object>> datos = plcDataQueryService.getHistoricoKWhByRango(maquina, desde, hasta);
 
-            // CONDICIONANTE: elegir si es con diferencia o sin diferencia
-                boolean conDiferencia = true;
-                if ((maquina.contains("Temperatura") || maquina.contains("Psi") || maquina.contains("BarCompHP"))) {
-                    conDiferencia = false;
+            boolean conDiferencia = graficaKWh.clasificarYFijarUnidad(maquina);
 
-                    // Setear unidad según máquina
-                    if (maquina.contains("Temperatura")) {
-                        graficaKWh.setUnidad("°C");
-                    } else if (maquina.contains("Psi")) {
-                        graficaKWh.setUnidad("PSI");
-                    } else if (maquina.contains("Bar")) {
-                        graficaKWh.setUnidad("BAR");
-                    }
-                } else {
-                    graficaKWh.setUnidad("KWh");
-                }
-
-                if (datos.size() < (conDiferencia ? 2 : 1)) {
-                    mensajeSpan.setText(conDiferencia ?
-                            "Insuficientes datos para calcular diferencias" :
-                            "No hay registros para graficar");
-                    graficaKWh.setSeriesNames(new String[]{"Datos"});
-                    getElement().executeJs(graficaKWh.getInitScript2("chartdiv_historico"));
-                    return;
-                }
-
+            if (datos.size() < (conDiferencia ? 2 : 1)) {
+                mensajeSpan.setText(conDiferencia ?
+                        "Insuficientes datos para calcular diferencias" :
+                        "No hay registros para graficar");
                 graficaKWh.setSeriesNames(new String[]{"Datos"});
-                SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
-                List<Long> timestamps = new java.util.ArrayList<>();
-                List<Float> valores = new java.util.ArrayList<>();
+                getElement().executeJs(graficaKWh.getInitScript2("chartdiv_historico"));
+                return;
+            }
 
-                if (conDiferencia) {
-                    // CON DIFERENCIA
-                    for (int i = 1; i < datos.size(); i++) {
-                        try {
-                            double actual = ((Number) datos.get(i).get("kwh")).doubleValue();
-                            double anterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
-                            double dif = actual - anterior;
-                            if (dif < 0) dif = 0;
+            graficaKWh.setSeriesNames(new String[]{"Datos"});
+            GraficaModel.SerieKWh serie = GraficaModel.calcularSerieKWh(datos, conDiferencia);
 
-                            long ts = sdf.parse((String) datos.get(i).get("fecha")).getTime();
-                            timestamps.add(ts);
-                            valores.add((float) dif);
-                        } catch (Exception ignored) {}
-                    }
-                } else {
-                    // SIN DIFERENCIA (valor directo)
-                    for (Map<String, Object> row : datos) {
-                        try {
-                            double valor = ((Number) row.get("kwh")).doubleValue();
+            // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
+            // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
+            List<Float> valoresLimpios = GraficaModel.limpiarAtipicos(serie.valores(), GraficaModel.FACTOR_ATIPICO);
 
-                            long ts = sdf.parse((String) row.get("fecha")).getTime();
-                            timestamps.add(ts);
-                            valores.add((float) valor);
-                        } catch (Exception ignored) {}
-                    }
-                }
+            graficaKWh.setMinY(0.0);
+            graficaKWh.aplicarRangosPredefinidos(maquina);
+            // El preset por máquina actúa como piso; se amplía si los datos reales lo
+            // superan. Se usa el percentil 95 en vez del máximo crudo como margen
+            // adicional de seguridad.
+            double p95 = GraficaModel.percentil(valoresLimpios, 0.95);
+            double maxConMargen = p95 * 1.1;
+            if (maxConMargen > graficaKWh.getMaxY()) {
+                graficaKWh.setMaxY(maxConMargen);
+            }
 
-                // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
-                // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
-                List<Float> valoresLimpios = GraficaModel.limpiarAtipicos(valores, GraficaModel.FACTOR_ATIPICO);
+            StringBuilder batchScript = new StringBuilder();
+            batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
+            for (int i = 0; i < serie.timestamps().size(); i++) {
+                batchScript.append(graficaKWh.getAddDataScript(
+                        "chartdiv_historico", serie.timestamps().get(i), new Float[]{valoresLimpios.get(i)}, false));
+            }
+            batchScript.append(graficaKWh.getAplicarZoomInicialScript("chartdiv_historico"));
 
-                graficaKWh.setMinY(0.0);
-                graficaKWh.aplicarRangosPredefinidos(maquina);
-                // El preset por máquina actúa como piso; se amplía si los datos reales lo
-                // superan. Se usa el percentil 95 en vez del máximo crudo como margen
-                // adicional de seguridad.
-                double p95 = GraficaModel.percentil(valoresLimpios, 0.95);
-                double maxConMargen = p95 * 1.1;
-                if (maxConMargen > graficaKWh.getMaxY()) {
-                    graficaKWh.setMaxY(maxConMargen);
-                }
-
-                StringBuilder batchScript = new StringBuilder();
-                batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
-                for (int i = 0; i < timestamps.size(); i++) {
-                    batchScript.append(graficaKWh.getAddDataScript(
-                            "chartdiv_historico", timestamps.get(i), new Float[]{valoresLimpios.get(i)}, false));
-                }
-                batchScript.append(graficaKWh.getAplicarZoomInicialScript("chartdiv_historico"));
-
-                getElement().executeJs(batchScript.toString());
-                mensajeSpan.setText(timestamps.size() + " puntos graficados");
+            getElement().executeJs(batchScript.toString());
+            mensajeSpan.setText(serie.timestamps().size() + " puntos graficados");
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());
         }
@@ -393,21 +346,6 @@ public class HistoricoView extends VerticalLayout {
                 "  inst.xAxis.zoom(0, 1);" +
                 "  inst.aplicarZoomCalculado();" +
                 "  console.log('🔄 Zoom reseteado');" +
-                "}");
-    }
-
-    private void resetearMarcadores() {
-        graficaActiva.resetearMarcadores();
-        getElement().executeJs("if(window.am5Charts && window.am5Charts['chartdiv_historico']) {" +
-                "  var inst = window.am5Charts['chartdiv_historico'];" +
-                "  inst.tiemposMarcadores = [];" +
-                "  inst.posY = 0;" +
-                "  if(inst.seriesList && inst.seriesList[0]) {" +
-                "    while(inst.seriesList[0].bullets.length > 0) {" +
-                "      inst.seriesList[0].bullets.pop().dispose();" +
-                "    }" +
-                "  }" +
-                "  console.log('🗑️ Marcadores eliminados');" +
                 "}");
     }
 
