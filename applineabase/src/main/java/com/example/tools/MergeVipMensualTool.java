@@ -105,13 +105,7 @@ public class MergeVipMensualTool {
         try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + mensualPath);
              Statement st = conn.createStatement()) {
             for (String linea : lineas) {
-                StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ").append(linea)
-                        .append(" (fecha TEXT PRIMARY KEY NOT NULL");
-                for (String campo : campos) {
-                    sql.append(", ").append(campo).append(" FLOAT NOT NULL");
-                }
-                sql.append(")");
-                st.execute(sql.toString());
+                st.execute(RutaArchivosEnergia.construirSqlCrearTabla(linea, campos));
             }
         }
     }

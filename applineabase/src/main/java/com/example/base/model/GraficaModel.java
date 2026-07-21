@@ -123,12 +123,16 @@ public class GraficaModel {
                         "  var isDoubleClick = (nowTime - inst.lastClickTime) < 300;" +
                         "  inst.lastClickTime = nowTime;" +
                         "  if (isDoubleClick) {" +
-                        "    inst.tiemposMarcadores = [];" +
-                        "    inst.posY = 0;" +
-                        "    inst.marcadores.forEach(function(marker) { marker.dispose(); });" +
-                        "    inst.marcadores = [];" +
-                        "    inst.aplicarZoomCalculado();" +
-                        "    if ($0.$server && $0.$server.limpiarTarjetas) { $0.$server.limpiarTarjetas(); }"+
+                        "    try {" +
+                        "      inst.tiemposMarcadores = [];" +
+                        "      inst.posY = 0;" +
+                        "      inst.marcadores.forEach(function(marker) { marker.dispose(); });" +
+                        "      inst.marcadores = [];" +
+                        "      inst.aplicarZoomCalculado();" +
+                        "      if ($0.$server && $0.$server.limpiarTarjetas) { $0.$server.limpiarTarjetas(); }"+
+                        "    } catch(e) {" +
+                        "      console.error('Error en doble-click:', e);" +
+                        "    }" +
                         "  } else {" +
                         "    try {" +
                         "      var timestamp = null;" +
@@ -392,7 +396,11 @@ public class GraficaModel {
      */
     public static double percentil(List<Float> valores, double p) {
         if (valores == null || valores.isEmpty()) return 0.0;
-        List<Float> ordenado = new ArrayList<>(valores);
+        List<Float> ordenado = new ArrayList<>();
+        for (Float v : valores) {
+            if (v != null) ordenado.add(v);
+        }
+        if (ordenado.isEmpty()) return 0.0;
         Collections.sort(ordenado);
         int idx = (int) Math.ceil(p * ordenado.size()) - 1;
         idx = Math.max(0, Math.min(idx, ordenado.size() - 1));

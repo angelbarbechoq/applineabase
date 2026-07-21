@@ -89,14 +89,7 @@ public class DatabaseInitializationService {
 
     public void creaTabla(String dbPath, String nombreTabla, String[] datos) {
         try {
-            String sqlCampos = "(fecha TEXT PRIMARY KEY NOT NULL,";
-            for (int ix = 0; ix < datos.length; ix++) {
-                if (ix == datos.length - 1)
-                    sqlCampos = sqlCampos + datos[ix] + " FLOAT NOT NULL)";
-                else
-                    sqlCampos = sqlCampos + datos[ix] + " FLOAT NOT NULL,";
-            }
-            String sqlCrearTabla = "CREATE TABLE IF NOT EXISTS " + nombreTabla + sqlCampos;
+            String sqlCrearTabla = RutaArchivosEnergia.construirSqlCrearTabla(nombreTabla, datos);
 
             conectar(dbPath);
 

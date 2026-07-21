@@ -185,6 +185,10 @@ public class HistoricoView extends VerticalLayout {
                         "Insuficientes datos para calcular diferencias" :
                         "No hay registros para graficar");
                 graficaKWh.setSeriesNames(new String[]{"Datos"});
+                // Resetear al preset de la máquina: si no, el gráfico vacío hereda el zoom
+                // que haya quedado de la última consulta exitosa sobre esta misma instancia.
+                graficaKWh.setMinY(0.0);
+                graficaKWh.aplicarRangosPredefinidos(maquina);
                 getElement().executeJs(graficaKWh.getInitScript2("chartdiv_historico"));
                 return;
             }
@@ -232,6 +236,17 @@ public class HistoricoView extends VerticalLayout {
 
             if (datos.isEmpty()) {
                 mensajeSpan.setText("No hay datos en el rango seleccionado");
+                // Resetear al piso por defecto: si no, el gráfico vacío hereda el zoom que
+                // haya quedado de la última consulta exitosa sobre esta misma instancia.
+                if (tipoVar.equals("Voltajes")) {
+                    graficaVoltajes.setMaxY(VOLTAJES_MAX_Y_DEFAULT);
+                } else if (tipoVar.equals("Corrientes")) {
+                    graficaCorrientes.setMaxY(CORRIENTES_MAX_Y_DEFAULT);
+                } else if (tipoVar.equals("PW")) {
+                    graficaPW.setMaxY(PW_MAX_Y_DEFAULT);
+                } else if (tipoVar.equals("PF")) {
+                    graficaPF.setMaxY(1.0);
+                }
                 getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
                 return;
             }

@@ -33,4 +33,22 @@ public final class RutaArchivosEnergia {
         }
         return -1;
     }
+
+    /**
+     * SQL de "CREATE TABLE IF NOT EXISTS" para una tabla de línea/máquina: fecha (clave
+     * primaria) más una columna FLOAT NOT NULL por cada campo. Única función para este
+     * armado: la usan DatabaseInitializationService.creaTabla() y
+     * MergeVipMensualTool.crearArchivoMensual(), que además de esto hacen cosas distintas
+     * (una migra columnas con ALTER TABLE sobre una conexión compartida, la otra abre su
+     * propia conexión aislada), así que solo se comparte la construcción del SQL en sí.
+     */
+    public static String construirSqlCrearTabla(String nombreTabla, String[] campos) {
+        StringBuilder sql = new StringBuilder("CREATE TABLE IF NOT EXISTS ").append(nombreTabla)
+                .append(" (fecha TEXT PRIMARY KEY NOT NULL");
+        for (String campo : campos) {
+            sql.append(", ").append(campo).append(" FLOAT NOT NULL");
+        }
+        sql.append(")");
+        return sql.toString();
+    }
 }
