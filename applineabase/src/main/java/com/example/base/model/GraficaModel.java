@@ -64,7 +64,8 @@ public class GraficaModel {
 
                         // PASO 4: Crear EJES PRIMERO
                         "var xAxis = chart.xAxes.push(am5xy.DateAxis.new(root, { maxDeviation: 0.2, baseInterval: { timeUnit: 'second', count: 1 }, renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 50 }) }));" +
-                        "xAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
+                        "var xTooltip = xAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
+                        "xTooltip.label.setAll({ fontSize: '11px', textAlign: 'center' });" +
                         "xAxis.set('tooltipDateFormat', 'dd-MM-yyyy\\nHH:mm:ss');" +
                         "console.log('✓ Eje X creado con tooltip');" +
 
