@@ -349,12 +349,7 @@ public class ChartsView extends VerticalLayout {
     }
 
     private void resetZoom() {
-        getElement().executeJs("if(window.am5Charts && window.am5Charts['chartdiv_industrial']) {" +
-                "  var inst = window.am5Charts['chartdiv_industrial'];" +
-                "  inst.xAxis.zoom(0, 1);" +
-                "  inst.aplicarZoomCalculado();" +
-                "  console.log('🔄 Zoom reseteado');" +
-                "}");
+        getElement().executeJs(graficaModel.getResetZoomScript("chartdiv_industrial"));
     }
 
     @ClientCallable

@@ -1,5 +1,6 @@
 package com.example.tools;
 
+import com.example.dataacquisition.RutaArchivosEnergia;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
@@ -34,14 +35,6 @@ import java.util.regex.Pattern;
 @Service
 public class MergeVipMensualTool {
 
-    private static final String BASE_PATH = "C:\\LineaBaseX";
-    private static final String[] NOMBRES_MES = {
-            "enero", "febrero", "marzo", "abril", "mayo", "junio",
-            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
-    };
-    private static final String[] CAMPOS_NORMAL = {"kwh"};
-    private static final String[] CAMPOS_VIP = {"VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF", "KWhR"};
-
     /** Uso desde IntelliJ (clic derecho -> Run): sin argumentos usa el mes actual; con "yyyy-MM" procesa ese mes. */
     public static void main(String[] args) throws Exception {
         YearMonth mes = args.length > 0 ? YearMonth.parse(args[0]) : YearMonth.now();
@@ -61,8 +54,8 @@ public class MergeVipMensualTool {
 
     private ResultadoReparacion reparar(YearMonth mes, String sufijo) {
         List<String> log = new ArrayList<>();
-        String nombreMes = NOMBRES_MES[mes.getMonthValue() - 1];
-        String carpetaMes = BASE_PATH + "\\" + mes.getYear() + "\\" + nombreMes;
+        String nombreMes = RutaArchivosEnergia.getNombreMes(mes.getMonthValue());
+        String carpetaMes = RutaArchivosEnergia.BASE_PATH + "\\" + mes.getYear() + "\\" + nombreMes;
         String mensualPath = carpetaMes + "\\" + nombreMes + sufijo;
         String etiqueta = sufijo.isEmpty() ? "normal (KWh)" : sufijo;
 
@@ -108,7 +101,7 @@ public class MergeVipMensualTool {
     }
 
     private void crearArchivoMensual(String mensualPath, List<String> lineas, String sufijo) throws SQLException {
-        String[] campos = sufijo.isEmpty() ? CAMPOS_NORMAL : CAMPOS_VIP;
+        String[] campos = sufijo.isEmpty() ? RutaArchivosEnergia.CAMPOS_NORMAL : RutaArchivosEnergia.CAMPOS_VIP;
         try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + mensualPath);
              Statement st = conn.createStatement()) {
             for (String linea : lineas) {

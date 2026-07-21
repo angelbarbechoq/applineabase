@@ -1,5 +1,6 @@
 package com.example.dataacquisition.service;
 
+import com.example.dataacquisition.RutaArchivosEnergia;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,10 +26,6 @@ import java.util.Map;
 public class DatabaseInitializationService {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseInitializationService.class);
-    private static final String BASE_PATH = "C:\\LineaBaseX";
-
-    private static final String[] CAMPOS_NORMAL = {"kwh"};
-    private static final String[] CAMPOS_VIP = {"VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF", "KWhR"};
 
     private final ConfigLoaderService configLoaderService;
     private Connection conexion;
@@ -61,12 +58,12 @@ public class DatabaseInitializationService {
         int month = today.getMonthValue();
         int day = today.getDayOfMonth();
 
-        String monthName = getMonthName(month);
+        String monthName = RutaArchivosEnergia.getNombreMes(month);
         //String monthFormatted = String.format("%02d", month);
         String dayFormatted = String.format("%02d", day);
 
         String monthFolder =  monthName;
-        String monthPath = BASE_PATH + "\\" + year + "\\" + monthFolder;
+        String monthPath = RutaArchivosEnergia.BASE_PATH + "\\" + year + "\\" + monthFolder;
 
         try {
             Files.createDirectories(Paths.get(monthPath));
@@ -79,10 +76,10 @@ public class DatabaseInitializationService {
             String[] lineas = obtenerLineas();
 
             for (String linea : lineas) {
-                creaTabla(dailyPath, linea, CAMPOS_NORMAL);
-                creaTabla(dailyVIPPath, linea, CAMPOS_VIP);
-                creaTabla(monthlyPath, linea, CAMPOS_NORMAL);
-                creaTabla(monthlyVIPPath, linea, CAMPOS_VIP);
+                creaTabla(dailyPath, linea, RutaArchivosEnergia.CAMPOS_NORMAL);
+                creaTabla(dailyVIPPath, linea, RutaArchivosEnergia.CAMPOS_VIP);
+                creaTabla(monthlyPath, linea, RutaArchivosEnergia.CAMPOS_NORMAL);
+                creaTabla(monthlyVIPPath, linea, RutaArchivosEnergia.CAMPOS_VIP);
             }
 
         } catch (Exception e) {
@@ -188,12 +185,6 @@ public class DatabaseInitializationService {
         }
     }
 
-    private String getMonthName(int month) {
-        String[] months = {"enero", "febrero", "marzo", "abril", "mayo", "junio",
-                          "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"};
-        return months[month - 1];
-    }
-
     /**
      * Lista los meses (año+mes) para los que existe una carpeta de datos en BASE_PATH,
      * ordenados de más antiguo a más reciente. Usado por el backfill del horómetro para
@@ -201,7 +192,7 @@ public class DatabaseInitializationService {
      */
     public List<YearMonth> listarMesesDisponibles() {
         List<YearMonth> meses = new ArrayList<>();
-        File[] carpetasAnio = new File(BASE_PATH).listFiles(File::isDirectory);
+        File[] carpetasAnio = new File(RutaArchivosEnergia.BASE_PATH).listFiles(File::isDirectory);
         if (carpetasAnio == null) {
             return meses;
         }
@@ -217,7 +208,7 @@ public class DatabaseInitializationService {
                 continue;
             }
             for (File carpetaMes : carpetasMes) {
-                int numeroMes = mesNumeroDesdeNombre(carpetaMes.getName());
+                int numeroMes = RutaArchivosEnergia.getMesNumeroDesdeNombre(carpetaMes.getName());
                 if (numeroMes > 0) {
                     meses.add(YearMonth.of(anio, numeroMes));
                 }
@@ -225,17 +216,6 @@ public class DatabaseInitializationService {
         }
         Collections.sort(meses);
         return meses;
-    }
-
-    private int mesNumeroDesdeNombre(String nombreMes) {
-        String[] months = {"enero", "febrero", "marzo", "abril", "mayo", "junio",
-                          "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"};
-        for (int i = 0; i < months.length; i++) {
-            if (months[i].equalsIgnoreCase(nombreMes)) {
-                return i + 1;
-            }
-        }
-        return -1;
     }
 
     public String getDailyPath() { return dailyPath; }

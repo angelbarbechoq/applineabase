@@ -209,6 +209,21 @@ public class GraficaModel {
                 "});";
     }
 
+    /**
+     * Script del botón "Reset Zoom": vuelve el eje de tiempo (X) al rango completo y aplica
+     * el zoom calculado (piso + percentil) en Y. Única función para esto: la usan tanto
+     * ChartsView como HistoricoView, para que el botón haga siempre lo mismo en las dos vistas.
+     */
+    public String getResetZoomScript(String containerId) {
+        return
+                "if (window.am5Charts && window.am5Charts['" + containerId + "']) {" +
+                "  var inst = window.am5Charts['" + containerId + "'];" +
+                "  inst.xAxis.zoom(0, 1);" +
+                "  inst.aplicarZoomCalculado();" +
+                "  console.log('🔄 Zoom reseteado');" +
+                "}";
+    }
+
     public String getAddDataScript(String containerId, long timestamp, Float[] dato, boolean limit) {
         int maxPoints = 1440; // 24 horas a 1 punto/minuto
         StringBuilder sb = new StringBuilder();
