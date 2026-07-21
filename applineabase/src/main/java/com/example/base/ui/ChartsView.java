@@ -304,8 +304,9 @@ public class ChartsView extends VerticalLayout {
             "      var dateStr = data.fecha.split(' ')[0]; var timeStr = data.fecha.split(' ')[1];" +
             "      var [day, month, year] = dateStr.split('-'); var [hour, min, sec] = timeStr.split(':');" +
             "      var timestamp = new Date(parseInt(year), parseInt(month)-1, parseInt(day), parseInt(hour), parseInt(min), parseInt(sec)).getTime();" +
-            "      inst.seriesList[0].data.push({ date: timestamp, value: data.diferencia });" +
+            "      inst.seriesList[0].data.push({ date: timestamp, value: Math.abs(data.diferencia) });" +
             "      inst.seriesList[0].markDirtyValues();" +
+            "      inst.aplicarZoomCalculado();" +
             "      console.log('✅ Punto agregado y renderizado:', { fecha: data.fecha, diferencia: data.diferencia, timestamp: timestamp });" +
             "    } else {" +
             "      console.warn('⚠️ chartdiv_industrial no inicializado');" +

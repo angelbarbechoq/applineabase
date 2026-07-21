@@ -328,25 +328,36 @@ public class HistoricoView extends VerticalLayout {
 
     private Float[] extractValues(Map<String, Object> row, String tipoVar) {
         return switch (tipoVar) {
+            // Voltaje, corriente y potencia nunca son negativos: se toman en valor absoluto.
             case "Voltajes" -> new Float[]{
-                toFloat(row.get("VAB")), toFloat(row.get("VAC")), toFloat(row.get("VBC"))
+                toFloatAbs(row.get("VAB")), toFloatAbs(row.get("VAC")), toFloatAbs(row.get("VBC"))
             };
             case "Corrientes" -> new Float[]{
-                toFloat(row.get("IA")), toFloat(row.get("IB")), toFloat(row.get("IC"))
+                toFloatAbs(row.get("IA")), toFloatAbs(row.get("IB")), toFloatAbs(row.get("IC"))
             };
-            case "PW" -> new Float[]{toFloat(row.get("PW"))};
+            case "PW" -> new Float[]{toFloatAbs(row.get("PW"))};
+            // El factor de potencia sí puede ser negativo en el medidor principal: se
+            // conserva tal cual, sin valor absoluto.
             case "PF" -> new Float[]{toFloat(row.get("PF"))};
             default -> new Float[]{0f};
         };
     }
 
+    /** Convierte a Float, o null si el dato falta o no se puede convertir: un dato faltante
+     *  no se grafica (no se muestra como si fuera un 0 real). */
     private Float toFloat(Object v) {
-        if (v == null) return 0f;
+        if (v == null) return null;
         try {
             return ((Number) v).floatValue();
         } catch (Exception e) {
-            return 0f;
+            return null;
         }
+    }
+
+    /** Igual que toFloat, pero en valor absoluto. */
+    private Float toFloatAbs(Object v) {
+        Float f = toFloat(v);
+        return f == null ? null : Math.abs(f);
     }
 
     @Override

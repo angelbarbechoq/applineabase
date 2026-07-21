@@ -333,7 +333,9 @@ public class GraficaModel {
                     double anterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
                     long ts = formatter.parse((String) datos.get(i).get("fecha")).getTime();
                     timestamps.add(ts);
-                    valores.add((float) (actual - anterior));
+                    // La energía nunca es negativa: un reinicio de contador da una resta
+                    // negativa que no es un valor real, se toma en valor absoluto.
+                    valores.add((float) Math.abs(actual - anterior));
                 } catch (Exception ignored) {}
             }
         } else {
