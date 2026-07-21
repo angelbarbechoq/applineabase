@@ -69,11 +69,7 @@ public class GraficaModel {
                         "xAxis.set('tooltipDateFormat', 'dd-MM-yyyy\\nHH:mm:ss');" +
                         "console.log('✓ Eje X creado con tooltip');" +
 
-                        // min fijo en 0 (nunca max): todas las variables son no-negativas tras el
-                        // valor absoluto, así que el cero siempre debe verse como referencia, aun
-                        // haciendo zoom manual con el ratón. Fijar solo el min (no el max) no
-                        // bloquea el zoom nativo, a diferencia de fijar ambos extremos.
-                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, renderer: am5xy.AxisRendererY.new(root, {}) }));" +
+                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));" +
                         "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
                         "console.log('✓ Eje Y creado con tooltip. Zoom inicial: " + minY + " - " + maxY + "');" +
                         // PASO 5: Crear CURSOR con ejes (pero sin snapToSeries aún)
