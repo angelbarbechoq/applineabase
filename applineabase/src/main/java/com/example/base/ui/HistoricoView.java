@@ -34,6 +34,9 @@ public class HistoricoView extends VerticalLayout {
     private static final double VOLTAJES_MAX_Y_DEFAULT = 500.0;
     private static final double CORRIENTES_MAX_Y_DEFAULT = 300.0;
     private static final double PW_MAX_Y_DEFAULT = 200.0;
+    // El medidor reporta el factor de potencia en escala de porcentaje (ej. -95.96), no
+    // como fracción 0-1: el piso debe cubrir esa escala real, igual que las demás variables.
+    private static final double PF_MAX_Y_DEFAULT = 100.0;
 
     private final GraficaModel graficaKWh = new GraficaModel(1);
     private final GraficaModel graficaVoltajes = new GraficaModel(3);
@@ -73,7 +76,7 @@ public class HistoricoView extends VerticalLayout {
         graficaPW.setMinY(0.0);
         graficaPW.setMaxY(PW_MAX_Y_DEFAULT);
         graficaPF.setMinY(0.0);
-        graficaPF.setMaxY(1.0);
+        graficaPF.setMaxY(PF_MAX_Y_DEFAULT);
 
         graficaActiva = graficaKWh;
 
@@ -221,7 +224,7 @@ public class HistoricoView extends VerticalLayout {
                 } else if (tipoVar.equals("PW")) {
                     graficaPW.setMaxY(PW_MAX_Y_DEFAULT);
                 } else if (tipoVar.equals("PF")) {
-                    graficaPF.setMaxY(1.0);
+                    graficaPF.setMaxY(PF_MAX_Y_DEFAULT);
                 }
                 getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
                 return;
@@ -284,7 +287,7 @@ public class HistoricoView extends VerticalLayout {
             } else if (tipoVar.equals("PW")) {
                 graficaPW.setMaxY(Math.max(PW_MAX_Y_DEFAULT, p95 * 1.1));
             } else if (tipoVar.equals("PF")) {
-                graficaPF.setMaxY(1.0);
+                graficaPF.setMaxY(Math.max(PF_MAX_Y_DEFAULT, p95 * 1.1));
             }
 
             StringBuilder batchScript = new StringBuilder();
