@@ -193,34 +193,10 @@ public class HistoricoView extends VerticalLayout {
                 return;
             }
 
-            graficaKWh.setSeriesNames(new String[]{"Datos"});
-            GraficaModel.SerieKWh serie = GraficaModel.calcularSerieKWh(datos, conDiferencia);
-
-            // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
-            // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
-            List<Float> valoresLimpios = GraficaModel.limpiarAtipicos(serie.valores(), GraficaModel.FACTOR_ATIPICO);
-
-            graficaKWh.setMinY(0.0);
-            graficaKWh.aplicarRangosPredefinidos(maquina);
-            // El preset por máquina actúa como piso; se amplía si los datos reales lo
-            // superan. Se usa el percentil 95 en vez del máximo crudo como margen
-            // adicional de seguridad.
-            double p95 = GraficaModel.percentil(valoresLimpios, 0.95);
-            double maxConMargen = p95 * 1.1;
-            if (maxConMargen > graficaKWh.getMaxY()) {
-                graficaKWh.setMaxY(maxConMargen);
-            }
-
-            StringBuilder batchScript = new StringBuilder();
-            batchScript.append(graficaKWh.getInitScript2("chartdiv_historico"));
-            for (int i = 0; i < serie.timestamps().size(); i++) {
-                batchScript.append(graficaKWh.getAddDataScript(
-                        "chartdiv_historico", serie.timestamps().get(i), new Float[]{valoresLimpios.get(i)}, false));
-            }
-            batchScript.append(graficaKWh.getAplicarZoomInicialScript("chartdiv_historico"));
-
-            getElement().executeJs(batchScript.toString());
-            mensajeSpan.setText(serie.timestamps().size() + " puntos graficados");
+            GraficaModel.ResultadoGrafica resultado = graficaKWh.graficarSerieKWh(
+                    "chartdiv_historico", datos, conDiferencia, maquina, new String[]{"Datos"}, false);
+            getElement().executeJs(resultado.script());
+            mensajeSpan.setText(resultado.puntosGraficados() + " puntos graficados");
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());
         }

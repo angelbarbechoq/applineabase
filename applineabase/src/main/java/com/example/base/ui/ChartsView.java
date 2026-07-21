@@ -204,36 +204,9 @@ public class ChartsView extends VerticalLayout {
                 return;
             }
 
-            GraficaModel.SerieKWh serie = GraficaModel.calcularSerieKWh(datos, conDiferencia);
-
-            // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
-            // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
-            List<Float> valoresLimpios = GraficaModel.limpiarAtipicos(serie.valores(), GraficaModel.FACTOR_ATIPICO);
-
-            // Configuración de la gráfica
-            graficaModel.setSeriesNames(new String[]{"KWh"});
-            graficaModel.setMinY(0.0);
-            graficaModel.aplicarRangosPredefinidos(maquina);
-            // El preset actúa como piso; si los datos reales lo superan, se amplía el eje.
-            // Se usa el percentil 95 en vez del máximo crudo como margen adicional de seguridad.
-            double p95 = GraficaModel.percentil(valoresLimpios, 0.95);
-            double maxConMargen = p95 * 1.1;
-            if (maxConMargen > graficaModel.getMaxY()) {
-                graficaModel.setMaxY(maxConMargen);
-            }
-
-            // Construcción del script batch
-            StringBuilder jsBuilder = new StringBuilder();
-            jsBuilder.append(graficaModel.getInitScript2("chartdiv_industrial"));
-
-            for (int i = 0; i < serie.timestamps().size(); i++) {
-                Float[] values = {valoresLimpios.get(i)};
-                jsBuilder.append(graficaModel.getAddDataScript(
-                        "chartdiv_industrial", serie.timestamps().get(i), values, true));
-            }
-            jsBuilder.append(graficaModel.getAplicarZoomInicialScript("chartdiv_industrial"));
-            // Ejecución en una sola llamada
-            getElement().executeJs(jsBuilder.toString());
+            GraficaModel.ResultadoGrafica resultado = graficaModel.graficarSerieKWh(
+                    "chartdiv_industrial", datos, conDiferencia, maquina, new String[]{"KWh"}, true);
+            getElement().executeJs(resultado.script());
 
         } catch (Exception e) {
             e.printStackTrace();

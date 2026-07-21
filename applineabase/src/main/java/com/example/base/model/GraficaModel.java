@@ -228,6 +228,47 @@ public class GraficaModel {
                 "}";
     }
 
+    public record ResultadoGrafica(String script, int puntosGraficados) {
+    }
+
+    /**
+     * Arma el script completo (init + todos los puntos + zoom inicial) para graficar una
+     * serie de KWh: calcula la serie (diferencia o valor directo), limpia atípicos, aplica
+     * el preset por máquina como piso del eje Y (ampliándolo con el percentil 95 si los
+     * datos reales lo superan), y arma el batch de JS. Única función para esta orquestación:
+     * la usan tanto la gráfica en vivo (ChartsView) como el histórico (HistoricoView), para
+     * que ambas grafiquen siempre igual a partir de los mismos datos.
+     */
+    public ResultadoGrafica graficarSerieKWh(String containerId, List<Map<String, Object>> datos,
+                                              boolean conDiferencia, String maquina,
+                                              String[] seriesNames, boolean limitarPuntos) {
+        setSeriesNames(seriesNames);
+        SerieKWh serie = calcularSerieKWh(datos, conDiferencia);
+
+        // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
+        // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
+        List<Float> valoresLimpios = limpiarAtipicos(serie.valores(), FACTOR_ATIPICO);
+
+        setMinY(0.0);
+        aplicarRangosPredefinidos(maquina);
+        // El preset actúa como piso; si los datos reales lo superan, se amplía el eje.
+        // Se usa el percentil 95 en vez del máximo crudo como margen adicional de seguridad.
+        double p95 = percentil(valoresLimpios, 0.95);
+        double maxConMargen = p95 * 1.1;
+        if (maxConMargen > getMaxY()) {
+            setMaxY(maxConMargen);
+        }
+
+        StringBuilder script = new StringBuilder();
+        script.append(getInitScript2(containerId));
+        for (int i = 0; i < serie.timestamps().size(); i++) {
+            script.append(getAddDataScript(containerId, serie.timestamps().get(i), new Float[]{valoresLimpios.get(i)}, limitarPuntos));
+        }
+        script.append(getAplicarZoomInicialScript(containerId));
+
+        return new ResultadoGrafica(script.toString(), serie.timestamps().size());
+    }
+
     public String getAddDataScript(String containerId, long timestamp, Float[] dato, boolean limit) {
         int maxPoints = 1440; // 24 horas a 1 punto/minuto
         StringBuilder sb = new StringBuilder();
@@ -255,8 +296,15 @@ public class GraficaModel {
         return sb.toString();
     }
 
+    private static final int MAX_MARCADORES_HISTORIAL = 100;
+
     public void registrarClick(long timestamp) {
         this.tiemposMarcadores.add(timestamp);
+        // Ya no hay botón que limpie esta lista (se maneja del lado del cliente con el
+        // doble-click); se acota acá para que no crezca sin límite en una sesión larga.
+        if (this.tiemposMarcadores.size() > MAX_MARCADORES_HISTORIAL) {
+            this.tiemposMarcadores.remove(0);
+        }
         System.out.println("Click en: " + houra.format(new Date(timestamp)));
         if (tiemposMarcadores.size() > 1) {
             long tiempoAnterior = tiemposMarcadores.get(tiemposMarcadores.size() - 2);
