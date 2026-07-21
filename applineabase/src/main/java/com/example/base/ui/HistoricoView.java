@@ -217,29 +217,12 @@ public class HistoricoView extends VerticalLayout {
                 mensajeSpan.setText("No hay datos en el rango seleccionado");
                 // Resetear al piso por defecto: si no, el gráfico vacío hereda el zoom que
                 // haya quedado de la última consulta exitosa sobre esta misma instancia.
-                if (tipoVar.equals("Voltajes")) {
-                    graficaVoltajes.setMaxY(VOLTAJES_MAX_Y_DEFAULT);
-                } else if (tipoVar.equals("Corrientes")) {
-                    graficaCorrientes.setMaxY(CORRIENTES_MAX_Y_DEFAULT);
-                } else if (tipoVar.equals("PW")) {
-                    graficaPW.setMaxY(PW_MAX_Y_DEFAULT);
-                } else if (tipoVar.equals("PF")) {
-                    graficaPF.setMaxY(PF_MAX_Y_DEFAULT);
-                }
+                graficaActiva.setMaxY(maxYDefaultPorTipo(tipoVar));
                 getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
                 return;
             }
 
-            // Setear nombres de series según variable
-            if (tipoVar.equals("Voltajes")) {
-                graficaVoltajes.setSeriesNames(new String[]{"VAB", "VAC", "VBC"});
-            } else if (tipoVar.equals("Corrientes")) {
-                graficaCorrientes.setSeriesNames(new String[]{"IA", "IB", "IC"});
-            } else if (tipoVar.equals("PW")) {
-                graficaPW.setSeriesNames(new String[]{"PW"});
-            } else if (tipoVar.equals("PF")) {
-                graficaPF.setSeriesNames(new String[]{"PF"});
-            }
+            graficaActiva.setSeriesNames(seriesNamesPorTipo(tipoVar));
 
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
             List<Long> timestamps = new java.util.ArrayList<>();
@@ -280,15 +263,7 @@ public class HistoricoView extends VerticalLayout {
             // el piso por defecto se amplía si los datos reales lo superan. Se usa el
             // percentil 95 en vez del máximo crudo como margen adicional de seguridad.
             double p95 = GraficaModel.percentil(valoresParaEscala, 0.95);
-            if (tipoVar.equals("Voltajes")) {
-                graficaVoltajes.setMaxY(Math.max(VOLTAJES_MAX_Y_DEFAULT, p95 * 1.1));
-            } else if (tipoVar.equals("Corrientes")) {
-                graficaCorrientes.setMaxY(Math.max(CORRIENTES_MAX_Y_DEFAULT, p95 * 1.1));
-            } else if (tipoVar.equals("PW")) {
-                graficaPW.setMaxY(Math.max(PW_MAX_Y_DEFAULT, p95 * 1.1));
-            } else if (tipoVar.equals("PF")) {
-                graficaPF.setMaxY(Math.max(PF_MAX_Y_DEFAULT, p95 * 1.1));
-            }
+            graficaActiva.setMaxY(Math.max(maxYDefaultPorTipo(tipoVar), p95 * 1.1));
 
             StringBuilder batchScript = new StringBuilder();
             batchScript.append(graficaActiva.getInitScript2("chartdiv_historico"));
@@ -303,6 +278,27 @@ public class HistoricoView extends VerticalLayout {
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());
         }
+    }
+
+    /** Piso por defecto del eje Y para cada variable VIP (se amplía con el percentil 95 si los datos reales lo superan). */
+    private double maxYDefaultPorTipo(String tipoVar) {
+        return switch (tipoVar) {
+            case "Voltajes" -> VOLTAJES_MAX_Y_DEFAULT;
+            case "Corrientes" -> CORRIENTES_MAX_Y_DEFAULT;
+            case "PW" -> PW_MAX_Y_DEFAULT;
+            case "PF" -> PF_MAX_Y_DEFAULT;
+            default -> 0.0;
+        };
+    }
+
+    private String[] seriesNamesPorTipo(String tipoVar) {
+        return switch (tipoVar) {
+            case "Voltajes" -> new String[]{"VAB", "VAC", "VBC"};
+            case "Corrientes" -> new String[]{"IA", "IB", "IC"};
+            case "PW" -> new String[]{"PW"};
+            case "PF" -> new String[]{"PF"};
+            default -> new String[]{"Valor"};
+        };
     }
 
     private Float[] extractValues(Map<String, Object> row, String tipoVar) {

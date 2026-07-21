@@ -324,12 +324,7 @@ public class GraficaModel {
         System.out.println("Click en: " + houra.format(new Date(timestamp)));
         if (tiemposMarcadores.size() > 1) {
             long tiempoAnterior = tiemposMarcadores.get(tiemposMarcadores.size() - 2);
-            long diferencia = timestamp - tiempoAnterior;
-            long horas = diferencia / (1000 * 60 * 60);
-            long minutos = (diferencia % (1000 * 60 * 60)) / (1000 * 60);
-            long segundos = (diferencia % (1000 * 60)) / 1000;
-            System.out.println("Tiempo transcurrido: " +
-                String.format("%02d:%02d:%02d", horas, minutos, segundos));
+            System.out.println("Tiempo transcurrido: " + formatearDuracion(timestamp - tiempoAnterior));
         }
     }
 
@@ -341,10 +336,14 @@ public class GraficaModel {
         if (indice1 < 0 || indice2 < 0 || indice1 >= tiemposMarcadores.size() || indice2 >= tiemposMarcadores.size()) {
             return "00:00:00";
         }
-        long diferencia = Math.abs(tiemposMarcadores.get(indice2) - tiemposMarcadores.get(indice1));
-        long horas = diferencia / (1000 * 60 * 60);
-        long minutos = (diferencia % (1000 * 60 * 60)) / (1000 * 60);
-        long segundos = (diferencia % (1000 * 60)) / 1000;
+        return formatearDuracion(Math.abs(tiemposMarcadores.get(indice2) - tiemposMarcadores.get(indice1)));
+    }
+
+    /** Formatea una duración en milisegundos como HH:mm:ss. */
+    private static String formatearDuracion(long milisegundos) {
+        long horas = milisegundos / (1000 * 60 * 60);
+        long minutos = (milisegundos % (1000 * 60 * 60)) / (1000 * 60);
+        long segundos = (milisegundos % (1000 * 60)) / 1000;
         return String.format("%02d:%02d:%02d", horas, minutos, segundos);
     }
     /**

@@ -331,37 +331,42 @@ public class ChartsView extends VerticalLayout {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             MainLayout layout = (MainLayout) this.getParent().get();
 
-            String htmlVacio = "<div style='" +
-                    "background: #4a4a4a; " +
-                    "border-radius: 8px; " +
-                    "padding: 10px 14px; " +
-                    "color: #ffffff; " +
-                    "display: flex; " +
-                    "gap: 12px; " +
-                    "align-items: center; " +
-                    "font-size: 12px; " +
-                    "'>" +
-
-                    "  <div style='text-align: center;'>" +
-                    "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Fecha</div>" +
-                    "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>00-00-00</div>" +
-                    "  </div>" +
-
-                    "  <div style='text-align: center;'>" +
-                    "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Hora</div>" +
-                    "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>00:00:00</div>" +
-                    "  </div>" +
-
-                    "  <div style='text-align: center;'>" +
-                    "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>KWh</div>" +
-                    "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>0.0</div>" +
-                    "  </div>" +
-
-                    "</div>";
+            String htmlVacio = construirTarjetaHtml("00-00-00", "00:00:00", "0.0");
 
             layout.getUltimoClickCard().getElement().setProperty("innerHTML", htmlVacio);
             layout.getClickAnteriorCard().getElement().setProperty("innerHTML", htmlVacio);
         }
+    }
+
+    /** Tarjeta HTML de Fecha/Hora/KWh, usada tanto para el estado vacío como con datos reales. */
+    private String construirTarjetaHtml(String fechaStr, String horaStr, String valorStr) {
+        return "<div style='" +
+                "background: #4a4a4a; " +
+                "border-radius: 8px; " +
+                "padding: 10px 14px; " +
+                "color: #ffffff; " +
+                "display: flex; " +
+                "gap: 12px; " +
+                "align-items: center; " +
+                "font-size: 12px; " +
+                "'>" +
+
+                "  <div style='text-align: center;'>" +
+                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Fecha</div>" +
+                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + fechaStr + "</div>" +
+                "  </div>" +
+
+                "  <div style='text-align: center;'>" +
+                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Hora</div>" +
+                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + horaStr + "</div>" +
+                "  </div>" +
+
+                "  <div style='text-align: center;'>" +
+                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>KWh</div>" +
+                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + valorStr + "</div>" +
+                "  </div>" +
+
+                "</div>";
     }
 
     @ClientCallable
@@ -392,49 +397,7 @@ public class ChartsView extends VerticalLayout {
             valorStr = "Error";
         }
 
-        List<Long> marcadores = graficaModel.obtenerMarcadores();
-        String deltaStr = "";
-        if (marcadores.size() > 1) {
-            int ultimoIdx = marcadores.size() - 1;
-            int penultimoIdx = ultimoIdx - 1;
-            deltaStr = graficaModel.obtenerTiempoTranscurrido(penultimoIdx, ultimoIdx);
-        }
-
-        StringBuilder htmlBuilder = new StringBuilder();
-        htmlBuilder.append("<div style='" +
-                "background: #4a4a4a; " +
-                "border-radius: 8px; " +
-                "padding: 10px 14px; " +
-                "color: #ffffff; " +
-                "display: flex; " +
-                "gap: 12px; " +
-                "align-items: center; " +
-                "font-size: 12px; " +
-                "'>" +
-
-                "  <div style='text-align: center;'>" +
-                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Fecha</div>" +
-                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + fechaStr + "</div>" +
-                "  </div>" +
-
-                "  <div style='text-align: center;'>" +
-                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Hora</div>" +
-                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + horaStr + "</div>" +
-                "  </div>" +
-
-                "  <div style='text-align: center;'>" +
-                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>KWh</div>" +
-                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + valorStr + "</div>" +
-                "  </div>");
-/*
-        if (!deltaStr.isEmpty()) {
-            htmlBuilder.append("  <div style='text-align: center;'>" +
-                    "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Δ</div>" +
-                    "    <div style='font-size: 11px; font-weight: bold; color: #ffd700;'>" + deltaStr + "</div>" +
-                    "  </div>");
-        }
-*/
-        final String html = htmlBuilder.append("</div>").toString();
+        final String html = construirTarjetaHtml(fechaStr, horaStr, valorStr);
 
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             MainLayout layout = (MainLayout) this.getParent().get();
