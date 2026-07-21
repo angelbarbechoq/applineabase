@@ -381,20 +381,25 @@ public class GraficaModel {
                 try {
                     double actual = ((Number) datos.get(i).get("kwh")).doubleValue();
                     double anterior = ((Number) datos.get(i - 1).get("kwh")).doubleValue();
-                    long ts = formatter.parse((String) datos.get(i).get("fecha")).getTime();
-                    timestamps.add(ts);
                     // La energía nunca es negativa: un reinicio de contador da una resta
                     // negativa que no es un valor real, se toma en valor absoluto.
-                    valores.add((float) Math.abs(actual - anterior));
+                    float diferencia = (float) Math.abs(actual - anterior);
+                    // Un NaN/Infinito (ej. división por cero en un cálculo previo) no se
+                    // grafica: amCharts puede colgarse si recibe un valor no finito.
+                    if (!Float.isFinite(diferencia)) continue;
+                    long ts = formatter.parse((String) datos.get(i).get("fecha")).getTime();
+                    timestamps.add(ts);
+                    valores.add(diferencia);
                 } catch (Exception ignored) {}
             }
         } else {
             for (Map<String, Object> row : datos) {
                 try {
-                    double valor = ((Number) row.get("kwh")).doubleValue();
+                    float valor = (float) ((Number) row.get("kwh")).doubleValue();
+                    if (!Float.isFinite(valor)) continue;
                     long ts = formatter.parse((String) row.get("fecha")).getTime();
                     timestamps.add(ts);
-                    valores.add((float) valor);
+                    valores.add(valor);
                 } catch (Exception ignored) {}
             }
         }

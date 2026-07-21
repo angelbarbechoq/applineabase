@@ -319,12 +319,15 @@ public class HistoricoView extends VerticalLayout {
         };
     }
 
-    /** Convierte a Float, o null si el dato falta o no se puede convertir: un dato faltante
-     *  no se grafica (no se muestra como si fuera un 0 real). */
+    /** Convierte a Float, o null si el dato falta, no se puede convertir, o no es un número
+     *  finito (NaN/Infinito, típico de una división por cero en el cálculo del PF): un dato
+     *  faltante o inválido no se grafica (no se muestra como si fuera un 0 real, y amCharts
+     *  puede colgarse si recibe un NaN/Infinito al calcular la escala del eje). */
     private Float toFloat(Object v) {
         if (v == null) return null;
         try {
-            return ((Number) v).floatValue();
+            float f = ((Number) v).floatValue();
+            return Float.isFinite(f) ? f : null;
         } catch (Exception e) {
             return null;
         }
