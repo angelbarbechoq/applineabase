@@ -69,7 +69,13 @@ public class GraficaModel {
                         "xAxis.set('tooltipDateFormat', 'dd-MM-yyyy\\nHH:mm:ss');" +
                         "console.log('✓ Eje X creado con tooltip');" +
 
-                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));" +
+                        // autoZoom:false evita que el eje Y recalcule su propio min/max para
+                        // ajustarse solo a los datos visibles cada vez que hay zoom/pan en X;
+                        // eso era lo que hacía que el piso en cero (aplicarZoomCalculado) se
+                        // perdiera apenas se interactuaba con la grafica. El zoom manual con el
+                        // raton (wheelY/cursor) sigue funcionando igual, ya que es una acción
+                        // directa del usuario sobre el eje Y, no el autoajuste que se desactiva.
+                        "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { autoZoom: false, renderer: am5xy.AxisRendererY.new(root, {}) }));" +
                         "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
                         "console.log('✓ Eje Y creado con tooltip. Zoom inicial: " + minY + " - " + maxY + "');" +
                         // PASO 5: Crear CURSOR con ejes (pero sin snapToSeries aún)
