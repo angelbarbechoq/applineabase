@@ -116,8 +116,13 @@ public class GraficaModel {
                         // formas de "resetear el zoom" hagan siempre exactamente lo mismo.
                         // Se fija min/max directamente (no con zoomToValues, que es conocido por
                         // no aplicar nada si el eje aún no calculó su min/max privado la primera vez)
-                        // para forzar de forma confiable el piso en cero + techo calculado.
-                        "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [], aplicarZoomCalculado: function() { yAxis.set('min', " + minY + "); yAxis.set('max', " + maxY + "); } };" +
+                        // para forzar de forma confiable el piso en cero + techo calculado. Además
+                        // de la escala (min/max), se debe resetear la VENTANA de zoom en sí
+                        // (yAxis.zoom(0,1)): son dos cosas independientes en amCharts5, y sin este
+                        // reset, un zoom manual previo con el ratón (que solo mueve la ventana, no
+                        // la escala) dejaba una ventana angosta aplicada sobre la nueva escala, y
+                        // el resultado se veía diminuto en vez de mostrar cero-a-techo completo.
+                        "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [], aplicarZoomCalculado: function() { yAxis.set('min', " + minY + "); yAxis.set('max', " + maxY + "); yAxis.zoom(0, 1); } };" +
                         "console.log('✓ am5Charts inicializado');" +
 
                         // PASO 10b: en cuanto el usuario interactúa manualmente con el eje Y
