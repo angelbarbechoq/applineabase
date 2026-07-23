@@ -5,6 +5,8 @@ import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.ClientCallable;
+import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -21,6 +23,7 @@ import jakarta.annotation.security.PermitAll;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -57,6 +60,7 @@ public class HistoricoView extends VerticalLayout {
     private Button consultarBtn;
     private Span mensajeSpan;
     private Div chartContainer;
+    private Div datosActualesCard;
 
     public HistoricoView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
                           PLCDataQueryService plcDataQueryService) {
@@ -80,7 +84,14 @@ public class HistoricoView extends VerticalLayout {
 
         graficaActiva = graficaKWh;
 
-        add(new H3("Historico de Graficas"));
+        datosActualesCard = new Div();
+        datosActualesCard.setVisible(false);
+
+        HorizontalLayout encabezado = new HorizontalLayout(new H3("Historico de Graficas"), datosActualesCard);
+        encabezado.setAlignItems(FlexComponent.Alignment.CENTER);
+        encabezado.getStyle().set("flex-wrap", "wrap");
+        add(encabezado);
+
         add(buildFiltrosLayout());
 
         mensajeSpan = new Span("Seleccione los filtros y presione Consultar");
@@ -92,6 +103,10 @@ public class HistoricoView extends VerticalLayout {
         chartContainer.setHeight("500px");
         add(chartContainer);
         setFlexGrow(1, chartContainer);
+
+        if (maquinaCombo.getValue() != null) {
+            cargarDatosActuales(maquinaCombo.getValue());
+        }
     }
 
     private HorizontalLayout buildFiltrosLayout() {
@@ -101,6 +116,9 @@ public class HistoricoView extends VerticalLayout {
         maquinaCombo.setItems(maquinas);
         maquinaCombo.setWidth("200px");
         if (!maquinas.isEmpty()) maquinaCombo.setValue(maquinas.get(0));
+        maquinaCombo.addValueChangeListener(e -> {
+            if (e.getValue() != null) cargarDatosActuales(e.getValue());
+        });
 
         desdeDate = new DatePicker("Desde");
         desdeDate.setValue(LocalDate.now().minusDays(7));
@@ -322,10 +340,92 @@ public class HistoricoView extends VerticalLayout {
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
         getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
+
+        this.getUI().ifPresent(ui -> ui.getChildren()
+                .filter(c -> c instanceof MainLayout)
+                .findFirst()
+                .ifPresent(layout -> ((MainLayout) layout).getUltimoClickCard().setVisible(true)));
+        actualizarTarjetaUltimoClick(System.currentTimeMillis());
+    }
+
+    @Override
+    protected void onDetach(DetachEvent detachEvent) {
+        super.onDetach(detachEvent);
+        this.getUI().ifPresent(ui -> ui.getChildren()
+                .filter(c -> c instanceof MainLayout)
+                .findFirst()
+                .ifPresent(layout -> ((MainLayout) layout).getUltimoClickCard().setVisible(false)));
     }
 
     private void resetZoom() {
         getElement().executeJs(graficaActiva.getResetZoomScript("chartdiv_historico"));
+    }
+
+    /** Franja de valores en vivo (KWh/VAB/VAC/etc.) junto al título — misma posición y texto que ChartsView. */
+    private void cargarDatosActuales(String maquina) {
+        try {
+            if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
+                datosActualesCard.setVisible(false);
+                return;
+            }
+            Map<String, Object> datosVIP = plcDataQueryService.getLatestVIPDataByMaquina(maquina);
+            Map<String, Object> datosKWh = plcDataQueryService.getLatestKWhDataByMaquina(maquina);
+
+            if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
+                datosActualesCard.getElement().setProperty("innerHTML",
+                        GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh));
+                datosActualesCard.setVisible(true);
+            } else {
+                datosActualesCard.setVisible(false);
+            }
+        } catch (Exception e) {
+            datosActualesCard.setVisible(false);
+        }
+    }
+
+    @ClientCallable
+    public void limpiarTarjetas() {
+        if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
+            MainLayout layout = (MainLayout) this.getParent().get();
+            layout.getUltimoClickCard().getElement().setProperty("innerHTML",
+                    GraficaModel.construirHtmlUltimoClick("00-00-00", "00:00:00", "0.0"));
+        }
+    }
+
+    @ClientCallable
+    public void registrarClickEnGrafica(long timestamp) {
+        graficaActiva.registrarClick(timestamp);
+        actualizarTarjetaUltimoClick(timestamp);
+    }
+
+    /** Tarjeta compartida (MainLayout) de Fecha/Hora/KWh del último click — misma que usa ChartsView. */
+    private void actualizarTarjetaUltimoClick(long timestamp) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+        Date fecha = new Date(timestamp);
+
+        String fechaStr = dateFormat.format(fecha);
+        String horaStr = timeFormat.format(fecha);
+
+        String valorStr = "";
+        try {
+            String maquina = maquinaCombo.getValue();
+            if (maquina != null && lineaAccessService.tieneAccesoAMaquina(maquina)) {
+                Map<String, Object> data = plcDataQueryService.getKWhByFechaExacta(maquina, fechaStr + " " + horaStr);
+                if (data.containsKey("kwh")) {
+                    valorStr = String.format("%.2f", data.get("kwh"));
+                }
+            }
+        } catch (Exception e) {
+            valorStr = "Error";
+        }
+
+        final String html = GraficaModel.construirHtmlUltimoClick(fechaStr, horaStr, valorStr);
+
+        if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
+            MainLayout layout = (MainLayout) this.getParent().get();
+            layout.getUltimoClickCard().getElement().setProperty("innerHTML", html);
+        }
     }
 
 }

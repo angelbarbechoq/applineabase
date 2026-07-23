@@ -729,4 +729,60 @@ public class GraficaModel {
     public void setnGraficas(int nGraficas) { this.nGraficas = nGraficas; }
     public String[] getSeriesNames() { return seriesNames; }
     public void setSeriesNames(String[] seriesNames) { this.seriesNames = seriesNames; }
+
+    /**
+     * HTML de texto plano para la franja de valores en vivo (KWh/VAB/VAC/VBC/IA/IB/IC/PW/PF),
+     * con la corriente en un color propio. Usado por ChartsView e HistoricoView (mismo texto,
+     * misma posición junto al título) para no duplicar el marcado en cada pantalla.
+     */
+    public static String construirHtmlValoresActuales(Map<String, Object> datosVIP, Map<String, Object> datosKWh) {
+        String[] labels = {"KWh", "VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF"};
+        double[] valores = {
+                toDoubleSeguro(datosKWh.get("kwh")),
+                toDoubleSeguro(datosVIP.get("VAB")),
+                toDoubleSeguro(datosVIP.get("VAC")),
+                toDoubleSeguro(datosVIP.get("VBC")),
+                toDoubleSeguro(datosVIP.get("IA")),
+                toDoubleSeguro(datosVIP.get("IB")),
+                toDoubleSeguro(datosVIP.get("IC")),
+                toDoubleSeguro(datosVIP.get("PW")),
+                toDoubleSeguro(datosVIP.get("PF"))
+        };
+
+        StringBuilder html = new StringBuilder();
+        html.append("<div style='display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline;'>");
+        for (int i = 0; i < labels.length; i++) {
+            if (i > 0) {
+                html.append("<span style='color: #c3c2b7;'>|</span>");
+            }
+            boolean esCorriente = labels[i].equals("IA") || labels[i].equals("IB") || labels[i].equals("IC");
+            String colorValor = esCorriente ? "#e34948" : "#0b0b0b";
+            html.append("<span>")
+                    .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(": </span>")
+                    .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
+                    .append(String.format("%.2f", valores[i]))
+                    .append("</span>")
+                    .append("</span>");
+        }
+        html.append("</div>");
+        return html.toString();
+    }
+
+    private static double toDoubleSeguro(Object valor) {
+        if (valor == null) return 0.0;
+        try {
+            return Double.parseDouble(valor.toString());
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
+
+    /** HTML de texto plano "Fecha: ... Hora: ... KWh: ..." de la tarjeta compartida de último click. */
+    public static String construirHtmlUltimoClick(String fechaStr, String horaStr, String valorStr) {
+        return "<div style='display: flex; gap: 10px; align-items: baseline; font-size: 12px; white-space: nowrap;'>" +
+                "<span><span style='color: #898781;'>Fecha: </span><span style='font-weight: 600; color: #0b0b0b;'>" + fechaStr + "</span></span>" +
+                "<span><span style='color: #898781;'>Hora: </span><span style='font-weight: 600; color: #0b0b0b;'>" + horaStr + "</span></span>" +
+                "<span><span style='color: #898781;'>KWh: </span><span style='font-weight: 600; color: #0b0b0b;'>" + valorStr + "</span></span>" +
+                "</div>";
+    }
 }

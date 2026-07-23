@@ -556,17 +556,8 @@ public class ChartsView extends VerticalLayout {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             MainLayout layout = (MainLayout) this.getParent().get();
             layout.getUltimoClickCard().getElement().setProperty("innerHTML",
-                    construirTarjetaHtml("00-00-00", "00:00:00", "0.0"));
+                    GraficaModel.construirHtmlUltimoClick("00-00-00", "00:00:00", "0.0"));
         }
-    }
-
-    /** Texto plano de Fecha/Hora/KWh del último click — antes era una tarjeta con fondo oscuro. */
-    private String construirTarjetaHtml(String fechaStr, String horaStr, String valorStr) {
-        return "<div style='display: flex; gap: 10px; align-items: baseline; font-size: 12px; white-space: nowrap;'>" +
-                "<span><span style='color: #898781;'>Fecha: </span><span style='font-weight: 600; color: #0b0b0b;'>" + fechaStr + "</span></span>" +
-                "<span><span style='color: #898781;'>Hora: </span><span style='font-weight: 600; color: #0b0b0b;'>" + horaStr + "</span></span>" +
-                "<span><span style='color: #898781;'>KWh: </span><span style='font-weight: 600; color: #0b0b0b;'>" + valorStr + "</span></span>" +
-                "</div>";
     }
 
     @ClientCallable
@@ -597,7 +588,7 @@ public class ChartsView extends VerticalLayout {
             valorStr = "Error";
         }
 
-        final String html = construirTarjetaHtml(fechaStr, horaStr, valorStr);
+        final String html = GraficaModel.construirHtmlUltimoClick(fechaStr, horaStr, valorStr);
 
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             MainLayout layout = (MainLayout) this.getParent().get();
@@ -626,59 +617,16 @@ public class ChartsView extends VerticalLayout {
     }
 
     /**
-     * Texto plano (etiqueta chica en gris + valor semibold), separado por un divisor fino —
-     * antes eran 9 tarjetas con fondo degradado, que ocupaban mucho espacio junto al título.
-     * dataUpdate (ver iniciarSSE) actualiza estos valores en vivo vía la clase "dato-valor" en
-     * el mismo orden, así que el marcado y el orden de acá deben mantenerse en sync con esa lista.
+     * Texto plano (etiqueta chica en gris + valor semibold) — antes eran 9 tarjetas con fondo
+     * degradado, que ocupaban mucho espacio junto al título. dataUpdate (ver iniciarSSE)
+     * actualiza estos valores en vivo vía la clase "dato-valor" en el mismo orden que arma
+     * GraficaModel.construirHtmlValoresActuales, así que ese orden no se puede reordenar sin
+     * ajustar también iniciarSSE. HistoricoView usa el mismo helper (mismo texto, misma posición).
      */
     private void mostrarTarjetaDatos(Map<String, Object> datosVIP, Map<String, Object> datosKWh) {
-        datosActualesCard.removeAll();
-
-        String[] labels = {"KWh", "VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF"};
-        double[] valores = {
-            formatearNumero(datosKWh.get("kwh")),
-            formatearNumero(datosVIP.get("VAB")),
-            formatearNumero(datosVIP.get("VAC")),
-            formatearNumero(datosVIP.get("VBC")),
-            formatearNumero(datosVIP.get("IA")),
-            formatearNumero(datosVIP.get("IB")),
-            formatearNumero(datosVIP.get("IC")),
-            formatearNumero(datosVIP.get("PW")),
-            formatearNumero(datosVIP.get("PF"))
-        };
-
-        StringBuilder html = new StringBuilder();
-        html.append("<div style='display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline;'>");
-
-        for (int i = 0; i < labels.length; i++) {
-            if (i > 0) {
-                html.append("<span style='color: #c3c2b7;'>|</span>");
-            }
-            // Corriente (IA/IB/IC) en un color propio para diferenciarla de energía/voltaje a
-            // simple vista; el resto sigue en la tinta oscura de siempre.
-            boolean esCorriente = labels[i].equals("IA") || labels[i].equals("IB") || labels[i].equals("IC");
-            String colorValor = esCorriente ? "#e34948" : "#0b0b0b";
-            html.append("<span>")
-                .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(": </span>")
-                .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
-                .append(String.format("%.2f", valores[i]))
-                .append("</span>")
-                .append("</span>");
-        }
-
-        html.append("</div>");
-
-        datosActualesCard.getElement().setProperty("innerHTML", html.toString());
+        datosActualesCard.getElement().setProperty("innerHTML",
+                GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh));
         datosActualesCard.setVisible(true);
-    }
-
-    private double formatearNumero(Object valor) {
-        if (valor == null) return 0.0;
-        try {
-            return Double.parseDouble(valor.toString());
-        } catch (NumberFormatException e) {
-            return 0.0;
-        }
     }
 
     private void mostrarInfoMaquina(String maquina) {
