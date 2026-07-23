@@ -617,35 +617,26 @@ public class GraficaModel {
     }
 
     /**
-     * Scripts de dos gráficos de barras de un solo eje (KWh consumido + Horas trabajadas por
-     * línea), uno por contenedor. Antes era un único gráfico de barras agrupadas con dos ejes Y
-     * (KWh vs Horas, escalas muy distintas) — un gráfico de doble eje es engañoso porque las
-     * dos escalas se pueden alinear arbitrariamente, así que se separó en dos gráficos, cada uno
-     * con un solo tono. El orden de las categorías es el que traiga la lista (el llamador ya la
-     * ordena de mayor a menor por KWh). No es una serie temporal: a diferencia de
-     * getInitScript2/getAddDataScript, arma cada gráfico completo de una sola vez (no hay
-     * streaming de puntos), porque el dato de origen es un snapshot.
+     * Script de un gráfico de barras agrupadas (KWh consumido hoy + Horas trabajadas en el mes)
+     * por línea, en un solo gráfico con eje de categorías (líneas) y dos ejes de valor (escalas
+     * distintas: KWh puede ser cientos, Horas del mes hasta ~744) — pedido explícito así, con un
+     * tono sobrio por serie (no chillón) y el valor sobre cada barra. El orden de las categorías
+     * es el que traiga la lista (el llamador ya la ordena de mayor a menor por KWh). No es una
+     * serie temporal: a diferencia de getInitScript2/getAddDataScript, arma el gráfico completo
+     * de una sola vez (no hay streaming de puntos), porque el dato de origen es un snapshot.
      */
-    public static String getBarChartScript(String containerIdKwh, String containerIdHoras,
-                                            List<String> categorias,
+    public static String getBarChartScript(String containerId, List<String> categorias,
                                             List<Double> valoresKwh, List<Double> valoresHoras) {
-        return scriptBarraUnEje(containerIdKwh, categorias, valoresKwh, "0x2a78d6", " kWh")
-                + scriptBarraUnEje(containerIdHoras, categorias, valoresHoras, "0x1baf7a", " h");
-    }
-
-    /** Un gráfico de barras de un solo eje Y, un solo tono, con el valor sobre cada barra. */
-    private static String scriptBarraUnEje(String containerId, List<String> categorias,
-                                            List<Double> valores, String colorHex, String tooltipUnidad) {
         StringBuilder datos = new StringBuilder("[");
         for (int i = 0; i < categorias.size(); i++) {
             if (i > 0) datos.append(",");
             datos.append("{ categoria: ").append(jsString(categorias.get(i)))
-                    .append(", valor: ").append(valores.get(i)).append(" }");
+                    .append(", kwh: ").append(valoresKwh.get(i))
+                    .append(", horas: ").append(valoresHoras.get(i)).append(" }");
         }
         datos.append("]");
 
         return
-                "(function() {" +
                 "if (!window.am5Charts) { window.am5Charts = {}; }" +
                 "var id = '" + containerId + "';" +
                 "if (window.am5Charts[id] && window.am5Charts[id].root) {" +
@@ -659,23 +650,37 @@ public class GraficaModel {
                 "xAxis.get('renderer').labels.template.setAll({ rotation: -45, centerY: am5.p50, centerX: am5.p100, fontSize: '11px', fill: am5.color(0x898781) });" +
                 "xAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });" +
                 "xAxis.data.setAll(datos);" +
-                "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, renderer: am5xy.AxisRendererY.new(root, {}) }));" +
-                "yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x898781), fontSize: '11px' });" +
-                "yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });" +
-                "var serie = chart.series.push(am5xy.ColumnSeries.new(root, { xAxis: xAxis, yAxis: yAxis, valueYField: 'valor', categoryXField: 'categoria' }));" +
-                "serie.columns.template.setAll({ fill: am5.color(" + colorHex + "), stroke: am5.color(" + colorHex + "), strokeOpacity: 0, width: am5.percent(60), cornerRadiusTL: 4, cornerRadiusTR: 4, tooltipText: '{categoryX}: {valueY.formatNumber(\\u0022#.##\\u0022)}" + tooltipUnidad + "' });" +
-                "serie.bullets.push(function() {" +
+                "var yAxisKwh = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, renderer: am5xy.AxisRendererY.new(root, {}) }));" +
+                "yAxisKwh.get('renderer').labels.template.setAll({ fill: am5.color(0x898781), fontSize: '11px' });" +
+                "yAxisKwh.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });" +
+                "var yAxisHoras = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, renderer: am5xy.AxisRendererY.new(root, { opposite: true }) }));" +
+                "yAxisHoras.get('renderer').labels.template.setAll({ fill: am5.color(0x898781), fontSize: '11px' });" +
+                "yAxisHoras.get('renderer').grid.template.setAll({ visible: false });" +
+                "var serieKwh = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'KWh consumido hoy', xAxis: xAxis, yAxis: yAxisKwh, valueYField: 'kwh', categoryXField: 'categoria', clustered: true }));" +
+                "serieKwh.columns.template.setAll({ fill: am5.color(0x2a78d6), stroke: am5.color(0x2a78d6), strokeOpacity: 0, width: am5.percent(70), cornerRadiusTL: 4, cornerRadiusTR: 4, tooltipText: '{name}, {categoryX}: {valueY.formatNumber(\\u0022#.##\\u0022)} kWh' });" +
+                "serieKwh.bullets.push(function() {" +
                 "  return am5.Bullet.new(root, { locationY: 1, sprite: am5.Label.new(root, {" +
                 "    text: '{valueY.formatNumber(\\u0022#.##\\u0022)}'," +
-                "    centerX: am5.p50, centerY: am5.p100, dy: -8, fontSize: '11px', fill: am5.color(0x52514e), populateText: true" +
+                "    centerX: am5.p50, centerY: am5.p100, dy: -8, fontSize: '10px', fill: am5.color(0x52514e), populateText: true" +
                 "  }) });" +
                 "});" +
-                "serie.data.setAll(datos);" +
+                "serieKwh.data.setAll(datos);" +
+                "var serieHoras = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Horas trabajadas en el mes', xAxis: xAxis, yAxis: yAxisHoras, valueYField: 'horas', categoryXField: 'categoria', clustered: true }));" +
+                "serieHoras.columns.template.setAll({ fill: am5.color(0x1baf7a), stroke: am5.color(0x1baf7a), strokeOpacity: 0, width: am5.percent(70), cornerRadiusTL: 4, cornerRadiusTR: 4, tooltipText: '{name}, {categoryX}: {valueY.formatNumber(\\u0022#.##\\u0022)} h' });" +
+                "serieHoras.bullets.push(function() {" +
+                "  return am5.Bullet.new(root, { locationY: 1, sprite: am5.Label.new(root, {" +
+                "    text: '{valueY.formatNumber(\\u0022#.##\\u0022)}'," +
+                "    centerX: am5.p50, centerY: am5.p100, dy: -8, fontSize: '10px', fill: am5.color(0x52514e), populateText: true" +
+                "  }) });" +
+                "});" +
+                "serieHoras.data.setAll(datos);" +
+                "var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50 }));" +
+                "legend.data.setAll(chart.series.values);" +
                 "chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'none', xAxis: xAxis }));" +
                 "window.am5Charts[id] = { root: root, chart: chart };" +
-                "serie.appear(1000, 100);" +
-                "chart.appear(1000, 100);" +
-                "})();";
+                "serieKwh.appear(1000, 100);" +
+                "serieHoras.appear(1000, 100);" +
+                "chart.appear(1000, 100);";
     }
 
     /** Escapa un string para insertarlo como literal JS entre comillas simples. */

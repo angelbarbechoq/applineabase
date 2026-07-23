@@ -113,13 +113,12 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
 
         add(new H3("Horómetro de Máquinas"));
         if (lineaAccessService.esAdmin()) {
-            HorizontalLayout accionesAdmin = new HorizontalLayout(
+            HorizontalLayout accionesRapidas = new HorizontalLayout(
                     new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class),
-                    crearBotonRecalcularTodos(),
-                    crearExportadorCsv());
-            accionesAdmin.setAlignItems(Alignment.END);
-            accionesAdmin.setWidthFull();
-            add(accionesAdmin);
+                    crearBotonRecalcularTodos());
+            accionesRapidas.setAlignItems(Alignment.CENTER);
+            add(accionesRapidas);
+            add(crearExportadorCsv());
         }
 
         grid.addColumn(HorometroRow::maquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
@@ -206,25 +205,13 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         VerticalLayout panel = new VerticalLayout();
         panel.setSizeFull();
         panel.setPadding(false);
-        panel.setSpacing(false);
 
-        Span tituloKwh = new Span("KWh consumido hoy");
-        tituloKwh.getStyle().set("font-weight", "600").set("margin", "8px 0 0 0");
-        Div chartDivKwh = new Div();
-        chartDivKwh.setId(containerId + "_kwh");
-        chartDivKwh.setWidthFull();
-        chartDivKwh.setHeight("100%");
-
-        Span tituloHoras = new Span("Horas trabajadas este mes");
-        tituloHoras.getStyle().set("font-weight", "600").set("margin", "8px 0 0 0");
-        Div chartDivHoras = new Div();
-        chartDivHoras.setId(containerId + "_horas");
-        chartDivHoras.setWidthFull();
-        chartDivHoras.setHeight("100%");
-
-        panel.add(tituloKwh, chartDivKwh, tituloHoras, chartDivHoras);
-        panel.setFlexGrow(1, chartDivKwh);
-        panel.setFlexGrow(1, chartDivHoras);
+        Div chartDiv = new Div();
+        chartDiv.setId(containerId);
+        chartDiv.setWidthFull();
+        chartDiv.setHeight("100%");
+        panel.add(chartDiv);
+        panel.setFlexGrow(1, chartDiv);
 
         return panel;
     }
@@ -253,8 +240,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         List<Double> kwhs = filas.stream().map(FilaGrupo::kwh).collect(Collectors.toList());
         List<Double> horas = filas.stream().map(FilaGrupo::horasMes).collect(Collectors.toList());
 
-        getElement().executeJs(GraficaModel.getBarChartScript(
-                containerId + "_kwh", containerId + "_horas", categorias, kwhs, horas));
+        getElement().executeJs(GraficaModel.getBarChartScript(containerId, categorias, kwhs, horas));
     }
 
     @Override
@@ -338,10 +324,10 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
      * actual — así sirve para comparar contra la lectura física de cualquier semana pasada.
      */
     private HorizontalLayout crearExportadorCsv() {
-        DatePicker fechaSemanaPicker = new DatePicker("Semana a reportar (cualquier día de esa semana)");
+        DatePicker fechaSemanaPicker = new DatePicker("Semana a reportar");
         fechaSemanaPicker.setValue(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)));
-        fechaSemanaPicker.setWidth("300px");
-        fechaSemanaPicker.setHelperText("El reporte usa el domingo de la semana que contiene esta fecha");
+        fechaSemanaPicker.setWidth("220px");
+        fechaSemanaPicker.setHelperText("Cualquier día de esa semana; se usa el domingo que la contiene");
 
         StreamResource recurso = new StreamResource("horometro-semanal.csv",
                 () -> generarCsv(fechaSemanaPicker.getValue()));
