@@ -120,31 +120,26 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         if (lineaAccessService.esAdmin()) {
             grid.addComponentColumn(this::botonRecalcular).setHeader("Recalcular").setAutoWidth(true);
         }
-        grid.setWidthFull();
-        grid.setHeight("400px");
-
-        add(grid);
+        grid.setSizeFull();
 
         maquinasExtrusion = maquinasPorZona("Extrusión");
         maquinasMezcla = maquinasPorZona("Mezcla");
         maquinasCasaFuerza = maquinasPorGrupo(GRUPO_CASA_FUERZA);
 
-        if (!maquinasExtrusion.isEmpty() || !maquinasMezcla.isEmpty() || !maquinasCasaFuerza.isEmpty()) {
-            TabSheet tabSheetGrupos = new TabSheet();
-            tabSheetGrupos.setSizeFull();
-            if (!maquinasExtrusion.isEmpty()) {
-                tabSheetGrupos.add("Extrusión", crearPanelGrupo(ID_CHART_EXTRUSION));
-            }
-            if (!maquinasMezcla.isEmpty()) {
-                tabSheetGrupos.add("Mezcla", crearPanelGrupo(ID_CHART_MEZCLA));
-            }
-            if (!maquinasCasaFuerza.isEmpty()) {
-                tabSheetGrupos.add(GRUPO_CASA_FUERZA, crearPanelGrupo(ID_CHART_CASA_FUERZA));
-            }
-            add(new H3("KWh consumido y horas trabajadas por grupo"));
-            add(tabSheetGrupos);
-            setFlexGrow(1, tabSheetGrupos);
+        TabSheet tabSheetPrincipal = new TabSheet();
+        tabSheetPrincipal.setSizeFull();
+        tabSheetPrincipal.add("Tabla", grid);
+        if (!maquinasExtrusion.isEmpty()) {
+            tabSheetPrincipal.add("Extrusión", crearPanelGrupo(ID_CHART_EXTRUSION));
         }
+        if (!maquinasMezcla.isEmpty()) {
+            tabSheetPrincipal.add("Mezcla", crearPanelGrupo(ID_CHART_MEZCLA));
+        }
+        if (!maquinasCasaFuerza.isEmpty()) {
+            tabSheetPrincipal.add(GRUPO_CASA_FUERZA, crearPanelGrupo(ID_CHART_CASA_FUERZA));
+        }
+        add(tabSheetPrincipal);
+        setFlexGrow(1, tabSheetPrincipal);
 
         refrescarGrid();
         refrescarGraficosGrupos();

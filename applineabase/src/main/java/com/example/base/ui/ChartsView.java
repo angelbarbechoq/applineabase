@@ -6,7 +6,6 @@ import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ClientCallable;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
@@ -52,7 +51,6 @@ public class ChartsView extends VerticalLayout {
     private Div ultimoClickCard;
 
     // --- Temperatura (TemperaturaAgua + TemperaturaAmbiente combinadas) ---
-    private static final int POLL_INTERVAL_MS = 30000;
     private boolean mostrarTemperatura;
     private GraficaModel graficaTemperatura;
     private Span temperaturaMensajeSpan;
@@ -92,19 +90,14 @@ public class ChartsView extends VerticalLayout {
         setFlexGrow(1, tabSheet);
 
         addAttachListener(event -> {
+            // Cada carga inicial deja andando su propio SSE (ver iniciarSSETemperatura/
+            // iniciarSSEPFGeneral): no hace falta un poll que reconstruya todo el gráfico
+            // cada tanto, los puntos nuevos llegan solos y se agregan sin recargar nada.
             if (mostrarTemperatura) {
                 cargarTemperaturaChart();
             }
             if (mostrarPFGeneral) {
                 cargarPFGeneralChart();
-            }
-            if (mostrarTemperatura || mostrarPFGeneral) {
-                UI ui = event.getUI();
-                ui.setPollInterval(POLL_INTERVAL_MS);
-                ui.addPollListener(pollEvent -> {
-                    if (mostrarTemperatura) cargarTemperaturaChart();
-                    if (mostrarPFGeneral) cargarPFGeneralChart();
-                });
             }
         });
     }
@@ -246,6 +239,8 @@ public class ChartsView extends VerticalLayout {
      * TemperaturaAgua y TemperaturaAmbiente se leen en el mismo ciclo de lectura (mismo PLC,
      * mismo loop), por eso comparten timestamp exacto y se pueden alinear directamente con
      * graficarSeriesCrudasAlineadas (misma función que usa la pestaña PF general, con N=2).
+     * Se llama una sola vez (carga inicial): los puntos siguientes llegan por SSE (ver
+     * iniciarSSETemperatura), sin reconstruir el gráfico de nuevo.
      */
     private void cargarTemperaturaChart() {
         try {
@@ -254,17 +249,29 @@ public class ChartsView extends VerticalLayout {
 
             if (datosAgua.isEmpty() && datosAmbiente.isEmpty()) {
                 temperaturaMensajeSpan.setText("No hay datos de temperatura para la fecha actual");
-                return;
+                getElement().executeJs(graficaTemperatura.getInitScript2("chartdiv_temperatura"));
+            } else {
+                GraficaModel.ResultadoGrafica resultado = graficaTemperatura.graficarSeriesCrudasAlineadas(
+                        "chartdiv_temperatura", List.of(datosAgua, datosAmbiente),
+                        new String[]{"Temperatura Agua", "Temperatura Ambiente"}, 30.0, true);
+                getElement().executeJs(resultado.script());
+                temperaturaMensajeSpan.setText("");
             }
-
-            GraficaModel.ResultadoGrafica resultado = graficaTemperatura.graficarSeriesCrudasAlineadas(
-                    "chartdiv_temperatura", List.of(datosAgua, datosAmbiente),
-                    new String[]{"Temperatura Agua", "Temperatura Ambiente"}, 30.0, true);
-            getElement().executeJs(resultado.script());
-            temperaturaMensajeSpan.setText("");
+            iniciarSSETemperatura();
         } catch (Exception e) {
             temperaturaMensajeSpan.setText("Error: " + e.getMessage());
         }
+    }
+
+    /** Streams independientes por sensor (cada uno actualiza su propia serie del mismo gráfico). */
+    private void iniciarSSETemperatura() {
+        String baseUrl = getBaseUrl();
+        getElement().executeJs(construirScriptSSESerie(
+                baseUrl + "/api/plc/stream/TemperaturaAgua", "sensorUpdate", "chartdiv_temperatura",
+                0, "data.valor", "eventSourceTempAgua"));
+        getElement().executeJs(construirScriptSSESerie(
+                baseUrl + "/api/plc/stream/TemperaturaAmbiente", "sensorUpdate", "chartdiv_temperatura",
+                1, "data.valor", "eventSourceTempAmbiente"));
     }
 
     // ================= PF general (KWhPlanta1) =================
@@ -296,16 +303,12 @@ public class ChartsView extends VerticalLayout {
      * (ej. -85.5). Se toma en valor absoluto (misma conversión que ya usa HistoricoView, via
      * GraficaModel.toFloatAbs) y ademas se divide entre 100 para verlo en escala 0-1: a
      * diferencia de Historico (que deja la escala 0-100 a proposito), esta pestana especifica
-     * la quiere en fraccion.
+     * la quiere en fraccion. Se llama una sola vez (carga inicial): los puntos siguientes
+     * llegan por SSE (ver iniciarSSEPFGeneral), sin reconstruir el gráfico de nuevo.
      */
     private void cargarPFGeneralChart() {
         try {
             List<Map<String, Object>> datosVip = plcDataQueryService.getTodayDataByMaquina("KWhPlanta1");
-            if (datosVip.isEmpty()) {
-                pfGeneralMensajeSpan.setText("No hay datos de PF para la fecha actual");
-                return;
-            }
-
             List<Map<String, Object>> datosPf = new ArrayList<>();
             for (Map<String, Object> fila : datosVip) {
                 Float pf = GraficaModel.toFloatAbs(fila.get("PF"));
@@ -316,13 +319,57 @@ public class ChartsView extends VerticalLayout {
                 datosPf.add(punto);
             }
 
-            GraficaModel.ResultadoGrafica resultado = graficaPFGeneral.graficarSeriesCrudasAlineadas(
-                    "chartdiv_pfgeneral", List.of(datosPf), new String[]{"PF general"}, 1.0, true);
-            getElement().executeJs(resultado.script());
-            pfGeneralMensajeSpan.setText("");
+            if (datosPf.isEmpty()) {
+                pfGeneralMensajeSpan.setText("No hay datos de PF para la fecha actual");
+                getElement().executeJs(graficaPFGeneral.getInitScript2("chartdiv_pfgeneral"));
+            } else {
+                GraficaModel.ResultadoGrafica resultado = graficaPFGeneral.graficarSeriesCrudasAlineadas(
+                        "chartdiv_pfgeneral", List.of(datosPf), new String[]{"PF general"}, 1.0, true);
+                getElement().executeJs(resultado.script());
+                pfGeneralMensajeSpan.setText("");
+            }
+            iniciarSSEPFGeneral();
         } catch (Exception e) {
             pfGeneralMensajeSpan.setText("Error: " + e.getMessage());
         }
+    }
+
+    /** dataUpdate ya lo publica KWhDifferenceService.publicarDatosActuales para KWhPlanta1 (incluye PF). */
+    private void iniciarSSEPFGeneral() {
+        String baseUrl = getBaseUrl();
+        getElement().executeJs(construirScriptSSESerie(
+                baseUrl + "/api/plc/stream/KWhPlanta1", "dataUpdate", "chartdiv_pfgeneral", 0,
+                "(data.PF !== undefined && data.PF !== null) ? Math.abs(data.PF) / 100 : null", "eventSourcePF"));
+    }
+
+    /**
+     * Wire-up genérico de un stream SSE que empuja un punto nuevo a UNA serie de un gráfico ya
+     * inicializado (sin recargar nada), reutilizado por Temperatura (2 sensores, una serie cada
+     * uno) y PF general (1 serie). expresionValorJs se evalúa contra la variable `data` ya
+     * parseada del evento; si da null/NaN, ese punto se descarta sin romper el resto del stream.
+     */
+    private String construirScriptSSESerie(String streamUrl, String eventoNombre, String containerId,
+                                            int indiceSerie, String expresionValorJs, String varGlobal) {
+        return
+            "if(window." + varGlobal + ") { window." + varGlobal + ".close(); }" +
+            "window." + varGlobal + " = new EventSource('" + streamUrl + "');" +
+            "window." + varGlobal + ".addEventListener('" + eventoNombre + "', function(event) {" +
+            "  try {" +
+            "    var data = JSON.parse(event.data);" +
+            "    if(window.am5Charts && window.am5Charts['" + containerId + "'] && window.am5Charts['" + containerId + "'].seriesList && window.am5Charts['" + containerId + "'].seriesList[" + indiceSerie + "]) {" +
+            "      var inst = window.am5Charts['" + containerId + "'];" +
+            "      var dateStr = data.fecha.split(' ')[0]; var timeStr = data.fecha.split(' ')[1];" +
+            "      var partesFecha = dateStr.split('-'); var partesHora = timeStr.split(':');" +
+            "      var timestamp = new Date(parseInt(partesFecha[2]), parseInt(partesFecha[1]) - 1, parseInt(partesFecha[0]), parseInt(partesHora[0]), parseInt(partesHora[1]), parseInt(partesHora[2])).getTime();" +
+            "      var valor = " + expresionValorJs + ";" +
+            "      if (valor !== null && valor !== undefined && isFinite(valor)) {" +
+            "        inst.seriesList[" + indiceSerie + "].data.push({ date: timestamp, value: valor });" +
+            "        inst.seriesList[" + indiceSerie + "].markDirtyValues();" +
+            "        inst.aplicarZoomCalculado();" +
+            "      }" +
+            "    }" +
+            "  } catch(e) { console.error('Error procesando SSE:', e); }" +
+            "});";
     }
 
     private void cargarDatos(String maquina) {
@@ -384,6 +431,12 @@ public class ChartsView extends VerticalLayout {
     protected void onDetach(com.vaadin.flow.component.DetachEvent detachEvent) {
         super.onDetach(detachEvent);
         detenerSSE();
+        if (mostrarTemperatura || mostrarPFGeneral) {
+            getElement().executeJs(
+                "if(window.eventSourcePF) { window.eventSourcePF.close(); window.eventSourcePF = null; }" +
+                "if(window.eventSourceTempAgua) { window.eventSourceTempAgua.close(); window.eventSourceTempAgua = null; }" +
+                "if(window.eventSourceTempAmbiente) { window.eventSourceTempAmbiente.close(); window.eventSourceTempAmbiente = null; }");
+        }
     }
 
     private void detenerSSE() {

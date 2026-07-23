@@ -2,6 +2,7 @@ package com.example.dataacquisition.controller;
 
 import com.example.dataacquisition.event.KWhDifferenceEvent;
 import com.example.dataacquisition.event.MaquinaDataUpdateEvent;
+import com.example.dataacquisition.event.SensorDataUpdateEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -115,6 +116,39 @@ public class KWhStreamController {
             }
         } else {
             logger.warn("⚠️ No hay clientes conectados para {}", maquina);
+        }
+    }
+
+    /**
+     * Sensores auxiliares (TemperaturaAgua, TemperaturaAmbiente, etc.) no pasan por el flujo
+     * de KWh/VIP, pero SÍ publican este evento en cada ciclo de lectura (ver
+     * PLCDataAcquisitionService). Reutiliza el mismo mapa de emitters por máquina que ya usan
+     * kwhUpdate/dataUpdate, para que la pestaña Temperatura de ChartsView pueda recibir el
+     * valor nuevo sin recargar el gráfico completo cada vez.
+     */
+    @EventListener
+    public void onSensorDataUpdateEvent(SensorDataUpdateEvent event) {
+        String sensor = event.getNombreSensor();
+        CopyOnWriteArrayList<SseEmitter> emitters = emittersByMaquina.get(sensor);
+
+        if (emitters != null && !emitters.isEmpty()) {
+            Map<String, Object> eventData = new HashMap<>();
+            eventData.put("maquina", sensor);
+            eventData.put("fecha", event.getFecha());
+            eventData.put("valor", event.getValor());
+
+            for (SseEmitter emitter : emitters) {
+                try {
+                    emitter.send(SseEmitter.event()
+                        .id(System.currentTimeMillis() + "")
+                        .name("sensorUpdate")
+                        .data(eventData)
+                        .build());
+                } catch (IOException e) {
+                    logger.error("❌ Error enviando evento SSE de sensor a {}: {}", sensor, e.getMessage());
+                    emitters.remove(emitter);
+                }
+            }
         }
     }
 }
