@@ -75,16 +75,22 @@ public class ChartsView extends VerticalLayout {
         setPadding(true);
         setSpacing(true);
 
-        add(new H3("Gráficas"));
-
         // Temperatura/PF general viven solo en la zona Mantenimiento (y ADMIN, que ve todo):
         // la misma regla de acceso por zona que ya aplica al resto de la app, no una nueva.
         mostrarTemperatura = lineaAccessService.tieneAccesoAMaquina("TemperaturaAgua");
         mostrarPFGeneral = lineaAccessService.tieneAccesoAMaquina("KWhPlanta1");
 
+        // crearPanelKwh() deja armado datosActualesCard (las tarjetas KWh/VAB/VAC/etc.); se
+        // arma antes para poder ponerlo junto al título, en vez de junto al selector de máquina.
+        VerticalLayout panelKwh = crearPanelKwh();
+        HorizontalLayout encabezado = new HorizontalLayout(new H3("Gráficas"), datosActualesCard);
+        encabezado.setAlignItems(Alignment.CENTER);
+        encabezado.getStyle().set("flex-wrap", "wrap");
+        add(encabezado);
+
         TabSheet tabSheet = new TabSheet();
         tabSheet.setSizeFull();
-        tabSheet.add("KWh", crearPanelKwh());
+        tabSheet.add("KWh", panelKwh);
         if (mostrarTemperatura) {
             tabTemperatura = tabSheet.add("Temperatura", crearPanelTemperatura());
         }
@@ -151,7 +157,6 @@ public class ChartsView extends VerticalLayout {
         HorizontalLayout selectorLayout = new HorizontalLayout(
                 maquinaCombo,
                 maquinaInfoCard,
-                datosActualesCard,
                 resetZoomBtn
         );
         selectorLayout.setAlignItems(Alignment.CENTER);
