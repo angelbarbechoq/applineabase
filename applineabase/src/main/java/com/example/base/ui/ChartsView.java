@@ -154,18 +154,18 @@ public class ChartsView extends VerticalLayout {
         com.vaadin.flow.component.button.Button resetZoomBtn = new com.vaadin.flow.component.button.Button("Reset Zoom", e -> resetZoom());
         resetZoomBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
 
+        mensajeSpan = new Span();
+
         HorizontalLayout selectorLayout = new HorizontalLayout(
                 maquinaCombo,
                 maquinaInfoCard,
-                resetZoomBtn
+                resetZoomBtn,
+                mensajeSpan
         );
         selectorLayout.setAlignItems(Alignment.CENTER);
         selectorLayout.setSpacing(true);
         selectorLayout.getStyle().set("flex-wrap", "wrap");
         panel.add(selectorLayout);
-
-        mensajeSpan = new Span();
-        panel.add(mensajeSpan);
 
         if (!maquinas.isEmpty()) {
             maquinaCombo.setValue(maquinas.getFirst());//get(0)
@@ -518,19 +518,19 @@ public class ChartsView extends VerticalLayout {
             "  try {" +
             "    var data = JSON.parse(event.data);" +
             "    console.log('📈 Datos actualizados:', data);" +
-            "    var tarjetasDiv = document.querySelector('[id^=\"datosActualesCard\"]') || document.querySelector('div[style*=\"display: flex\"][style*=\"gap: 9px\"]');" +
+            "    var tarjetasDiv = document.querySelector('[id^=\"datosActualesCard\"]') || document.querySelector('div[style*=\"display: flex\"][style*=\"gap: 14px\"]');" +
             "    if(tarjetasDiv) {" +
-            "      var tarjetas = tarjetasDiv.querySelectorAll('div[style*=\"background: linear-gradient\"]');" +
-            "      if(tarjetas.length > 0) {" +
-            "        tarjetas[0].querySelectorAll('div')[1].textContent = (data.KWh || 0).toFixed(2);" +
-            "        tarjetas[1].querySelectorAll('div')[1].textContent = (data.VAB || 0).toFixed(2);" +
-            "        tarjetas[2].querySelectorAll('div')[1].textContent = (data.VAC || 0).toFixed(2);" +
-            "        tarjetas[3].querySelectorAll('div')[1].textContent = (data.VBC || 0).toFixed(2);" +
-            "        tarjetas[4].querySelectorAll('div')[1].textContent = (data.IA || 0).toFixed(2);" +
-            "        tarjetas[5].querySelectorAll('div')[1].textContent = (data.IB || 0).toFixed(2);" +
-            "        tarjetas[6].querySelectorAll('div')[1].textContent = (data.IC || 0).toFixed(2);" +
-            "        tarjetas[7].querySelectorAll('div')[1].textContent = (data.PW || 0).toFixed(2);" +
-            "        tarjetas[8].querySelectorAll('div')[1].textContent = (data.PF || 0).toFixed(2);" +
+            "      var valores = tarjetasDiv.querySelectorAll('.dato-valor');" +
+            "      if(valores.length > 0) {" +
+            "        valores[0].textContent = (data.KWh || 0).toFixed(2);" +
+            "        valores[1].textContent = (data.VAB || 0).toFixed(2);" +
+            "        valores[2].textContent = (data.VAC || 0).toFixed(2);" +
+            "        valores[3].textContent = (data.VBC || 0).toFixed(2);" +
+            "        valores[4].textContent = (data.IA || 0).toFixed(2);" +
+            "        valores[5].textContent = (data.IB || 0).toFixed(2);" +
+            "        valores[6].textContent = (data.IC || 0).toFixed(2);" +
+            "        valores[7].textContent = (data.PW || 0).toFixed(2);" +
+            "        valores[8].textContent = (data.PF || 0).toFixed(2);" +
             "        console.log('✅ Tarjetas actualizadas en tiempo real');" +
             "      }" +
             "    }" +
@@ -658,6 +658,12 @@ public class ChartsView extends VerticalLayout {
         }
     }
 
+    /**
+     * Texto plano (etiqueta chica en gris + valor semibold), separado por un divisor fino —
+     * antes eran 9 tarjetas con fondo degradado, que ocupaban mucho espacio junto al título.
+     * dataUpdate (ver iniciarSSE) actualiza estos valores en vivo vía la clase "dato-valor" en
+     * el mismo orden, así que el marcado y el orden de acá deben mantenerse en sync con esa lista.
+     */
     private void mostrarTarjetaDatos(Map<String, Object> datosVIP, Map<String, Object> datosKWh) {
         datosActualesCard.removeAll();
 
@@ -674,40 +680,19 @@ public class ChartsView extends VerticalLayout {
             formatearNumero(datosVIP.get("PF"))
         };
 
-        String[] colores = {
-            "linear-gradient(135deg, #5a5a5a 0%, #3d3d3d 100%)",  // Gris oscuro - KWh
-            "linear-gradient(135deg, #4a4a4a 0%, #2d2d2d 100%)",  // Gris oscuro - VAB
-            "linear-gradient(135deg, #4a4a4a 0%, #2d2d2d 100%)",  // Gris oscuro - VAC
-            "linear-gradient(135deg, #4a4a4a 0%, #2d2d2d 100%)",  // Gris oscuro - VBC
-            "linear-gradient(135deg, #a8a8a8 0%, #8a8a8a 100%)",  // Gris claro - IA
-            "linear-gradient(135deg, #a8a8a8 0%, #8a8a8a 100%)",  // Gris claro - IB
-            "linear-gradient(135deg, #a8a8a8 0%, #8a8a8a 100%)",  // Gris claro - IC
-            "linear-gradient(135deg, #5a5a5a 0%, #3d3d3d 100%)",  // Gris oscuro - PW
-            "linear-gradient(135deg, #5a5a5a 0%, #3d3d3d 100%)"   // Gris oscuro - PF
-        };
-
         StringBuilder html = new StringBuilder();
-        html.append("<div style='display: flex; gap: 9px; flex-wrap: wrap; align-items: center;'>");
+        html.append("<div style='display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline;'>");
 
         for (int i = 0; i < labels.length; i++) {
-            html.append("<div style='")
-                .append("background: ").append(colores[i]).append("; ")
-                .append("border-radius: 7px; ")
-                .append("padding: 10px 14px; ")
-                .append("color: white; ")
-                .append("text-align: center; ")
-                .append("box-shadow: 0 2px 4px rgba(0,0,0,0.1); ")
-                .append("'>");
-
-            html.append("<div style='font-size: 10px; opacity: 0.9; margin-bottom: 3px;'>")
-                .append(labels[i])
-                .append("</div>");
-
-            html.append("<div style='font-size: 14px; font-weight: bold;'>")
+            if (i > 0) {
+                html.append("<span style='color: #c3c2b7;'>|</span>");
+            }
+            html.append("<span>")
+                .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(" </span>")
+                .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: #0b0b0b;'>")
                 .append(String.format("%.2f", valores[i]))
-                .append("</div>");
-
-            html.append("</div>");
+                .append("</span>")
+                .append("</span>");
         }
 
         html.append("</div>");
