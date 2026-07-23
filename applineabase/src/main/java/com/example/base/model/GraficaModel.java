@@ -110,12 +110,14 @@ public class GraficaModel {
                         "for(var i=0; i < " + nGraficas + "; i++) {" +
                         "  console.log('  📍 Iteración ' + i + ' de " + nGraficas + "');" +
                         "  var series = chart.series.push(am5xy.LineSeries.new(root, { name: seriesNames[i], xAxis: xAxis, yAxis: yAxis, valueYField: 'value', valueXField: 'date', strokeWidth: 2, snapToTooltip: true }));" +
-                        // series.set('stroke', ...) es el que manda (color propio de la serie);
-                        // sin esto, amCharts5 asigna su propio color automático vía chart.get('colors')
-                        // y lo que se pusiera en strokes.template.setAll quedaba pisado (leyenda,
-                        // tooltip e incluso a veces la línea misma no respetaban el color elegido).
-                        "  series.set('stroke', colors[i % colors.length]);" +
-                        "  series.set('fill', colors[i % colors.length]);" +
+                        // series.set('stroke', ...) es el que manda (color propio de la serie) —
+                        // sin esto, amCharts5 puede pisar lo que se puso en strokes.template con su
+                        // propio color automático. Pero forzarlo SIEMPRE cambiaba el color de TODOS
+                        // los gráficos (KWh, PF general, Histórico) a los rojo/azul/verde por defecto,
+                        // no solo el gráfico que pidió colores propios (Temperatura); por eso el forzado
+                        // extra solo aplica cuando alguien llamó setColoresPersonalizados — el resto
+                        // de las pantallas queda exactamente como estaba antes de este ajuste.
+                        (coloresPersonalizados != null ? "  series.set('stroke', colors[i % colors.length]);" : "") +
                         "  series.strokes.template.setAll({ stroke: colors[i % colors.length] });" +
                         "  var tooltip = series.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
                         //"  tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}\\n{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
