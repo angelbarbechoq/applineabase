@@ -688,7 +688,7 @@ public class ChartsView extends VerticalLayout {
                 html.append("<span style='color: #c3c2b7;'>|</span>");
             }
             html.append("<span>")
-                .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(" </span>")
+                .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(": </span>")
                 .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: #0b0b0b;'>")
                 .append(String.format("%.2f", valores[i]))
                 .append("</span>")
