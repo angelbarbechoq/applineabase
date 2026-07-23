@@ -165,6 +165,7 @@ public final class MainLayout extends AppLayout {
         nav.addItem(new SideNavItem("Historico", "historico", VaadinIcon.CLOCK.create()));
         if (lineaAccessService.esAdmin()) {
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
+            nav.addItem(new SideNavItem("Configuración", "configuracion", VaadinIcon.COG.create()));
         }
         //nav.addSelectionListener(e -> setDrawerOpened(false));
         return nav;

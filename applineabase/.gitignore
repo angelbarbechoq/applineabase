@@ -12,3 +12,10 @@
 node_modules/
 src/main/frontend/generated/
 vite.generated.ts
+.vaadin-node-tasks.lock
+
+# Configuracion externa sembrada en runtime (ver app.config.dir)
+/config/
+
+# Base H2 local (usuarios y datos de la app)
+/data/
