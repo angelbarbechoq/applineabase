@@ -555,42 +555,17 @@ public class ChartsView extends VerticalLayout {
     public void limpiarTarjetas() {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             MainLayout layout = (MainLayout) this.getParent().get();
-
-            String htmlVacio = construirTarjetaHtml("00-00-00", "00:00:00", "0.0");
-
-            layout.getUltimoClickCard().getElement().setProperty("innerHTML", htmlVacio);
-            layout.getClickAnteriorCard().getElement().setProperty("innerHTML", htmlVacio);
+            layout.getUltimoClickCard().getElement().setProperty("innerHTML",
+                    construirTarjetaHtml("00-00-00", "00:00:00", "0.0"));
         }
     }
 
-    /** Tarjeta HTML de Fecha/Hora/KWh, usada tanto para el estado vacío como con datos reales. */
+    /** Texto plano de Fecha/Hora/KWh del último click — antes era una tarjeta con fondo oscuro. */
     private String construirTarjetaHtml(String fechaStr, String horaStr, String valorStr) {
-        return "<div style='" +
-                "background: #4a4a4a; " +
-                "border-radius: 8px; " +
-                "padding: 10px 14px; " +
-                "color: #ffffff; " +
-                "display: flex; " +
-                "gap: 12px; " +
-                "align-items: center; " +
-                "font-size: 12px; " +
-                "'>" +
-
-                "  <div style='text-align: center;'>" +
-                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Fecha</div>" +
-                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + fechaStr + "</div>" +
-                "  </div>" +
-
-                "  <div style='text-align: center;'>" +
-                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>Hora</div>" +
-                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + horaStr + "</div>" +
-                "  </div>" +
-
-                "  <div style='text-align: center;'>" +
-                "    <div style='font-size: 9px; opacity: 0.7; color: #b0b0b0;'>KWh</div>" +
-                "    <div style='font-size: 11px; font-weight: bold; color: #ffffff;'>" + valorStr + "</div>" +
-                "  </div>" +
-
+        return "<div style='display: flex; gap: 10px; align-items: baseline; font-size: 12px; white-space: nowrap;'>" +
+                "<span><span style='color: #898781;'>Fecha: </span><span style='font-weight: 600; color: #0b0b0b;'>" + fechaStr + "</span></span>" +
+                "<span><span style='color: #898781;'>Hora: </span><span style='font-weight: 600; color: #0b0b0b;'>" + horaStr + "</span></span>" +
+                "<span><span style='color: #898781;'>KWh: </span><span style='font-weight: 600; color: #0b0b0b;'>" + valorStr + "</span></span>" +
                 "</div>";
     }
 
@@ -626,14 +601,6 @@ public class ChartsView extends VerticalLayout {
 
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             MainLayout layout = (MainLayout) this.getParent().get();
-
-            // Guardar HTML anterior
-            String htmlAnterior = layout.getUltimoClickCard().getElement().getProperty("innerHTML");
-
-            // Pasar a tarjeta anterior
-            layout.getClickAnteriorCard().getElement().setProperty("innerHTML", htmlAnterior);
-
-            // Actualizar tarjeta actual
             layout.getUltimoClickCard().getElement().setProperty("innerHTML", html);
         }
     }
@@ -687,9 +654,13 @@ public class ChartsView extends VerticalLayout {
             if (i > 0) {
                 html.append("<span style='color: #c3c2b7;'>|</span>");
             }
+            // Corriente (IA/IB/IC) en un color propio para diferenciarla de energía/voltaje a
+            // simple vista; el resto sigue en la tinta oscura de siempre.
+            boolean esCorriente = labels[i].equals("IA") || labels[i].equals("IB") || labels[i].equals("IC");
+            String colorValor = esCorriente ? "#e34948" : "#0b0b0b";
             html.append("<span>")
                 .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(": </span>")
-                .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: #0b0b0b;'>")
+                .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
                 .append(String.format("%.2f", valores[i]))
                 .append("</span>")
                 .append("</span>");
