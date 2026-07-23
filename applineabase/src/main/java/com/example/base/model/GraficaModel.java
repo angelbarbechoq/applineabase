@@ -141,6 +141,12 @@ public class GraficaModel {
                         "console.log('🔴 ANTES, snapToSeries:', cursor.get('snapToSeries'));" +
                         "cursor.setAll({ snapToSeries: seriesList, snapToSeriesBy: 'x' });" +
                         "console.log('🟢 DESPUÉS, snapToSeries.length:', cursor.get('snapToSeries').length);" +
+                        // Con 2+ series, amCharts5 por defecto solo muestra el tooltip de la serie
+                        // más cercana al cursor, no el de todas — se fuerza a mostrar el de cada
+                        // una en cada movimiento para poder comparar los valores a simple vista.
+                        "cursor.events.on('cursormoved', function() {" +
+                        "  seriesList.forEach(function(s) { s.showTooltip(); });" +
+                        "});" +
 
 
                         // PASO 9: AGREGAR tooltip separado del cursor (para mostrar fecha/hora al pasar el ratón)
