@@ -4,15 +4,18 @@ import com.example.dataacquisition.service.ConfigLoaderService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.dialog.Dialog;
+import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H3;
-import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
-import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
@@ -31,6 +34,9 @@ import java.util.stream.Stream;
  * app.config.dir; el polling Modbus (PASReaderService, PLCDataAcquisitionService)
  * solo toma estos cambios tras reiniciar la aplicacion, porque arma sus
  * dispositivos una sola vez al iniciar.
+ *
+ * El alta/edicion se hace en dialogos (no inline) para que las 3 grillas
+ * puedan ocupar toda la pantalla en vez de competir por espacio.
  */
 @PageTitle("Configuración | LineaBase")
 @Route(value = "configuracion", layout = MainLayout.class)
@@ -44,27 +50,8 @@ public class ConfiguracionView extends VerticalLayout {
     private List<Map<String, Object>> gateways;
 
     private final Grid<Map<String, Object>> lineasGrid = new Grid<>();
-    private final IntegerField lineaIdField = new IntegerField("ID");
-    private final TextField lineaNombreField = new TextField("Línea/Máquina");
-    private final TextField medidorField = new TextField("Medidor");
-    private final ComboBox<String> lineaPlcField = new ComboBox<>("PLC");
-    private final TextField serialField = new TextField("Serial");
-    private final ComboBox<String> zonaField = new ComboBox<>("Zona");
-    private final Span lineaFormTitle = new Span("Nueva línea");
-    private Map<String, Object> lineaEnEdicion;
-
     private final Grid<Map<String, Object>> plcsGrid = new Grid<>();
-    private final TextField plcNombreField = new TextField("Nombre");
-    private final TextField plcIpField = new TextField("IP");
-    private final Span plcFormTitle = new Span("Nuevo PLC");
-    private Map<String, Object> plcEnEdicion;
-
     private final Grid<Map<String, Object>> gatewaysGrid = new Grid<>();
-    private final TextField gatewayNombreField = new TextField("Nombre");
-    private final TextField gatewayIpField = new TextField("IP");
-    private final TextField gatewayDescripcionField = new TextField("Descripción");
-    private final Span gatewayFormTitle = new Span("Nuevo gateway");
-    private Map<String, Object> gatewayEnEdicion;
 
     public ConfiguracionView(ConfigLoaderService configLoaderService) {
         this.configLoaderService = configLoaderService;
@@ -75,16 +62,13 @@ public class ConfiguracionView extends VerticalLayout {
         add(new H3("Configuración de Líneas, PLCs y Gateways"));
         add(crearAvisoReinicio());
 
-        VerticalLayout panelLineas = crearPanelLineas();
-        VerticalLayout panelDerecho = crearPanelDerecho();
-
-        HorizontalLayout columnas = new HorizontalLayout(panelLineas, panelDerecho);
-        columnas.setSizeFull();
-        columnas.setSpacing(true);
-        columnas.setFlexGrow(3, panelLineas);
-        columnas.setFlexGrow(2, panelDerecho);
-        add(columnas);
-        setFlexGrow(1, columnas);
+        TabSheet tabSheet = new TabSheet();
+        tabSheet.setSizeFull();
+        tabSheet.add("Líneas / Máquinas", crearPanelLineas());
+        tabSheet.add("PLCs", crearPanelPlcs());
+        tabSheet.add("Gateways", crearPanelGateways());
+        add(tabSheet);
+        setFlexGrow(1, tabSheet);
 
         cargarTodo();
     }
@@ -96,9 +80,9 @@ public class ConfiguracionView extends VerticalLayout {
         aviso.getStyle()
                 .set("background", "#fff3cd")
                 .set("color", "#7a5b00")
-                .set("padding", "8px 12px")
+                .set("padding", "6px 12px")
                 .set("border-radius", "6px")
-                .set("font-size", "13px");
+                .set("font-size", "12px");
         return aviso;
     }
 
@@ -106,108 +90,120 @@ public class ConfiguracionView extends VerticalLayout {
 
     private VerticalLayout crearPanelLineas() {
         VerticalLayout panel = new VerticalLayout();
-        panel.setPadding(false);
-        panel.setSpacing(true);
         panel.setSizeFull();
+        panel.setPadding(false);
+        panel.setSpacing(false);
 
-        lineaIdField.setWidth("90px");
-        lineaIdField.setStepButtonsVisible(false);
-        lineaNombreField.setWidth("160px");
-        medidorField.setWidth("120px");
-        lineaPlcField.setWidth("150px");
-        serialField.setWidth("160px");
-        zonaField.setWidth("150px");
-        zonaField.setAllowCustomValue(true);
-        zonaField.addCustomValueSetListener(e -> zonaField.setValue(e.getDetail()));
+        Button nuevaBtn = new Button("Nueva línea", VaadinIcon.PLUS.create(), e -> abrirDialogoLinea(null));
+        nuevaBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        Button guardarBtn = new Button("Guardar", e -> guardarLinea());
-        guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        Button nuevaBtn = new Button("Nueva", e -> limpiarFormularioLinea());
-        nuevaBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-
-        HorizontalLayout fila1 = new HorizontalLayout(lineaIdField, lineaNombreField, medidorField, lineaPlcField);
-        HorizontalLayout fila2 = new HorizontalLayout(serialField, zonaField, guardarBtn, nuevaBtn);
-        fila1.setAlignItems(Alignment.END);
-        fila2.setAlignItems(Alignment.END);
-        fila1.getStyle().set("flex-wrap", "wrap");
-        fila2.getStyle().set("flex-wrap", "wrap");
+        HorizontalLayout toolbar = new HorizontalLayout(nuevaBtn);
+        toolbar.setWidthFull();
+        toolbar.setJustifyContentMode(JustifyContentMode.END);
+        toolbar.getStyle().set("padding", "8px 0");
 
         lineasGrid.addColumn(l -> l.get("id")).setHeader("ID").setAutoWidth(true).setSortable(true);
         lineasGrid.addColumn(l -> l.get("lineaMaquina")).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
         lineasGrid.addColumn(l -> l.get("modeloMedidor")).setHeader("Medidor").setAutoWidth(true);
-        lineasGrid.addColumn(l -> l.get("nombrePLC")).setHeader("PLC").setAutoWidth(true);
+        lineasGrid.addColumn(l -> l.get("nombrePLC")).setHeader("PLC").setAutoWidth(true).setSortable(true);
         lineasGrid.addColumn(l -> l.get("numeroSerie")).setHeader("Serial").setAutoWidth(true);
-        lineasGrid.addColumn(l -> l.get("zona")).setHeader("Zona").setAutoWidth(true);
+        lineasGrid.addColumn(l -> l.get("zona")).setHeader("Zona").setAutoWidth(true).setSortable(true);
         lineasGrid.addComponentColumn(this::crearAccionesLinea).setHeader("Acciones").setAutoWidth(true);
         lineasGrid.setSizeFull();
 
-        panel.add(lineaFormTitle, fila1, fila2, lineasGrid);
+        panel.add(toolbar, lineasGrid);
         panel.setFlexGrow(1, lineasGrid);
         return panel;
     }
 
     private HorizontalLayout crearAccionesLinea(Map<String, Object> linea) {
-        Button editar = new Button("Editar", e -> cargarLineaEnFormulario(linea));
+        Button editar = new Button("Editar", e -> abrirDialogoLinea(linea));
         Button eliminar = new Button("Eliminar", e -> eliminarLinea(linea));
         eliminar.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
         return new HorizontalLayout(editar, eliminar);
     }
 
-    private void cargarLineaEnFormulario(Map<String, Object> linea) {
-        lineaEnEdicion = linea;
-        lineaFormTitle.setText("Editando: " + linea.get("lineaMaquina"));
-        lineaIdField.setValue(((Number) linea.get("id")).intValue());
-        lineaNombreField.setValue(String.valueOf(linea.getOrDefault("lineaMaquina", "")));
-        medidorField.setValue(String.valueOf(linea.getOrDefault("modeloMedidor", "")));
-        lineaPlcField.setValue((String) linea.get("nombrePLC"));
-        serialField.setValue(String.valueOf(linea.getOrDefault("numeroSerie", "")));
-        zonaField.setValue((String) linea.get("zona"));
+    private void abrirDialogoLinea(Map<String, Object> lineaEnEdicion) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle(lineaEnEdicion == null ? "Nueva línea" : "Editar: " + lineaEnEdicion.get("lineaMaquina"));
+        dialog.setWidth("480px");
+
+        IntegerField idField = new IntegerField("ID");
+        idField.setStepButtonsVisible(false);
+        TextField nombreField = new TextField("Línea/Máquina");
+        TextField medidorField = new TextField("Medidor");
+        ComboBox<String> plcField = new ComboBox<>("PLC");
+        plcField.setItems(Stream.concat(
+                plcs.stream().map(p -> String.valueOf(p.get("nombre"))),
+                gateways.stream().map(g -> String.valueOf(g.get("nombre")))
+        ).collect(Collectors.toList()));
+        TextField serialField = new TextField("Serial");
+        ComboBox<String> zonaField = new ComboBox<>("Zona");
+        zonaField.setItems(lineas.stream()
+                .map(l -> (String) l.get("zona"))
+                .filter(z -> z != null && !z.isBlank())
+                .distinct().sorted().collect(Collectors.toList()));
+        zonaField.setAllowCustomValue(true);
+        zonaField.addCustomValueSetListener(e -> zonaField.setValue(e.getDetail()));
+
+        if (lineaEnEdicion != null) {
+            idField.setValue(((Number) lineaEnEdicion.get("id")).intValue());
+            nombreField.setValue(String.valueOf(lineaEnEdicion.getOrDefault("lineaMaquina", "")));
+            medidorField.setValue(String.valueOf(lineaEnEdicion.getOrDefault("modeloMedidor", "")));
+            plcField.setValue((String) lineaEnEdicion.get("nombrePLC"));
+            serialField.setValue(String.valueOf(lineaEnEdicion.getOrDefault("numeroSerie", "")));
+            zonaField.setValue((String) lineaEnEdicion.get("zona"));
+        }
+
+        FormLayout form = new FormLayout(idField, nombreField, medidorField, plcField, serialField, zonaField);
+        form.setResponsiveSteps(
+                new FormLayout.ResponsiveStep("0", 1),
+                new FormLayout.ResponsiveStep("320px", 2));
+        dialog.add(form);
+
+        Button cancelarBtn = new Button("Cancelar", e -> dialog.close());
+        Button guardarBtn = new Button("Guardar", e -> {
+            boolean ok = guardarLinea(lineaEnEdicion, idField.getValue(), nombreField.getValue(),
+                    medidorField.getValue(), plcField.getValue(), serialField.getValue(), zonaField.getValue());
+            if (ok) {
+                dialog.close();
+            }
+        });
+        guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        dialog.getFooter().add(cancelarBtn, guardarBtn);
+
+        dialog.open();
     }
 
-    private void limpiarFormularioLinea() {
-        lineaEnEdicion = null;
-        lineaFormTitle.setText("Nueva línea");
-        lineaIdField.clear();
-        lineaNombreField.clear();
-        medidorField.clear();
-        lineaPlcField.clear();
-        serialField.clear();
-        zonaField.clear();
-    }
-
-    private void guardarLinea() {
-        Integer id = lineaIdField.getValue();
-        String nombre = lineaNombreField.getValue();
-        String plc = lineaPlcField.getValue();
-        String zona = zonaField.getValue();
-
+    private boolean guardarLinea(Map<String, Object> lineaEnEdicion, Integer id, String nombre, String medidor,
+                                  String plc, String serial, String zona) {
         if (id == null) {
             mostrarError("El ID es obligatorio");
-            return;
+            return false;
         }
         if (nombre == null || nombre.isBlank()) {
             mostrarError("Línea/Máquina es obligatorio");
-            return;
+            return false;
         }
         if (plc == null || plc.isBlank()) {
             mostrarError("Debes asignar un PLC o Gateway");
-            return;
+            return false;
         }
         if (zona == null || zona.isBlank()) {
             mostrarError("La zona es obligatoria");
-            return;
+            return false;
         }
         boolean idDuplicado = lineas.stream()
                 .anyMatch(l -> l != lineaEnEdicion && id.equals(((Number) l.get("id")).intValue()));
         if (idDuplicado) {
             mostrarError("Ya existe una línea con ese ID");
-            return;
+            return false;
         }
         boolean nombreDuplicado = lineas.stream()
                 .anyMatch(l -> l != lineaEnEdicion && nombre.equalsIgnoreCase(String.valueOf(l.get("lineaMaquina"))));
         if (nombreDuplicado) {
             mostrarError("Ya existe una línea con ese nombre");
-            return;
+            return false;
         }
 
         Map<String, Object> linea;
@@ -219,15 +215,16 @@ public class ConfiguracionView extends VerticalLayout {
         }
         linea.put("id", id);
         linea.put("lineaMaquina", nombre);
-        linea.put("modeloMedidor", medidorField.getValue());
+        linea.put("modeloMedidor", medidor);
         linea.put("nombrePLC", plc);
-        linea.put("numeroSerie", serialField.getValue() == null ? "" : serialField.getValue());
+        linea.put("numeroSerie", serial == null ? "" : serial);
         linea.put("zona", zona);
 
         configLoaderService.saveLineaIDConfig(lineas);
         Notification.show("Línea guardada", 2500, Notification.Position.BOTTOM_END)
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
         cargarTodo();
+        return true;
     }
 
     private void eliminarLinea(Map<String, Object> linea) {
@@ -238,82 +235,83 @@ public class ConfiguracionView extends VerticalLayout {
         cargarTodo();
     }
 
-    // ================= PLCs y Gateways =================
-
-    private VerticalLayout crearPanelDerecho() {
-        VerticalLayout panel = new VerticalLayout(crearPanelPlcs(), crearPanelGateways());
-        panel.setPadding(false);
-        panel.setSpacing(true);
-        return panel;
-    }
+    // ================= PLCs =================
 
     private VerticalLayout crearPanelPlcs() {
         VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
         panel.setPadding(false);
-        panel.setSpacing(true);
+        panel.setSpacing(false);
 
-        plcNombreField.setWidth("110px");
-        plcIpField.setWidth("130px");
+        Button nuevoBtn = new Button("Nuevo PLC", VaadinIcon.PLUS.create(), e -> abrirDialogoPlc(null));
+        nuevoBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        Button guardarBtn = new Button("Guardar", e -> guardarPlc());
-        guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        Button nuevoBtn = new Button("Nuevo", e -> limpiarFormularioPlc());
-        nuevoBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-
-        HorizontalLayout fila = new HorizontalLayout(plcNombreField, plcIpField, guardarBtn, nuevoBtn);
-        fila.setAlignItems(Alignment.END);
-        fila.getStyle().set("flex-wrap", "wrap");
+        HorizontalLayout toolbar = new HorizontalLayout(nuevoBtn);
+        toolbar.setWidthFull();
+        toolbar.setJustifyContentMode(JustifyContentMode.END);
+        toolbar.getStyle().set("padding", "8px 0");
 
         plcsGrid.addColumn(p -> p.get("nombre")).setHeader("Nombre").setAutoWidth(true);
         plcsGrid.addColumn(p -> p.get("ipAddress")).setHeader("IP").setAutoWidth(true);
         plcsGrid.addComponentColumn(this::crearAccionesPlc).setHeader("Acciones").setAutoWidth(true);
-        plcsGrid.setHeight("220px");
-        plcsGrid.setWidthFull();
+        plcsGrid.setSizeFull();
 
-        panel.add(new H4("PLCs"), plcFormTitle, fila, plcsGrid);
+        panel.add(toolbar, plcsGrid);
+        panel.setFlexGrow(1, plcsGrid);
         return panel;
     }
 
     private HorizontalLayout crearAccionesPlc(Map<String, Object> plc) {
-        Button editar = new Button("Editar", e -> cargarPlcEnFormulario(plc));
+        Button editar = new Button("Editar", e -> abrirDialogoPlc(plc));
         Button eliminar = new Button("Eliminar", e -> eliminarPlc(plc));
         eliminar.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
         return new HorizontalLayout(editar, eliminar);
     }
 
-    private void cargarPlcEnFormulario(Map<String, Object> plc) {
-        plcEnEdicion = plc;
-        plcFormTitle.setText("Editando: " + plc.get("nombre"));
-        plcNombreField.setValue(String.valueOf(plc.getOrDefault("nombre", "")));
-        plcNombreField.setReadOnly(true);
-        plcIpField.setValue(String.valueOf(plc.getOrDefault("ipAddress", "")));
+    private void abrirDialogoPlc(Map<String, Object> plcEnEdicion) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle(plcEnEdicion == null ? "Nuevo PLC" : "Editar: " + plcEnEdicion.get("nombre"));
+        dialog.setWidth("360px");
+
+        TextField nombreField = new TextField("Nombre");
+        TextField ipField = new TextField("IP");
+
+        if (plcEnEdicion != null) {
+            nombreField.setValue(String.valueOf(plcEnEdicion.getOrDefault("nombre", "")));
+            nombreField.setReadOnly(true);
+            ipField.setValue(String.valueOf(plcEnEdicion.getOrDefault("ipAddress", "")));
+        }
+
+        FormLayout form = new FormLayout(nombreField, ipField);
+        form.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
+        dialog.add(form);
+
+        Button cancelarBtn = new Button("Cancelar", e -> dialog.close());
+        Button guardarBtn = new Button("Guardar", e -> {
+            if (guardarPlc(plcEnEdicion, nombreField.getValue(), ipField.getValue())) {
+                dialog.close();
+            }
+        });
+        guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        dialog.getFooter().add(cancelarBtn, guardarBtn);
+
+        dialog.open();
     }
 
-    private void limpiarFormularioPlc() {
-        plcEnEdicion = null;
-        plcFormTitle.setText("Nuevo PLC");
-        plcNombreField.clear();
-        plcNombreField.setReadOnly(false);
-        plcIpField.clear();
-    }
-
-    private void guardarPlc() {
-        String nombre = plcNombreField.getValue();
-        String ip = plcIpField.getValue();
-
+    private boolean guardarPlc(Map<String, Object> plcEnEdicion, String nombre, String ip) {
         if (nombre == null || nombre.isBlank()) {
             mostrarError("El nombre del PLC es obligatorio");
-            return;
+            return false;
         }
         if (!esIpValida(ip)) {
             mostrarError("La IP no tiene un formato válido");
-            return;
+            return false;
         }
         boolean nombreDuplicado = plcs.stream()
                 .anyMatch(p -> p != plcEnEdicion && nombre.equalsIgnoreCase(String.valueOf(p.get("nombre"))));
         if (nombreDuplicado) {
             mostrarError("Ya existe un PLC con ese nombre");
-            return;
+            return false;
         }
 
         Map<String, Object> plc;
@@ -330,6 +328,7 @@ public class ConfiguracionView extends VerticalLayout {
         Notification.show("PLC guardado", 2500, Notification.Position.BOTTOM_END)
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
         cargarTodo();
+        return true;
     }
 
     private void eliminarPlc(Map<String, Object> plc) {
@@ -347,77 +346,86 @@ public class ConfiguracionView extends VerticalLayout {
         cargarTodo();
     }
 
+    // ================= Gateways =================
+
     private VerticalLayout crearPanelGateways() {
         VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
         panel.setPadding(false);
-        panel.setSpacing(true);
+        panel.setSpacing(false);
 
-        gatewayNombreField.setWidth("110px");
-        gatewayIpField.setWidth("130px");
-        gatewayDescripcionField.setWidth("180px");
+        Button nuevoBtn = new Button("Nuevo Gateway", VaadinIcon.PLUS.create(), e -> abrirDialogoGateway(null));
+        nuevoBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        Button guardarBtn = new Button("Guardar", e -> guardarGateway());
-        guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        Button nuevoBtn = new Button("Nuevo", e -> limpiarFormularioGateway());
-        nuevoBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-
-        HorizontalLayout fila = new HorizontalLayout(gatewayNombreField, gatewayIpField, gatewayDescripcionField, guardarBtn, nuevoBtn);
-        fila.setAlignItems(Alignment.END);
-        fila.getStyle().set("flex-wrap", "wrap");
+        HorizontalLayout toolbar = new HorizontalLayout(nuevoBtn);
+        toolbar.setWidthFull();
+        toolbar.setJustifyContentMode(JustifyContentMode.END);
+        toolbar.getStyle().set("padding", "8px 0");
 
         gatewaysGrid.addColumn(g -> g.get("nombre")).setHeader("Nombre").setAutoWidth(true);
         gatewaysGrid.addColumn(g -> g.get("ipAddress")).setHeader("IP").setAutoWidth(true);
         gatewaysGrid.addColumn(g -> g.get("descripcion")).setHeader("Descripción").setAutoWidth(true);
         gatewaysGrid.addComponentColumn(this::crearAccionesGateway).setHeader("Acciones").setAutoWidth(true);
-        gatewaysGrid.setHeight("220px");
-        gatewaysGrid.setWidthFull();
+        gatewaysGrid.setSizeFull();
 
-        panel.add(new H4("Gateways"), gatewayFormTitle, fila, gatewaysGrid);
+        panel.add(toolbar, gatewaysGrid);
+        panel.setFlexGrow(1, gatewaysGrid);
         return panel;
     }
 
     private HorizontalLayout crearAccionesGateway(Map<String, Object> gateway) {
-        Button editar = new Button("Editar", e -> cargarGatewayEnFormulario(gateway));
+        Button editar = new Button("Editar", e -> abrirDialogoGateway(gateway));
         Button eliminar = new Button("Eliminar", e -> eliminarGateway(gateway));
         eliminar.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY);
         return new HorizontalLayout(editar, eliminar);
     }
 
-    private void cargarGatewayEnFormulario(Map<String, Object> gateway) {
-        gatewayEnEdicion = gateway;
-        gatewayFormTitle.setText("Editando: " + gateway.get("nombre"));
-        gatewayNombreField.setValue(String.valueOf(gateway.getOrDefault("nombre", "")));
-        gatewayNombreField.setReadOnly(true);
-        gatewayIpField.setValue(String.valueOf(gateway.getOrDefault("ipAddress", "")));
-        gatewayDescripcionField.setValue(String.valueOf(gateway.getOrDefault("descripcion", "")));
+    private void abrirDialogoGateway(Map<String, Object> gatewayEnEdicion) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle(gatewayEnEdicion == null ? "Nuevo gateway" : "Editar: " + gatewayEnEdicion.get("nombre"));
+        dialog.setWidth("360px");
+
+        TextField nombreField = new TextField("Nombre");
+        TextField ipField = new TextField("IP");
+        TextField descripcionField = new TextField("Descripción");
+
+        if (gatewayEnEdicion != null) {
+            nombreField.setValue(String.valueOf(gatewayEnEdicion.getOrDefault("nombre", "")));
+            nombreField.setReadOnly(true);
+            ipField.setValue(String.valueOf(gatewayEnEdicion.getOrDefault("ipAddress", "")));
+            descripcionField.setValue(String.valueOf(gatewayEnEdicion.getOrDefault("descripcion", "")));
+        }
+
+        FormLayout form = new FormLayout(nombreField, ipField, descripcionField);
+        form.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
+        dialog.add(form);
+
+        Button cancelarBtn = new Button("Cancelar", e -> dialog.close());
+        Button guardarBtn = new Button("Guardar", e -> {
+            if (guardarGateway(gatewayEnEdicion, nombreField.getValue(), ipField.getValue(), descripcionField.getValue())) {
+                dialog.close();
+            }
+        });
+        guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        dialog.getFooter().add(cancelarBtn, guardarBtn);
+
+        dialog.open();
     }
 
-    private void limpiarFormularioGateway() {
-        gatewayEnEdicion = null;
-        gatewayFormTitle.setText("Nuevo gateway");
-        gatewayNombreField.clear();
-        gatewayNombreField.setReadOnly(false);
-        gatewayIpField.clear();
-        gatewayDescripcionField.clear();
-    }
-
-    private void guardarGateway() {
-        String nombre = gatewayNombreField.getValue();
-        String ip = gatewayIpField.getValue();
-
+    private boolean guardarGateway(Map<String, Object> gatewayEnEdicion, String nombre, String ip, String descripcion) {
         if (nombre == null || nombre.isBlank()) {
             mostrarError("El nombre del gateway es obligatorio");
-            return;
+            return false;
         }
         if (!esIpValida(ip)) {
             mostrarError("La IP no tiene un formato válido");
-            return;
+            return false;
         }
         boolean nombreDuplicado = gateways.stream()
                 .anyMatch(g -> g != gatewayEnEdicion && nombre.equalsIgnoreCase(String.valueOf(g.get("nombre"))));
         if (nombreDuplicado) {
             mostrarError("Ya existe un gateway con ese nombre");
-            return;
+            return false;
         }
 
         Map<String, Object> gateway;
@@ -429,12 +437,13 @@ public class ConfiguracionView extends VerticalLayout {
         }
         gateway.put("nombre", nombre);
         gateway.put("ipAddress", ip);
-        gateway.put("descripcion", gatewayDescripcionField.getValue());
+        gateway.put("descripcion", descripcion);
 
         configLoaderService.savePLCsYGateways(plcs, gateways);
         Notification.show("Gateway guardado", 2500, Notification.Position.BOTTOM_END)
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
         cargarTodo();
+        return true;
     }
 
     private void eliminarGateway(Map<String, Object> gateway) {
@@ -463,30 +472,10 @@ public class ConfiguracionView extends VerticalLayout {
                 .addThemeVariants(NotificationVariant.LUMO_ERROR);
     }
 
-    /**
-     * Vuelve a leer los 3 JSON desde disco y refresca las grillas. Se llama
-     * tras cada alta/edicion/baja, asi que tambien resetea los 3 formularios:
-     * de lo contrario un formulario "en edicion" quedaria apuntando a un Map
-     * que ya no pertenece a las listas recien cargadas.
-     */
     private void cargarTodo() {
         lineas = configLoaderService.loadLineaIDConfig();
         plcs = configLoaderService.loadPLCConfig();
         gateways = configLoaderService.loadGatewayConfig();
-
-        List<String> nombresPlcYGateway = Stream.concat(
-                plcs.stream().map(p -> String.valueOf(p.get("nombre"))),
-                gateways.stream().map(g -> String.valueOf(g.get("nombre")))
-        ).collect(Collectors.toList());
-        lineaPlcField.setItems(nombresPlcYGateway);
-
-        List<String> zonas = lineas.stream()
-                .map(l -> (String) l.get("zona"))
-                .filter(z -> z != null && !z.isBlank())
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
-        zonaField.setItems(zonas);
 
         lineasGrid.setItems(lineas);
         plcsGrid.setItems(plcs);
@@ -494,9 +483,5 @@ public class ConfiguracionView extends VerticalLayout {
         lineasGrid.recalculateColumnWidths();
         plcsGrid.recalculateColumnWidths();
         gatewaysGrid.recalculateColumnWidths();
-
-        limpiarFormularioLinea();
-        limpiarFormularioPlc();
-        limpiarFormularioGateway();
     }
 }
