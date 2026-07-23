@@ -108,6 +108,7 @@ public class ConfiguracionView extends VerticalLayout {
         lineasGrid.addColumn(l -> l.get("nombrePLC")).setHeader("PLC").setAutoWidth(true).setSortable(true);
         lineasGrid.addColumn(l -> l.get("numeroSerie")).setHeader("Serial").setAutoWidth(true);
         lineasGrid.addColumn(l -> l.get("zona")).setHeader("Zona").setAutoWidth(true).setSortable(true);
+        lineasGrid.addColumn(l -> l.get("grupo")).setHeader("Grupo").setAutoWidth(true).setSortable(true);
         lineasGrid.addComponentColumn(this::crearAccionesLinea).setHeader("Acciones").setAutoWidth(true);
         lineasGrid.setSizeFull();
 
@@ -146,6 +147,15 @@ public class ConfiguracionView extends VerticalLayout {
         zonaField.setAllowCustomValue(true);
         zonaField.addCustomValueSetListener(e -> zonaField.setValue(e.getDetail()));
 
+        ComboBox<String> grupoField = new ComboBox<>("Grupo (opcional)");
+        grupoField.setItems(lineas.stream()
+                .map(l -> (String) l.get("grupo"))
+                .filter(g -> g != null && !g.isBlank())
+                .distinct().sorted().collect(Collectors.toList()));
+        grupoField.setAllowCustomValue(true);
+        grupoField.addCustomValueSetListener(e -> grupoField.setValue(e.getDetail()));
+        grupoField.setHelperText("Agrupación libre para reportes (ej. Casa Fuerza). No afecta el acceso por zona.");
+
         if (lineaEnEdicion != null) {
             idField.setValue(((Number) lineaEnEdicion.get("id")).intValue());
             nombreField.setValue(String.valueOf(lineaEnEdicion.getOrDefault("lineaMaquina", "")));
@@ -153,9 +163,10 @@ public class ConfiguracionView extends VerticalLayout {
             plcField.setValue((String) lineaEnEdicion.get("nombrePLC"));
             serialField.setValue(String.valueOf(lineaEnEdicion.getOrDefault("numeroSerie", "")));
             zonaField.setValue((String) lineaEnEdicion.get("zona"));
+            grupoField.setValue((String) lineaEnEdicion.get("grupo"));
         }
 
-        FormLayout form = new FormLayout(idField, nombreField, medidorField, plcField, serialField, zonaField);
+        FormLayout form = new FormLayout(idField, nombreField, medidorField, plcField, serialField, zonaField, grupoField);
         form.setResponsiveSteps(
                 new FormLayout.ResponsiveStep("0", 1),
                 new FormLayout.ResponsiveStep("320px", 2));
@@ -164,7 +175,8 @@ public class ConfiguracionView extends VerticalLayout {
         Button cancelarBtn = new Button("Cancelar", e -> dialog.close());
         Button guardarBtn = new Button("Guardar", e -> {
             boolean ok = guardarLinea(lineaEnEdicion, idField.getValue(), nombreField.getValue(),
-                    medidorField.getValue(), plcField.getValue(), serialField.getValue(), zonaField.getValue());
+                    medidorField.getValue(), plcField.getValue(), serialField.getValue(), zonaField.getValue(),
+                    grupoField.getValue());
             if (ok) {
                 dialog.close();
             }
@@ -176,7 +188,7 @@ public class ConfiguracionView extends VerticalLayout {
     }
 
     private boolean guardarLinea(Map<String, Object> lineaEnEdicion, Integer id, String nombre, String medidor,
-                                  String plc, String serial, String zona) {
+                                  String plc, String serial, String zona, String grupo) {
         if (id == null) {
             mostrarError("El ID es obligatorio");
             return false;
@@ -219,6 +231,11 @@ public class ConfiguracionView extends VerticalLayout {
         linea.put("nombrePLC", plc);
         linea.put("numeroSerie", serial == null ? "" : serial);
         linea.put("zona", zona);
+        if (grupo == null || grupo.isBlank()) {
+            linea.remove("grupo");
+        } else {
+            linea.put("grupo", grupo);
+        }
 
         configLoaderService.saveLineaIDConfig(lineas);
         Notification.show("Línea guardada", 2500, Notification.Position.BOTTOM_END)

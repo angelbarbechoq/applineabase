@@ -305,37 +305,17 @@ public class HistoricoView extends VerticalLayout {
         return switch (tipoVar) {
             // Voltaje, corriente y potencia nunca son negativos: se toman en valor absoluto.
             case "Voltajes" -> new Float[]{
-                toFloatAbs(row.get("VAB")), toFloatAbs(row.get("VAC")), toFloatAbs(row.get("VBC"))
+                GraficaModel.toFloatAbs(row.get("VAB")), GraficaModel.toFloatAbs(row.get("VAC")), GraficaModel.toFloatAbs(row.get("VBC"))
             };
             case "Corrientes" -> new Float[]{
-                toFloatAbs(row.get("IA")), toFloatAbs(row.get("IB")), toFloatAbs(row.get("IC"))
+                GraficaModel.toFloatAbs(row.get("IA")), GraficaModel.toFloatAbs(row.get("IB")), GraficaModel.toFloatAbs(row.get("IC"))
             };
-            case "PW" -> new Float[]{toFloatAbs(row.get("PW"))};
+            case "PW" -> new Float[]{GraficaModel.toFloatAbs(row.get("PW"))};
             // El factor de potencia es el que da negativo en el medidor principal: se
             // toma en valor absoluto igual que el resto.
-            case "PF" -> new Float[]{toFloatAbs(row.get("PF"))};
+            case "PF" -> new Float[]{GraficaModel.toFloatAbs(row.get("PF"))};
             default -> new Float[]{0f};
         };
-    }
-
-    /** Convierte a Float, o null si el dato falta, no se puede convertir, o no es un número
-     *  finito (NaN/Infinito, típico de una división por cero en el cálculo del PF): un dato
-     *  faltante o inválido no se grafica (no se muestra como si fuera un 0 real, y amCharts
-     *  puede colgarse si recibe un NaN/Infinito al calcular la escala del eje). */
-    private Float toFloat(Object v) {
-        if (v == null) return null;
-        try {
-            float f = ((Number) v).floatValue();
-            return Float.isFinite(f) ? f : null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    /** Igual que toFloat, pero en valor absoluto. */
-    private Float toFloatAbs(Object v) {
-        Float f = toFloat(v);
-        return f == null ? null : Math.abs(f);
     }
 
     @Override

@@ -38,7 +38,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC3",
       "numeroSerie": "540060642863",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 116,
@@ -46,7 +47,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
       "numeroSerie": "540060642867",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 120,
@@ -54,7 +56,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
       "numeroSerie": "540060660822",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 110,
@@ -94,7 +97,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
       "numeroSerie": "540060701264",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 109,
@@ -110,7 +114,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC3",
       "numeroSerie": "540060701227",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 115,
@@ -118,7 +123,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
       "numeroSerie": "540060701270",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 147,
@@ -150,7 +156,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
       "numeroSerie": "540060677915",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 134,
@@ -174,7 +181,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "GteWay01",
       "numeroSerie": "4C3DF472",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 126,
@@ -214,7 +222,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
       "numeroSerie": "540060651544",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 148,
@@ -230,7 +239,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
       "numeroSerie": "540060666058",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 146,
@@ -262,7 +272,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC2",
       "numeroSerie": "540060710700",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 111,
@@ -334,7 +345,8 @@
       "modeloMedidor": "PM5110",
       "nombrePLC": "PLC1",
       "numeroSerie": "null",
-      "zona": "Mantenimiento"
+      "zona": "Mantenimiento",
+      "grupo": "Casa Fuerza"
     },
     {
       "id": 151,

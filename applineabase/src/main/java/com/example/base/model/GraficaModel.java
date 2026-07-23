@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 public class GraficaModel {
 
@@ -290,6 +291,64 @@ public class GraficaModel {
         return new ResultadoGrafica(script.toString(), serie.timestamps().size());
     }
 
+    /**
+     * Arma el script completo (init + todos los puntos + zoom inicial) para graficar N series
+     * de valor crudo ya obtenidas por separado (una por máquina/sensor), alineadas por fecha
+     * exacta. A diferencia de graficarSerieKWh (que grafica UNA máquina), esta se usa para
+     * comparar en un mismo gráfico el valor de varios sensores (p.ej. Temperatura del agua vs
+     * Temperatura ambiente). Un dato faltante en una serie para una fecha dada simplemente no
+     * agrega ese punto en esa serie (getAddDataScript ya lo maneja), sin romper el resto.
+     */
+    public ResultadoGrafica graficarSeriesCrudasAlineadas(String containerId, List<List<Map<String, Object>>> datosPorSerie,
+                                                           String[] seriesNames, double maxYDefault, boolean limitarPuntos) {
+        setSeriesNames(seriesNames);
+        int n = datosPorSerie.size();
+        SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+
+        // Las máquinas que comparten ciclo de lectura (mismo PLC, mismo loop) escriben con el
+        // mismo timestamp exacto, por eso alinear por texto de fecha funciona sin interpolar.
+        TreeMap<String, Float[]> porFecha = new TreeMap<>();
+        for (int s = 0; s < n; s++) {
+            for (Map<String, Object> row : datosPorSerie.get(s)) {
+                String fecha = (String) row.get("fecha");
+                Float valor = toFloat(row.get("kwh"));
+                if (fecha == null || valor == null) continue;
+                porFecha.computeIfAbsent(fecha, k -> new Float[n])[s] = valor;
+            }
+        }
+
+        List<String> fechas = new ArrayList<>(porFecha.keySet());
+        List<List<Float>> columnas = new ArrayList<>();
+        List<Float> valoresParaEscala = new ArrayList<>();
+        for (int s = 0; s < n; s++) {
+            List<Float> columna = new ArrayList<>();
+            for (String fecha : fechas) columna.add(porFecha.get(fecha)[s]);
+            List<Float> columnaLimpia = limpiarAtipicos(columna, FACTOR_ATIPICO);
+            columnas.add(columnaLimpia);
+            for (Float v : columnaLimpia) {
+                if (v != null && v > 0) valoresParaEscala.add(v);
+            }
+        }
+
+        setMinY(0.0);
+        double p95 = percentil(valoresParaEscala, 0.95);
+        setMaxY(Math.max(maxYDefault, p95 * 1.1));
+
+        StringBuilder script = new StringBuilder();
+        script.append(getInitScript2(containerId));
+        for (int i = 0; i < fechas.size(); i++) {
+            try {
+                long ts = formatter.parse(fechas.get(i)).getTime();
+                Float[] valores = new Float[n];
+                for (int s = 0; s < n; s++) valores[s] = columnas.get(s).get(i);
+                script.append(getAddDataScript(containerId, ts, valores, limitarPuntos));
+            } catch (Exception ignored) {}
+        }
+        script.append(getAplicarZoomInicialScript(containerId));
+
+        return new ResultadoGrafica(script.toString(), fechas.size());
+    }
+
     public String getAddDataScript(String containerId, long timestamp, Float[] dato, boolean limit) {
         int maxPoints = 1440; // 24 horas a 1 punto/minuto
         StringBuilder sb = new StringBuilder();
@@ -482,6 +541,30 @@ public class GraficaModel {
         return ordenado.get(idx);
     }
 
+    /**
+     * Convierte a Float, o null si el dato falta, no se puede convertir, o no es un número
+     * finito (NaN/Infinito, típico de una división por cero en el cálculo del PF): un dato
+     * faltante o inválido no se grafica (no se muestra como si fuera un 0 real, y amCharts
+     * puede colgarse si recibe un NaN/Infinito al calcular la escala del eje).
+     *
+     * Única función para esta conversión: la usan tanto ChartsView como HistoricoView.
+     */
+    public static Float toFloat(Object v) {
+        if (v == null) return null;
+        try {
+            float f = ((Number) v).floatValue();
+            return Float.isFinite(f) ? f : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Igual que toFloat, pero en valor absoluto (voltaje, corriente, potencia y PF nunca son negativos en la realidad). */
+    public static Float toFloatAbs(Object v) {
+        Float f = toFloat(v);
+        return f == null ? null : Math.abs(f);
+    }
+
     /** Un valor se considera atípico si supera este múltiplo del percentil 90 de la serie. */
     public static final double FACTOR_ATIPICO = 10.0;
 
@@ -531,6 +614,59 @@ public class GraficaModel {
             limpio.set(i, reemplazo);
         }
         return limpio;
+    }
+
+    /**
+     * Script de un gráfico de barras agrupadas (KWh consumido + Horas trabajadas por línea),
+     * con eje de categorías (líneas) y dos ejes de valor independientes (escalas muy distintas:
+     * KWh puede ser cientos, Horas es 0-24). El orden de las categorías es el que traiga la
+     * lista (el llamador ya la ordena de mayor a menor por KWh). No es una serie temporal:
+     * a diferencia de getInitScript2/getAddDataScript, esta arma el gráfico completo de una
+     * sola vez (no hay streaming de puntos), porque el dato de origen es un snapshot de hoy.
+     */
+    public static String getBarChartScript(String containerId, List<String> categorias,
+                                            List<Double> valoresKwh, List<Double> valoresHoras) {
+        StringBuilder datos = new StringBuilder("[");
+        for (int i = 0; i < categorias.size(); i++) {
+            if (i > 0) datos.append(",");
+            datos.append("{ categoria: ").append(jsString(categorias.get(i)))
+                    .append(", kwh: ").append(valoresKwh.get(i))
+                    .append(", horas: ").append(valoresHoras.get(i)).append(" }");
+        }
+        datos.append("]");
+
+        return
+                "if (!window.am5Charts) { window.am5Charts = {}; }" +
+                "var id = '" + containerId + "';" +
+                "if (window.am5Charts[id] && window.am5Charts[id].root) {" +
+                "  try { window.am5Charts[id].root.dispose(); } catch(e) {}" +
+                "}" +
+                "var root = am5.Root.new(id);" +
+                "root.setThemes([am5themes_Animated.new(root)]);" +
+                "var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: false, panY: false, wheelX: 'none', wheelY: 'none' }));" +
+                "var datos = " + datos + ";" +
+                "var xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, { categoryField: 'categoria', renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 20 }) }));" +
+                "xAxis.get('renderer').labels.template.setAll({ rotation: -45, centerY: am5.p50, centerX: am5.p100, fontSize: '11px' });" +
+                "xAxis.data.setAll(datos);" +
+                "var yAxisKwh = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, renderer: am5xy.AxisRendererY.new(root, {}) }));" +
+                "var yAxisHoras = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, renderer: am5xy.AxisRendererY.new(root, { opposite: true }) }));" +
+                "var serieKwh = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'KWh consumido hoy', xAxis: xAxis, yAxis: yAxisKwh, valueYField: 'kwh', categoryXField: 'categoria', clustered: true }));" +
+                "serieKwh.columns.template.setAll({ fill: am5.color(0x4472c4), stroke: am5.color(0x4472c4), tooltipText: '{name}, {categoryX}: {valueY.formatNumber(\\u0022#.##\\u0022)}' });" +
+                "serieKwh.data.setAll(datos);" +
+                "var serieHoras = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Horas trabajadas hoy', xAxis: xAxis, yAxis: yAxisHoras, valueYField: 'horas', categoryXField: 'categoria', clustered: true }));" +
+                "serieHoras.columns.template.setAll({ fill: am5.color(0x70ad47), stroke: am5.color(0x70ad47), tooltipText: '{name}, {categoryX}: {valueY.formatNumber(\\u0022#.##\\u0022)} h' });" +
+                "serieHoras.data.setAll(datos);" +
+                "var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50 }));" +
+                "legend.data.setAll(chart.series.values);" +
+                "chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'none', xAxis: xAxis }));" +
+                "window.am5Charts[id] = { root: root, chart: chart };" +
+                "chart.appear(1000, 100);";
+    }
+
+    /** Escapa un string para insertarlo como literal JS entre comillas simples. */
+    private static String jsString(String valor) {
+        String seguro = valor == null ? "" : valor.replace("\\", "\\\\").replace("'", "\\'");
+        return "'" + seguro + "'";
     }
 
     public Double getMinY() { return minY; }

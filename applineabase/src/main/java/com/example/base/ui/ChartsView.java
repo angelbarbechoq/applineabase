@@ -6,12 +6,14 @@ import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ClientCallable;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
@@ -21,7 +23,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,6 +51,17 @@ public class ChartsView extends VerticalLayout {
     private Div datosActualesCard;
     private Div ultimoClickCard;
 
+    // --- Temperatura (TemperaturaAgua + TemperaturaAmbiente combinadas) ---
+    private static final int POLL_INTERVAL_MS = 30000;
+    private boolean mostrarTemperatura;
+    private GraficaModel graficaTemperatura;
+    private Span temperaturaMensajeSpan;
+
+    // --- PF general (KWhPlanta1) ---
+    private boolean mostrarPFGeneral;
+    private GraficaModel graficaPFGeneral;
+    private Span pfGeneralMensajeSpan;
+
     public ChartsView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
                        PLCDataQueryService plcDataQueryService) {
         this.graficaModel = new GraficaModel(1);
@@ -57,8 +72,47 @@ public class ChartsView extends VerticalLayout {
         setPadding(true);
         setSpacing(true);
 
-        H3 title = new H3("Gráfica de KWh - Fecha Actual");
-        add(title);
+        add(new H3("Gráficas"));
+
+        // Temperatura/PF general viven solo en la zona Mantenimiento (y ADMIN, que ve todo):
+        // la misma regla de acceso por zona que ya aplica al resto de la app, no una nueva.
+        mostrarTemperatura = lineaAccessService.tieneAccesoAMaquina("TemperaturaAgua");
+        mostrarPFGeneral = lineaAccessService.tieneAccesoAMaquina("KWhPlanta1");
+
+        TabSheet tabSheet = new TabSheet();
+        tabSheet.setSizeFull();
+        tabSheet.add("KWh", crearPanelKwh());
+        if (mostrarTemperatura) {
+            tabSheet.add("Temperatura", crearPanelTemperatura());
+        }
+        if (mostrarPFGeneral) {
+            tabSheet.add("PF general", crearPanelPFGeneral());
+        }
+        add(tabSheet);
+        setFlexGrow(1, tabSheet);
+
+        addAttachListener(event -> {
+            if (mostrarTemperatura) {
+                cargarTemperaturaChart();
+            }
+            if (mostrarPFGeneral) {
+                cargarPFGeneralChart();
+            }
+            if (mostrarTemperatura || mostrarPFGeneral) {
+                UI ui = event.getUI();
+                ui.setPollInterval(POLL_INTERVAL_MS);
+                ui.addPollListener(pollEvent -> {
+                    if (mostrarTemperatura) cargarTemperaturaChart();
+                    if (mostrarPFGeneral) cargarPFGeneralChart();
+                });
+            }
+        });
+    }
+
+    private VerticalLayout crearPanelKwh() {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
+        panel.setPadding(false);
 
         lineas = lineaAccessService.getLineasPermitidas();
         List<String> maquinas = lineas.stream()
@@ -89,15 +143,6 @@ public class ChartsView extends VerticalLayout {
                 .set("margin-left", "16px")
                 .set("margin-right", "auto");
 
-
-//        this.addAttachListener(event -> {
-//            com.vaadin.flow.component.UI.getCurrent().getChildren()
-//                    .filter(c -> c instanceof com.vaadin.flow.component.applayout.AppLayout)
-//                    .findFirst()
-//                    .ifPresent(layout -> {
-//                        ((com.vaadin.flow.component.applayout.AppLayout) layout).addToNavbar(ultimoClickCard);
-//                    });
-//        });
         com.vaadin.flow.component.button.Button resetZoomBtn = new com.vaadin.flow.component.button.Button("Reset Zoom", e -> resetZoom());
         resetZoomBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
 
@@ -110,10 +155,10 @@ public class ChartsView extends VerticalLayout {
         selectorLayout.setAlignItems(Alignment.CENTER);
         selectorLayout.setSpacing(true);
         selectorLayout.getStyle().set("flex-wrap", "wrap");
-        add(selectorLayout);
+        panel.add(selectorLayout);
 
         mensajeSpan = new Span();
-        add(mensajeSpan);
+        panel.add(mensajeSpan);
 
         if (!maquinas.isEmpty()) {
             maquinaCombo.setValue(maquinas.getFirst());//get(0)
@@ -143,8 +188,8 @@ public class ChartsView extends VerticalLayout {
         chartContainer.setWidthFull();
         chartContainer.setHeight("500px");
 
-        add(chartContainer);
-        setFlexGrow(1, chartContainer);
+        panel.add(chartContainer);
+        panel.setFlexGrow(1, chartContainer);
         this.addDetachListener(event -> {
             this.getUI().ifPresent(ui -> {
                 ui.getChildren()
@@ -169,6 +214,115 @@ public class ChartsView extends VerticalLayout {
             long ahora = System.currentTimeMillis();
             actualizarTarjetaUltimoClick(ahora);
         });
+
+        return panel;
+    }
+
+    // ================= Temperatura (Agua + Ambiente) =================
+
+    private VerticalLayout crearPanelTemperatura() {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
+        panel.setPadding(false);
+
+        graficaTemperatura = new GraficaModel(2);
+        graficaTemperatura.setSeriesNames(new String[]{"Temperatura Agua", "Temperatura Ambiente"});
+        graficaTemperatura.setUnidad("°C");
+
+        temperaturaMensajeSpan = new Span();
+        panel.add(temperaturaMensajeSpan);
+
+        Div temperaturaChartContainer = new Div();
+        temperaturaChartContainer.setId("chartdiv_temperatura");
+        temperaturaChartContainer.setWidthFull();
+        temperaturaChartContainer.setHeight("500px");
+        panel.add(temperaturaChartContainer);
+        panel.setFlexGrow(1, temperaturaChartContainer);
+
+        return panel;
+    }
+
+    /**
+     * TemperaturaAgua y TemperaturaAmbiente se leen en el mismo ciclo de lectura (mismo PLC,
+     * mismo loop), por eso comparten timestamp exacto y se pueden alinear directamente con
+     * graficarSeriesCrudasAlineadas (misma función que usa la pestaña PF general, con N=2).
+     */
+    private void cargarTemperaturaChart() {
+        try {
+            List<Map<String, Object>> datosAgua = plcDataQueryService.getTodayKWhDataByMaquina("TemperaturaAgua");
+            List<Map<String, Object>> datosAmbiente = plcDataQueryService.getTodayKWhDataByMaquina("TemperaturaAmbiente");
+
+            if (datosAgua.isEmpty() && datosAmbiente.isEmpty()) {
+                temperaturaMensajeSpan.setText("No hay datos de temperatura para la fecha actual");
+                return;
+            }
+
+            GraficaModel.ResultadoGrafica resultado = graficaTemperatura.graficarSeriesCrudasAlineadas(
+                    "chartdiv_temperatura", List.of(datosAgua, datosAmbiente),
+                    new String[]{"Temperatura Agua", "Temperatura Ambiente"}, 30.0, true);
+            getElement().executeJs(resultado.script());
+            temperaturaMensajeSpan.setText("");
+        } catch (Exception e) {
+            temperaturaMensajeSpan.setText("Error: " + e.getMessage());
+        }
+    }
+
+    // ================= PF general (KWhPlanta1) =================
+
+    private VerticalLayout crearPanelPFGeneral() {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
+        panel.setPadding(false);
+
+        graficaPFGeneral = new GraficaModel(1);
+        graficaPFGeneral.setSeriesNames(new String[]{"PF general"});
+        graficaPFGeneral.setUnidad("");
+
+        pfGeneralMensajeSpan = new Span();
+        panel.add(pfGeneralMensajeSpan);
+
+        Div pfGeneralChartContainer = new Div();
+        pfGeneralChartContainer.setId("chartdiv_pfgeneral");
+        pfGeneralChartContainer.setWidthFull();
+        pfGeneralChartContainer.setHeight("500px");
+        panel.add(pfGeneralChartContainer);
+        panel.setFlexGrow(1, pfGeneralChartContainer);
+
+        return panel;
+    }
+
+    /**
+     * El medidor principal (KWhPlanta1) reporta el PF en negativo y en escala de porcentaje
+     * (ej. -85.5). Se toma en valor absoluto (misma conversión que ya usa HistoricoView, via
+     * GraficaModel.toFloatAbs) y ademas se divide entre 100 para verlo en escala 0-1: a
+     * diferencia de Historico (que deja la escala 0-100 a proposito), esta pestana especifica
+     * la quiere en fraccion.
+     */
+    private void cargarPFGeneralChart() {
+        try {
+            List<Map<String, Object>> datosVip = plcDataQueryService.getTodayDataByMaquina("KWhPlanta1");
+            if (datosVip.isEmpty()) {
+                pfGeneralMensajeSpan.setText("No hay datos de PF para la fecha actual");
+                return;
+            }
+
+            List<Map<String, Object>> datosPf = new ArrayList<>();
+            for (Map<String, Object> fila : datosVip) {
+                Float pf = GraficaModel.toFloatAbs(fila.get("PF"));
+                if (pf == null) continue;
+                Map<String, Object> punto = new HashMap<>();
+                punto.put("fecha", fila.get("fecha"));
+                punto.put("kwh", pf / 100.0);
+                datosPf.add(punto);
+            }
+
+            GraficaModel.ResultadoGrafica resultado = graficaPFGeneral.graficarSeriesCrudasAlineadas(
+                    "chartdiv_pfgeneral", List.of(datosPf), new String[]{"PF general"}, 1.0, true);
+            getElement().executeJs(resultado.script());
+            pfGeneralMensajeSpan.setText("");
+        } catch (Exception e) {
+            pfGeneralMensajeSpan.setText("Error: " + e.getMessage());
+        }
     }
 
     private void cargarDatos(String maquina) {

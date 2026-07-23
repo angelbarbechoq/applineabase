@@ -4,8 +4,10 @@ import com.example.alarmas.model.AlarmaConfig;
 import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.ui.AlarmasConfigView;
+import com.example.base.model.GraficaModel;
 import com.example.base.ui.ChartsView;
 import com.example.base.ui.MainLayout;
+import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.horometro.service.HorometroBackfillRunner;
 import com.example.horometro.service.HorometroService;
 import com.example.security.LineaAccessService;
@@ -15,6 +17,7 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Anchor;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
@@ -22,6 +25,7 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
@@ -41,7 +45,9 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Dashboard con todas las máquinas a la vez: estado ON/OFF, PW en vivo junto al umbral
@@ -66,15 +72,31 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private final HorometroBackfillRunner horometroBackfillRunner;
     private final LineaAccessService lineaAccessService;
     private final AlarmaConfigRepository alarmaConfigRepository;
+    private final PLCDataQueryService plcDataQueryService;
 
     private final Grid<HorometroRow> grid = new Grid<>(HorometroRow.class, false);
 
+    // Grupos para el grafico de barras (KWh + horas trabajadas), debajo de la tabla de arriba.
+    // Extrusion/Mezcla salen del campo zona; Casa Fuerza es un grupo curado (campo "grupo" en
+    // linea-id-config.json, editable desde la pantalla de Configuracion) porque no todas las
+    // maquinas de la zona Mantenimiento son parte de el (sensores, medidores generales, etc).
+    private static final String GRUPO_CASA_FUERZA = "Casa Fuerza";
+    private static final String ID_CHART_EXTRUSION = "chartdiv_horo_extrusion";
+    private static final String ID_CHART_MEZCLA = "chartdiv_horo_mezcla";
+    private static final String ID_CHART_CASA_FUERZA = "chartdiv_horo_casafuerza";
+
+    private List<String> maquinasExtrusion;
+    private List<String> maquinasMezcla;
+    private List<String> maquinasCasaFuerza;
+
     public HorometroView(HorometroService horometroService, HorometroBackfillRunner horometroBackfillRunner,
-                          LineaAccessService lineaAccessService, AlarmaConfigRepository alarmaConfigRepository) {
+                          LineaAccessService lineaAccessService, AlarmaConfigRepository alarmaConfigRepository,
+                          PLCDataQueryService plcDataQueryService) {
         this.horometroService = horometroService;
         this.horometroBackfillRunner = horometroBackfillRunner;
         this.lineaAccessService = lineaAccessService;
         this.alarmaConfigRepository = alarmaConfigRepository;
+        this.plcDataQueryService = plcDataQueryService;
 
         setSizeFull();
         setPadding(true);
@@ -98,18 +120,104 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         if (lineaAccessService.esAdmin()) {
             grid.addComponentColumn(this::botonRecalcular).setHeader("Recalcular").setAutoWidth(true);
         }
-        grid.setSizeFull();
+        grid.setWidthFull();
+        grid.setHeight("400px");
 
         add(grid);
-        setFlexGrow(1, grid);
+
+        maquinasExtrusion = maquinasPorZona("Extrusión");
+        maquinasMezcla = maquinasPorZona("Mezcla");
+        maquinasCasaFuerza = maquinasPorGrupo(GRUPO_CASA_FUERZA);
+
+        if (!maquinasExtrusion.isEmpty() || !maquinasMezcla.isEmpty() || !maquinasCasaFuerza.isEmpty()) {
+            TabSheet tabSheetGrupos = new TabSheet();
+            tabSheetGrupos.setSizeFull();
+            if (!maquinasExtrusion.isEmpty()) {
+                tabSheetGrupos.add("Extrusión", crearPanelGrupo(ID_CHART_EXTRUSION));
+            }
+            if (!maquinasMezcla.isEmpty()) {
+                tabSheetGrupos.add("Mezcla", crearPanelGrupo(ID_CHART_MEZCLA));
+            }
+            if (!maquinasCasaFuerza.isEmpty()) {
+                tabSheetGrupos.add(GRUPO_CASA_FUERZA, crearPanelGrupo(ID_CHART_CASA_FUERZA));
+            }
+            add(new H3("KWh consumido y horas trabajadas por grupo"));
+            add(tabSheetGrupos);
+            setFlexGrow(1, tabSheetGrupos);
+        }
 
         refrescarGrid();
+        refrescarGraficosGrupos();
 
         addAttachListener(e -> {
             UI ui = e.getUI();
             ui.setPollInterval(POLL_INTERVAL_MS);
-            ui.addPollListener(pollEvent -> refrescarGrid());
+            ui.addPollListener(pollEvent -> {
+                refrescarGrid();
+                refrescarGraficosGrupos();
+            });
         });
+    }
+
+    private List<String> maquinasPorZona(String zona) {
+        return lineaAccessService.getLineasPermitidas().stream()
+                .filter(l -> zona.equalsIgnoreCase(String.valueOf(l.get("zona"))))
+                .map(l -> (String) l.get("lineaMaquina"))
+                .distinct().sorted().collect(Collectors.toList());
+    }
+
+    private List<String> maquinasPorGrupo(String grupo) {
+        return lineaAccessService.getLineasPermitidas().stream()
+                .filter(l -> grupo.equalsIgnoreCase(String.valueOf(l.get("grupo"))))
+                .map(l -> (String) l.get("lineaMaquina"))
+                .distinct().sorted().collect(Collectors.toList());
+    }
+
+    private VerticalLayout crearPanelGrupo(String containerId) {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
+        panel.setPadding(false);
+
+        Div chartDiv = new Div();
+        chartDiv.setId(containerId);
+        chartDiv.setWidthFull();
+        chartDiv.setHeight("100%");
+        panel.add(chartDiv);
+        panel.setFlexGrow(1, chartDiv);
+
+        return panel;
+    }
+
+    private void refrescarGraficosGrupos() {
+        if (!maquinasExtrusion.isEmpty()) refrescarGraficoGrupo(ID_CHART_EXTRUSION, maquinasExtrusion);
+        if (!maquinasMezcla.isEmpty()) refrescarGraficoGrupo(ID_CHART_MEZCLA, maquinasMezcla);
+        if (!maquinasCasaFuerza.isEmpty()) refrescarGraficoGrupo(ID_CHART_CASA_FUERZA, maquinasCasaFuerza);
+    }
+
+    /**
+     * KWh consumido hoy (suma de diferencias entre lecturas consecutivas, misma logica que
+     * usan ChartsView/Historico via GraficaModel.calcularSerieKWh) y horas trabajadas hoy
+     * (HorometroService.obtenerSnapshot, la misma fuente que ya muestra la tabla de arriba),
+     * ordenado de mayor a menor por KWh.
+     */
+    private void refrescarGraficoGrupo(String containerId, List<String> maquinas) {
+        record FilaGrupo(String maquina, double kwh, double horas) {
+        }
+        List<FilaGrupo> filas = new ArrayList<>();
+        for (String maquina : maquinas) {
+            List<Map<String, Object>> datos = plcDataQueryService.getTodayKWhDataByMaquina(maquina);
+            GraficaModel.SerieKWh serie = GraficaModel.calcularSerieKWh(datos, true);
+            double kwhHoy = serie.valores().stream().mapToDouble(Float::doubleValue).sum();
+            double horasHoy = horometroService.obtenerSnapshot(maquina).horasHoy();
+            filas.add(new FilaGrupo(maquina, kwhHoy, horasHoy));
+        }
+        filas.sort((a, b) -> Double.compare(b.kwh(), a.kwh()));
+
+        List<String> categorias = filas.stream().map(FilaGrupo::maquina).collect(Collectors.toList());
+        List<Double> kwhs = filas.stream().map(FilaGrupo::kwh).collect(Collectors.toList());
+        List<Double> horas = filas.stream().map(FilaGrupo::horas).collect(Collectors.toList());
+
+        getElement().executeJs(GraficaModel.getBarChartScript(containerId, categorias, kwhs, horas));
     }
 
     @Override
