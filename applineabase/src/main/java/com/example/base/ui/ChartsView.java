@@ -22,9 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +47,6 @@ public class ChartsView extends VerticalLayout {
     private List<Map<String, Object>> lineas;
     private Div maquinaInfoCard;
     private Div datosActualesCard;
-    private Div ultimoClickCard;
 
     // --- Temperatura (TemperaturaAgua + TemperaturaAmbiente combinadas) ---
     private boolean mostrarTemperatura;
@@ -142,15 +139,6 @@ public class ChartsView extends VerticalLayout {
             .set("padding", "0px")
             .set("margin-bottom", "0px")
             .set("flex-wrap", "wrap");
-        //para ver los datos al hacer click.
-        ultimoClickCard = new Div();
-        ultimoClickCard.setVisible(true);
-        ultimoClickCard.getStyle()
-                .set("padding", "0px")
-                .set("margin-bottom", "0px")
-                .set("margin-left", "16px")
-                .set("margin-right", "auto");
-
         com.vaadin.flow.component.button.Button resetZoomBtn = new com.vaadin.flow.component.button.Button("Reset Zoom", e -> resetZoom());
         resetZoomBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
 
@@ -197,29 +185,11 @@ public class ChartsView extends VerticalLayout {
 
         panel.add(chartContainer);
         panel.setFlexGrow(1, chartContainer);
-        this.addDetachListener(event -> {
-            this.getUI().ifPresent(ui -> {
-                ui.getChildren()
-                        .filter(c -> c instanceof MainLayout)
-                        .findFirst()
-                        .ifPresent(layout -> {
-                            ((MainLayout) layout).getUltimoClickCard().setVisible(false);
-                        });
-            });
-        });
+        this.addDetachListener(event ->
+                this.getUI().ifPresent(ui -> TarjetasEstadoActual.mostrarUltimoClickCard(ui, false)));
         this.addAttachListener(event -> {
-            // Hacer visible la tarjeta
-            this.getUI().ifPresent(ui -> {
-                ui.getChildren()
-                        .filter(c -> c instanceof MainLayout)
-                        .findFirst()
-                        .ifPresent(layout -> {
-                            ((MainLayout) layout).getUltimoClickCard().setVisible(true);
-                        });
-            });
-
-            long ahora = System.currentTimeMillis();
-            actualizarTarjetaUltimoClick(ahora);
+            this.getUI().ifPresent(ui -> TarjetasEstadoActual.mostrarUltimoClickCard(ui, true));
+            actualizarTarjetaUltimoClick(System.currentTimeMillis());
         });
 
         return panel;
@@ -361,6 +331,19 @@ public class ChartsView extends VerticalLayout {
     }
 
     /**
+     * JS que parsea una fecha "dd-MM-yyyy HH:mm:ss" (el formato que usa todo el proyecto) al
+     * timestamp epoch que espera amCharts5, declarando `var timestamp = ...;`. expresionFecha es
+     * la expresión JS que resuelve a ese string (p.ej. "data.fecha"). Antes este parseo estaba
+     * escrito dos veces con sintaxis distinta en construirScriptSSESerie y en iniciarSSE.
+     */
+    private static String scriptParsearFechaATimestamp(String expresionFecha) {
+        return
+            "      var dateStr = " + expresionFecha + ".split(' ')[0]; var timeStr = " + expresionFecha + ".split(' ')[1];" +
+            "      var partesFecha = dateStr.split('-'); var partesHora = timeStr.split(':');" +
+            "      var timestamp = new Date(parseInt(partesFecha[2]), parseInt(partesFecha[1]) - 1, parseInt(partesFecha[0]), parseInt(partesHora[0]), parseInt(partesHora[1]), parseInt(partesHora[2])).getTime();";
+    }
+
+    /**
      * Wire-up genérico de un stream SSE que empuja un punto nuevo a UNA serie de un gráfico ya
      * inicializado (sin recargar nada), reutilizado por Temperatura (2 sensores, una serie cada
      * uno) y PF general (1 serie). expresionValorJs se evalúa contra la variable `data` ya
@@ -376,9 +359,7 @@ public class ChartsView extends VerticalLayout {
             "    var data = JSON.parse(event.data);" +
             "    if(window.am5Charts && window.am5Charts['" + containerId + "'] && window.am5Charts['" + containerId + "'].seriesList && window.am5Charts['" + containerId + "'].seriesList[" + indiceSerie + "]) {" +
             "      var inst = window.am5Charts['" + containerId + "'];" +
-            "      var dateStr = data.fecha.split(' ')[0]; var timeStr = data.fecha.split(' ')[1];" +
-            "      var partesFecha = dateStr.split('-'); var partesHora = timeStr.split(':');" +
-            "      var timestamp = new Date(parseInt(partesFecha[2]), parseInt(partesFecha[1]) - 1, parseInt(partesFecha[0]), parseInt(partesHora[0]), parseInt(partesHora[1]), parseInt(partesHora[2])).getTime();" +
+            scriptParsearFechaATimestamp("data.fecha") +
             "      var valor = " + expresionValorJs + ";" +
             "      if (valor !== null && valor !== undefined && isFinite(valor)) {" +
             "        inst.seriesList[" + indiceSerie + "].data.push({ date: timestamp, value: valor });" +
@@ -499,9 +480,7 @@ public class ChartsView extends VerticalLayout {
             "    console.log('📊 Datos parseados:', data);" +
             "    if(window.am5Charts && window.am5Charts['chartdiv_industrial'] && window.am5Charts['chartdiv_industrial'].seriesList && window.am5Charts['chartdiv_industrial'].seriesList[0]) {" +
             "      var inst = window.am5Charts['chartdiv_industrial'];" +
-            "      var dateStr = data.fecha.split(' ')[0]; var timeStr = data.fecha.split(' ')[1];" +
-            "      var [day, month, year] = dateStr.split('-'); var [hour, min, sec] = timeStr.split(':');" +
-            "      var timestamp = new Date(parseInt(year), parseInt(month)-1, parseInt(day), parseInt(hour), parseInt(min), parseInt(sec)).getTime();" +
+            scriptParsearFechaATimestamp("data.fecha") +
             "      inst.seriesList[0].data.push({ date: timestamp, value: Math.abs(data.diferencia) });" +
             "      inst.seriesList[0].markDirtyValues();" +
             "      inst.aplicarZoomCalculado();" +
@@ -518,10 +497,8 @@ public class ChartsView extends VerticalLayout {
             "  try {" +
             "    var data = JSON.parse(event.data);" +
             "    console.log('📈 Datos actualizados:', data);" +
-            "    var tarjetasDiv = document.querySelector('[id^=\"datosActualesCard\"]') || document.querySelector('div[style*=\"display: flex\"][style*=\"gap: 14px\"]');" +
-            "    if(tarjetasDiv) {" +
-            "      var valores = tarjetasDiv.querySelectorAll('.dato-valor');" +
-            "      if(valores.length > 0) {" +
+            "    var valores = document.querySelectorAll('.dato-valor');" +
+            "    if(valores.length > 0) {" +
             "        valores[0].textContent = (data.KWh || 0).toFixed(2);" +
             "        valores[1].textContent = (data.VAB || 0).toFixed(2);" +
             "        valores[2].textContent = (data.VAC || 0).toFixed(2);" +
@@ -532,7 +509,6 @@ public class ChartsView extends VerticalLayout {
             "        valores[7].textContent = (data.PW || 0).toFixed(2);" +
             "        valores[8].textContent = (data.PF || 0).toFixed(2);" +
             "        console.log('✅ Tarjetas actualizadas en tiempo real');" +
-            "      }" +
             "    }" +
             "  } catch(e) {" +
             "    console.error('❌ Error procesando evento de datos:', e);" +
@@ -554,79 +530,31 @@ public class ChartsView extends VerticalLayout {
     @ClientCallable
     public void limpiarTarjetas() {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
-            MainLayout layout = (MainLayout) this.getParent().get();
-            layout.getUltimoClickCard().getElement().setProperty("innerHTML",
-                    GraficaModel.construirHtmlUltimoClick("00-00-00", "00:00:00", "0.0"));
+            TarjetasEstadoActual.limpiarUltimoClick((MainLayout) this.getParent().get());
         }
     }
 
     @ClientCallable
     public void registrarClickEnGrafica(long timestamp) {
-        graficaModel.registrarClick(timestamp);
-        // Actualizar tarjeta con el nuevo click
         actualizarTarjetaUltimoClick(timestamp);
     }
 
     private void actualizarTarjetaUltimoClick(long timestamp) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
-        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
-        Date fecha = new Date(timestamp);
-
-        String fechaStr = dateFormat.format(fecha);
-        String horaStr = timeFormat.format(fecha);
-
-        // Obtener KWh directamente del servicio
-        String valorStr = "";
-        try {
-            if (lineaAccessService.tieneAccesoAMaquina(maquinaSeleccionada)) {
-                Map<String, Object> data = plcDataQueryService.getKWhByFechaExacta(maquinaSeleccionada, fechaStr + " " + horaStr);
-                if (data.containsKey("kwh")) {
-                    valorStr = String.format("%.2f", data.get("kwh"));
-                }
-            }
-        } catch (Exception e) {
-            valorStr = "Error";
-        }
-
-        final String html = GraficaModel.construirHtmlUltimoClick(fechaStr, horaStr, valorStr);
-
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             MainLayout layout = (MainLayout) this.getParent().get();
-            layout.getUltimoClickCard().getElement().setProperty("innerHTML", html);
-        }
-    }
-
-    private void cargarDatosActuales(String maquina) {
-        try {
-            if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
-                datosActualesCard.setVisible(false);
-                return;
-            }
-
-            Map<String, Object> datosVIP = plcDataQueryService.getLatestVIPDataByMaquina(maquina);
-            Map<String, Object> datosKWh = plcDataQueryService.getLatestKWhDataByMaquina(maquina);
-
-            if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
-                mostrarTarjetaDatos(datosVIP, datosKWh);
-            } else {
-                datosActualesCard.setVisible(false);
-            }
-        } catch (Exception e) {
-            datosActualesCard.setVisible(false);
+            TarjetasEstadoActual.actualizarUltimoClick(lineaAccessService, plcDataQueryService,
+                    graficaModel, maquinaSeleccionada, layout, timestamp);
         }
     }
 
     /**
-     * Texto plano (etiqueta chica en gris + valor semibold) — antes eran 9 tarjetas con fondo
-     * degradado, que ocupaban mucho espacio junto al título. dataUpdate (ver iniciarSSE)
-     * actualiza estos valores en vivo vía la clase "dato-valor" en el mismo orden que arma
-     * GraficaModel.construirHtmlValoresActuales, así que ese orden no se puede reordenar sin
-     * ajustar también iniciarSSE. HistoricoView usa el mismo helper (mismo texto, misma posición).
+     * Franja de valores en vivo (KWh/VAB/VAC/etc.) junto al título — HistoricoView usa el mismo
+     * helper (mismo texto, misma posición). dataUpdate (ver iniciarSSE) actualiza estos valores
+     * en vivo vía la clase "dato-valor" en el orden que arma
+     * GraficaModel.construirHtmlValoresActuales.
      */
-    private void mostrarTarjetaDatos(Map<String, Object> datosVIP, Map<String, Object> datosKWh) {
-        datosActualesCard.getElement().setProperty("innerHTML",
-                GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh));
-        datosActualesCard.setVisible(true);
+    private void cargarDatosActuales(String maquina) {
+        TarjetasEstadoActual.cargarDatosActuales(lineaAccessService, plcDataQueryService, maquina, datosActualesCard);
     }
 
     private void mostrarInfoMaquina(String maquina) {

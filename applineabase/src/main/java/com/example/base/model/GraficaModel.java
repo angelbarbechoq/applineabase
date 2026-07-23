@@ -48,6 +48,21 @@ public class GraficaModel {
     public GraficaModel(int nGraficas) {
         this.nGraficas = nGraficas;
     }
+    /**
+     * Descarta el root am5 anterior de este contenedor (si había uno) y crea uno nuevo con el
+     * tema animado — el primer paso de todo gráfico amCharts5 de este proyecto. Antes estaba
+     * copiado igual en getInitScript2 y getBarChartScript; ahora lo arma un solo lugar.
+     */
+    private static String scriptInicializarRoot(String containerId) {
+        return "if (!window.am5Charts) { window.am5Charts = {}; }" +
+                "var id = '" + containerId + "';" +
+                "if (window.am5Charts[id] && window.am5Charts[id].root) {" +
+                "  try { window.am5Charts[id].root.dispose(); } catch(e) {}" +
+                "}" +
+                "var root = am5.Root.new(id);" +
+                "root.setThemes([am5themes_Animated.new(root)]);";
+    }
+
     public String getInitScript2(String containerId) {
         String[] hexColores = coloresPersonalizados != null
                 ? coloresPersonalizados : new String[]{"0xc83830", "0x4472c4", "0x70ad47"};
@@ -66,16 +81,8 @@ public class GraficaModel {
         seriesNamesJs.append("];");
 
         return
-                // PASO 0: Validar/Inicializar contenedor global
-                "if (!window.am5Charts) { window.am5Charts = {}; }" +
-                        "var id = '" + containerId + "';" +
-                        "if (window.am5Charts[id] && window.am5Charts[id].root) {" +
-                        "  try { window.am5Charts[id].root.dispose(); } catch(e) {}" +
-                        "}" +
-
-                        // PASO 1: Root y temas
-                        "var root = am5.Root.new(id);" +
-                        "root.setThemes([am5themes_Animated.new(root)]);" +
+                // PASO 0-1: Contenedor global + Root y temas
+                scriptInicializarRoot(containerId) +
 
                         // PASO 2: Chart SIN cursor inicial
                         // maxTooltipDistance NO va en 0: en amCharts5 eso fuerza a mostrar solo
@@ -93,11 +100,9 @@ public class GraficaModel {
                         "var xTooltip = xAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
                         "xTooltip.label.setAll({ fontSize: '11px', textAlign: 'center' });" +
                         "xAxis.set('tooltipDateFormat', 'dd-MM-yyyy\\nHH:mm:ss');" +
-                        "console.log('✓ Eje X creado con tooltip');" +
 
                         "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));" +
                         "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
-                        "console.log('✓ Eje Y creado con tooltip. Zoom inicial: " + minY + " - " + maxY + "');" +
                         // PASO 5: Crear CURSOR con ejes (pero sin snapToSeries aún)
                         "var cursor = chart.set('cursor', am5xy.XYCursor.new(root, { yAxis: yAxis, xAxis: xAxis, behavior: 'zoomXY' }));" +
                         "cursor.lineX.setAll({ visible: true });" +
@@ -109,9 +114,7 @@ public class GraficaModel {
                         unidadJs +
                         // PASO 7: CREAR SERIES con tooltips individuales
                         "var seriesList = [];" +
-                        "console.log('🔍 Iniciando loop. nGraficas: " + nGraficas + "');" +
                         "for(var i=0; i < " + nGraficas + "; i++) {" +
-                        "  console.log('  📍 Iteración ' + i + ' de " + nGraficas + "');" +
                         "  var series = chart.series.push(am5xy.LineSeries.new(root, { name: seriesNames[i], xAxis: xAxis, yAxis: yAxis, valueYField: 'value', valueXField: 'date', strokeWidth: 2, snapToTooltip: true }));" +
                         // series.set('stroke', ...) es el que manda (color propio de la serie) —
                         // sin esto, amCharts5 puede pisar lo que se puso en strokes.template con su
@@ -123,14 +126,9 @@ public class GraficaModel {
                         (coloresPersonalizados != null ? "  series.set('stroke', colors[i % colors.length]);" : "") +
                         "  series.strokes.template.setAll({ stroke: colors[i % colors.length] });" +
                         "  var tooltip = series.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
-                        //"  tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}\\n{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
-                        //"  tooltip.set(\"getFillFromSprite\", false); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}' });" +
-                        //"  tooltip.setAll({ autoTextColor: false, getFillFromSprite: false }); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ fill: am5.color(0x999999), text: '[bold]' + seriesNames[i] + ':[/] {valueY.formatNumber(\\u0022#.##\\u0022)}' });" +
                         "  tooltip.setAll({ autoTextColor: false, getFillFromSprite: false }); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ fill: am5.color(0x999999), text: '{name}: {valueY.formatNumber(\\u0022#.##\\u0022)} ' + unidad });" +
                         "  seriesList.push(series);" +
-                        "  console.log('    ✅ Serie ' + i + ' agregada. Total: ' + seriesList.length);" +
                         "}" +
-                        "console.log('✅ Loop finalizado. Total de series: ' + seriesList.length);" +
 
                         // Leyenda opcional (ver setMostrarLeyenda): solo la piden gráficos con
                         // 2+ series que necesitan distinguir identidad por color (p.ej.
@@ -141,21 +139,13 @@ public class GraficaModel {
                         "legend.data.setAll(chart.series.values);" : "") +
 
                         // PASO 8: ASIGNAR snapToSeries al cursor DESPUÉS de tener series
-                        "console.log('🔴 ANTES, snapToSeries:', cursor.get('snapToSeries'));" +
                         "cursor.setAll({ snapToSeries: seriesList, snapToSeriesBy: 'x' });" +
-                        "console.log('🟢 DESPUÉS, snapToSeries.length:', cursor.get('snapToSeries').length);" +
                         // Con 2+ series, amCharts5 por defecto solo muestra el tooltip de la serie
                         // más cercana al cursor, no el de todas — se fuerza a mostrar el de cada
                         // una en cada movimiento para poder comparar los valores a simple vista.
                         "cursor.events.on('cursormoved', function() {" +
                         "  seriesList.forEach(function(s) { s.showTooltip(); });" +
                         "});" +
-
-
-                        // PASO 9: AGREGAR tooltip separado del cursor (para mostrar fecha/hora al pasar el ratón)
-//                        "var cursorTooltip = cursor.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
-//                        "cursorTooltip.label.setAll({ text: '{valueX.formatDate(\\u0022dd-MM-yyyy HH:mm:ss\\u0022)}' });" +
-//                        "console.log('✓ Cursor tooltip configurado');" +
 
                         // PASO 10: Almacenar referencias globales.
                         // aplicarZoomCalculado es la ÚNICA función que aplica el zoom piso+percentil
@@ -171,7 +161,6 @@ public class GraficaModel {
                         // la escala) dejaba una ventana angosta aplicada sobre la nueva escala, y
                         // el resultado se veía diminuto en vez de mostrar cero-a-techo completo.
                         "window.am5Charts[id] = { root: root, chart: chart, xAxis: xAxis, yAxis: yAxis, seriesList: seriesList, cursor: cursor, tiemposMarcadores: [], posY: 0, lastClickTime: 0, containerId: '" + containerId + "', marcadores: [], aplicarZoomCalculado: function() { yAxis.set('min', " + minY + "); yAxis.set('max', " + maxY + "); yAxis.zoom(0, 1); } };" +
-                        "console.log('✓ am5Charts inicializado');" +
 
                         // PASO 10b: en cuanto el usuario interactúa manualmente con el eje Y
                         // (rueda del ratón o arrastre de zoom), se libera el piso/techo fijado
@@ -321,12 +310,7 @@ public class GraficaModel {
         setMinY(0.0);
         aplicarRangosPredefinidos(maquina);
         // El preset actúa como piso; si los datos reales lo superan, se amplía el eje.
-        // Se usa el percentil 95 en vez del máximo crudo como margen adicional de seguridad.
-        double p95 = percentil(valoresLimpios, 0.95);
-        double maxConMargen = p95 * 1.1;
-        if (maxConMargen > getMaxY()) {
-            setMaxY(maxConMargen);
-        }
+        setMaxY(calcularMaxYConMargen(valoresLimpios, getMaxY()));
 
         StringBuilder script = new StringBuilder();
         script.append(getInitScript2(containerId));
@@ -378,8 +362,7 @@ public class GraficaModel {
         }
 
         setMinY(0.0);
-        double p95 = percentil(valoresParaEscala, 0.95);
-        setMaxY(Math.max(maxYDefault, p95 * 1.1));
+        setMaxY(calcularMaxYConMargen(valoresParaEscala, maxYDefault));
 
         StringBuilder script = new StringBuilder();
         script.append(getInitScript2(containerId));
@@ -589,6 +572,17 @@ public class GraficaModel {
     }
 
     /**
+     * Techo del eje Y con margen: percentil 95 de los datos reales (con 10% de margen extra),
+     * nunca por debajo del piso dado. Única función para este cálculo — la usan
+     * graficarSerieKWh, graficarSeriesCrudasAlineadas e HistoricoView, para que las tres
+     * amplíen el eje de la misma forma en vez de repetir la fórmula cada una a su manera.
+     */
+    public static double calcularMaxYConMargen(List<Float> valores, double piso) {
+        double p95 = percentil(valores, 0.95);
+        return Math.max(piso, p95 * 1.1);
+    }
+
+    /**
      * Convierte a Float, o null si el dato falta, no se puede convertir, o no es un número
      * finito (NaN/Infinito, típico de una división por cero en el cálculo del PF): un dato
      * faltante o inválido no se grafica (no se muestra como si fuera un 0 real, y amCharts
@@ -683,13 +677,7 @@ public class GraficaModel {
         datos.append("]");
 
         return
-                "if (!window.am5Charts) { window.am5Charts = {}; }" +
-                "var id = '" + containerId + "';" +
-                "if (window.am5Charts[id] && window.am5Charts[id].root) {" +
-                "  try { window.am5Charts[id].root.dispose(); } catch(e) {}" +
-                "}" +
-                "var root = am5.Root.new(id);" +
-                "root.setThemes([am5themes_Animated.new(root)]);" +
+                scriptInicializarRoot(containerId) +
                 "var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: false, panY: false, wheelX: 'none', wheelY: 'none', paddingTop: 24 }));" +
                 "var datos = " + datos + ";" +
                 "var xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, { categoryField: 'categoria', renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 20 }) }));" +

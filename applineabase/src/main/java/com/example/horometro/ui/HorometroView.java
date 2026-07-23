@@ -45,6 +45,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -124,9 +125,10 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         }
         grid.setSizeFull();
 
-        maquinasExtrusion = maquinasPorZona("Extrusión");
-        maquinasMezcla = maquinasPorZona("Mezcla");
-        maquinasCasaFuerza = maquinasPorGrupo(GRUPO_CASA_FUERZA);
+        List<Map<String, Object>> lineasPermitidas = lineaAccessService.getLineasPermitidas();
+        maquinasExtrusion = maquinasPorCampo(lineasPermitidas, "zona", "Extrusión");
+        maquinasMezcla = maquinasPorCampo(lineasPermitidas, "zona", "Mezcla");
+        maquinasCasaFuerza = maquinasPorCampo(lineasPermitidas, "grupo", GRUPO_CASA_FUERZA);
 
         TabSheet tabSheetPrincipal = new TabSheet();
         tabSheetPrincipal.setSizeFull();
@@ -177,16 +179,14 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         refrescoGrupoActual.run();
     }
 
-    private List<String> maquinasPorZona(String zona) {
-        return lineaAccessService.getLineasPermitidas().stream()
-                .filter(l -> zona.equalsIgnoreCase(String.valueOf(l.get("zona"))))
-                .map(l -> (String) l.get("lineaMaquina"))
-                .distinct().sorted().collect(Collectors.toList());
-    }
-
-    private List<String> maquinasPorGrupo(String grupo) {
-        return lineaAccessService.getLineasPermitidas().stream()
-                .filter(l -> grupo.equalsIgnoreCase(String.valueOf(l.get("grupo"))))
+    /**
+     * Filtra las líneas permitidas por un campo arbitrario (zona o grupo) — antes había un
+     * método casi idéntico por cada campo. Recibe la lista ya cargada (en vez de volver a
+     * pedirla) porque el constructor la necesita para los tres filtros de este método.
+     */
+    private List<String> maquinasPorCampo(List<Map<String, Object>> lineas, String campo, String valor) {
+        return lineas.stream()
+                .filter(l -> valor.equalsIgnoreCase(String.valueOf(l.get(campo))))
                 .map(l -> (String) l.get("lineaMaquina"))
                 .distinct().sorted().collect(Collectors.toList());
     }
