@@ -7,7 +7,6 @@ import com.example.alarmas.ui.AlarmasConfigView;
 import com.example.base.model.GraficaModel;
 import com.example.base.ui.ChartsView;
 import com.example.base.ui.MainLayout;
-import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.horometro.service.HorometroBackfillRunner;
 import com.example.horometro.service.HorometroService;
 import com.example.security.LineaAccessService;
@@ -46,7 +45,6 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -73,11 +71,10 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private final HorometroBackfillRunner horometroBackfillRunner;
     private final LineaAccessService lineaAccessService;
     private final AlarmaConfigRepository alarmaConfigRepository;
-    private final PLCDataQueryService plcDataQueryService;
 
     private final Grid<HorometroRow> grid = new Grid<>(HorometroRow.class, false);
 
-    // Grupos para el grafico de barras (KWh + horas trabajadas), debajo de la tabla de arriba.
+    // Grupos para el grafico de barras (horas trabajadas en el mes), debajo de la tabla de arriba.
     // Extrusion/Mezcla salen del campo zona; Casa Fuerza es un grupo curado (campo "grupo" en
     // linea-id-config.json, editable desde la pantalla de Configuracion) porque no todas las
     // maquinas de la zona Mantenimiento son parte de el (sensores, medidores generales, etc).
@@ -99,13 +96,11 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private Runnable refrescoGrupoActual = () -> { };
 
     public HorometroView(HorometroService horometroService, HorometroBackfillRunner horometroBackfillRunner,
-                          LineaAccessService lineaAccessService, AlarmaConfigRepository alarmaConfigRepository,
-                          PLCDataQueryService plcDataQueryService) {
+                          LineaAccessService lineaAccessService, AlarmaConfigRepository alarmaConfigRepository) {
         this.horometroService = horometroService;
         this.horometroBackfillRunner = horometroBackfillRunner;
         this.lineaAccessService = lineaAccessService;
         this.alarmaConfigRepository = alarmaConfigRepository;
-        this.plcDataQueryService = plcDataQueryService;
 
         setSizeFull();
         setPadding(true);
@@ -113,12 +108,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
 
         add(new H3("Horómetro de Máquinas"));
         if (lineaAccessService.esAdmin()) {
-            HorizontalLayout accionesRapidas = new HorizontalLayout(
-                    new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class),
-                    crearBotonRecalcularTodos());
-            accionesRapidas.setAlignItems(Alignment.CENTER);
-            add(accionesRapidas);
-            add(crearExportadorCsv());
+            agregarAccionesAdmin();
         }
 
         grid.addColumn(HorometroRow::maquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
@@ -217,30 +207,24 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     }
 
     /**
-     * KWh consumido hoy (suma de diferencias entre lecturas consecutivas, misma logica que
-     * usan ChartsView/Historico via GraficaModel.calcularSerieKWh) y horas trabajadas en el mes
-     * (HorometroService.obtenerSnapshot, la misma fuente que ya muestra la tabla de arriba),
-     * ordenado de mayor a menor por KWh. Se llama solo para el grupo de la pestaña actualmente
-     * seleccionada (ver onTabSeleccionadaCambio), nunca para los tres a la vez.
+     * Horas trabajadas en el mes (HorometroService.obtenerSnapshot, la misma fuente que ya
+     * muestra la tabla de arriba), ordenado de mayor a menor. Se llama solo para el grupo de la
+     * pestaña actualmente seleccionada (ver onTabSeleccionadaCambio), nunca para los tres a la vez.
      */
     private void refrescarGraficoGrupo(String containerId, List<String> maquinas) {
-        record FilaGrupo(String maquina, double kwh, double horasMes) {
+        record FilaGrupo(String maquina, double horasMes) {
         }
         List<FilaGrupo> filas = new ArrayList<>();
         for (String maquina : maquinas) {
-            List<Map<String, Object>> datos = plcDataQueryService.getTodayKWhDataByMaquina(maquina);
-            GraficaModel.SerieKWh serie = GraficaModel.calcularSerieKWh(datos, true);
-            double kwhHoy = serie.valores().stream().mapToDouble(Float::doubleValue).sum();
             double horasMes = horometroService.obtenerSnapshot(maquina).horasMes();
-            filas.add(new FilaGrupo(maquina, kwhHoy, horasMes));
+            filas.add(new FilaGrupo(maquina, horasMes));
         }
-        filas.sort((a, b) -> Double.compare(b.kwh(), a.kwh()));
+        filas.sort((a, b) -> Double.compare(b.horasMes(), a.horasMes()));
 
         List<String> categorias = filas.stream().map(FilaGrupo::maquina).collect(Collectors.toList());
-        List<Double> kwhs = filas.stream().map(FilaGrupo::kwh).collect(Collectors.toList());
         List<Double> horas = filas.stream().map(FilaGrupo::horasMes).collect(Collectors.toList());
 
-        getElement().executeJs(GraficaModel.getBarChartScript(containerId, categorias, kwhs, horas));
+        getElement().executeJs(GraficaModel.getBarChartScript(containerId, categorias, horas));
     }
 
     @Override
@@ -317,30 +301,45 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     }
 
     /**
+     * Fila de la semana (con su aclaración en letra chica al lado, no como etiqueta principal)
+     * y, debajo, la fila de acciones rápidas en el orden pedido: descargar CSV, ajustar
+     * umbrales, recalcular todas.
+     */
+    private void agregarAccionesAdmin() {
+        DatePicker fechaSemanaPicker = new DatePicker("Semana a reportar");
+        fechaSemanaPicker.setValue(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)));
+        fechaSemanaPicker.setWidth("220px");
+
+        Span notaSemana = new Span("Cualquier día de esa semana; se usa el domingo que la contiene");
+        notaSemana.getStyle().set("font-size", "12px").set("color", "var(--lumo-secondary-text-color)");
+
+        HorizontalLayout filaSemana = new HorizontalLayout(fechaSemanaPicker, notaSemana);
+        filaSemana.setAlignItems(Alignment.CENTER);
+        add(filaSemana);
+
+        HorizontalLayout filaAcciones = new HorizontalLayout(
+                crearLinkDescargaCsv(fechaSemanaPicker),
+                new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class),
+                crearBotonRecalcularTodos());
+        filaAcciones.setAlignItems(Alignment.CENTER);
+        add(filaAcciones);
+    }
+
+    /**
      * Exportador CSV semanal, solo ADMIN. Ancla las 4 columnas al domingo de la semana
      * elegida (por defecto el último domingo completo), para que el reporte coincida con
      * la rutina real: cada lunes se toma el horómetro físico de la semana que acaba de
      * terminar. "Horas totales" se reconstruye histórico hasta esa fecha, no es el valor
      * actual — así sirve para comparar contra la lectura física de cualquier semana pasada.
      */
-    private HorizontalLayout crearExportadorCsv() {
-        DatePicker fechaSemanaPicker = new DatePicker("Semana a reportar");
-        fechaSemanaPicker.setValue(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)));
-        fechaSemanaPicker.setWidth("220px");
-        fechaSemanaPicker.setHelperText("Cualquier día de esa semana; se usa el domingo que la contiene");
-
+    private Anchor crearLinkDescargaCsv(DatePicker fechaSemanaPicker) {
         StreamResource recurso = new StreamResource("horometro-semanal.csv",
                 () -> generarCsv(fechaSemanaPicker.getValue()));
         recurso.setContentType("text/csv; charset=UTF-8");
 
         Anchor descargarLink = new Anchor(recurso, "Descargar CSV semanal");
         descargarLink.getElement().setAttribute("download", true);
-        descargarLink.getElement().getThemeList().add("button");
-        descargarLink.getElement().getThemeList().add("primary");
-
-        HorizontalLayout layout = new HorizontalLayout(fechaSemanaPicker, descargarLink);
-        layout.setAlignItems(Alignment.END);
-        return layout;
+        return descargarLink;
     }
 
     private InputStream generarCsv(LocalDate fechaSeleccionada) {

@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Controller
@@ -23,8 +24,11 @@ public class KWhStreamController {
 
     private static final Logger logger = LoggerFactory.getLogger(KWhStreamController.class);
 
-    // Map de máquina -> lista de clientes conectados (emitters)
-    private final Map<String, CopyOnWriteArrayList<SseEmitter>> emittersByMaquina = new HashMap<>();
+    // Map de máquina -> lista de clientes conectados (emitters). ConcurrentHashMap porque
+    // computeIfAbsent se llama desde el hilo de cada request HTTP: la pestaña Temperatura, por
+    // ejemplo, abre dos streams (Agua + Ambiente) casi al mismo tiempo, y un HashMap normal
+    // corrompe su estructura interna ante escrituras concurrentes (ConcurrentModificationException).
+    private final Map<String, CopyOnWriteArrayList<SseEmitter>> emittersByMaquina = new ConcurrentHashMap<>();
 
     @GetMapping("/{maquina}")
     public SseEmitter streamKWh(@PathVariable String maquina) {
