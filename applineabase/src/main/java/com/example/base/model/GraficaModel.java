@@ -78,7 +78,10 @@ public class GraficaModel {
                         "root.setThemes([am5themes_Animated.new(root)]);" +
 
                         // PASO 2: Chart SIN cursor inicial
-                        "var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: false, panY: false, wheelX: 'none', wheelY: 'zoomY', pinchZoomX: true, pinchZoomY: true, maxTooltipDistance: 0 }));" +
+                        // maxTooltipDistance NO va en 0: en amCharts5 eso fuerza a mostrar solo
+                        // el tooltip mas cercano al cursor y ocultar el resto — justo lo contrario
+                        // de lo que queremos con 2+ series (ver el valor de todas a la vez).
+                        "var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: false, panY: false, wheelX: 'none', wheelY: 'zoomY', pinchZoomX: true, pinchZoomY: true }));" +
 
                         // PASO 3: Scrollbar
                         "var scrollbarX = am5xy.XYChartScrollbar.new(root, { orientation: 'horizontal', height: 15});" +
@@ -96,7 +99,7 @@ public class GraficaModel {
                         "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
                         "console.log('✓ Eje Y creado con tooltip. Zoom inicial: " + minY + " - " + maxY + "');" +
                         // PASO 5: Crear CURSOR con ejes (pero sin snapToSeries aún)
-                        "var cursor = chart.set('cursor', am5xy.XYCursor.new(root, { yAxis: yAxis, xAxis: xAxis, maxTooltipDistance: 0, behavior: 'zoomXY' }));" +
+                        "var cursor = chart.set('cursor', am5xy.XYCursor.new(root, { yAxis: yAxis, xAxis: xAxis, behavior: 'zoomXY' }));" +
                         "cursor.lineX.setAll({ visible: true });" +
                         "cursor.lineY.setAll({ visible: true });" +
 
