@@ -25,6 +25,7 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
@@ -89,6 +90,14 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private List<String> maquinasMezcla;
     private List<String> maquinasCasaFuerza;
 
+    private Tab tabExtrusion;
+    private Tab tabMezcla;
+    private Tab tabCasaFuerza;
+    // Solo se refresca el grafico de la pestaña de grupo actualmente visible (nunca las tres a
+    // la vez): asi el gráfico amCharts5 recien se crea (am5.Root.new) cuando su contenedor ya
+    // esta visible/con tamaño, evitando que quede en blanco hasta el proximo dato.
+    private Runnable refrescoGrupoActual = () -> { };
+
     public HorometroView(HorometroService horometroService, HorometroBackfillRunner horometroBackfillRunner,
                           LineaAccessService lineaAccessService, AlarmaConfigRepository alarmaConfigRepository,
                           PLCDataQueryService plcDataQueryService) {
@@ -104,9 +113,13 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
 
         add(new H3("Horómetro de Máquinas"));
         if (lineaAccessService.esAdmin()) {
-            add(new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class));
-            add(crearBotonRecalcularTodos());
-            add(crearExportadorCsv());
+            HorizontalLayout accionesAdmin = new HorizontalLayout(
+                    new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class),
+                    crearBotonRecalcularTodos(),
+                    crearExportadorCsv());
+            accionesAdmin.setAlignItems(Alignment.END);
+            accionesAdmin.setWidthFull();
+            add(accionesAdmin);
         }
 
         grid.addColumn(HorometroRow::maquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
@@ -130,28 +143,49 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         tabSheetPrincipal.setSizeFull();
         tabSheetPrincipal.add("Tabla", grid);
         if (!maquinasExtrusion.isEmpty()) {
-            tabSheetPrincipal.add("Extrusión", crearPanelGrupo(ID_CHART_EXTRUSION));
+            tabExtrusion = tabSheetPrincipal.add("Extrusión", crearPanelGrupo(ID_CHART_EXTRUSION));
         }
         if (!maquinasMezcla.isEmpty()) {
-            tabSheetPrincipal.add("Mezcla", crearPanelGrupo(ID_CHART_MEZCLA));
+            tabMezcla = tabSheetPrincipal.add("Mezcla", crearPanelGrupo(ID_CHART_MEZCLA));
         }
         if (!maquinasCasaFuerza.isEmpty()) {
-            tabSheetPrincipal.add(GRUPO_CASA_FUERZA, crearPanelGrupo(ID_CHART_CASA_FUERZA));
+            tabCasaFuerza = tabSheetPrincipal.add(GRUPO_CASA_FUERZA, crearPanelGrupo(ID_CHART_CASA_FUERZA));
         }
         add(tabSheetPrincipal);
         setFlexGrow(1, tabSheetPrincipal);
 
+        tabSheetPrincipal.addSelectedChangeListener(this::onTabSeleccionadaCambio);
+
         refrescarGrid();
-        refrescarGraficosGrupos();
 
         addAttachListener(e -> {
             UI ui = e.getUI();
             ui.setPollInterval(POLL_INTERVAL_MS);
             ui.addPollListener(pollEvent -> {
                 refrescarGrid();
-                refrescarGraficosGrupos();
+                refrescoGrupoActual.run();
             });
         });
+    }
+
+    /**
+     * Cambia qué gráfico de grupo se refresca en cada poll (nunca los tres a la vez) y, para la
+     * pestaña recién seleccionada, lo dispara de inmediato — así el gráfico se crea recién
+     * cuando su contenedor ya está visible, en vez de precargarse oculto y quedar en blanco.
+     */
+    private void onTabSeleccionadaCambio(TabSheet.SelectedChangeEvent event) {
+        Tab seleccionada = event.getSelectedTab();
+        if (seleccionada == tabExtrusion) {
+            refrescoGrupoActual = () -> refrescarGraficoGrupo(ID_CHART_EXTRUSION, maquinasExtrusion);
+        } else if (seleccionada == tabMezcla) {
+            refrescoGrupoActual = () -> refrescarGraficoGrupo(ID_CHART_MEZCLA, maquinasMezcla);
+        } else if (seleccionada == tabCasaFuerza) {
+            refrescoGrupoActual = () -> refrescarGraficoGrupo(ID_CHART_CASA_FUERZA, maquinasCasaFuerza);
+        } else {
+            refrescoGrupoActual = () -> { };
+            return;
+        }
+        refrescoGrupoActual.run();
     }
 
     private List<String> maquinasPorZona(String zona) {
@@ -172,47 +206,55 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         VerticalLayout panel = new VerticalLayout();
         panel.setSizeFull();
         panel.setPadding(false);
+        panel.setSpacing(false);
 
-        Div chartDiv = new Div();
-        chartDiv.setId(containerId);
-        chartDiv.setWidthFull();
-        chartDiv.setHeight("100%");
-        panel.add(chartDiv);
-        panel.setFlexGrow(1, chartDiv);
+        Span tituloKwh = new Span("KWh consumido hoy");
+        tituloKwh.getStyle().set("font-weight", "600").set("margin", "8px 0 0 0");
+        Div chartDivKwh = new Div();
+        chartDivKwh.setId(containerId + "_kwh");
+        chartDivKwh.setWidthFull();
+        chartDivKwh.setHeight("100%");
+
+        Span tituloHoras = new Span("Horas trabajadas este mes");
+        tituloHoras.getStyle().set("font-weight", "600").set("margin", "8px 0 0 0");
+        Div chartDivHoras = new Div();
+        chartDivHoras.setId(containerId + "_horas");
+        chartDivHoras.setWidthFull();
+        chartDivHoras.setHeight("100%");
+
+        panel.add(tituloKwh, chartDivKwh, tituloHoras, chartDivHoras);
+        panel.setFlexGrow(1, chartDivKwh);
+        panel.setFlexGrow(1, chartDivHoras);
 
         return panel;
     }
 
-    private void refrescarGraficosGrupos() {
-        if (!maquinasExtrusion.isEmpty()) refrescarGraficoGrupo(ID_CHART_EXTRUSION, maquinasExtrusion);
-        if (!maquinasMezcla.isEmpty()) refrescarGraficoGrupo(ID_CHART_MEZCLA, maquinasMezcla);
-        if (!maquinasCasaFuerza.isEmpty()) refrescarGraficoGrupo(ID_CHART_CASA_FUERZA, maquinasCasaFuerza);
-    }
-
     /**
      * KWh consumido hoy (suma de diferencias entre lecturas consecutivas, misma logica que
-     * usan ChartsView/Historico via GraficaModel.calcularSerieKWh) y horas trabajadas hoy
+     * usan ChartsView/Historico via GraficaModel.calcularSerieKWh) y horas trabajadas en el mes
      * (HorometroService.obtenerSnapshot, la misma fuente que ya muestra la tabla de arriba),
-     * ordenado de mayor a menor por KWh.
+     * ordenado de mayor a menor por KWh. Se llama solo para el grupo de la pestaña actualmente
+     * seleccionada (ver onTabSeleccionadaCambio), nunca para los tres a la vez.
      */
     private void refrescarGraficoGrupo(String containerId, List<String> maquinas) {
-        record FilaGrupo(String maquina, double kwh, double horas) {
+        record FilaGrupo(String maquina, double kwh, double horasMes) {
         }
         List<FilaGrupo> filas = new ArrayList<>();
         for (String maquina : maquinas) {
             List<Map<String, Object>> datos = plcDataQueryService.getTodayKWhDataByMaquina(maquina);
             GraficaModel.SerieKWh serie = GraficaModel.calcularSerieKWh(datos, true);
             double kwhHoy = serie.valores().stream().mapToDouble(Float::doubleValue).sum();
-            double horasHoy = horometroService.obtenerSnapshot(maquina).horasHoy();
-            filas.add(new FilaGrupo(maquina, kwhHoy, horasHoy));
+            double horasMes = horometroService.obtenerSnapshot(maquina).horasMes();
+            filas.add(new FilaGrupo(maquina, kwhHoy, horasMes));
         }
         filas.sort((a, b) -> Double.compare(b.kwh(), a.kwh()));
 
         List<String> categorias = filas.stream().map(FilaGrupo::maquina).collect(Collectors.toList());
         List<Double> kwhs = filas.stream().map(FilaGrupo::kwh).collect(Collectors.toList());
-        List<Double> horas = filas.stream().map(FilaGrupo::horas).collect(Collectors.toList());
+        List<Double> horas = filas.stream().map(FilaGrupo::horasMes).collect(Collectors.toList());
 
-        getElement().executeJs(GraficaModel.getBarChartScript(containerId, categorias, kwhs, horas));
+        getElement().executeJs(GraficaModel.getBarChartScript(
+                containerId + "_kwh", containerId + "_horas", categorias, kwhs, horas));
     }
 
     @Override

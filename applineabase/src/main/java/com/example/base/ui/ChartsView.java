@@ -12,6 +12,7 @@ import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -54,11 +55,15 @@ public class ChartsView extends VerticalLayout {
     private boolean mostrarTemperatura;
     private GraficaModel graficaTemperatura;
     private Span temperaturaMensajeSpan;
+    private Tab tabTemperatura;
+    private boolean temperaturaCargada;
 
     // --- PF general (KWhPlanta1) ---
     private boolean mostrarPFGeneral;
     private GraficaModel graficaPFGeneral;
     private Span pfGeneralMensajeSpan;
+    private Tab tabPFGeneral;
+    private boolean pfGeneralCargada;
 
     public ChartsView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
                        PLCDataQueryService plcDataQueryService) {
@@ -81,22 +86,26 @@ public class ChartsView extends VerticalLayout {
         tabSheet.setSizeFull();
         tabSheet.add("KWh", crearPanelKwh());
         if (mostrarTemperatura) {
-            tabSheet.add("Temperatura", crearPanelTemperatura());
+            tabTemperatura = tabSheet.add("Temperatura", crearPanelTemperatura());
         }
         if (mostrarPFGeneral) {
-            tabSheet.add("PF general", crearPanelPFGeneral());
+            tabPFGeneral = tabSheet.add("PF general", crearPanelPFGeneral());
         }
         add(tabSheet);
         setFlexGrow(1, tabSheet);
 
-        addAttachListener(event -> {
-            // Cada carga inicial deja andando su propio SSE (ver iniciarSSETemperatura/
-            // iniciarSSEPFGeneral): no hace falta un poll que reconstruya todo el gráfico
-            // cada tanto, los puntos nuevos llegan solos y se agregan sin recargar nada.
-            if (mostrarTemperatura) {
+        // Temperatura/PF general se cargan recién la primera vez que se seleccionan (no al
+        // adjuntar la vista): si se inicializa el gráfico amCharts5 con la pestaña todavía
+        // oculta, el contenedor queda sin tamaño y el gráfico se ve en blanco hasta el próximo
+        // dato. Cada carga deja andando su propio SSE (ver iniciarSSETemperatura/
+        // iniciarSSEPFGeneral), así que solo hace falta cargar una vez por pestaña.
+        tabSheet.addSelectedChangeListener(event -> {
+            Tab seleccionada = event.getSelectedTab();
+            if (seleccionada == tabTemperatura && !temperaturaCargada) {
+                temperaturaCargada = true;
                 cargarTemperaturaChart();
-            }
-            if (mostrarPFGeneral) {
+            } else if (seleccionada == tabPFGeneral && !pfGeneralCargada) {
+                pfGeneralCargada = true;
                 cargarPFGeneralChart();
             }
         });
