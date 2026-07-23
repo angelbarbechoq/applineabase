@@ -237,7 +237,7 @@ public class ChartsView extends VerticalLayout {
         graficaTemperatura.setUnidad("°C");
         // Ambiente en magenta para distinguirla de Agua a simple vista; con 2 series hace falta
         // leyenda (identidad por color, no solo por tooltip).
-        graficaTemperatura.setColoresPersonalizados(new String[]{"0xc83830", "0xe87ba4"});
+        graficaTemperatura.setColoresPersonalizados(new String[]{"0x29b6f6", "0xe87ba4"});
         graficaTemperatura.setMostrarLeyenda(true);
 
         temperaturaMensajeSpan = new Span();
