@@ -36,29 +36,6 @@ final class TarjetasEstadoActual {
         }
     }
 
-    /**
-     * Igual que cargarDatosActuales, pero lee del archivo MENSUAL (via
-     * getLatestVIPDataByMaquinaHistorico/getLatestKWhDataByMaquinaHistorico) en vez del diario
-     * — a pedido, para que Histórico use siempre la misma referencia (mensual) sin importar si
-     * la franja de valores se carga al abrir la vista, al cambiar de máquina, o desde un click
-     * en el gráfico. El dato más reciente es idéntico al del diario (los dos archivos se
-     * escriben en el mismo batch de adquisición); esto solo unifica de dónde se lee.
-     */
-    static void cargarDatosActualesHistorico(LineaAccessService lineaAccessService, PLCDataQueryService plcDataQueryService,
-                                              String maquina, Div card) {
-        try {
-            if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
-                card.setVisible(false);
-                return;
-            }
-            Map<String, Object> datosVIP = plcDataQueryService.getLatestVIPDataByMaquinaHistorico(maquina);
-            Map<String, Object> datosKWh = plcDataQueryService.getLatestKWhDataByMaquinaHistorico(maquina);
-            mostrarDatosActuales(card, datosVIP, datosKWh);
-        } catch (Exception e) {
-            card.setVisible(false);
-        }
-    }
-
     private static void mostrarDatosActuales(Div card, Map<String, Object> datosVIP, Map<String, Object> datosKWh) {
         if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
             card.getElement().setProperty("innerHTML",

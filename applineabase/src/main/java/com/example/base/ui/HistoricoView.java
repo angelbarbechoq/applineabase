@@ -102,10 +102,6 @@ public class HistoricoView extends VerticalLayout {
         chartContainer.setHeight("500px");
         add(chartContainer);
         setFlexGrow(1, chartContainer);
-
-        if (maquinaCombo.getValue() != null) {
-            cargarDatosActuales(maquinaCombo.getValue());
-        }
     }
 
     private HorizontalLayout buildFiltrosLayout() {
@@ -115,9 +111,10 @@ public class HistoricoView extends VerticalLayout {
         maquinaCombo.setItems(maquinas);
         maquinaCombo.setWidth("200px");
         if (!maquinas.isEmpty()) maquinaCombo.setValue(maquinas.get(0));
-        maquinaCombo.addValueChangeListener(e -> {
-            if (e.getValue() != null) cargarDatosActuales(e.getValue());
-        });
+        // Al cambiar de máquina, la tarjeta de último click y la franja de valores quedan
+        // referidas a la máquina anterior: se limpian en vez de mostrar datos de otra máquina
+        // o "los últimos valores", ya que en Histórico esos valores solo deben venir de un click.
+        maquinaCombo.addValueChangeListener(e -> limpiarTarjetas());
 
         desdeDate = new DatePicker("Desde");
         desdeDate.setValue(LocalDate.now().minusDays(7));
@@ -339,7 +336,7 @@ public class HistoricoView extends VerticalLayout {
         getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
 
         this.getUI().ifPresent(ui -> TarjetasEstadoActual.mostrarUltimoClickCard(ui, true));
-        actualizarTarjetaUltimoClick(System.currentTimeMillis());
+        limpiarTarjetas();
     }
 
     @Override
@@ -350,16 +347,6 @@ public class HistoricoView extends VerticalLayout {
 
     private void resetZoom() {
         getElement().executeJs(graficaActiva.getResetZoomScript("chartdiv_historico"));
-    }
-
-    /**
-     * Franja de valores en vivo (KWh/VAB/VAC/etc.) junto al título — misma posición y texto que
-     * ChartsView, pero lee del archivo MENSUAL (cargarDatosActualesHistorico) para que toda la
-     * vista de Histórico use siempre la misma referencia, sea cual sea el disparador (apertura
-     * de la vista, cambio de máquina, o click en el gráfico).
-     */
-    private void cargarDatosActuales(String maquina) {
-        TarjetasEstadoActual.cargarDatosActualesHistorico(lineaAccessService, plcDataQueryService, maquina, datosActualesCard);
     }
 
     @ClientCallable

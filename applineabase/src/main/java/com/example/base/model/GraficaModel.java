@@ -749,7 +749,8 @@ public class GraficaModel {
                 html.append("<span style='color: #c3c2b7;'>|</span>");
             }
             boolean esCorriente = labels[i].equals("IA") || labels[i].equals("IB") || labels[i].equals("IC");
-            String colorValor = esCorriente ? "#e34948" : "#0b0b0b";
+            boolean esVoltaje = labels[i].equals("VAB") || labels[i].equals("VAC") || labels[i].equals("VBC");
+            String colorValor = esCorriente ? "#e34948" : esVoltaje ? "#1a3c8c" : "#0b0b0b";
             html.append("<span>")
                     .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(": </span>")
                     .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
