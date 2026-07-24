@@ -193,12 +193,18 @@ public final class MainLayout extends AppLayout {
         graficas.addItem(new SideNavItem("Tiempo Real", "grafica", VaadinIcon.CHART_LINE.create()));
         graficas.addItem(new SideNavItem("Histórico", "historico", VaadinIcon.CLOCK.create()));
         nav.addItem(graficas);
+        colapsarAlSalirDelMouse(graficas);
 
         nav.addItem(new SideNavItem("Consulta de Datos", "query", VaadinIcon.LIST.create()));
         nav.addItem(new SideNavItem("Horómetro", "horometro", VaadinIcon.TIMER.create()));
         if (lineaAccessService.puedeVerAlarmas()) {
-            nav.addItem(new SideNavItem("Alarmas Activas", "alarmas", VaadinIcon.BELL.create()));
-            nav.addItem(new SideNavItem("Historial Alarmas", "alarmas/historial", VaadinIcon.CLOCK.create()));
+            SideNavItem alarmas = new SideNavItem("Alarmas");
+            alarmas.setPrefixComponent(VaadinIcon.BELL.create());
+            alarmas.setExpanded(false);
+            alarmas.addItem(new SideNavItem("Alarmas Activas", "alarmas", VaadinIcon.BELL_O.create()));
+            alarmas.addItem(new SideNavItem("Historial Alarmas", "alarmas/historial", VaadinIcon.CLOCK.create()));
+            nav.addItem(alarmas);
+            colapsarAlSalirDelMouse(alarmas);
         }
         if (lineaAccessService.esAdmin()) {
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
@@ -210,9 +216,22 @@ public final class MainLayout extends AppLayout {
             configuracion.addItem(new SideNavItem("Configuración de alarmas", "alarmas/config", VaadinIcon.BELL.create()));
             configuracion.addItem(new SideNavItem("Configuración de hardware", "configuracion", VaadinIcon.SERVER.create()));
             nav.addItem(configuracion);
+            colapsarAlSalirDelMouse(configuracion);
         }
         //nav.addSelectionListener(e -> setDrawerOpened(false));
         return nav;
+    }
+
+    /**
+     * Ademas del click para expandir/contraer que SideNavItem ya trae de fabrica, a pedido el
+     * submenu tambien se contrae solo apenas el mouse sale de su zona (el item y sus hijos
+     * expandidos, que son parte del mismo elemento via slot="children"). Se aplica igual en los
+     * tres menus con submenu (Gráficas, Alarmas, Configuración) para que ninguno se comporte
+     * distinto de los demas.
+     */
+    private void colapsarAlSalirDelMouse(SideNavItem item) {
+        item.getElement().executeJs(
+                "this.addEventListener('mouseleave', function() { this.expanded = false; });");
     }
 
     private SideNavItem createSideNavItem(MenuEntry menuEntry) {
