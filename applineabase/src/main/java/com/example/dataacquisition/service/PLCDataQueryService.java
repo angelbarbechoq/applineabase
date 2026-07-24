@@ -271,4 +271,61 @@ public class PLCDataQueryService {
 
         return result;
     }
+
+    /**
+     * Igual que getKWhByFechaExacta, pero para Histórico: busca en el archivo MENSUAL que
+     * corresponde a la fecha pedida (no en el diario, que solo tiene el día de hoy). El punto
+     * clickeado en un gráfico de Histórico puede ser de cualquier día del rango consultado, a
+     * diferencia de ChartsView que siempre clickea sobre "hoy".
+     */
+    public Map<String, Object> getKWhByFechaExactaHistorico(String maquina, String fechaHoraStr) {
+        return buscarPorFechaExactaEnMensual(maquina, fechaHoraStr, false, new String[]{"kwh"});
+    }
+
+    /** Variante VIP (VAB/VAC/VBC/IA/IB/IC/PW/PF) de getKWhByFechaExactaHistorico. */
+    public Map<String, Object> getVIPByFechaExactaHistorico(String maquina, String fechaHoraStr) {
+        return buscarPorFechaExactaEnMensual(maquina, fechaHoraStr, true, RutaArchivosEnergia.CAMPOS_VIP);
+    }
+
+    private Map<String, Object> buscarPorFechaExactaEnMensual(String maquina, String fechaHoraStr, boolean vip, String[] campos) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            // Buscar sin segundos: "dd-MM-yyyy HH:mm", igual que getKWhByFechaExacta (la
+            // posición del click en el eje X no siempre cae justo en el segundo exacto).
+            String fechaBusqueda = fechaHoraStr.substring(0, 16);
+
+            SimpleDateFormat sdfSoloFecha = new SimpleDateFormat("dd-MM-yyyy");
+            Date fechaDia = sdfSoloFecha.parse(fechaHoraStr.substring(0, 10));
+            YearMonth ym = YearMonth.from(fechaDia.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+
+            String dbPath = buildMonthlyPath(ym, vip);
+            java.io.File dbFile = new java.io.File(dbPath);
+            if (!dbFile.exists()) {
+                logger.warn("BD mensual no encontrada para fecha exacta {}: {}", fechaBusqueda, dbPath);
+                result.put("error", "BD mensual no encontrada: " + dbPath);
+                return result;
+            }
+
+            String columnas = String.join(", ", campos);
+            try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+                 PreparedStatement pstmt = conn.prepareStatement(
+                         "SELECT fecha, " + columnas + " FROM " + maquina + " WHERE fecha LIKE ? LIMIT 1")) {
+                pstmt.setString(1, fechaBusqueda + "%");
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        result.put("fecha", rs.getString("fecha"));
+                        for (String campo : campos) {
+                            result.put(campo, rs.getDouble(campo));
+                        }
+                    } else {
+                        result.put("error", "No se encontró " + maquina + " en " + fechaBusqueda);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error buscando {} por fecha exacta histórica: {}", maquina, e.getMessage());
+            result.put("error", e.getMessage());
+        }
+        return result;
+    }
 }

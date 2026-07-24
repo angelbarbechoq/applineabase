@@ -360,7 +360,7 @@ public class HistoricoView extends VerticalLayout {
     @ClientCallable
     public void limpiarTarjetas() {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
-            TarjetasEstadoActual.limpiarUltimoClick((MainLayout) this.getParent().get());
+            TarjetasEstadoActual.limpiarUltimoClickHistorico((MainLayout) this.getParent().get(), datosActualesCard);
         }
     }
 
@@ -369,12 +369,17 @@ public class HistoricoView extends VerticalLayout {
         actualizarTarjetaUltimoClick(timestamp);
     }
 
-    /** Tarjeta compartida (MainLayout) de Fecha/Hora/KWh del último click — misma que usa ChartsView. */
+    /**
+     * Tarjeta compartida (MainLayout) de Fecha/Hora/KWh del último click, y de paso la franja de
+     * valores (KWh/VAB/VAC/etc.) pasa a mostrar los valores de ESE momento — a diferencia de
+     * ChartsView, acá el punto clickeado puede ser de cualquier día del rango consultado, así
+     * que usa la variante "Historico" (busca en el archivo mensual correspondiente).
+     */
     private void actualizarTarjetaUltimoClick(long timestamp) {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             MainLayout layout = (MainLayout) this.getParent().get();
-            TarjetasEstadoActual.actualizarUltimoClick(lineaAccessService, plcDataQueryService,
-                    graficaActiva, maquinaCombo.getValue(), layout, timestamp);
+            TarjetasEstadoActual.actualizarUltimoClickHistorico(lineaAccessService, plcDataQueryService,
+                    graficaActiva, maquinaCombo.getValue(), layout, datosActualesCard, timestamp);
         }
     }
 

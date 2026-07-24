@@ -89,4 +89,64 @@ final class TarjetasEstadoActual {
         layout.getUltimoClickCard().getElement().setProperty("innerHTML",
                 GraficaModel.construirHtmlUltimoClick(fechaStr, horaStr, valorStr));
     }
+
+    /**
+     * Variante de actualizarUltimoClick solo para Histórico: a diferencia de ChartsView (donde
+     * el click siempre cae en "hoy"), acá el punto clickeado puede ser de cualquier día del
+     * rango consultado, así que la búsqueda de KWh tiene que ir al archivo mensual
+     * correspondiente (ver PLCDataQueryService.getKWhByFechaExactaHistorico), no al diario.
+     * Además, a pedido, actualiza también la franja de valores completa (KWh/VAB/VAC/etc.) con
+     * los valores de ESE momento en vez de los últimos en vivo.
+     */
+    static void actualizarUltimoClickHistorico(LineaAccessService lineaAccessService, PLCDataQueryService plcDataQueryService,
+                                                GraficaModel graficaActiva, String maquina, MainLayout layout,
+                                                Div franjaValores, long timestamp) {
+        if (graficaActiva != null) {
+            graficaActiva.registrarClick(timestamp);
+        }
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+        Date fecha = new Date(timestamp);
+        String fechaStr = dateFormat.format(fecha);
+        String horaStr = timeFormat.format(fecha);
+        String fechaHoraStr = fechaStr + " " + horaStr;
+
+        String valorStr = "";
+        if (maquina != null && lineaAccessService.tieneAccesoAMaquina(maquina)) {
+            try {
+                Map<String, Object> datosKWh = plcDataQueryService.getKWhByFechaExactaHistorico(maquina, fechaHoraStr);
+                if (datosKWh.containsKey("kwh")) {
+                    valorStr = String.format("%.2f", datosKWh.get("kwh"));
+                }
+
+                Map<String, Object> datosVIP = plcDataQueryService.getVIPByFechaExactaHistorico(maquina, fechaHoraStr);
+                if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
+                    franjaValores.getElement().setProperty("innerHTML",
+                            GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh));
+                    franjaValores.setVisible(true);
+                } else {
+                    franjaValores.setVisible(false);
+                }
+            } catch (Exception e) {
+                valorStr = "Error";
+                franjaValores.setVisible(false);
+            }
+        } else {
+            franjaValores.setVisible(false);
+        }
+
+        layout.getUltimoClickCard().getElement().setProperty("innerHTML",
+                GraficaModel.construirHtmlUltimoClick(fechaStr, horaStr, valorStr));
+    }
+
+    /**
+     * Variante de limpiarUltimoClick solo para Histórico: además de resetear la tarjeta de
+     * último click, oculta la franja de valores (que quedó "pinneada" al punto clickeado) —
+     * a pedido, el doble-click debe borrar ambas cosas.
+     */
+    static void limpiarUltimoClickHistorico(MainLayout layout, Div franjaValores) {
+        limpiarUltimoClick(layout);
+        franjaValores.setVisible(false);
+    }
 }
