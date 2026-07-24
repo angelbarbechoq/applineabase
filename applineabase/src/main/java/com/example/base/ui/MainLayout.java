@@ -196,10 +196,14 @@ public final class MainLayout extends AppLayout {
             nav.addItem(new SideNavItem("Historial Alarmas", "alarmas/historial", VaadinIcon.CLOCK.create()));
         }
         if (lineaAccessService.esAdmin()) {
-            nav.addItem(new SideNavItem("Config. Alarmas", "alarmas/config", VaadinIcon.COG.create()));
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
             nav.addItem(new SideNavItem("Reparar VIP Mensual", "admin/reparar-vip", VaadinIcon.WRENCH.create()));
-            nav.addItem(new SideNavItem("Configuración", "configuracion", VaadinIcon.COG.create()));
+
+            SideNavItem configuracion = new SideNavItem("Configuración");
+            configuracion.setPrefixComponent(VaadinIcon.COG.create());
+            configuracion.addItem(new SideNavItem("Configuración de alarmas", "alarmas/config"));
+            configuracion.addItem(new SideNavItem("Configuración de hardware", "configuracion"));
+            nav.addItem(configuracion);
         }
         //nav.addSelectionListener(e -> setDrawerOpened(false));
         return nav;
