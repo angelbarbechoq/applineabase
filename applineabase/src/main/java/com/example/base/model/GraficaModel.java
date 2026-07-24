@@ -727,8 +727,14 @@ public class GraficaModel {
      * HTML de texto plano para la franja de valores en vivo (KWh/VAB/VAC/VBC/IA/IB/IC/PW/PF),
      * con la corriente en un color propio. Usado por ChartsView e HistoricoView (mismo texto,
      * misma posición junto al título) para no duplicar el marcado en cada pantalla.
+     *
+     * temperaturaAgua/temperaturaAmbiente/pfGeneral son un segundo grupo (plantas, no por
+     * máquina) que se agrega después de un separador más marcado que el "|" de siempre — cada
+     * uno puede venir null si el usuario no tiene acceso a esa zona, en cuyo caso simplemente no
+     * se muestra (ver TarjetasEstadoActual, que ya filtra por acceso antes de llamar acá).
      */
-    public static String construirHtmlValoresActuales(Map<String, Object> datosVIP, Map<String, Object> datosKWh) {
+    public static String construirHtmlValoresActuales(Map<String, Object> datosVIP, Map<String, Object> datosKWh,
+                                                        Double temperaturaAgua, Double temperaturaAmbiente, Double pfGeneral) {
         String[] labels = {"KWh", "VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF"};
         double[] valores = {
                 toDoubleSeguro(datosKWh.get("kwh")),
@@ -758,6 +764,31 @@ public class GraficaModel {
                     .append("</span>")
                     .append("</span>");
         }
+
+        String[] labelsExtra = {"Temp. Agua", "Temp. Ambiente", "PF general"};
+        Double[] valoresExtra = {temperaturaAgua, temperaturaAmbiente, pfGeneral};
+        boolean primeroExtra = true;
+        for (int i = 0; i < labelsExtra.length; i++) {
+            if (valoresExtra[i] == null) {
+                continue;
+            }
+            if (primeroExtra) {
+                // Separador bien marcado (no el "|" fino de siempre): esta franja pasa de valores
+                // por máquina a valores de planta, así que la separación tiene que notarse.
+                html.append("<span style='align-self: stretch; border-left: 2px solid #c3c2b7; margin: 0 10px;'></span>");
+                primeroExtra = false;
+            } else {
+                html.append("<span style='color: #c3c2b7;'>|</span>");
+            }
+            String colorValor = labelsExtra[i].equals("PF general") ? "#e34948" : "#0b0b0b";
+            html.append("<span>")
+                    .append("<span style='font-size: 12px; color: #898781;'>").append(labelsExtra[i]).append(": </span>")
+                    .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
+                    .append(String.format("%.2f", valoresExtra[i]))
+                    .append("</span>")
+                    .append("</span>");
+        }
+
         html.append("</div>");
         return html.toString();
     }

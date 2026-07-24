@@ -17,6 +17,14 @@ import java.util.Map;
  */
 final class TarjetasEstadoActual {
 
+    // Mismos nombres de "máquina virtual" que ya usa ChartsView para sus pestañas Temperatura y
+    // PF general (ver mostrarTemperatura/mostrarPFGeneral) — Temperatura Agua/Ambiente y PF
+    // general se guardan con el mismo esquema de tabla que el KWh normal, así que se leen con
+    // los mismos métodos de siempre (getLatestKWhDataByMaquina/getKWhByFechaExactaHistorico).
+    private static final String MAQUINA_TEMPERATURA_AGUA = "TemperaturaAgua";
+    private static final String MAQUINA_TEMPERATURA_AMBIENTE = "TemperaturaAmbiente";
+    private static final String MAQUINA_KWH_PLANTA1 = "KWhPlanta1";
+
     private TarjetasEstadoActual() {
     }
 
@@ -30,16 +38,31 @@ final class TarjetasEstadoActual {
             }
             Map<String, Object> datosVIP = plcDataQueryService.getLatestVIPDataByMaquina(maquina);
             Map<String, Object> datosKWh = plcDataQueryService.getLatestKWhDataByMaquina(maquina);
-            mostrarDatosActuales(card, datosVIP, datosKWh);
+
+            boolean accesoTemperatura = lineaAccessService.tieneAccesoAMaquina(MAQUINA_TEMPERATURA_AGUA);
+            Double temperaturaAgua = accesoTemperatura
+                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MAQUINA_TEMPERATURA_AGUA)) : null;
+            Double temperaturaAmbiente = accesoTemperatura
+                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MAQUINA_TEMPERATURA_AMBIENTE)) : null;
+            Double pfGeneral = lineaAccessService.tieneAccesoAMaquina(MAQUINA_KWH_PLANTA1)
+                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MAQUINA_KWH_PLANTA1)) : null;
+
+            mostrarDatosActuales(card, datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral);
         } catch (Exception e) {
             card.setVisible(false);
         }
     }
 
-    private static void mostrarDatosActuales(Div card, Map<String, Object> datosVIP, Map<String, Object> datosKWh) {
+    /** El "kwh" de estas máquinas virtuales guarda en realidad temperatura o PF general, según el caso. */
+    private static Double extraerKwh(Map<String, Object> datos) {
+        return datos.containsKey("kwh") ? ((Number) datos.get("kwh")).doubleValue() : null;
+    }
+
+    private static void mostrarDatosActuales(Div card, Map<String, Object> datosVIP, Map<String, Object> datosKWh,
+                                              Double temperaturaAgua, Double temperaturaAmbiente, Double pfGeneral) {
         if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
             card.getElement().setProperty("innerHTML",
-                    GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh));
+                    GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral));
             card.setVisible(true);
         } else {
             card.setVisible(false);
@@ -115,6 +138,9 @@ final class TarjetasEstadoActual {
         String horaStr = timeFormat.format(fecha);
         String fechaHoraStr = fechaStr + " " + horaStr;
 
+        // Temperatura Agua/Ambiente y PF general son solo para Tiempo Real (ver
+        // TarjetasEstadoActual.cargarDatosActuales) — acá van null a propósito, así que
+        // construirHtmlValoresActuales las omite y la franja de Histórico queda igual que antes.
         String valorStr = "";
         if (maquina != null && lineaAccessService.tieneAccesoAMaquina(maquina)) {
             try {
@@ -126,7 +152,7 @@ final class TarjetasEstadoActual {
                 Map<String, Object> datosVIP = plcDataQueryService.getVIPByFechaExactaHistorico(maquina, fechaHoraStr);
                 if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
                     franjaValores.getElement().setProperty("innerHTML",
-                            GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh));
+                            GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, null, null, null));
                     franjaValores.setVisible(true);
                 } else {
                     franjaValores.setVisible(false);
