@@ -19,6 +19,11 @@ public class GraficaModel {
     private static final int DIVISIONES_Y = 10;
     private String unidad = "";
 
+    // Referencia fija del gráfico de barras de Horómetro: un mes completo (30 días x 24h), para
+    // que el eje Y siempre muestre cuánto trabajó cada máquina en relación al mes, no solo en
+    // relación a la máquina que más horas tenga.
+    public static final int HORAS_MES_COMPLETO = 720;
+
     // Por defecto null (se usa la paleta roja/azul/verde de siempre, la que ya usan Histórico y
     // KWh/PF general) y sin leyenda (una sola serie no la necesita). Solo los gráficos que
     // explícitamente pidan otra cosa (ver ChartsView, pestaña Temperatura) llaman estos setters;
@@ -684,7 +689,7 @@ public class GraficaModel {
                 "xAxis.get('renderer').labels.template.setAll({ rotation: -45, centerY: am5.p50, centerX: am5.p100, fontSize: '11px', fill: am5.color(0x898781) });" +
                 "xAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });" +
                 "xAxis.data.setAll(datos);" +
-                "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, renderer: am5xy.AxisRendererY.new(root, {}) }));" +
+                "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, max: " + HORAS_MES_COMPLETO + ", strictMinMax: true, renderer: am5xy.AxisRendererY.new(root, {}) }));" +
                 "yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x898781), fontSize: '11px' });" +
                 "yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });" +
                 "var serieHoras = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Horas trabajadas en el mes', xAxis: xAxis, yAxis: yAxis, valueYField: 'horas', categoryXField: 'categoria' }));" +
