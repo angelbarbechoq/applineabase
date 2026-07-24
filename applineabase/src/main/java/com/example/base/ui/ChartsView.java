@@ -134,6 +134,7 @@ public class ChartsView extends VerticalLayout {
         maquinaInfoCard.setVisible(false);
 
         datosActualesCard = new Div();
+        datosActualesCard.setId("datosActualesCard");
         datosActualesCard.setVisible(false);
         datosActualesCard.getStyle()
             .set("padding", "0px")
@@ -497,7 +498,8 @@ public class ChartsView extends VerticalLayout {
             "  try {" +
             "    var data = JSON.parse(event.data);" +
             "    console.log('📈 Datos actualizados:', data);" +
-            "    var valores = document.querySelectorAll('.dato-valor');" +
+            "    var tarjetasDiv = document.getElementById('datosActualesCard');" +
+            "    var valores = tarjetasDiv ? tarjetasDiv.querySelectorAll('.dato-valor') : [];" +
             "    if(valores.length > 0) {" +
             "        valores[0].textContent = (data.KWh || 0).toFixed(2);" +
             "        valores[1].textContent = (data.VAB || 0).toFixed(2);" +

@@ -290,6 +290,14 @@ public class PLCDataQueryService {
     private Map<String, Object> buscarPorFechaExactaEnMensual(String maquina, String fechaHoraStr, boolean vip, String[] campos) {
         Map<String, Object> result = new HashMap<>();
         try {
+            // maquina se concatena directo en el SQL (el nombre de tabla no se puede parametrizar
+            // con PreparedStatement) — se valida como identificador simple antes de usarlo, para
+            // no depender solo de que el ComboBox de la UI nunca mande texto libre.
+            if (!maquina.matches("[A-Za-z0-9_]+")) {
+                result.put("error", "Nombre de máquina inválido: " + maquina);
+                return result;
+            }
+
             // Buscar sin segundos: "dd-MM-yyyy HH:mm", igual que getKWhByFechaExacta (la
             // posición del click en el eje X no siempre cae justo en el segundo exacto).
             String fechaBusqueda = fechaHoraStr.substring(0, 16);
