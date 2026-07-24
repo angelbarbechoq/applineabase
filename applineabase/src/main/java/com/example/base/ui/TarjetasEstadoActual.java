@@ -45,7 +45,7 @@ final class TarjetasEstadoActual {
             Double temperaturaAmbiente = accesoTemperatura
                     ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MAQUINA_TEMPERATURA_AMBIENTE)) : null;
             Double pfGeneral = lineaAccessService.tieneAccesoAMaquina(MAQUINA_KWH_PLANTA1)
-                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MAQUINA_KWH_PLANTA1)) : null;
+                    ? extraerPFGeneral(plcDataQueryService.getLatestVIPDataByMaquina(MAQUINA_KWH_PLANTA1)) : null;
 
             mostrarDatosActuales(card, datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral);
         } catch (Exception e) {
@@ -53,9 +53,19 @@ final class TarjetasEstadoActual {
         }
     }
 
-    /** El "kwh" de estas máquinas virtuales guarda en realidad temperatura o PF general, según el caso. */
+    /** El "kwh" de estas máquinas virtuales guarda en realidad temperatura, según el caso. */
     private static Double extraerKwh(Map<String, Object> datos) {
         return datos.containsKey("kwh") ? ((Number) datos.get("kwh")).doubleValue() : null;
+    }
+
+    /**
+     * KWhPlanta1 reporta el PF en el campo VIP "PF" (no en "kwh", que ahí es KWh real de esa
+     * planta) y en negativo y escala de porcentaje (ej. -85.5) — mismo ajuste que ya usa
+     * ChartsView.cargarPFGeneralChart: valor absoluto y dividido entre 100 para verlo en 0-1.
+     */
+    private static Double extraerPFGeneral(Map<String, Object> datosVIP) {
+        Float pf = GraficaModel.toFloatAbs(datosVIP.get("PF"));
+        return pf == null ? null : pf / 100.0;
     }
 
     private static void mostrarDatosActuales(Div card, Map<String, Object> datosVIP, Map<String, Object> datosKWh,

@@ -780,7 +780,14 @@ public class GraficaModel {
             } else {
                 html.append("<span style='color: #c3c2b7;'>|</span>");
             }
-            String colorValor = labelsExtra[i].equals("PF general") ? "#e34948" : "#0b0b0b";
+            String colorValor;
+            if (labelsExtra[i].equals("PF general")) {
+                // Azul oscuro en condición normal (igual que voltaje); por debajo de 0.94 en
+                // valor absoluto pasa a rojo (igual que corriente), como aviso de PF bajo.
+                colorValor = Math.abs(valoresExtra[i]) < 0.94 ? "#e34948" : "#1a3c8c";
+            } else {
+                colorValor = "#0b0b0b";
+            }
             html.append("<span>")
                     .append("<span style='font-size: 12px; color: #898781;'>").append(labelsExtra[i]).append(": </span>")
                     .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
