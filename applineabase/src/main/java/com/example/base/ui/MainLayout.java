@@ -187,9 +187,14 @@ public final class MainLayout extends AppLayout {
         nav.setMinWidth(200, Unit.PIXELS);
         MenuConfiguration.getMenuEntries().forEach(entry -> nav.addItem(createSideNavItem(entry)));
 
-        nav.addItem(new SideNavItem("Charts", "grafica", VaadinIcon.CHART.create()));
+        SideNavItem graficas = new SideNavItem("Gráficas");
+        graficas.setPrefixComponent(VaadinIcon.CHART.create());
+        graficas.setExpanded(false);
+        graficas.addItem(new SideNavItem("Tiempo Real", "grafica", VaadinIcon.CHART_LINE.create()));
+        graficas.addItem(new SideNavItem("Histórico", "historico", VaadinIcon.CLOCK.create()));
+        nav.addItem(graficas);
+
         nav.addItem(new SideNavItem("Consulta de Datos", "query", VaadinIcon.LIST.create()));
-        nav.addItem(new SideNavItem("Historico", "historico", VaadinIcon.CLOCK.create()));
         nav.addItem(new SideNavItem("Horómetro", "horometro", VaadinIcon.TIMER.create()));
         if (lineaAccessService.puedeVerAlarmas()) {
             nav.addItem(new SideNavItem("Alarmas Activas", "alarmas", VaadinIcon.BELL.create()));
@@ -201,8 +206,9 @@ public final class MainLayout extends AppLayout {
 
             SideNavItem configuracion = new SideNavItem("Configuración");
             configuracion.setPrefixComponent(VaadinIcon.COG.create());
-            configuracion.addItem(new SideNavItem("Configuración de alarmas", "alarmas/config"));
-            configuracion.addItem(new SideNavItem("Configuración de hardware", "configuracion"));
+            configuracion.setExpanded(false);
+            configuracion.addItem(new SideNavItem("Configuración de alarmas", "alarmas/config", VaadinIcon.BELL.create()));
+            configuracion.addItem(new SideNavItem("Configuración de hardware", "configuracion", VaadinIcon.SERVER.create()));
             nav.addItem(configuracion);
         }
         //nav.addSelectionListener(e -> setDrawerOpened(false));
