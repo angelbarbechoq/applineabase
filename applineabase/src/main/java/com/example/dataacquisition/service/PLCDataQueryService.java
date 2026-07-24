@@ -47,10 +47,24 @@ public class PLCDataQueryService {
     }
 
     public Map<String, Object> getLatestVIPDataByMaquina(String nombreMaquina) {
+        return obtenerUltimaFilaVIP(nombreMaquina, databaseInitializationService.getDailyVIPPath());
+    }
+
+    /**
+     * Igual que getLatestVIPDataByMaquina, pero lee del archivo MENSUAL en vez del diario. Los
+     * dos se escriben en el mismo batch (ver DatabaseInitializationService.guardarDatoBatch),
+     * así que el dato más reciente es idéntico entre ambos — esta variante existe para que
+     * Histórico use siempre la misma referencia (mensual) que ya usan sus demás consultas
+     * (rango y click), sin importar de dónde se dispare la carga.
+     */
+    public Map<String, Object> getLatestVIPDataByMaquinaHistorico(String nombreMaquina) {
+        return obtenerUltimaFilaVIP(nombreMaquina, databaseInitializationService.getMonthlyVIPPath());
+    }
+
+    private Map<String, Object> obtenerUltimaFilaVIP(String nombreMaquina, String dbPath) {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            String dbPath = databaseInitializationService.getDailyVIPPath();
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
                  PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM " + nombreMaquina + " ORDER BY fecha DESC LIMIT 1");
                  ResultSet rs = pstmt.executeQuery()) {
@@ -73,10 +87,18 @@ public class PLCDataQueryService {
     }
 
     public Map<String, Object> getLatestKWhDataByMaquina(String nombreMaquina) {
+        return obtenerUltimaFilaKWh(nombreMaquina, databaseInitializationService.getDailyPath());
+    }
+
+    /** Variante de getLatestKWhDataByMaquina que lee del archivo MENSUAL — ver getLatestVIPDataByMaquinaHistorico. */
+    public Map<String, Object> getLatestKWhDataByMaquinaHistorico(String nombreMaquina) {
+        return obtenerUltimaFilaKWh(nombreMaquina, databaseInitializationService.getMonthlyPath());
+    }
+
+    private Map<String, Object> obtenerUltimaFilaKWh(String nombreMaquina, String dbPath) {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            String dbPath = databaseInitializationService.getDailyPath();
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
                  PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM " + nombreMaquina + " ORDER BY fecha DESC LIMIT 1");
                  ResultSet rs = pstmt.executeQuery()) {

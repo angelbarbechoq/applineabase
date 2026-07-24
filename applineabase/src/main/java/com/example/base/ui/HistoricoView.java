@@ -352,9 +352,14 @@ public class HistoricoView extends VerticalLayout {
         getElement().executeJs(graficaActiva.getResetZoomScript("chartdiv_historico"));
     }
 
-    /** Franja de valores en vivo (KWh/VAB/VAC/etc.) junto al título — misma posición y texto que ChartsView. */
+    /**
+     * Franja de valores en vivo (KWh/VAB/VAC/etc.) junto al título — misma posición y texto que
+     * ChartsView, pero lee del archivo MENSUAL (cargarDatosActualesHistorico) para que toda la
+     * vista de Histórico use siempre la misma referencia, sea cual sea el disparador (apertura
+     * de la vista, cambio de máquina, o click en el gráfico).
+     */
     private void cargarDatosActuales(String maquina) {
-        TarjetasEstadoActual.cargarDatosActuales(lineaAccessService, plcDataQueryService, maquina, datosActualesCard);
+        TarjetasEstadoActual.cargarDatosActualesHistorico(lineaAccessService, plcDataQueryService, maquina, datosActualesCard);
     }
 
     @ClientCallable
