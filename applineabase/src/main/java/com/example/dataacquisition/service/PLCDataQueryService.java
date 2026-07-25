@@ -189,7 +189,7 @@ public class PLCDataQueryService {
             logger.warn("Nombre de máquina inválido: {}", maquina);
             return result;
         }
-        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+        SimpleDateFormat sdf = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
         YearMonth ymDesde = YearMonth.from(desde);
         YearMonth ymHasta = YearMonth.from(hasta);
@@ -234,7 +234,7 @@ public class PLCDataQueryService {
             logger.warn("Nombre de máquina inválido: {}", maquina);
             return result;
         }
-        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+        SimpleDateFormat sdf = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
         YearMonth ymDesde = YearMonth.from(desde);
         YearMonth ymHasta = YearMonth.from(hasta);

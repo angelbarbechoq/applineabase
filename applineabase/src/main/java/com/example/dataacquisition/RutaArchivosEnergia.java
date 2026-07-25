@@ -12,6 +12,14 @@ public final class RutaArchivosEnergia {
     public static final String[] CAMPOS_NORMAL = {"kwh"};
     public static final String[] CAMPOS_VIP = {"VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF", "KWhR"};
 
+    /**
+     * Formato de fecha/hora que usan todas las tablas de estos archivos SQLite (columna
+     * "fecha"). Antes estaba repetido como literal en 9 clases distintas (SimpleDateFormat y
+     * DateTimeFormatter por igual); centralizarlo acá evita que un cambio de formato tenga que
+     * aplicarse a mano en cada una.
+     */
+    public static final String FORMATO_FECHA_HORA = "dd-MM-yyyy HH:mm:ss";
+
     private static final String[] NOMBRES_MES = {
             "enero", "febrero", "marzo", "abril", "mayo", "junio",
             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"

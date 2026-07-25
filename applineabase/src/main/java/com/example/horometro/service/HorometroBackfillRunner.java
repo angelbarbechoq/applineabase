@@ -4,6 +4,7 @@ import com.example.alarmas.model.AlarmaConfig;
 import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.repository.AlarmaEventoRepository;
+import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.DatabaseInitializationService;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.horometro.repository.HorometroDiarioRepository;
@@ -50,7 +51,7 @@ import java.util.TreeMap;
 public class HorometroBackfillRunner implements ApplicationRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(HorometroBackfillRunner.class);
-    private static final DateTimeFormatter FECHA_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+    private static final DateTimeFormatter FECHA_FORMATTER = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
     private static final double UMBRAL_MINIMO_KW_DEFAULT = 15.0;
     private static final int VENTANA_CICLOS_DEFAULT = 5;
 

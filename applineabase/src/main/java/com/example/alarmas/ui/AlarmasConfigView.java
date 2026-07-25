@@ -4,6 +4,7 @@ import com.example.alarmas.model.AlarmaConfig;
 import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.base.ui.MainLayout;
+import com.example.base.ui.NotificacionesUtil;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -24,7 +25,6 @@ import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Configuración de umbrales de alarma por línea. Solo el ADMIN puede editar,
@@ -64,12 +64,7 @@ public class AlarmasConfigView extends VerticalLayout {
 
         add(new H3("Configuración de Alarmas"));
 
-        List<String> lineas = configLoaderService.loadLineaIDConfig().stream()
-                .map(l -> (String) l.get("lineaMaquina"))
-                .filter(n -> n != null && !n.isBlank())
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
+        List<String> lineas = configLoaderService.listarNombresLinea();
         lineaCombo.setItems(lineas);
         lineaCombo.setAllowCustomValue(true);
         lineaCombo.setWidth("220px");
@@ -188,11 +183,11 @@ public class AlarmasConfigView extends VerticalLayout {
             String linea = lineaCombo.getValue();
             TipoAlarma tipo = tipoSelect.getValue();
             if (linea == null || linea.isBlank() || tipo == null) {
-                mostrarError("Selecciona línea/máquina y tipo de alarma");
+                NotificacionesUtil.mostrarError("Selecciona línea/máquina y tipo de alarma");
                 return;
             }
             if (configRepository.existsByLineaMaquinaAndTipoAlarma(linea, tipo)) {
-                mostrarError("Ya existe una regla de " + tipo + " para " + linea + "; selecciónala en la tabla para editarla");
+                NotificacionesUtil.mostrarError("Ya existe una regla de " + tipo + " para " + linea + "; selecciónala en la tabla para editarla");
                 return;
             }
             config = new AlarmaConfig();
@@ -226,10 +221,6 @@ public class AlarmasConfigView extends VerticalLayout {
         refrescarGrid();
     }
 
-    private void mostrarError(String mensaje) {
-        Notification.show(mensaje, 3000, Notification.Position.BOTTOM_END)
-                .addThemeVariants(NotificationVariant.LUMO_ERROR);
-    }
 
     private void refrescarGrid() {
         grid.setItems(configRepository.findAllByOrderByLineaMaquinaAsc());

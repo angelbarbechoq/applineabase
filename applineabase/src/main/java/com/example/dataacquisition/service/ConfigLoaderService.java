@@ -17,6 +17,7 @@ import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Carga y persiste la configuración de PLCs, gateways y líneas/máquinas.
@@ -102,6 +103,20 @@ public class ConfigLoaderService {
     public List<Map<String, Object>> loadLineaIDConfig() {
         Object lineas = leerArchivo(LINEA_CONFIG_FILE).get("lineas");
         return lineas != null ? (List<Map<String, Object>>) lineas : List.of();
+    }
+
+    /**
+     * Nombres de línea/máquina configurados, sin vacíos/duplicados y ordenados — para
+     * poblar selects de UI que necesitan el catálogo completo de líneas. No es la lista
+     * filtrada por zona de acceso del usuario logueado (para eso ver LineaAccessService).
+     */
+    public List<String> listarNombresLinea() {
+        return loadLineaIDConfig().stream()
+                .map(l -> (String) l.get("lineaMaquina"))
+                .filter(n -> n != null && !n.isBlank())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     @SuppressWarnings("unchecked")

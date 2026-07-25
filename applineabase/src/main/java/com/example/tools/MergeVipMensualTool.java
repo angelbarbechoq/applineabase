@@ -1,7 +1,9 @@
 package com.example.tools;
 
 import com.example.dataacquisition.RutaArchivosEnergia;
+import com.example.dataacquisition.service.ConfigLoaderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -16,6 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Reconstruye el mensual a partir de los diarios, que suelen quedar completos aunque
@@ -34,6 +37,25 @@ import java.util.regex.Pattern;
  */
 @Service
 public class MergeVipMensualTool {
+
+    /**
+     * En la app (Spring), las líneas se leen del linea-id-config.json EXTERNALIZADO (el mismo
+     * que edita ConfiguracionView) — antes esta clase leía el JSON embebido en el jar, así que
+     * una línea agregada después de compilar quedaba invisible para esta herramienta hasta
+     * reconstruir el jar. Queda null solo cuando se instancia standalone (ver constructor sin
+     * argumentos, para main()), caso en el que se sigue leyendo el JSON embebido como antes.
+     */
+    private final ConfigLoaderService configLoaderService;
+
+    @Autowired
+    public MergeVipMensualTool(ConfigLoaderService configLoaderService) {
+        this.configLoaderService = configLoaderService;
+    }
+
+    /** Uso standalone (main(), IntelliJ): sin contexto de Spring, así que lee el JSON embebido en el jar. */
+    public MergeVipMensualTool() {
+        this.configLoaderService = null;
+    }
 
     /** Uso desde IntelliJ (clic derecho -> Run): sin argumentos usa el mes actual; con "yyyy-MM" procesa ese mes. */
     public static void main(String[] args) throws Exception {
@@ -144,8 +166,19 @@ public class MergeVipMensualTool {
         return resultado;
     }
 
-    @SuppressWarnings("unchecked")
     private List<String> leerLineasDesdeConfig() throws Exception {
+        if (configLoaderService != null) {
+            return configLoaderService.loadLineaIDConfig().stream()
+                    .map(l -> (String) l.get("lineaMaquina"))
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toList());
+        }
+        return leerLineasDesdeJsonEmbebido();
+    }
+
+    /** Fallback para el constructor standalone (sin ConfigLoaderService/Spring): el JSON embebido en el jar. */
+    @SuppressWarnings("unchecked")
+    private List<String> leerLineasDesdeJsonEmbebido() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         try (InputStream is = MergeVipMensualTool.class.getResourceAsStream("/linea-id-config.json")) {
             Map<String, Object> config = mapper.readValue(is, Map.class);

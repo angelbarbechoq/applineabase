@@ -1,6 +1,7 @@
 package com.example.base.ui;
 
 import com.example.base.model.GraficaModel;
+import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
@@ -238,7 +239,7 @@ public class HistoricoView extends VerticalLayout {
 
             graficaActiva.setSeriesNames(seriesNamesPorTipo(tipoVar));
 
-            SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+            SimpleDateFormat sdf = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
             List<Long> timestamps = new java.util.ArrayList<>();
             List<Float[]> valoresPorFila = new java.util.ArrayList<>();
 

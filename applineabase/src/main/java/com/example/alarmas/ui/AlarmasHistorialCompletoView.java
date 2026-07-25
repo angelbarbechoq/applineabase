@@ -2,8 +2,8 @@ package com.example.alarmas.ui;
 
 import com.example.alarmas.model.AlarmaEvento;
 import com.example.alarmas.repository.AlarmaEventoRepository;
-import com.example.base.ui.ChartsView;
 import com.example.base.ui.MainLayout;
+import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.button.Button;
@@ -11,8 +11,6 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H3;
-import com.vaadin.flow.component.notification.Notification;
-import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -24,7 +22,6 @@ import jakarta.annotation.security.PermitAll;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Historial completo de alarmas (activas + resueltas), filtrable por
@@ -36,7 +33,7 @@ import java.util.stream.Collectors;
 @PermitAll
 public class AlarmasHistorialCompletoView extends VerticalLayout implements BeforeEnterObserver {
 
-    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
     private static final String TODAS = "Todas las líneas";
 
     private final AlarmaEventoRepository eventoRepository;
@@ -55,12 +52,7 @@ public class AlarmasHistorialCompletoView extends VerticalLayout implements Befo
 
         add(new H3("Historial de Alarmas"));
 
-        List<String> lineas = configLoaderService.loadLineaIDConfig().stream()
-                .map(l -> (String) l.get("lineaMaquina"))
-                .filter(n -> n != null && !n.isBlank())
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
+        List<String> lineas = configLoaderService.listarNombresLinea();
         lineaFiltro.setItems(concatenarTodas(lineas));
         lineaFiltro.setValue(TODAS);
         lineaFiltro.setWidth("220px");
@@ -95,11 +87,7 @@ public class AlarmasHistorialCompletoView extends VerticalLayout implements Befo
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        if (!lineaAccessService.puedeVerAlarmas()) {
-            Notification.show("No tienes permiso para ver las alarmas", 3000, Notification.Position.MIDDLE)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            event.forwardTo(ChartsView.class);
-        }
+        AccesoAlarmas.verificar(event, lineaAccessService);
     }
 
     private void refrescarGrid() {

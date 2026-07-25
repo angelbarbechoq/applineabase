@@ -1,5 +1,6 @@
 package com.example.dataacquisition.service;
 
+import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.model.PAS600Lx;
 import com.example.dataacquisition.model.PASModbusRegistry;
 import de.re.easymodbus.exceptions.ModbusException;
@@ -31,7 +32,7 @@ import java.util.*;
 public class PASReaderService {
 
     private static final Logger logger = LoggerFactory.getLogger(PASReaderService.class);
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
     private final ArrayList<PAS600Lx> gatewayDevices;
     private final List<Map<String, Object>> lineaIdConfigCache;

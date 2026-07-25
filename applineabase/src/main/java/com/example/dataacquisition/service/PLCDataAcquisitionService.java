@@ -1,5 +1,6 @@
 package com.example.dataacquisition.service;
 
+import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.event.SensorDataUpdateEvent;
 import com.example.dataacquisition.model.PLCS7200x;
 import de.re.easymodbus.modbusclient.ModbusClient;
@@ -34,7 +35,7 @@ public class PLCDataAcquisitionService {
 
     private static final Logger logger = LoggerFactory.getLogger(PLCDataAcquisitionService.class);
 
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
     private final ArrayList<PLCS7200x> plcDevices;
     private List<Map<String, Object>> lineaIdConfigCache;

@@ -190,31 +190,31 @@ public class ConfiguracionView extends VerticalLayout {
     private boolean guardarLinea(Map<String, Object> lineaEnEdicion, Integer id, String nombre, String medidor,
                                   String plc, String serial, String zona, String grupo) {
         if (id == null) {
-            mostrarError("El ID es obligatorio");
+            NotificacionesUtil.mostrarError("El ID es obligatorio");
             return false;
         }
         if (nombre == null || nombre.isBlank()) {
-            mostrarError("Línea/Máquina es obligatorio");
+            NotificacionesUtil.mostrarError("Línea/Máquina es obligatorio");
             return false;
         }
         if (plc == null || plc.isBlank()) {
-            mostrarError("Debes asignar un PLC o Gateway");
+            NotificacionesUtil.mostrarError("Debes asignar un PLC o Gateway");
             return false;
         }
         if (zona == null || zona.isBlank()) {
-            mostrarError("La zona es obligatoria");
+            NotificacionesUtil.mostrarError("La zona es obligatoria");
             return false;
         }
         boolean idDuplicado = lineas.stream()
                 .anyMatch(l -> l != lineaEnEdicion && id.equals(((Number) l.get("id")).intValue()));
         if (idDuplicado) {
-            mostrarError("Ya existe una línea con ese ID");
+            NotificacionesUtil.mostrarError("Ya existe una línea con ese ID");
             return false;
         }
         boolean nombreDuplicado = lineas.stream()
                 .anyMatch(l -> l != lineaEnEdicion && nombre.equalsIgnoreCase(String.valueOf(l.get("lineaMaquina"))));
         if (nombreDuplicado) {
-            mostrarError("Ya existe una línea con ese nombre");
+            NotificacionesUtil.mostrarError("Ya existe una línea con ese nombre");
             return false;
         }
 
@@ -317,17 +317,17 @@ public class ConfiguracionView extends VerticalLayout {
 
     private boolean guardarPlc(Map<String, Object> plcEnEdicion, String nombre, String ip) {
         if (nombre == null || nombre.isBlank()) {
-            mostrarError("El nombre del PLC es obligatorio");
+            NotificacionesUtil.mostrarError("El nombre del PLC es obligatorio");
             return false;
         }
         if (!esIpValida(ip)) {
-            mostrarError("La IP no tiene un formato válido");
+            NotificacionesUtil.mostrarError("La IP no tiene un formato válido");
             return false;
         }
         boolean nombreDuplicado = plcs.stream()
                 .anyMatch(p -> p != plcEnEdicion && nombre.equalsIgnoreCase(String.valueOf(p.get("nombre"))));
         if (nombreDuplicado) {
-            mostrarError("Ya existe un PLC con ese nombre");
+            NotificacionesUtil.mostrarError("Ya existe un PLC con ese nombre");
             return false;
         }
 
@@ -431,17 +431,17 @@ public class ConfiguracionView extends VerticalLayout {
 
     private boolean guardarGateway(Map<String, Object> gatewayEnEdicion, String nombre, String ip, String descripcion) {
         if (nombre == null || nombre.isBlank()) {
-            mostrarError("El nombre del gateway es obligatorio");
+            NotificacionesUtil.mostrarError("El nombre del gateway es obligatorio");
             return false;
         }
         if (!esIpValida(ip)) {
-            mostrarError("La IP no tiene un formato válido");
+            NotificacionesUtil.mostrarError("La IP no tiene un formato válido");
             return false;
         }
         boolean nombreDuplicado = gateways.stream()
                 .anyMatch(g -> g != gatewayEnEdicion && nombre.equalsIgnoreCase(String.valueOf(g.get("nombre"))));
         if (nombreDuplicado) {
-            mostrarError("Ya existe un gateway con ese nombre");
+            NotificacionesUtil.mostrarError("Ya existe un gateway con ese nombre");
             return false;
         }
 
@@ -484,10 +484,6 @@ public class ConfiguracionView extends VerticalLayout {
         return ip != null && ip.matches("^\\d{1,3}(\\.\\d{1,3}){3}$");
     }
 
-    private void mostrarError(String mensaje) {
-        Notification.show(mensaje, 3000, Notification.Position.BOTTOM_END)
-                .addThemeVariants(NotificationVariant.LUMO_ERROR);
-    }
 
     private void cargarTodo() {
         lineas = configLoaderService.loadLineaIDConfig();

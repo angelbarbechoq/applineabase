@@ -2,16 +2,14 @@ package com.example.alarmas.ui;
 
 import com.example.alarmas.model.AlarmaEvento;
 import com.example.alarmas.repository.AlarmaEventoRepository;
-import com.example.base.ui.ChartsView;
 import com.example.base.ui.MainLayout;
+import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H3;
-import com.vaadin.flow.component.notification.Notification;
-import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.BeforeEnterEvent;
@@ -35,7 +33,7 @@ import java.time.format.DateTimeFormatter;
 @PermitAll
 public class AlarmasHistorialView extends VerticalLayout implements BeforeEnterObserver {
 
-    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
     private final AlarmaEventoRepository eventoRepository;
     private final LineaAccessService lineaAccessService;
@@ -76,11 +74,7 @@ public class AlarmasHistorialView extends VerticalLayout implements BeforeEnterO
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        if (!lineaAccessService.puedeVerAlarmas()) {
-            Notification.show("No tienes permiso para ver las alarmas", 3000, Notification.Position.MIDDLE)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            event.forwardTo(ChartsView.class);
-        }
+        AccesoAlarmas.verificar(event, lineaAccessService);
     }
 
     private void refrescarGrid() {

@@ -1,5 +1,7 @@
 package com.example.base.model;
 
+import com.example.dataacquisition.RutaArchivosEnergia;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,7 +15,7 @@ public class GraficaModel {
     private int nGraficas = 1;
     private Double maxY = 100.0, minY = 0.0;
     private List<Long> tiemposMarcadores = new ArrayList<>();
-    private SimpleDateFormat houra = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+    private SimpleDateFormat houra = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
     private String[] seriesNames = {"Valor"};
     private int posY = 0;
     private static final int DIVISIONES_Y = 10;
@@ -339,7 +341,7 @@ public class GraficaModel {
                                                            String[] seriesNames, double maxYDefault, boolean limitarPuntos) {
         setSeriesNames(seriesNames);
         int n = datosPorSerie.size();
-        SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+        SimpleDateFormat formatter = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
         // Las máquinas que comparten ciclo de lectura (mismo PLC, mismo loop) escriben con el
         // mismo timestamp exacto, por eso alinear por texto de fecha funciona sin interpolar.
@@ -484,7 +486,7 @@ public class GraficaModel {
      * histórico, para que ambas grafiquen exactamente lo mismo a partir de los mismos datos.
      */
     public static SerieKWh calcularSerieKWh(List<Map<String, Object>> datos, boolean esDiferencia) {
-        SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+        SimpleDateFormat formatter = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
         List<Long> timestamps = new ArrayList<>();
         List<Float> valores = new ArrayList<>();
 
