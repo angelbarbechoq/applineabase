@@ -32,6 +32,19 @@ public class PLCDataQueryService {
     }
 
     /**
+     * El nombre de máquina se concatena directo en el SQL en todos los métodos de esta clase (el
+     * nombre de tabla no se puede parametrizar con PreparedStatement) — se valida acá como
+     * identificador simple antes de usarlo en cualquiera de ellos. No alcanza con que la UI
+     * (ComboBox) solo ofrezca valores fijos: PLCDataController expone estos mismos métodos por
+     * REST con "maquina" como @PathVariable libre, y tieneAccesoAMaquina() deja pasar cualquier
+     * valor para un usuario ADMIN (no valida contra la lista de máquinas reales), así que esta es
+     * la única barrera real contra inyección SQL vía el nombre de tabla.
+     */
+    private static boolean esNombreMaquinaValido(String maquina) {
+        return maquina != null && maquina.matches("[A-Za-z0-9_]+");
+    }
+
+    /**
      * Mapea una fila de una tabla VIP (fecha + VAB, VAC, VBC, IA, IB, IC, PW, PF, KWhR) a un
      * Map. Única función para este mapeo: la usan getLatestVIPDataByMaquina,
      * getTodayDataByMaquina y getHistoricoVIPByRango, para que las tres lean siempre las
@@ -48,6 +61,10 @@ public class PLCDataQueryService {
 
     public Map<String, Object> getLatestVIPDataByMaquina(String nombreMaquina) {
         Map<String, Object> result = new HashMap<>();
+        if (!esNombreMaquinaValido(nombreMaquina)) {
+            result.put("error", "Nombre de máquina inválido: " + nombreMaquina);
+            return result;
+        }
 
         try {
             String dbPath = databaseInitializationService.getDailyVIPPath();
@@ -74,6 +91,10 @@ public class PLCDataQueryService {
 
     public Map<String, Object> getLatestKWhDataByMaquina(String nombreMaquina) {
         Map<String, Object> result = new HashMap<>();
+        if (!esNombreMaquinaValido(nombreMaquina)) {
+            result.put("error", "Nombre de máquina inválido: " + nombreMaquina);
+            return result;
+        }
 
         try {
             String dbPath = databaseInitializationService.getDailyPath();
@@ -101,6 +122,10 @@ public class PLCDataQueryService {
 
     public java.util.List<Map<String, Object>> getTodayDataByMaquina(String nombreMaquina) {
         java.util.List<Map<String, Object>> result = new java.util.ArrayList<>();
+        if (!esNombreMaquinaValido(nombreMaquina)) {
+            logger.warn("Nombre de máquina inválido: {}", nombreMaquina);
+            return result;
+        }
 
         try {
             String dbPath = databaseInitializationService.getDailyVIPPath();
@@ -122,6 +147,10 @@ public class PLCDataQueryService {
 
     public java.util.List<Map<String, Object>> getTodayKWhDataByMaquina(String nombreMaquina) {
         java.util.List<Map<String, Object>> result = new java.util.ArrayList<>();
+        if (!esNombreMaquinaValido(nombreMaquina)) {
+            logger.warn("Nombre de máquina inválido: {}", nombreMaquina);
+            return result;
+        }
 
         try {
             String dbPath = databaseInitializationService.getDailyPath();
@@ -156,6 +185,10 @@ public class PLCDataQueryService {
 
     public List<Map<String, Object>> getHistoricoVIPByRango(String maquina, LocalDate desde, LocalDate hasta) {
         List<Map<String, Object>> result = new ArrayList<>();
+        if (!esNombreMaquinaValido(maquina)) {
+            logger.warn("Nombre de máquina inválido: {}", maquina);
+            return result;
+        }
         SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
 
         YearMonth ymDesde = YearMonth.from(desde);
@@ -197,6 +230,10 @@ public class PLCDataQueryService {
 
     public List<Map<String, Object>> getHistoricoKWhByRango(String maquina, LocalDate desde, LocalDate hasta) {
         List<Map<String, Object>> result = new ArrayList<>();
+        if (!esNombreMaquinaValido(maquina)) {
+            logger.warn("Nombre de máquina inválido: {}", maquina);
+            return result;
+        }
         SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
 
         YearMonth ymDesde = YearMonth.from(desde);
@@ -240,6 +277,11 @@ public class PLCDataQueryService {
     }
     public Map<String, Object> getKWhByFechaExacta(String maquina, String fechaStr) {
         Map<String, Object> result = new HashMap<>();
+        if (!esNombreMaquinaValido(maquina)) {
+            logger.warn("Nombre de máquina inválido: {}", maquina);
+            result.put("kwh", 0.0);
+            return result;
+        }
 
         try {
             // Buscar sin segundos: "dd-MM-yyyy HH:mm"
@@ -289,15 +331,11 @@ public class PLCDataQueryService {
 
     private Map<String, Object> buscarPorFechaExactaEnMensual(String maquina, String fechaHoraStr, boolean vip, String[] campos) {
         Map<String, Object> result = new HashMap<>();
+        if (!esNombreMaquinaValido(maquina)) {
+            result.put("error", "Nombre de máquina inválido: " + maquina);
+            return result;
+        }
         try {
-            // maquina se concatena directo en el SQL (el nombre de tabla no se puede parametrizar
-            // con PreparedStatement) — se valida como identificador simple antes de usarlo, para
-            // no depender solo de que el ComboBox de la UI nunca mande texto libre.
-            if (!maquina.matches("[A-Za-z0-9_]+")) {
-                result.put("error", "Nombre de máquina inválido: " + maquina);
-                return result;
-            }
-
             // Buscar sin segundos: "dd-MM-yyyy HH:mm", igual que getKWhByFechaExacta (la
             // posición del click en el eje X no siempre cae justo en el segundo exacto).
             String fechaBusqueda = fechaHoraStr.substring(0, 16);
