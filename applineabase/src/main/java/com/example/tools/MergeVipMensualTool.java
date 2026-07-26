@@ -18,7 +18,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Reconstruye el mensual a partir de los diarios, que suelen quedar completos aunque
@@ -168,10 +167,7 @@ public class MergeVipMensualTool {
 
     private List<String> leerLineasDesdeConfig() throws Exception {
         if (configLoaderService != null) {
-            return configLoaderService.loadLineaIDConfig().stream()
-                    .map(l -> (String) l.get("lineaMaquina"))
-                    .filter(java.util.Objects::nonNull)
-                    .collect(Collectors.toList());
+            return configLoaderService.listarNombresLinea();
         }
         return leerLineasDesdeJsonEmbebido();
     }
