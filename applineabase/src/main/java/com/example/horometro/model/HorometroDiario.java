@@ -2,9 +2,6 @@ package com.example.horometro.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
@@ -17,40 +14,17 @@ import java.time.LocalDate;
  */
 @Entity
 @Table(name = "horometro_diario", uniqueConstraints = @UniqueConstraint(columnNames = {"lineaMaquina", "fecha"}))
-public class HorometroDiario {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false)
-    private String lineaMaquina;
+public class HorometroDiario extends HorometroBase {
 
     @Column(nullable = false)
     private LocalDate fecha;
-
-    @Column(nullable = false)
-    private double horas;
 
     public HorometroDiario() {
     }
 
     public HorometroDiario(String lineaMaquina, LocalDate fecha, double horas) {
-        this.lineaMaquina = lineaMaquina;
+        super(lineaMaquina, horas);
         this.fecha = fecha;
-        this.horas = horas;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getLineaMaquina() {
-        return lineaMaquina;
-    }
-
-    public void setLineaMaquina(String lineaMaquina) {
-        this.lineaMaquina = lineaMaquina;
     }
 
     public LocalDate getFecha() {
@@ -59,13 +33,5 @@ public class HorometroDiario {
 
     public void setFecha(LocalDate fecha) {
         this.fecha = fecha;
-    }
-
-    public double getHoras() {
-        return horas;
-    }
-
-    public void setHoras(double horas) {
-        this.horas = horas;
     }
 }

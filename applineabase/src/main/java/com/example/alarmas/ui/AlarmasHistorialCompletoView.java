@@ -3,7 +3,6 @@ package com.example.alarmas.ui;
 import com.example.alarmas.model.AlarmaEvento;
 import com.example.alarmas.repository.AlarmaEventoRepository;
 import com.example.base.ui.MainLayout;
-import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.button.Button;
@@ -20,7 +19,6 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
 
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -33,7 +31,6 @@ import java.util.List;
 @PermitAll
 public class AlarmasHistorialCompletoView extends VerticalLayout implements BeforeEnterObserver {
 
-    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
     private static final String TODAS = "Todas las líneas";
 
     private final AlarmaEventoRepository eventoRepository;
@@ -64,12 +61,9 @@ public class AlarmasHistorialCompletoView extends VerticalLayout implements Befo
         HorizontalLayout filtros = new HorizontalLayout(lineaFiltro, refrescarBtn);
         filtros.setAlignItems(Alignment.END);
 
-        grid.addColumn(e -> e.getFechaInicio() == null ? "-" : e.getFechaInicio().format(FORMATO_FECHA))
-                .setHeader("Inicio").setAutoWidth(true).setSortable(true);
-        grid.addColumn(AlarmaEvento::getLineaMaquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
-        grid.addColumn(AlarmaEvento::getTipoAlarma).setHeader("Tipo").setAutoWidth(true).setSortable(true);
+        GrillaAlarmaEventoUtil.agregarColumnasInicioLineaTipo(grid);
         grid.addColumn(e -> e.isActiva() ? "Activa" : "Resuelta").setHeader("Estado").setAutoWidth(true);
-        grid.addColumn(AlarmaEvento::getMensaje).setHeader("Detalle").setFlexGrow(1);
+        GrillaAlarmaEventoUtil.agregarColumnaDetalle(grid);
         grid.setSizeFull();
 
         add(filtros, grid);
