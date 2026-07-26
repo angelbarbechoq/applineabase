@@ -736,7 +736,8 @@ public class GraficaModel {
      * se muestra (ver TarjetasEstadoActual, que ya filtra por acceso antes de llamar acá).
      */
     public static String construirHtmlValoresActuales(Map<String, Object> datosVIP, Map<String, Object> datosKWh,
-                                                        Double temperaturaAgua, Double temperaturaAmbiente, Double pfGeneral) {
+                                                        Double temperaturaAgua, Double temperaturaAmbiente, Double pfGeneral,
+                                                        double umbralPFMinimo) {
         String[] labels = {"KWh", "VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF"};
         double[] valores = {
                 toDoubleSeguro(datosKWh.get("kwh")),
@@ -784,9 +785,10 @@ public class GraficaModel {
             }
             String colorValor;
             if (labelsExtra[i].equals("PF general")) {
-                // Azul oscuro en condición normal (igual que voltaje); por debajo de 0.94 en
-                // valor absoluto pasa a rojo (igual que corriente), como aviso de PF bajo.
-                colorValor = Math.abs(valoresExtra[i]) < 0.94 ? "#e34948" : "#1a3c8c";
+                // Azul oscuro en condición normal (igual que voltaje); por debajo del umbral
+                // configurado (AlarmaConfig.factorPotenciaMinimo, el mismo que usa el sistema de
+                // alarmas) en valor absoluto pasa a rojo (igual que corriente), como aviso de PF bajo.
+                colorValor = Math.abs(valoresExtra[i]) < umbralPFMinimo ? "#e34948" : "#1a3c8c";
             } else {
                 colorValor = "#0b0b0b";
             }

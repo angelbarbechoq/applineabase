@@ -52,7 +52,7 @@ public class AlarmaEvaluatorService {
     private static final int VENTANA_CICLOS_DEFAULT = 5;
     private static final int MINUTOS_MAX_DEFAULT = 15;
     private static final double TEMPERATURA_MAX_DEFAULT = 13.0;
-    private static final double FACTOR_POTENCIA_MIN_DEFAULT = 0.94;
+    public static final double FACTOR_POTENCIA_MIN_DEFAULT = 0.94;
     private static final DateTimeFormatter FECHA_FORMATTER = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
     private final AlarmaConfigRepository configRepository;

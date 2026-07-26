@@ -1,5 +1,6 @@
 package com.example.base.ui;
 
+import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.base.model.GraficaModel;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCDataQueryService;
@@ -38,6 +39,7 @@ public class ChartsView extends VerticalLayout {
     private final ConfigLoaderService configLoaderService;
     private final LineaAccessService lineaAccessService;
     private final PLCDataQueryService plcDataQueryService;
+    private final AlarmaConfigRepository alarmaConfigRepository;
 
     private ComboBox<String> maquinaCombo;
     private Span mensajeSpan;
@@ -63,11 +65,12 @@ public class ChartsView extends VerticalLayout {
     private boolean pfGeneralCargada;
 
     public ChartsView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
-                       PLCDataQueryService plcDataQueryService) {
+                       PLCDataQueryService plcDataQueryService, AlarmaConfigRepository alarmaConfigRepository) {
         this.graficaModel = new GraficaModel(1);
         this.configLoaderService = configLoaderService;
         this.lineaAccessService = lineaAccessService;
         this.plcDataQueryService = plcDataQueryService;
+        this.alarmaConfigRepository = alarmaConfigRepository;
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -556,7 +559,7 @@ public class ChartsView extends VerticalLayout {
      * GraficaModel.construirHtmlValoresActuales.
      */
     private void cargarDatosActuales(String maquina) {
-        TarjetasEstadoActual.cargarDatosActuales(lineaAccessService, plcDataQueryService, maquina, datosActualesCard);
+        TarjetasEstadoActual.cargarDatosActuales(lineaAccessService, plcDataQueryService, alarmaConfigRepository, maquina, datosActualesCard);
     }
 
     private void mostrarInfoMaquina(String maquina) {

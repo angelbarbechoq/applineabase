@@ -1,5 +1,9 @@
 package com.example.base.ui;
 
+import com.example.alarmas.model.AlarmaConfig;
+import com.example.alarmas.model.TipoAlarma;
+import com.example.alarmas.repository.AlarmaConfigRepository;
+import com.example.alarmas.service.AlarmaEvaluatorService;
 import com.example.base.model.GraficaModel;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
@@ -30,7 +34,7 @@ final class TarjetasEstadoActual {
 
     /** Carga y muestra la franja de valores en vivo para la máquina dada, o la oculta si falla. */
     static void cargarDatosActuales(LineaAccessService lineaAccessService, PLCDataQueryService plcDataQueryService,
-                                     String maquina, Div card) {
+                                     AlarmaConfigRepository alarmaConfigRepository, String maquina, Div card) {
         try {
             if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
                 card.setVisible(false);
@@ -46,11 +50,23 @@ final class TarjetasEstadoActual {
                     ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MAQUINA_TEMPERATURA_AMBIENTE)) : null;
             Double pfGeneral = lineaAccessService.tieneAccesoAMaquina(MAQUINA_KWH_PLANTA1)
                     ? extraerPFGeneral(plcDataQueryService.getLatestVIPDataByMaquina(MAQUINA_KWH_PLANTA1)) : null;
+            double umbralPF = umbralPFMinimo(alarmaConfigRepository);
 
-            mostrarDatosActuales(card, datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral);
+            mostrarDatosActuales(card, datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral, umbralPF);
         } catch (Exception e) {
             card.setVisible(false);
         }
+    }
+
+    /**
+     * Mismo umbral que usa el sistema de alarmas (AlarmaEvaluatorService) para KWhPlanta1 —
+     * configurable por AlarmasConfigView, con el mismo valor por defecto si no hay regla.
+     */
+    private static double umbralPFMinimo(AlarmaConfigRepository alarmaConfigRepository) {
+        return alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(MAQUINA_KWH_PLANTA1, TipoAlarma.FACTOR_POTENCIA_BAJO)
+                .map(AlarmaConfig::getFactorPotenciaMinimo)
+                .filter(java.util.Objects::nonNull)
+                .orElse(AlarmaEvaluatorService.FACTOR_POTENCIA_MIN_DEFAULT);
     }
 
     /** El "kwh" de estas máquinas virtuales guarda en realidad temperatura, según el caso. */
@@ -69,10 +85,11 @@ final class TarjetasEstadoActual {
     }
 
     private static void mostrarDatosActuales(Div card, Map<String, Object> datosVIP, Map<String, Object> datosKWh,
-                                              Double temperaturaAgua, Double temperaturaAmbiente, Double pfGeneral) {
+                                              Double temperaturaAgua, Double temperaturaAmbiente, Double pfGeneral,
+                                              double umbralPFMinimo) {
         if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
             card.getElement().setProperty("innerHTML",
-                    GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral));
+                    GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral, umbralPFMinimo));
             card.setVisible(true);
         } else {
             card.setVisible(false);
@@ -162,7 +179,9 @@ final class TarjetasEstadoActual {
                 Map<String, Object> datosVIP = plcDataQueryService.getVIPByFechaExactaHistorico(maquina, fechaHoraStr);
                 if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
                     franjaValores.getElement().setProperty("innerHTML",
-                            GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, null, null, null));
+                            // pfGeneral va null (ver comentario arriba), así que el umbral no se usa acá.
+                            GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, null, null, null,
+                                    AlarmaEvaluatorService.FACTOR_POTENCIA_MIN_DEFAULT));
                     franjaValores.setVisible(true);
                 } else {
                     franjaValores.setVisible(false);
