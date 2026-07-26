@@ -40,7 +40,7 @@ public class PLCDataQueryService {
      * valor para un usuario ADMIN (no valida contra la lista de máquinas reales), así que esta es
      * la única barrera real contra inyección SQL vía el nombre de tabla.
      */
-    private static boolean esNombreMaquinaValido(String maquina) {
+    public static boolean esNombreMaquinaValido(String maquina) {
         return maquina != null && maquina.matches("[A-Za-z0-9_]+");
     }
 

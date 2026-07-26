@@ -92,7 +92,7 @@ public class MergeVipMensualTool {
 
         List<String> lineas;
         try {
-            lineas = leerLineasDesdeConfig();
+            lineas = filtrarNombresValidos(leerLineasDesdeConfig(), log);
         } catch (Exception e) {
             log.add("Error leyendo linea-id-config.json: " + e.getMessage());
             return new ResultadoReparacion(log, 0, false);
@@ -163,6 +163,25 @@ public class MergeVipMensualTool {
         }
         resultado.sort((a, b) -> a.getName().compareTo(b.getName()));
         return resultado;
+    }
+
+    /**
+     * Los nombres de línea se concatenan directo en el SQL (CREATE TABLE / INSERT OR REPLACE
+     * INTO) en crearArchivoMensual/procesarDia — mismo caso que PLCDataQueryService, así que
+     * reusa su mismo validador en vez de duplicar la regla. Hoy los nombres siempre vienen del
+     * config (no hay ningún campo libre en ReparacionVipView), pero valida igual como defensa
+     * en profundidad ante un config editado a mano con un nombre raro.
+     */
+    private static List<String> filtrarNombresValidos(List<String> lineas, List<String> log) {
+        List<String> validas = new ArrayList<>();
+        for (String linea : lineas) {
+            if (com.example.dataacquisition.service.PLCDataQueryService.esNombreMaquinaValido(linea)) {
+                validas.add(linea);
+            } else {
+                log.add("Línea con nombre inválido, se omite: " + linea);
+            }
+        }
+        return validas;
     }
 
     private List<String> leerLineasDesdeConfig() throws Exception {
