@@ -174,13 +174,7 @@ public class PLCDataQueryService {
     }
 
     private String buildMonthlyPath(YearMonth ym, boolean vip) {
-        int year = ym.getYear();
-        int month = ym.getMonthValue();
-        String monthName = RutaArchivosEnergia.getNombreMes(month);
-        //String monthFolder = String.format("%02d", month) + "_" + monthName;
-        String monthFolder = monthName;
-        String fileName =  monthName + (vip ? "VIP" : "");
-        return RutaArchivosEnergia.BASE_PATH + "\\" + year + "\\" + monthFolder + "\\" + fileName;
+        return RutaArchivosEnergia.construirRutaMensual(ym.getYear(), ym.getMonthValue(), vip);
     }
 
     public List<Map<String, Object>> getHistoricoVIPByRango(String maquina, LocalDate desde, LocalDate hasta) {

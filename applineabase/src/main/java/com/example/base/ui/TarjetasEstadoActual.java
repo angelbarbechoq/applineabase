@@ -110,6 +110,23 @@ final class TarjetasEstadoActual {
                 GraficaModel.construirHtmlUltimoClick("00-00-00", "00:00:00", "0.0"));
     }
 
+    /** Fecha ("dd-MM-yyyy") y hora ("HH:mm:ss") de un timestamp, ya separadas como las necesita
+     * GraficaModel.construirHtmlUltimoClick. */
+    private record FechaHora(String fecha, String hora) {
+    }
+
+    /** Anota el click en graficaActiva (si no es null) y separa el timestamp en fecha/hora —
+     * igual en ChartsView e HistoricoView, así que queda una sola vez acá. */
+    private static FechaHora registrarClickYFormatear(GraficaModel graficaActiva, long timestamp) {
+        if (graficaActiva != null) {
+            graficaActiva.registrarClick(timestamp);
+        }
+        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+        Date fecha = new Date(timestamp);
+        return new FechaHora(dateFormat.format(fecha), timeFormat.format(fecha));
+    }
+
     /**
      * Calcula fecha/hora/KWh para el timestamp clickeado y actualiza la tarjeta compartida de
      * último click. graficaActiva puede ser null; si no lo es, también anota el click ahí
@@ -117,15 +134,9 @@ final class TarjetasEstadoActual {
      */
     static void actualizarUltimoClick(LineaAccessService lineaAccessService, PLCDataQueryService plcDataQueryService,
                                        GraficaModel graficaActiva, String maquina, MainLayout layout, long timestamp) {
-        if (graficaActiva != null) {
-            graficaActiva.registrarClick(timestamp);
-        }
-
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
-        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
-        Date fecha = new Date(timestamp);
-        String fechaStr = dateFormat.format(fecha);
-        String horaStr = timeFormat.format(fecha);
+        FechaHora fechaHora = registrarClickYFormatear(graficaActiva, timestamp);
+        String fechaStr = fechaHora.fecha();
+        String horaStr = fechaHora.hora();
 
         String valorStr = "";
         try {
@@ -154,15 +165,9 @@ final class TarjetasEstadoActual {
     static void actualizarUltimoClickHistorico(LineaAccessService lineaAccessService, PLCDataQueryService plcDataQueryService,
                                                 GraficaModel graficaActiva, String maquina, MainLayout layout,
                                                 Div franjaValores, long timestamp) {
-        if (graficaActiva != null) {
-            graficaActiva.registrarClick(timestamp);
-        }
-
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
-        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
-        Date fecha = new Date(timestamp);
-        String fechaStr = dateFormat.format(fecha);
-        String horaStr = timeFormat.format(fecha);
+        FechaHora fechaHora = registrarClickYFormatear(graficaActiva, timestamp);
+        String fechaStr = fechaHora.fecha();
+        String horaStr = fechaHora.hora();
         String fechaHoraStr = fechaStr + " " + horaStr;
 
         // Temperatura Agua/Ambiente y PF general son solo para Tiempo Real (ver

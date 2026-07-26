@@ -32,6 +32,19 @@ public final class RutaArchivosEnergia {
         return NOMBRES_MES[mes - 1];
     }
 
+    /** Carpeta del mes (BASE_PATH\{año}\{nombreMes}) — misma convención que usan los 3 lugares
+     * que arman rutas de archivos mensuales (PLCDataQueryService, MergeVipMensualTool,
+     * DatabaseInitializationService). */
+    public static String construirCarpetaMes(int year, int mes) {
+        return BASE_PATH + "\\" + year + "\\" + getNombreMes(mes);
+    }
+
+    /** Ruta completa del archivo SQLite mensual (normal o VIP, según el sufijo del nombre). */
+    public static String construirRutaMensual(int year, int mes, boolean vip) {
+        String nombreMes = getNombreMes(mes);
+        return construirCarpetaMes(year, mes) + "\\" + nombreMes + (vip ? "VIP" : "");
+    }
+
     /** Número de mes (1-12) a partir del nombre en español, o -1 si no coincide con ninguno. */
     public static int getMesNumeroDesdeNombre(String nombreMes) {
         for (int i = 0; i < NOMBRES_MES.length; i++) {

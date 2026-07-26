@@ -76,8 +76,8 @@ public class MergeVipMensualTool {
     private ResultadoReparacion reparar(YearMonth mes, String sufijo) {
         List<String> log = new ArrayList<>();
         String nombreMes = RutaArchivosEnergia.getNombreMes(mes.getMonthValue());
-        String carpetaMes = RutaArchivosEnergia.BASE_PATH + "\\" + mes.getYear() + "\\" + nombreMes;
-        String mensualPath = carpetaMes + "\\" + nombreMes + sufijo;
+        String carpetaMes = RutaArchivosEnergia.construirCarpetaMes(mes.getYear(), mes.getMonthValue());
+        String mensualPath = RutaArchivosEnergia.construirRutaMensual(mes.getYear(), mes.getMonthValue(), !sufijo.isEmpty());
         String etiqueta = sufijo.isEmpty() ? "normal (KWh)" : sufijo;
 
         log.add("Mes: " + mes + " (" + nombreMes + ")");

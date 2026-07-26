@@ -59,11 +59,9 @@ public class DatabaseInitializationService {
         int day = today.getDayOfMonth();
 
         String monthName = RutaArchivosEnergia.getNombreMes(month);
-        //String monthFormatted = String.format("%02d", month);
         String dayFormatted = String.format("%02d", day);
 
-        String monthFolder =  monthName;
-        String monthPath = RutaArchivosEnergia.BASE_PATH + "\\" + year + "\\" + monthFolder;
+        String monthPath = RutaArchivosEnergia.construirCarpetaMes(year, month);
 
         try {
             Files.createDirectories(Paths.get(monthPath));
