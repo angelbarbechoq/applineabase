@@ -202,7 +202,11 @@ public final class MainLayout extends AppLayout {
             alarmas.setPrefixComponent(VaadinIcon.BELL.create());
             alarmas.setExpanded(false);
             alarmas.addItem(new SideNavItem("Alarmas Activas", "alarmas", VaadinIcon.BELL_O.create()));
-            alarmas.addItem(new SideNavItem("Historial Alarmas", "alarmas/historial", VaadinIcon.CLOCK.create()));
+            // Historial (con descarga CSV) queda solo para ADMIN por el momento, a diferencia de
+            // Alarmas Activas que sigue viendo también la zona Mantenimiento.
+            if (lineaAccessService.esAdmin()) {
+                alarmas.addItem(new SideNavItem("Historial Alarmas", "alarmas/historial", VaadinIcon.CLOCK.create()));
+            }
             nav.addItem(alarmas);
             colapsarAlSalirDelMouse(alarmas);
         }

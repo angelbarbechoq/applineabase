@@ -6,7 +6,6 @@ import com.example.base.ui.CsvUtil;
 import com.example.base.ui.MainLayout;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.ConfigLoaderService;
-import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -16,12 +15,10 @@ import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.StreamResource;
-import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -33,24 +30,25 @@ import java.util.List;
  * Historial completo de alarmas (activas + resueltas), filtrable por
  * línea/máquina. Las alarmas nunca se borran de aquí; solo AlarmasHistorialView
  * (/alarmas) deja de mostrarlas cuando se resuelven.
+ *
+ * Solo ADMIN por el momento (a diferencia de /alarmas, que también ve Mantenimiento vía
+ * AccesoAlarmas/puedeVerAlarmas) — incluye la descarga CSV, que se restringe de la misma forma
+ * al restringir la vista completa.
  */
 @PageTitle("Historial de Alarmas | LineaBase")
 @Route(value = "alarmas/historial", layout = MainLayout.class)
-@PermitAll
-public class AlarmasHistorialCompletoView extends VerticalLayout implements BeforeEnterObserver {
+@RolesAllowed("ADMIN")
+public class AlarmasHistorialCompletoView extends VerticalLayout {
 
     private static final String TODAS = "Todas las líneas";
     private static final DateTimeFormatter FORMATO_FECHA_CSV = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
     private final AlarmaEventoRepository eventoRepository;
-    private final LineaAccessService lineaAccessService;
     private final Grid<AlarmaEvento> grid = new Grid<>(AlarmaEvento.class, false);
     private final ComboBox<String> lineaFiltro = new ComboBox<>("Línea/Máquina");
 
-    public AlarmasHistorialCompletoView(AlarmaEventoRepository eventoRepository, LineaAccessService lineaAccessService,
-                                         ConfigLoaderService configLoaderService) {
+    public AlarmasHistorialCompletoView(AlarmaEventoRepository eventoRepository, ConfigLoaderService configLoaderService) {
         this.eventoRepository = eventoRepository;
-        this.lineaAccessService = lineaAccessService;
 
         setSizeFull();
         setPadding(true);
@@ -86,11 +84,6 @@ public class AlarmasHistorialCompletoView extends VerticalLayout implements Befo
         items.add(TODAS);
         items.addAll(lineas);
         return items;
-    }
-
-    @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        AccesoAlarmas.verificar(event, lineaAccessService);
     }
 
     private void refrescarGrid() {
