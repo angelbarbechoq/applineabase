@@ -37,9 +37,10 @@ public class HistoricoView extends VerticalLayout {
     private static final double VOLTAJES_MAX_Y_DEFAULT = 500.0;
     private static final double CORRIENTES_MAX_Y_DEFAULT = 300.0;
     private static final double PW_MAX_Y_DEFAULT = 200.0;
-    // El medidor reporta el factor de potencia en escala de porcentaje (ej. -95.96), no
-    // como fracción 0-1: el piso debe cubrir esa escala real, igual que las demás variables.
-    private static final double PF_MAX_Y_DEFAULT = 100.0;
+    // El factor de potencia se grafica siempre como fracción 0-1 (ver normalizarPF): algunos
+    // medidores (KWhPlanta1) lo reportan en escala de porcentaje (ej. -95.96) y otros ya en
+    // fracción (ej. 0.94) — normalizando antes de graficar, el piso es el mismo para todos.
+    private static final double PF_MAX_Y_DEFAULT = 1.0;
 
     private final GraficaModel graficaKWh = new GraficaModel(1);
     private final GraficaModel graficaVoltajes = new GraficaModel(3);
@@ -325,10 +326,23 @@ public class HistoricoView extends VerticalLayout {
             };
             case "PW" -> new Float[]{GraficaModel.toFloatAbs(row.get("PW"))};
             // El factor de potencia es el que da negativo en el medidor principal: se
-            // toma en valor absoluto igual que el resto.
-            case "PF" -> new Float[]{GraficaModel.toFloatAbs(row.get("PF"))};
+            // toma en valor absoluto igual que el resto, y se normaliza a fracción 0-1.
+            case "PF" -> new Float[]{normalizarPF(GraficaModel.toFloatAbs(row.get("PF")))};
             default -> new Float[]{0f};
         };
+    }
+
+    /**
+     * El factor de potencia (coseno de un ángulo) nunca supera 1 en valor absoluto: si el dato
+     * crudo lo supera, viene en escala de porcentaje (como KWhPlanta1, que reporta p.ej. -85.5,
+     * igual que TarjetasEstadoActual.extraerPFGeneral) y hay que dividirlo entre 100. Las
+     * máquinas que ya reportan la fracción 0-1 directamente quedan sin cambios.
+     */
+    private static Float normalizarPF(Float pf) {
+        if (pf == null) {
+            return null;
+        }
+        return Math.abs(pf) > 1f ? pf / 100f : pf;
     }
 
     @Override
