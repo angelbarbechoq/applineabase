@@ -1,5 +1,6 @@
 package com.example.dataacquisition.service;
 
+import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.event.SensorDataUpdateEvent;
 import com.example.dataacquisition.model.PLCS7200x;
@@ -159,7 +160,7 @@ public class PLCDataAcquisitionService {
                 datosConvertidosBD[lineIndex] = returnByteToBigDecimal(registrosPLC[lineIndex]);
             }
             //String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
-            List<String> tablas = List.of( "TemperaturaAmbiente", "PsiAireP1", "TemperaturaAgua", "PsiAgua", "BarCompHP");
+            List<String> tablas = List.of(MaquinasVirtuales.TEMPERATURA_AMBIENTE, "PsiAireP1", MaquinasVirtuales.TEMPERATURA_AGUA, "PsiAgua", "BarCompHP");
             int[] parametros=null;
             if(plc.getPlcIPx().equals("192.168.0.3"))
             {
@@ -210,7 +211,7 @@ public class PLCDataAcquisitionService {
                 if (nombreTabla[ixy].equals("TDGeneradorSA")) {
                     KWh[ixy] = KWh[ixy].divide(BigDecimal.valueOf(1000.0));
                 }
-                if (nombreTabla[ixy].equals("KWhPlanta1")) {
+                if (nombreTabla[ixy].equals(MaquinasVirtuales.KWH_PLANTA_1)) {
                     int bits = ((registrosPLC[0][ixy * 2] & 0xFFFF) << 16) | (registrosPLC[0][ixy * 2 + 1] & 0xFFFF);
                     KWh[ixy] = BigDecimal.valueOf((float) bits);
                     bits = ((registrosPLC[1][ixy * 2] & 0xFFFF) << 16) | (registrosPLC[1][ixy * 2 + 1] & 0xFFFF);

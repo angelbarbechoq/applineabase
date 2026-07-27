@@ -5,6 +5,7 @@ import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.service.AlarmaEvaluatorService;
 import com.example.base.model.GraficaModel;
+import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.UI;
@@ -21,14 +22,6 @@ import java.util.Map;
  */
 final class TarjetasEstadoActual {
 
-    // Mismos nombres de "máquina virtual" que ya usa ChartsView para sus pestañas Temperatura y
-    // PF general (ver mostrarTemperatura/mostrarPFGeneral) — Temperatura Agua/Ambiente y PF
-    // general se guardan con el mismo esquema de tabla que el KWh normal, así que se leen con
-    // los mismos métodos de siempre (getLatestKWhDataByMaquina/getKWhByFechaExactaHistorico).
-    private static final String MAQUINA_TEMPERATURA_AGUA = "TemperaturaAgua";
-    private static final String MAQUINA_TEMPERATURA_AMBIENTE = "TemperaturaAmbiente";
-    private static final String MAQUINA_KWH_PLANTA1 = "KWhPlanta1";
-
     private TarjetasEstadoActual() {
     }
 
@@ -43,13 +36,17 @@ final class TarjetasEstadoActual {
             Map<String, Object> datosVIP = plcDataQueryService.getLatestVIPDataByMaquina(maquina);
             Map<String, Object> datosKWh = plcDataQueryService.getLatestKWhDataByMaquina(maquina);
 
-            boolean accesoTemperatura = lineaAccessService.tieneAccesoAMaquina(MAQUINA_TEMPERATURA_AGUA);
+            // Temperatura Agua/Ambiente y PF general se guardan con el mismo esquema de tabla que
+            // el KWh normal, así que se leen con los mismos métodos de siempre — mismos nombres
+            // de "máquina virtual" que usa ChartsView para sus pestañas Temperatura y PF general
+            // (ver mostrarTemperatura/mostrarPFGeneral).
+            boolean accesoTemperatura = lineaAccessService.tieneAccesoAMaquina(MaquinasVirtuales.TEMPERATURA_AGUA);
             Double temperaturaAgua = accesoTemperatura
-                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MAQUINA_TEMPERATURA_AGUA)) : null;
+                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MaquinasVirtuales.TEMPERATURA_AGUA)) : null;
             Double temperaturaAmbiente = accesoTemperatura
-                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MAQUINA_TEMPERATURA_AMBIENTE)) : null;
-            Double pfGeneral = lineaAccessService.tieneAccesoAMaquina(MAQUINA_KWH_PLANTA1)
-                    ? extraerPFGeneral(plcDataQueryService.getLatestVIPDataByMaquina(MAQUINA_KWH_PLANTA1)) : null;
+                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MaquinasVirtuales.TEMPERATURA_AMBIENTE)) : null;
+            Double pfGeneral = lineaAccessService.tieneAccesoAMaquina(MaquinasVirtuales.KWH_PLANTA_1)
+                    ? extraerPFGeneral(plcDataQueryService.getLatestVIPDataByMaquina(MaquinasVirtuales.KWH_PLANTA_1)) : null;
             double umbralPF = umbralPFMinimo(alarmaConfigRepository);
 
             mostrarDatosActuales(card, datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral, umbralPF);
@@ -63,7 +60,7 @@ final class TarjetasEstadoActual {
      * configurable por AlarmasConfigView, con el mismo valor por defecto si no hay regla.
      */
     private static double umbralPFMinimo(AlarmaConfigRepository alarmaConfigRepository) {
-        return alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(MAQUINA_KWH_PLANTA1, TipoAlarma.FACTOR_POTENCIA_BAJO)
+        return alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(MaquinasVirtuales.KWH_PLANTA_1, TipoAlarma.FACTOR_POTENCIA_BAJO)
                 .map(AlarmaConfig::getFactorPotenciaMinimo)
                 .filter(java.util.Objects::nonNull)
                 .orElse(AlarmaEvaluatorService.FACTOR_POTENCIA_MIN_DEFAULT);

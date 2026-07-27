@@ -3,6 +3,7 @@ package com.example.alarmas.service;
 import com.example.alarmas.model.AlarmaConfig;
 import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
+import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,9 +38,8 @@ public class AlarmaConfigSeeder implements CommandLineRunner {
 
     private static final Set<String> COMPRESORES_CICLICOS = Set.of("CompAP", "Sauer");
     private static final Set<String> SENSORES_SIN_KWH = Set.of(
-            "TemperaturaAmbiente", "PsiAireP1", "TemperaturaAgua", "PsiAgua", "BarCompHP");
-    private static final String SENSOR_TEMPERATURA_AGUA = "TemperaturaAgua";
-    private static final Set<String> LINEAS_CON_FACTOR_POTENCIA = Set.of("KWhPlanta1", "Trafo1", "Trafo2");
+            MaquinasVirtuales.TEMPERATURA_AMBIENTE, "PsiAireP1", MaquinasVirtuales.TEMPERATURA_AGUA, "PsiAgua", "BarCompHP");
+    private static final Set<String> LINEAS_CON_FACTOR_POTENCIA = Set.of(MaquinasVirtuales.KWH_PLANTA_1, "Trafo1", "Trafo2");
 
     private final AlarmaConfigRepository configRepository;
     private final ConfigLoaderService configLoaderService;
@@ -69,7 +69,7 @@ public class AlarmaConfigSeeder implements CommandLineRunner {
                 });
             }
 
-            if (SENSOR_TEMPERATURA_AGUA.equals(nombre)) {
+            if (MaquinasVirtuales.TEMPERATURA_AGUA.equals(nombre)) {
                 seedSiNoExiste(nombre, TipoAlarma.TEMPERATURA_ALTA, config -> config.setTemperaturaMaxima(13.0));
             }
 

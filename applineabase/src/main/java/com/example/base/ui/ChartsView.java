@@ -2,6 +2,7 @@ package com.example.base.ui;
 
 import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.base.model.GraficaModel;
+import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
@@ -77,8 +78,8 @@ public class ChartsView extends VerticalLayout {
 
         // Temperatura/PF general viven solo en la zona Mantenimiento (y ADMIN, que ve todo):
         // la misma regla de acceso por zona que ya aplica al resto de la app, no una nueva.
-        mostrarTemperatura = lineaAccessService.tieneAccesoAMaquina("TemperaturaAgua");
-        mostrarPFGeneral = lineaAccessService.tieneAccesoAMaquina("KWhPlanta1");
+        mostrarTemperatura = lineaAccessService.tieneAccesoAMaquina(MaquinasVirtuales.TEMPERATURA_AGUA);
+        mostrarPFGeneral = lineaAccessService.tieneAccesoAMaquina(MaquinasVirtuales.KWH_PLANTA_1);
 
         // crearPanelKwh() deja armado datosActualesCard (las tarjetas KWh/VAB/VAC/etc.); se
         // arma antes para poder ponerlo junto al título, en vez de junto al selector de máquina.
@@ -236,8 +237,8 @@ public class ChartsView extends VerticalLayout {
      */
     private void cargarTemperaturaChart() {
         try {
-            List<Map<String, Object>> datosAgua = plcDataQueryService.getTodayKWhDataByMaquina("TemperaturaAgua");
-            List<Map<String, Object>> datosAmbiente = plcDataQueryService.getTodayKWhDataByMaquina("TemperaturaAmbiente");
+            List<Map<String, Object>> datosAgua = plcDataQueryService.getTodayKWhDataByMaquina(MaquinasVirtuales.TEMPERATURA_AGUA);
+            List<Map<String, Object>> datosAmbiente = plcDataQueryService.getTodayKWhDataByMaquina(MaquinasVirtuales.TEMPERATURA_AMBIENTE);
 
             if (datosAgua.isEmpty() && datosAmbiente.isEmpty()) {
                 temperaturaMensajeSpan.setText("No hay datos de temperatura para la fecha actual");
@@ -300,7 +301,7 @@ public class ChartsView extends VerticalLayout {
      */
     private void cargarPFGeneralChart() {
         try {
-            List<Map<String, Object>> datosVip = plcDataQueryService.getTodayDataByMaquina("KWhPlanta1");
+            List<Map<String, Object>> datosVip = plcDataQueryService.getTodayDataByMaquina(MaquinasVirtuales.KWH_PLANTA_1);
             List<Map<String, Object>> datosPf = new ArrayList<>();
             for (Map<String, Object> fila : datosVip) {
                 Float pf = GraficaModel.toFloatAbs(fila.get("PF"));
