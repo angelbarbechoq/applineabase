@@ -6,6 +6,7 @@ import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.ui.AlarmasConfigView;
 import com.example.base.model.GraficaModel;
 import com.example.base.ui.ChartsView;
+import com.example.base.ui.CsvUtil;
 import com.example.base.ui.MainLayout;
 import com.example.horometro.service.HorometroBackfillRunner;
 import com.example.horometro.service.HorometroService;
@@ -366,7 +367,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
                 continue;
             }
             HorometroService.ReporteSemanal r = horometroService.generarReporte(maquina, fecha);
-            sb.append(csvEscape(maquina)).append(';')
+            sb.append(CsvUtil.escape(maquina)).append(';')
                     .append(r.lunes().format(FORMATO_FECHA_CORTA)).append(';')
                     .append(r.domingo().format(FORMATO_FECHA_CORTA)).append(';')
                     .append(formatoDecimalExcel(r.horasDomingo())).append(';')
@@ -404,13 +405,6 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private Optional<AlarmaConfig> buscarConfigHorometro(String maquina) {
         return alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.DETENCION)
                 .or(() -> alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(maquina, TipoAlarma.CICLO_COMPRESOR));
-    }
-
-    private String csvEscape(String valor) {
-        if (valor.contains(";") || valor.contains("\"") || valor.contains("\n")) {
-            return "\"" + valor.replace("\"", "\"\"") + "\"";
-        }
-        return valor;
     }
 
     private void refrescarGrid() {

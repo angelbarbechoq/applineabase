@@ -2,13 +2,16 @@ package com.example.alarmas.ui;
 
 import com.example.alarmas.model.AlarmaEvento;
 import com.example.alarmas.repository.AlarmaEventoRepository;
+import com.example.base.ui.CsvUtil;
 import com.example.base.ui.MainLayout;
+import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -17,8 +20,13 @@ import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.PermitAll;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -32,6 +40,7 @@ import java.util.List;
 public class AlarmasHistorialCompletoView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String TODAS = "Todas las líneas";
+    private static final DateTimeFormatter FORMATO_FECHA_CSV = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
     private final AlarmaEventoRepository eventoRepository;
     private final LineaAccessService lineaAccessService;
@@ -58,7 +67,7 @@ public class AlarmasHistorialCompletoView extends VerticalLayout implements Befo
         Button refrescarBtn = new Button("Refrescar", e -> refrescarGrid());
         refrescarBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
-        HorizontalLayout filtros = new HorizontalLayout(lineaFiltro, refrescarBtn);
+        HorizontalLayout filtros = new HorizontalLayout(lineaFiltro, refrescarBtn, crearLinkDescargaCsv());
         filtros.setAlignItems(Alignment.END);
 
         GrillaAlarmaEventoUtil.agregarColumnasInicioLineaTipo(grid);
@@ -85,11 +94,38 @@ public class AlarmasHistorialCompletoView extends VerticalLayout implements Befo
     }
 
     private void refrescarGrid() {
+        grid.setItems(obtenerEventosFiltrados());
+    }
+
+    /** Misma línea (o "todas") que ve la grilla — la usa también la exportación CSV, para que
+     * el archivo descargado coincida siempre con lo que se ve filtrado en pantalla. */
+    private List<AlarmaEvento> obtenerEventosFiltrados() {
         String linea = lineaFiltro.getValue();
-        if (linea == null || TODAS.equals(linea)) {
-            grid.setItems(eventoRepository.findAllByOrderByFechaInicioDesc());
-        } else {
-            grid.setItems(eventoRepository.findByLineaMaquinaOrderByFechaInicioDesc(linea));
+        return (linea == null || TODAS.equals(linea))
+                ? eventoRepository.findAllByOrderByFechaInicioDesc()
+                : eventoRepository.findByLineaMaquinaOrderByFechaInicioDesc(linea);
+    }
+
+    private Anchor crearLinkDescargaCsv() {
+        StreamResource recurso = new StreamResource("alarmas-historial.csv", this::generarCsv);
+        recurso.setContentType("text/csv; charset=UTF-8");
+
+        Anchor descargarLink = new Anchor(recurso, "Descargar CSV");
+        descargarLink.getElement().setAttribute("download", true);
+        return descargarLink;
+    }
+
+    private InputStream generarCsv() {
+        StringBuilder sb = new StringBuilder();
+        sb.append((char) 0xFEFF); // BOM UTF-8, para que Excel muestre bien tildes/ñ
+        sb.append("Inicio;Línea/Máquina;Tipo;Estado;Detalle\r\n");
+        for (AlarmaEvento evento : obtenerEventosFiltrados()) {
+            sb.append(evento.getFechaInicio() == null ? "" : evento.getFechaInicio().format(FORMATO_FECHA_CSV)).append(';')
+                    .append(CsvUtil.escape(evento.getLineaMaquina())).append(';')
+                    .append(evento.getTipoAlarma()).append(';')
+                    .append(evento.isActiva() ? "Activa" : "Resuelta").append(';')
+                    .append(CsvUtil.escape(evento.getMensaje())).append("\r\n");
         }
+        return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 }

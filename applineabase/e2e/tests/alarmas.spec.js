@@ -28,4 +28,23 @@ test.describe('Alarmas', () => {
     await guardarBtn.click();
     await expect(page.locator('vaadin-notification-card')).toBeVisible({ timeout: 5_000 });
   });
+
+  test('/alarmas/historial descarga un CSV con el encabezado esperado', async ({ page }) => {
+    await page.goto('/alarmas/historial');
+
+    const link = page.locator('a', { hasText: 'Descargar CSV' });
+    await expect(link).toBeVisible({ timeout: 15_000 });
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      link.click(),
+    ]);
+    expect(download.suggestedFilename()).toBe('alarmas-historial.csv');
+
+    const stream = await download.createReadStream();
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    const contenido = Buffer.concat(chunks).toString('utf8');
+    expect(contenido).toContain('Inicio;Línea/Máquina;Tipo;Estado;Detalle');
+  });
 });
