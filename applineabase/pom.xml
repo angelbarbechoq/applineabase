@@ -114,36 +114,6 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.1</version>
-                <executions>
-                    <execution>
-                        <id>create-app-image</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>${java.home}/bin/jpackage</executable>
-                            <arguments>
-                                <argument>--name</argument>
-                                <argument>applineabase</argument>
-                                <argument>--input</argument>
-                                <argument>${project.build.directory}</argument>
-                                <argument>--main-jar</argument>
-                                <argument>applineabase-1.0-SNAPSHOT.jar</argument>
-                                <argument>--dest</argument>
-                                <argument>${project.build.directory}/dist</argument>
-                                <argument>--type</argument>
-                                <argument>app-image</argument>
-                                <argument>--win-console</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <groupId>com.vaadin</groupId>
                 <artifactId>vaadin-maven-plugin</artifactId>
                 <version>${vaadin.version}</version>
@@ -168,5 +138,58 @@
             <url>https://maven.vaadin.com/vaadin-addons</url>
         </repository>
     </repositories>
+
+    <profiles>
+        <!--
+        El paso jpackage con el argumento de consola de Windows solo es valido en ese SO (falla
+        con "is not valid on this platform" en Linux/Mac) - antes corria siempre y quedaba como un
+        error permanente en cualquier build no-Windows, aunque el jar ya estuviera listo. Con
+        activation por familia de SO, el profile (y por lo tanto el plugin) ni se activa fuera de
+        Windows, asi que "mvn package" da un exit code real y confiable en cualquier plataforma,
+        necesario para que CI pueda distinguir un build realmente roto de este falso positivo.
+        -->
+        <profile>
+            <id>windows-app-image</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.1</version>
+                        <executions>
+                            <execution>
+                                <id>create-app-image</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.home}/bin/jpackage</executable>
+                                    <arguments>
+                                        <argument>--name</argument>
+                                        <argument>applineabase</argument>
+                                        <argument>--input</argument>
+                                        <argument>${project.build.directory}</argument>
+                                        <argument>--main-jar</argument>
+                                        <argument>applineabase-1.0-SNAPSHOT.jar</argument>
+                                        <argument>--dest</argument>
+                                        <argument>${project.build.directory}/dist</argument>
+                                        <argument>--type</argument>
+                                        <argument>app-image</argument>
+                                        <argument>--win-console</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

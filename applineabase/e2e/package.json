@@ -1,0 +1,12 @@
+{
+  "name": "applineabase-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pruebas de regresion end-to-end de la app (Playwright). Corren solas en cada push/PR via .github/workflows/e2e.yml.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
