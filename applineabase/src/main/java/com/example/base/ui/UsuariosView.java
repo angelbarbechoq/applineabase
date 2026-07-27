@@ -24,7 +24,6 @@ import jakarta.annotation.security.RolesAllowed;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @PageTitle("Usuarios | LineaBase")
 @Route(value = "usuarios", layout = MainLayout.class)
@@ -56,12 +55,7 @@ public class UsuariosView extends VerticalLayout {
 
         add(new H3("Gestión de Usuarios"));
 
-        List<String> zonas = configLoaderService.loadLineaIDConfig().stream()
-                .map(l -> (String) l.get("zona"))
-                .filter(z -> z != null && !z.isBlank())
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
+        List<String> zonas = configLoaderService.listarValoresDistintos("zona");
         zonaCombo.setItems(zonas);
         zonaCombo.setWidth("220px");
 

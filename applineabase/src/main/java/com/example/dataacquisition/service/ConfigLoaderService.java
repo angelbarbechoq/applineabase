@@ -111,9 +111,18 @@ public class ConfigLoaderService {
      * filtrada por zona de acceso del usuario logueado (para eso ver LineaAccessService).
      */
     public List<String> listarNombresLinea() {
+        return listarValoresDistintos("lineaMaquina");
+    }
+
+    /**
+     * Valores distintos, no vacíos y ordenados de un campo de linea-id-config.json (p. ej.
+     * "lineaMaquina" o "zona") — mismo pipeline que antes se repetía a mano en cada vista que
+     * necesitaba poblar un select con el catálogo completo de un campo de esa configuración.
+     */
+    public List<String> listarValoresDistintos(String campo) {
         return loadLineaIDConfig().stream()
-                .map(l -> (String) l.get("lineaMaquina"))
-                .filter(n -> n != null && !n.isBlank())
+                .map(l -> (String) l.get(campo))
+                .filter(v -> v != null && !v.isBlank())
                 .distinct()
                 .sorted()
                 .collect(Collectors.toList());
