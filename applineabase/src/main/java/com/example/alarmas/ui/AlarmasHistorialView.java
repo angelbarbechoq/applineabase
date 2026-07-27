@@ -46,8 +46,13 @@ public class AlarmasHistorialView extends VerticalLayout implements BeforeEnterO
 
         Button refrescarBtn = new Button("Refrescar", e -> refrescarGrid());
         refrescarBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        RouterLink historialLink = new RouterLink("Ver historial completo", AlarmasHistorialCompletoView.class);
-        add(new HorizontalLayout(refrescarBtn, historialLink));
+        HorizontalLayout acciones = new HorizontalLayout(refrescarBtn);
+        // AlarmasHistorialCompletoView (con la descarga CSV) es solo ADMIN por el momento: el
+        // link no debe ofrecerse a Mantenimiento, que sigue viendo esta pantalla de activas.
+        if (lineaAccessService.esAdmin()) {
+            acciones.add(new RouterLink("Ver historial completo", AlarmasHistorialCompletoView.class));
+        }
+        add(acciones);
 
         GrillaAlarmaEventoUtil.agregarColumnasInicioLineaTipo(grid);
         GrillaAlarmaEventoUtil.agregarColumnaDetalle(grid);
