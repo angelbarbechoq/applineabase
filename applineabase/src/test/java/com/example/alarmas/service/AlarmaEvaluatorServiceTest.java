@@ -122,6 +122,25 @@ class AlarmaEvaluatorServiceTest {
     }
 
     @Test
+    void factor_potencia_bajo_normaliza_lectura_en_escala_de_porcentaje() {
+        String linea = "KWhPlanta1"; // el medidor reporta el PF real en escala de porcentaje (ej. -85.5), no como fracción 0-1
+
+        Map<String, Object> datosMalos = new HashMap<>();
+        datosMalos.put("PF", -50.0); // 0.50 en fracción, bajo el mínimo 0.94
+        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosMalos));
+        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.FACTOR_POTENCIA_BAJO))
+                .as("-50.0 normalizado a 0.50 < 0.94 debe disparar la alarma (sin normalizar, 50.0 nunca sería < 0.94)")
+                .isPresent();
+
+        Map<String, Object> datosBuenos = new HashMap<>();
+        datosBuenos.put("PF", -98.0); // 0.98 en fracción, sobre el mínimo
+        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosBuenos));
+        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.FACTOR_POTENCIA_BAJO))
+                .as("-98.0 normalizado a 0.98 >= 0.94 debe resolver la alarma")
+                .isEmpty();
+    }
+
+    @Test
     void temperatura_alta_se_dispara_sobre_el_maximo_configurado() {
         String sensor = "TemperaturaAgua"; // sembrada como TEMPERATURA_ALTA (máximo 13.0)
 

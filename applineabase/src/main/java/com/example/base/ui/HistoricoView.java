@@ -1,6 +1,7 @@
 package com.example.base.ui;
 
 import com.example.base.model.GraficaModel;
+import com.example.dataacquisition.FactorPotenciaUtil;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCDataQueryService;
@@ -332,17 +333,13 @@ public class HistoricoView extends VerticalLayout {
         };
     }
 
-    /**
-     * El factor de potencia (coseno de un ángulo) nunca supera 1 en valor absoluto: si el dato
-     * crudo lo supera, viene en escala de porcentaje (como KWhPlanta1, que reporta p.ej. -85.5,
-     * igual que TarjetasEstadoActual.extraerPFGeneral) y hay que dividirlo entre 100. Las
-     * máquinas que ya reportan la fracción 0-1 directamente quedan sin cambios.
-     */
+    /** Ver FactorPotenciaUtil: normaliza a fracción 0-1 solo si el dato viene en escala de
+     * porcentaje (como KWhPlanta1); las máquinas que ya reportan la fracción quedan sin cambios. */
     private static Float normalizarPF(Float pf) {
         if (pf == null) {
             return null;
         }
-        return Math.abs(pf) > 1f ? pf / 100f : pf;
+        return (float) FactorPotenciaUtil.normalizarAbs(Math.abs(pf));
     }
 
     @Override

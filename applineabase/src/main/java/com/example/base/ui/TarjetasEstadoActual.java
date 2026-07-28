@@ -5,6 +5,7 @@ import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.service.AlarmaEvaluatorService;
 import com.example.base.model.GraficaModel;
+import com.example.dataacquisition.FactorPotenciaUtil;
 import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
@@ -73,12 +74,12 @@ final class TarjetasEstadoActual {
 
     /**
      * KWhPlanta1 reporta el PF en el campo VIP "PF" (no en "kwh", que ahí es KWh real de esa
-     * planta) y en negativo y escala de porcentaje (ej. -85.5) — mismo ajuste que ya usa
-     * ChartsView.cargarPFGeneralChart: valor absoluto y dividido entre 100 para verlo en 0-1.
+     * planta), en negativo y escala de porcentaje (ej. -85.5) — ver FactorPotenciaUtil, misma
+     * normalización que usan HistoricoView y AlarmaEvaluatorService.
      */
     private static Double extraerPFGeneral(Map<String, Object> datosVIP) {
         Float pf = GraficaModel.toFloatAbs(datosVIP.get("PF"));
-        return pf == null ? null : pf / 100.0;
+        return pf == null ? null : FactorPotenciaUtil.normalizarAbs(pf);
     }
 
     private static void mostrarDatosActuales(Div card, Map<String, Object> datosVIP, Map<String, Object> datosKWh,

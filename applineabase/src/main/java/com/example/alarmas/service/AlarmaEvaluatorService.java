@@ -5,6 +5,7 @@ import com.example.alarmas.model.AlarmaEvento;
 import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.repository.AlarmaEventoRepository;
+import com.example.dataacquisition.FactorPotenciaUtil;
 import com.example.dataacquisition.event.MaquinaDataUpdateEvent;
 import com.example.dataacquisition.event.MaquinaEstadoCambioEvent;
 import com.example.dataacquisition.RutaArchivosEnergia;
@@ -155,7 +156,7 @@ public class AlarmaEvaluatorService {
         if (!(pfRaw instanceof Number)) {
             return;
         }
-        double pf = Math.abs(((Number) pfRaw).doubleValue());
+        double pf = FactorPotenciaUtil.normalizarAbs(Math.abs(((Number) pfRaw).doubleValue()));
         double minimo = config.getFactorPotenciaMinimo() != null ? config.getFactorPotenciaMinimo() : FACTOR_POTENCIA_MIN_DEFAULT;
 
         if (pf < minimo) {
