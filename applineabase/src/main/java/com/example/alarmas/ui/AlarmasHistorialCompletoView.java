@@ -5,7 +5,6 @@ import com.example.alarmas.repository.AlarmaEventoRepository;
 import com.example.base.ui.CsvUtil;
 import com.example.base.ui.MainLayout;
 import com.example.dataacquisition.RutaArchivosEnergia;
-import com.example.dataacquisition.service.ConfigLoaderService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -47,7 +46,7 @@ public class AlarmasHistorialCompletoView extends VerticalLayout {
     private final Grid<AlarmaEvento> grid = new Grid<>(AlarmaEvento.class, false);
     private final ComboBox<String> lineaFiltro = new ComboBox<>("Línea/Máquina");
 
-    public AlarmasHistorialCompletoView(AlarmaEventoRepository eventoRepository, ConfigLoaderService configLoaderService) {
+    public AlarmasHistorialCompletoView(AlarmaEventoRepository eventoRepository) {
         this.eventoRepository = eventoRepository;
 
         setSizeFull();
@@ -56,7 +55,7 @@ public class AlarmasHistorialCompletoView extends VerticalLayout {
 
         add(new H3("Historial de Alarmas"));
 
-        List<String> lineas = configLoaderService.listarNombresLinea();
+        List<String> lineas = eventoRepository.findDistinctLineaMaquina();
         lineaFiltro.setItems(concatenarTodas(lineas));
         lineaFiltro.setValue(TODAS);
         lineaFiltro.setWidth("220px");

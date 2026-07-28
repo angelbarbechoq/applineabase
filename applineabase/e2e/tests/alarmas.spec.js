@@ -11,13 +11,14 @@ test.describe('Alarmas', () => {
     await expect(page.locator('vaadin-grid')).toBeVisible({ timeout: 15_000 });
   });
 
-  test('/alarmas/historial muestra el catálogo completo de líneas', async ({ page }) => {
+  test('/alarmas/historial ofrece en el filtro solo líneas con alarma registrada', async ({ page }) => {
     await page.goto('/alarmas/historial');
 
     const lineaFiltro = page.locator('vaadin-combo-box').first();
     await lineaFiltro.click();
-    const opciones = page.locator('vaadin-combo-box-item');
-    expect(await opciones.count()).toBeGreaterThan(1);
+    // "Todas las líneas" siempre está; el resto de las opciones depende de si ya hubo
+    // alguna alarma real (no el catálogo completo de líneas configuradas).
+    await expect(page.locator('vaadin-combo-box-item', { hasText: 'Todas las líneas' })).toBeVisible();
     await page.keyboard.press('Escape');
   });
 

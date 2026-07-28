@@ -103,6 +103,23 @@ class AlarmaEvaluatorServiceTest {
     }
 
     @Test
+    void repositorioDeEventos_solo_devuelve_lineas_con_al_menos_un_evento_disparado() {
+        assertThat(eventoRepository.findDistinctLineaMaquina())
+                .as("sin ninguna alarma disparada todavía, no debe aparecer ninguna línea")
+                .isEmpty();
+
+        String linea = "Sauer"; // sembrada como CICLO_COMPRESOR
+        AlarmaConfig config = configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.CICLO_COMPRESOR).orElseThrow();
+        config.setMinutosMaxEncendido(0);
+        configRepository.save(config);
+        eventPublisher.publishEvent(new MaquinaDataUpdateEvent(this, linea, datosPW(20.0)));
+
+        assertThat(eventoRepository.findDistinctLineaMaquina())
+                .as("tras disparar una alarma para Sauer, el filtro debe ofrecer solo esa línea")
+                .containsExactly("Sauer");
+    }
+
+    @Test
     void factor_potencia_bajo_usa_valor_absoluto() {
         String linea = "KWhPlanta1"; // sembrada como FACTOR_POTENCIA_BAJO (mínimo 0.94)
 
