@@ -19,4 +19,13 @@ class GraficaModelTest {
 
         assertThat(script).contains("dy: -(i * 26)");
     }
+
+    @Test
+    void con_una_sola_serie_no_se_agrega_tooltip_de_nombre_y_valor() {
+        // Con una sola serie no hay nada que desambiguar entre series, y el nombre suele ser
+        // genérico (p.ej. "Datos" en KWh) — mostrar "nombre: valor" ahí no aporta nada.
+        String script = new GraficaModel(1).getInitScript2("test");
+
+        assertThat(script).doesNotContain("series.set('tooltip'");
+    }
 }
