@@ -21,11 +21,22 @@ class GraficaModelTest {
     }
 
     @Test
-    void con_una_sola_serie_no_se_agrega_tooltip_de_nombre_y_valor() {
-        // Con una sola serie no hay nada que desambiguar entre series, y el nombre suele ser
-        // genérico (p.ej. "Datos" en KWh) — mostrar "nombre: valor" ahí no aporta nada.
+    void con_una_sola_serie_el_tooltip_no_muestra_el_nombre_de_la_serie() {
+        // Con una sola serie el tooltip sigue mostrándose (solo el valor), pero sin el prefijo
+        // "{name}: " — no hay nada que desambiguar entre series, y el nombre suele ser genérico
+        // (p.ej. "Datos" en KWh), así que mostrarlo no aporta nada y solo ensucia el tooltip.
         String script = new GraficaModel(1).getInitScript2("test");
 
-        assertThat(script).doesNotContain("series.set('tooltip'");
+        assertThat(script)
+                .contains("series.set('tooltip'")
+                .doesNotContain("{name}: {valueY");
+    }
+
+    @Test
+    void con_dos_o_mas_series_el_tooltip_si_muestra_el_nombre_de_cada_una() {
+        // Con 2+ series sí hace falta saber a cuál corresponde cada valor.
+        String script = new GraficaModel(3).getInitScript2("test");
+
+        assertThat(script).contains("{name}: {valueY");
     }
 }

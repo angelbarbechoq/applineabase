@@ -132,16 +132,17 @@ public class GraficaModel {
                         // de las pantallas queda exactamente como estaba antes de este ajuste.
                         (coloresPersonalizados != null ? "  series.set('stroke', colors[i % colors.length]);" : "") +
                         "  series.strokes.template.setAll({ stroke: colors[i % colors.length] });" +
-                        // Tooltip por serie SOLO con 2+ series: ahí sirve para poder comparar el
-                        // valor de cada una (con el dy escalonado más abajo, para que no se tapen
-                        // entre sí). Con una sola serie mostrar "nombre: valor" no aporta nada —
-                        // sobra el nombre (ni el usuario lo necesita para desambiguar, ni "Datos",
-                        // el nombre genérico que usa KWh, dice algo útil) — y ya está la fecha en
-                        // el tooltip del eje X. Por eso ahí no se le agrega tooltip a la serie.
-                        (nGraficas > 1 ?
+                        // dy escalonado por serie: con 2+ series cuyos valores quedan cerca en
+                        // pantalla (p.ej. VAB/VAC/VBC), cada tooltip se dibuja independiente y sin
+                        // este corrimiento terminan superpuestos — solo se alcanza a leer el de la
+                        // última serie dibujada. Subiendo cada uno un poco más que el anterior quedan
+                        // apilados en vertical, uno debajo del otro, todos legibles a la vez.
                         "  var tooltip = series.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical', dy: -(i * 26) }));" +
-                        "  tooltip.setAll({ autoTextColor: false, getFillFromSprite: false }); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ fill: am5.color(0x999999), text: '{name}: {valueY.formatNumber(\\u0022#.##\\u0022)} ' + unidad });"
-                        : "") +
+                        // El nombre de la serie ("{name}: ") solo se agrega con 2+ series, ahí sí
+                        // hace falta para saber a cuál corresponde cada valor. Con una sola serie
+                        // sobra: no hay nada que desambiguar, y encima el nombre puede ser un
+                        // genérico poco descriptivo (p.ej. "Datos" en KWh) que no aporta nada.
+                        "  tooltip.setAll({ autoTextColor: false, getFillFromSprite: false }); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ fill: am5.color(0x999999), text: '" + (nGraficas > 1 ? "{name}: " : "") + "{valueY.formatNumber(\\u0022#.##\\u0022)} ' + unidad });" +
                         "  seriesList.push(series);" +
                         "}" +
 
