@@ -132,7 +132,12 @@ public class GraficaModel {
                         // de las pantallas queda exactamente como estaba antes de este ajuste.
                         (coloresPersonalizados != null ? "  series.set('stroke', colors[i % colors.length]);" : "") +
                         "  series.strokes.template.setAll({ stroke: colors[i % colors.length] });" +
-                        "  var tooltip = series.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical' }));" +
+                        // dy escalonado por serie: con 2+ series cuyos valores quedan cerca en
+                        // pantalla (p.ej. VAB/VAC/VBC), cada tooltip se dibuja independiente y sin
+                        // este corrimiento terminan superpuestos — solo se alcanza a leer el de la
+                        // última serie dibujada. Subiendo cada uno un poco más que el anterior quedan
+                        // apilados en vertical, uno debajo del otro, todos legibles a la vez.
+                        "  var tooltip = series.set('tooltip', am5.Tooltip.new(root, { pointerOrientation: 'vertical', dy: -(i * 26) }));" +
                         "  tooltip.setAll({ autoTextColor: false, getFillFromSprite: false }); tooltip.get(\"background\").setAll({ fillOpacity: 0, strokeOpacity: 0 }); tooltip.label.setAll({ fill: am5.color(0x999999), text: '{name}: {valueY.formatNumber(\\u0022#.##\\u0022)} ' + unidad });" +
                         "  seriesList.push(series);" +
                         "}" +
