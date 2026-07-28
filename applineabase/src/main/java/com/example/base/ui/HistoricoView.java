@@ -33,14 +33,24 @@ import java.util.Map;
 @PermitAll
 public class HistoricoView extends VerticalLayout {
 
-    // Pisos por defecto del eje Y: el eje se amplía si los datos reales los superan
+    // Piso por defecto del eje Y para KWh: cada máquina tiene un consumo típico muy distinto,
+    // pero graficarSerieKWh ya usa aplicarRangosPredefinidos(maquina) como piso real por máquina;
+    // este valor solo se ve en el instante inicial, antes de la primera consulta.
     private static final double KWH_MAX_Y_DEFAULT = 50.0;
-    private static final double VOLTAJES_MAX_Y_DEFAULT = 500.0;
-    private static final double CORRIENTES_MAX_Y_DEFAULT = 300.0;
-    private static final double PW_MAX_Y_DEFAULT = 200.0;
+    // Voltaje, corriente y potencia activa varían muchísimo entre máquinas (un motor chico vs.
+    // el medidor general de planta), así que NO existe un techo típico único válido para todas:
+    // a diferencia de KWh, aquí no hay un preset por máquina. Estos pisos son solo una red de
+    // seguridad para el caso degenerado (sin datos reales, o todos en cero) donde el eje no
+    // puede quedar en [0,0]; con datos reales, el percentil 95 (calcularMaxYConMargen) siempre
+    // domina y define la escala real. No subir estos valores "por las dudas": eso es lo que
+    // rompía el zoom para cualquier máquina cuyo valor real fuera bastante menor al piso.
+    private static final double VOLTAJES_MAX_Y_DEFAULT = 1.0;
+    private static final double CORRIENTES_MAX_Y_DEFAULT = 1.0;
+    private static final double PW_MAX_Y_DEFAULT = 1.0;
     // El factor de potencia se grafica siempre como fracción 0-1 (ver normalizarPF): algunos
     // medidores (KWhPlanta1) lo reportan en escala de porcentaje (ej. -95.96) y otros ya en
     // fracción (ej. 0.94) — normalizando antes de graficar, el piso es el mismo para todos.
+    // Este sí es un techo real (el PF nunca supera 1 en valor absoluto), no una red de seguridad.
     private static final double PF_MAX_Y_DEFAULT = 1.0;
 
     private final GraficaModel graficaKWh = new GraficaModel(1);
