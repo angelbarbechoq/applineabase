@@ -87,8 +87,18 @@ public class HistoricoView extends VerticalLayout {
         graficaKWh.setMaxY(KWH_MAX_Y_DEFAULT);
         graficaVoltajes.setMinY(0.0);
         graficaVoltajes.setMaxY(VOLTAJES_MAX_Y_DEFAULT);
+        // Sin colores propios, amCharts5 asigna su color automático a cada serie — para VAB/VAC/VBC
+        // (3 series) eso caía en tonos de azul difíciles de distinguir entre sí. Colores fijos y
+        // bien separados por serie (VAB=azul, VAC=rojo, VBC=verde bosque; más oscuro que el verde
+        // puro para que se lea bien sobre el fondo claro de la tarjeta).
+        graficaVoltajes.setColoresPersonalizados(new String[]{"0x0000ff", "0xff0000", "0x008000"});
+        graficaVoltajes.setMostrarLeyenda(true);
         graficaCorrientes.setMinY(0.0);
         graficaCorrientes.setMaxY(CORRIENTES_MAX_Y_DEFAULT);
+        // Mismo problema que Voltajes para IA/IB/IC: colores fijos, bien diferenciados entre sí y
+        // de los de Voltajes, para no confundir ambos gráficos entre sí tampoco.
+        graficaCorrientes.setColoresPersonalizados(new String[]{"0xff8c00", "0xd119a8", "0xa0522d"});
+        graficaCorrientes.setMostrarLeyenda(true);
         graficaPW.setMinY(0.0);
         graficaPW.setMaxY(PW_MAX_Y_DEFAULT);
         graficaPF.setMinY(0.0);
