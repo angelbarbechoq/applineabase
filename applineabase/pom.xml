@@ -119,6 +119,18 @@
                 <version>${vaadin.version}</version>
                 <executions>
                     <execution>
+                        <!--
+                        Sin "phase" explícito, build-frontend usa su fase por defecto
+                        (prepare-package, DESPUÉS de compile). Eso significa que "mvn compile"
+                        o "mvn spring-boot:run" sobre un target/ recién limpiado NUNCA generan
+                        el frontend de Vaadin, y en modo producción (vaadin.productionMode=true,
+                        fijo en application.properties) la app arranca pero cualquier página
+                        tira "Unable to find index.html" — solo "mvn package" (u otra fase que
+                        pase por prepare-package) lo generaba. Con phase=process-resources
+                        (ANTES de compile), se genera en cualquier build que llegue a compilar,
+                        que es prácticamente cualquier forma de correr o empaquetar la app.
+                        -->
+                        <phase>process-resources</phase>
                         <goals>
                             <goal>build-frontend</goal>
                         </goals>
