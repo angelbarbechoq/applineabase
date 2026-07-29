@@ -674,6 +674,33 @@ public class GraficaModel {
     }
 
     /**
+     * Reemplaza un cero AISLADO (con vecino anterior y siguiente ambos > 0) por una
+     * interpolación de esos vecinos. Para KWh esto no hace falta: como se grafica la
+     * diferencia entre lecturas consecutivas del contador, un cero real (no incrementó entre
+     * una lectura y la siguiente) es normal y frecuente. Pero Voltaje/Corriente/PW/PF grafican
+     * la lectura instantánea del PLC, no una diferencia — ahí un cero salteado entre lecturas
+     * reales (el dispositivo respondió, pero con una lectura inválida, no un apagado real) sí
+     * distorsiona el gráfico. Un apagado real de la máquina da VARIOS ceros seguidos, no uno
+     * solo — por eso solo se corrige el cero aislado, dejando intactos los tramos apagados.
+     */
+    public static List<Float> limpiarCeroAislado(List<Float> valores) {
+        if (valores == null || valores.size() < 3) return valores;
+
+        List<Float> limpio = new ArrayList<>(valores);
+        for (int i = 1; i < valores.size() - 1; i++) {
+            Float actual = valores.get(i);
+            Float anterior = valores.get(i - 1);
+            Float siguiente = valores.get(i + 1);
+            if (actual != null && actual == 0f
+                    && anterior != null && anterior > 0f
+                    && siguiente != null && siguiente > 0f) {
+                limpio.set(i, (anterior + siguiente) / 2f);
+            }
+        }
+        return limpio;
+    }
+
+    /**
      * Script de un gráfico de barras (Horas trabajadas en el mes) por línea, un solo eje de
      * valor y una sola serie — a pedido, ya no se muestra el KWh en este gráfico. Tono celeste
      * único (una sola serie no necesita leyenda) y el valor sobre cada barra. El orden de las
