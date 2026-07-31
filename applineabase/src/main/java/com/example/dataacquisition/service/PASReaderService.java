@@ -122,7 +122,7 @@ public class PASReaderService {
         }
 
         // Check connectivity via ping
-        if (!isIPAvailable(gatewayIP)) {
+        if (!ModbusUtil.isIPAvailable(gatewayIP)) {
             logger.warn("IP {} not available for gateway {}", gatewayIP, gatewayName);
             return;
         }
@@ -217,7 +217,7 @@ public class PASReaderService {
 
         int[] kwhRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
         if (kwhRegisters != null) {
-            BigDecimal kwh = registroIntToBigDecimal(kwhRegisters);
+            BigDecimal kwh = ModbusUtil.registroIntToBigDecimal(kwhRegisters);
             if (kwh != null && !kwh.equals(BigDecimal.ZERO)) {
                 gateway.setKWhActx(index, kwh);
             }
@@ -235,9 +235,9 @@ public class PASReaderService {
         int[] voltageRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
         if (voltageRegisters != null && voltageRegisters.length >= 6) {
             // PAS600L returns: [VAB_hi, VAB_lo, VBC_hi, VBC_lo, VAC_hi, VAC_lo]
-            BigDecimal vab = registroIntToBigDecimal(new int[]{voltageRegisters[0], voltageRegisters[1]});
-            BigDecimal vbc = registroIntToBigDecimal(new int[]{voltageRegisters[2], voltageRegisters[3]});
-            BigDecimal vac = registroIntToBigDecimal(new int[]{voltageRegisters[4], voltageRegisters[5]});
+            BigDecimal vab = ModbusUtil.registroIntToBigDecimal(new int[]{voltageRegisters[0], voltageRegisters[1]});
+            BigDecimal vbc = ModbusUtil.registroIntToBigDecimal(new int[]{voltageRegisters[2], voltageRegisters[3]});
+            BigDecimal vac = ModbusUtil.registroIntToBigDecimal(new int[]{voltageRegisters[4], voltageRegisters[5]});
 
             if (vab != null) gateway.setVABx(index, vab);
             if (vac != null) gateway.setVACx(index, vac);  // Reorganize to PLC order
@@ -256,9 +256,9 @@ public class PASReaderService {
         int[] currentRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
         if (currentRegisters != null && currentRegisters.length >= 6) {
             // Returns: [IA_hi, IA_lo, IB_hi, IB_lo, IC_hi, IC_lo]
-            BigDecimal ia = registroIntToBigDecimal(new int[]{currentRegisters[0], currentRegisters[1]});
-            BigDecimal ib = registroIntToBigDecimal(new int[]{currentRegisters[2], currentRegisters[3]});
-            BigDecimal ic = registroIntToBigDecimal(new int[]{currentRegisters[4], currentRegisters[5]});
+            BigDecimal ia = ModbusUtil.registroIntToBigDecimal(new int[]{currentRegisters[0], currentRegisters[1]});
+            BigDecimal ib = ModbusUtil.registroIntToBigDecimal(new int[]{currentRegisters[2], currentRegisters[3]});
+            BigDecimal ic = ModbusUtil.registroIntToBigDecimal(new int[]{currentRegisters[4], currentRegisters[5]});
 
             if (ia != null) gateway.setIAx(index, ia);
             if (ib != null) gateway.setIBx(index, ib);
@@ -276,7 +276,7 @@ public class PASReaderService {
 
         int[] powerRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
         if (powerRegisters != null && powerRegisters.length >= 2) {
-            BigDecimal kw = registroIntToBigDecimal(new int[]{powerRegisters[0], powerRegisters[1]});
+            BigDecimal kw = ModbusUtil.registroIntToBigDecimal(new int[]{powerRegisters[0], powerRegisters[1]});
             if (kw != null) gateway.setKWx(index, kw);
         }
     }
@@ -291,7 +291,7 @@ public class PASReaderService {
 
         int[] pfRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
         if (pfRegisters != null && pfRegisters.length >= 2) {
-            BigDecimal pf = registroIntToBigDecimal(new int[]{pfRegisters[0], pfRegisters[1]});
+            BigDecimal pf = ModbusUtil.registroIntToBigDecimal(new int[]{pfRegisters[0], pfRegisters[1]});
             if (pf != null) gateway.setPFx(index, pf);
         }
     }
@@ -349,33 +349,4 @@ public class PASReaderService {
         }
     }
 
-    /**
-     * Check if IP is reachable via ping
-     */
-    private boolean isIPAvailable(String ipAddress) {
-        try {
-            return java.net.InetAddress.getByName(ipAddress).isReachable(3000);
-        } catch (Exception e) {
-            logger.debug("Ping failed for IP {}: {}", ipAddress, e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Convert two int registers (Modbus) to BigDecimal (IEEE754 float)
-     */
-    private BigDecimal registroIntToBigDecimal(int[] dataMbTcIp) {
-        if (dataMbTcIp == null || dataMbTcIp.length != 2) {
-            return BigDecimal.ZERO;
-        }
-
-        int combinado = (dataMbTcIp[0] << 16) | (dataMbTcIp[1] & 0xFFFF);
-        float floatValue = Float.intBitsToFloat(combinado);
-
-        if (Float.isNaN(floatValue)) {
-            return BigDecimal.ZERO;
-        }
-
-        return new BigDecimal(floatValue);
-    }
 }

@@ -120,13 +120,7 @@ public class DatabaseInitializationService {
         try {
             conectar(dbPath);
 
-            StringBuilder placeholders = new StringBuilder();
-            for (int i = 0; i < datos.length; i++) {
-                if (i == datos.length - 1) placeholders.append("?");
-                else placeholders.append("?,");
-            }
-
-            String sqlInsert = "INSERT OR REPLACE INTO " + nombreTabla + " VALUES (" + placeholders + ")";
+            String sqlInsert = "INSERT OR REPLACE INTO " + nombreTabla + " VALUES (" + construirPlaceholders(datos.length) + ")";
             PreparedStatement pstmt = conexion.prepareStatement(sqlInsert);
 
             for (int i = 0; i < datos.length; i++) {
@@ -139,6 +133,15 @@ public class DatabaseInitializationService {
         } catch (SQLException ex) {
             logger.error("Error guardando datos en tabla {} en {}: {}", nombreTabla, dbPath, ex.getMessage());
         }
+    }
+
+    private String construirPlaceholders(int cantidad) {
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < cantidad; i++) {
+            if (i == cantidad - 1) placeholders.append("?");
+            else placeholders.append("?,");
+        }
+        return placeholders.toString();
     }
 
     private void conectar(String dbPath) throws SQLException {
@@ -264,13 +267,7 @@ public class DatabaseInitializationService {
                 return;
             }
 
-            StringBuilder placeholders = new StringBuilder();
-            for (int i = 0; i < datos.length; i++) {
-                if (i == datos.length - 1) placeholders.append("?");
-                else placeholders.append("?,");
-            }
-
-            String sqlInsert = "INSERT OR REPLACE INTO " + nombreTabla + " VALUES (" + placeholders + ")";
+            String sqlInsert = "INSERT OR REPLACE INTO " + nombreTabla + " VALUES (" + construirPlaceholders(datos.length) + ")";
             PreparedStatement pstmt = conn.prepareStatement(sqlInsert);
 
             for (int i = 0; i < datos.length; i++) {

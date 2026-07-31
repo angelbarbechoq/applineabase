@@ -47,15 +47,17 @@ public class PLCDataAcquisitionService {
     private final PLCDataQueryService plcDataQueryService;
     private final Map<String, BigDecimal> lastKWhValues = new HashMap<>();
     private final Map<String, ModbusClient> activeConnections = new ConcurrentHashMap<>();
+    private final PASGatewayConfigService gatewayConfigService;
 
     public PLCDataAcquisitionService(ConfigLoaderService configLoaderService, ApplicationEventPublisher eventPublisher,
                                     DatabaseInitializationService databaseInitializationService, KWhDifferenceService kwhDifferenceService,
-                                    PLCDataQueryService plcDataQueryService) {
+                                    PLCDataQueryService plcDataQueryService, PASGatewayConfigService gatewayConfigService) {
         this.configLoaderService = configLoaderService;
         this.eventPublisher = eventPublisher;
         this.databaseInitializationService = databaseInitializationService;
         this.kwhDifferenceService = kwhDifferenceService;
         this.plcDataQueryService = plcDataQueryService;
+        this.gatewayConfigService = gatewayConfigService;
         this.plcDevices = new ArrayList<>();
         initializePLCDevices();
     }
@@ -131,7 +133,7 @@ public class PLCDataAcquisitionService {
         logger.info("Reading PLC: {} ({})", plcName, plcIP);
 
         // Get lines for this PLC
-        List<Map<String, Object>> lineasDelPLC = filterLineasByPLC(plcName);
+        List<Map<String, Object>> lineasDelPLC = gatewayConfigService.getLineasForGateway(plcName, lineaIdConfigCache);
         logger.debug("PLC {} has {} lines", plcName, lineasDelPLC.size());
 
         if (lineasDelPLC.isEmpty()) {
@@ -139,7 +141,7 @@ public class PLCDataAcquisitionService {
             return;
         }
         // Check connectivity via ping
-        if (!isIPAvailable(plcIP)) {
+        if (!ModbusUtil.isIPAvailable(plcIP)) {
             logger.warn("IP {} not available for PLC {}", plcIP, plcName);
             return;
         }
@@ -287,18 +289,6 @@ public class PLCDataAcquisitionService {
         }
     }
 
-    /**
-     * Check if IP is reachable via ping
-     */
-    private boolean isIPAvailable(String ipAddress) {
-        try {
-            return java.net.InetAddress.getByName(ipAddress).isReachable(3000);
-        } catch (Exception e) {
-            logger.debug("Ping failed for IP {}: {}", ipAddress, e.getMessage());
-            return false;
-        }
-    }
-
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Converts int array to BigDecimal array
     private BigDecimal[] returnByteToBigDecimal(int[] arrayByte) {
@@ -307,41 +297,8 @@ public class PLCDataAcquisitionService {
         for (int ix = 0; ix < arrayByte.length / 2; ix++) {
             regIntX[0] = arrayByte[ix * 2];
             regIntX[1] = arrayByte[ix * 2 + 1];
-            byteToBigDecimal[ix] = registroIntToBigDecimal(regIntX);
+            byteToBigDecimal[ix] = ModbusUtil.registroIntToBigDecimal(regIntX);
         }
         return byteToBigDecimal;
     }
-
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Converts two int registers to BigDecimal
-    private BigDecimal registroIntToBigDecimal(int[] dataMbTcIp) {
-        if (dataMbTcIp.length != 2) {
-            return BigDecimal.ZERO;
-        }
-        int combinado = (dataMbTcIp[0] << 16) | (dataMbTcIp[1] & 0xFFFF);
-        float floatValue = Float.intBitsToFloat(combinado);
-
-        if (Float.isNaN(floatValue)) {
-            return BigDecimal.ZERO;
-        }
-        return new BigDecimal(floatValue);
-    }
-
-    /**
-     * Filter lines from config that belong to a specific PLC
-     */
-    private List<Map<String, Object>> filterLineasByPLC(String plcName) {
-        List<Map<String, Object>> filtered = new ArrayList<>();
-
-        for (Map<String, Object> linea : lineaIdConfigCache) {
-            String nombrePLC = (String) linea.get("nombrePLC");
-            if (plcName.equals(nombrePLC)) {
-                filtered.add(linea);
-            }
-        }
-
-        return filtered;
-    }
-
-
 }
