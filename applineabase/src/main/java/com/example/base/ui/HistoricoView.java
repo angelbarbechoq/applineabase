@@ -276,13 +276,17 @@ public class HistoricoView extends VerticalLayout {
 
             // Se limpia el atípico de cada serie por separado (VAB, VAC, VBC, etc. pueden
             // tener picos por falla de comunicación en momentos distintos), reemplazándolo
-            // por una interpolación de sus vecinos.
+            // por una interpolación de sus vecinos. Se limpia además el cero aislado (lectura
+            // inválida del PLC, no un apagado real) en las cuatro variables — Voltajes,
+            // Corrientes, PW y también PF, ya que el mismo glitch de comunicación que da un cero
+            // espurio en las otras tres suele darlo también en PF en esa misma lectura.
             int nSeries = graficaActiva.getnGraficas();
             List<List<Float>> columnasLimpias = new java.util.ArrayList<>();
             List<Float> valoresParaEscala = new java.util.ArrayList<>();
             for (int s = 0; s < nSeries; s++) {
                 List<Float> columna = new java.util.ArrayList<>();
                 for (Float[] fila : valoresPorFila) columna.add(fila[s]);
+                columna = GraficaModel.limpiarCeroAislado(columna);
                 List<Float> columnaLimpia = GraficaModel.limpiarAtipicos(columna, GraficaModel.FACTOR_ATIPICO);
                 columnasLimpias.add(columnaLimpia);
                 for (Float v : columnaLimpia) {
