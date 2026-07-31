@@ -50,6 +50,7 @@ public class AlarmasConfigView extends VerticalLayout {
     private final NumberField minutosField = new NumberField("Máx. minutos encendido");
     private final NumberField temperaturaField = new NumberField("Temperatura máxima (°C)");
     private final NumberField factorPotenciaField = new NumberField("Factor de potencia mínimo");
+    private final NumberField lecturasUrgenteField = new NumberField("Lecturas fallidas para urgente");
     private final Button guardarBtn = new Button("Guardar");
     private final Button eliminarBtn = new Button("Eliminar");
 
@@ -83,7 +84,9 @@ public class AlarmasConfigView extends VerticalLayout {
         umbralMinimoKwField.setStep(0.1);
         temperaturaField.setStep(0.1);
         factorPotenciaField.setStep(0.01);
-        for (NumberField field : new NumberField[]{umbralMinimoKwField, ventanaField, minutosField, temperaturaField, factorPotenciaField}) {
+        lecturasUrgenteField.setStep(1);
+        lecturasUrgenteField.setMin(1);
+        for (NumberField field : new NumberField[]{umbralMinimoKwField, ventanaField, minutosField, temperaturaField, factorPotenciaField, lecturasUrgenteField}) {
             field.setWidth("190px");
         }
 
@@ -99,7 +102,7 @@ public class AlarmasConfigView extends VerticalLayout {
 
         HorizontalLayout formLayout = new HorizontalLayout(
                 lineaCombo, tipoSelect, habilitadaCheckbox, umbralMinimoKwField, ventanaField, minutosField,
-                temperaturaField, factorPotenciaField, guardarBtn, nuevaBtn, eliminarBtn
+                temperaturaField, factorPotenciaField, lecturasUrgenteField, guardarBtn, nuevaBtn, eliminarBtn
         );
         formLayout.setAlignItems(Alignment.END);
         formLayout.getStyle().set("flex-wrap", "wrap");
@@ -119,6 +122,8 @@ public class AlarmasConfigView extends VerticalLayout {
                     valor(c.getUmbralMinimoKw()), c.getMinutosMaxEncendido() == null ? 0 : c.getMinutosMaxEncendido());
             case TEMPERATURA_ALTA -> String.format("máx=%.1f°C", valor(c.getTemperaturaMaxima()));
             case FACTOR_POTENCIA_BAJO -> String.format("mín=%.3f", valor(c.getFactorPotenciaMinimo()));
+            case DISPOSITIVO_NO_DISPONIBLE -> String.format("urgente tras %d lecturas fallidas",
+                    c.getLecturasConsecutivasUrgente() == null ? 0 : c.getLecturasConsecutivasUrgente());
         };
     }
 
@@ -143,6 +148,7 @@ public class AlarmasConfigView extends VerticalLayout {
         minutosField.setValue(config.getMinutosMaxEncendido() == null ? null : config.getMinutosMaxEncendido().doubleValue());
         temperaturaField.setValue(config.getTemperaturaMaxima());
         factorPotenciaField.setValue(config.getFactorPotenciaMinimo());
+        lecturasUrgenteField.setValue(config.getLecturasConsecutivasUrgente() == null ? null : config.getLecturasConsecutivasUrgente().doubleValue());
         actualizarVisibilidadCampos(config.getTipoAlarma());
         eliminarBtn.setEnabled(true);
     }
@@ -154,6 +160,7 @@ public class AlarmasConfigView extends VerticalLayout {
         minutosField.setVisible(tipo == TipoAlarma.CICLO_COMPRESOR);
         temperaturaField.setVisible(tipo == TipoAlarma.TEMPERATURA_ALTA);
         factorPotenciaField.setVisible(tipo == TipoAlarma.FACTOR_POTENCIA_BAJO);
+        lecturasUrgenteField.setVisible(tipo == TipoAlarma.DISPOSITIVO_NO_DISPONIBLE);
     }
 
     private void limpiarFormulario() {
@@ -170,7 +177,8 @@ public class AlarmasConfigView extends VerticalLayout {
         minutosField.clear();
         temperaturaField.clear();
         factorPotenciaField.clear();
-        for (NumberField field : new NumberField[]{umbralMinimoKwField, ventanaField, minutosField, temperaturaField, factorPotenciaField}) {
+        lecturasUrgenteField.clear();
+        for (NumberField field : new NumberField[]{umbralMinimoKwField, ventanaField, minutosField, temperaturaField, factorPotenciaField, lecturasUrgenteField}) {
             field.setVisible(false);
         }
         eliminarBtn.setEnabled(false);
@@ -201,6 +209,7 @@ public class AlarmasConfigView extends VerticalLayout {
         config.setMinutosMaxEncendido(minutosField.getValue() == null ? null : minutosField.getValue().intValue());
         config.setTemperaturaMaxima(temperaturaField.getValue());
         config.setFactorPotenciaMinimo(factorPotenciaField.getValue());
+        config.setLecturasConsecutivasUrgente(lecturasUrgenteField.getValue() == null ? null : lecturasUrgenteField.getValue().intValue());
 
         configRepository.save(config);
         Notification.show("Configuración guardada", 2500, Notification.Position.BOTTOM_END)

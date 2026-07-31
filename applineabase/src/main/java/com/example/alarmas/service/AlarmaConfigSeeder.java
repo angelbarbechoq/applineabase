@@ -76,6 +76,10 @@ public class AlarmaConfigSeeder implements CommandLineRunner {
             if (LINEAS_CON_FACTOR_POTENCIA.contains(nombre)) {
                 seedSiNoExiste(nombre, TipoAlarma.FACTOR_POTENCIA_BAJO, config -> config.setFactorPotenciaMinimo(0.94));
             }
+
+            // Toda línea viene de un PLC o gateway PAS600L, así que la conectividad aplica por igual
+            // a sensores virtuales y a máquinas reales.
+            seedSiNoExiste(nombre, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE, config -> config.setLecturasConsecutivasUrgente(3));
         }
     }
 

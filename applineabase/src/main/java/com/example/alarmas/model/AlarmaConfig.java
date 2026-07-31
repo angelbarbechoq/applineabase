@@ -47,6 +47,9 @@ public class AlarmaConfig {
     /** Factor de potencia mínimo, comparado en valor absoluto (FACTOR_POTENCIA_BAJO). */
     private Double factorPotenciaMinimo;
 
+    /** Lecturas fallidas consecutivas antes de escalar a urgente (DISPOSITIVO_NO_DISPONIBLE). */
+    private Integer lecturasConsecutivasUrgente;
+
     public AlarmaConfig() {
     }
 
@@ -116,5 +119,13 @@ public class AlarmaConfig {
 
     public void setFactorPotenciaMinimo(Double factorPotenciaMinimo) {
         this.factorPotenciaMinimo = factorPotenciaMinimo;
+    }
+
+    public Integer getLecturasConsecutivasUrgente() {
+        return lecturasConsecutivasUrgente;
+    }
+
+    public void setLecturasConsecutivasUrgente(Integer lecturasConsecutivasUrgente) {
+        this.lecturasConsecutivasUrgente = lecturasConsecutivasUrgente;
     }
 }

@@ -8,5 +8,7 @@ public enum TipoAlarma {
     /** Temperatura por encima del máximo configurado. */
     TEMPERATURA_ALTA,
     /** Factor de potencia (valor absoluto) por debajo del mínimo configurado. */
-    FACTOR_POTENCIA_BAJO
+    FACTOR_POTENCIA_BAJO,
+    /** El dispositivo (PLC o gateway PAS600L) no responde: falla el ping o la conexión Modbus. */
+    DISPOSITIVO_NO_DISPONIBLE
 }

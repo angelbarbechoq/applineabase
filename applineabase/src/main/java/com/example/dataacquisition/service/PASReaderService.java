@@ -1,6 +1,7 @@
 package com.example.dataacquisition.service;
 
 import com.example.dataacquisition.RutaArchivosEnergia;
+import com.example.dataacquisition.event.DispositivoConectividadEvent;
 import com.example.dataacquisition.model.PAS600Lx;
 import com.example.dataacquisition.model.PASModbusRegistry;
 import de.re.easymodbus.exceptions.ModbusException;
@@ -40,16 +41,19 @@ public class PASReaderService {
     private final DatabaseInitializationService databaseInitializationService;
     private final KWhDifferenceService kwhDifferenceService;
     private final PLCDataQueryService plcDataQueryService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PASReaderService(PASGatewayConfigService gatewayConfigService,
                             ConfigLoaderService configLoaderService,
                             DatabaseInitializationService databaseInitializationService,
                             KWhDifferenceService kwhDifferenceService,
-                            PLCDataQueryService plcDataQueryService) {
+                            PLCDataQueryService plcDataQueryService,
+                            ApplicationEventPublisher eventPublisher) {
         this.gatewayConfigService = gatewayConfigService;
         this.databaseInitializationService = databaseInitializationService;
         this.kwhDifferenceService = kwhDifferenceService;
         this.plcDataQueryService = plcDataQueryService;
+        this.eventPublisher = eventPublisher;
         this.gatewayDevices = new ArrayList<>();
         this.lineaIdConfigCache = configLoaderService.loadLineaIDConfig();
         initializeGatewayDevices();
@@ -124,6 +128,7 @@ public class PASReaderService {
         // Check connectivity via ping
         if (!ModbusUtil.isIPAvailable(gatewayIP)) {
             logger.warn("IP {} not available for gateway {}", gatewayIP, gatewayName);
+            publicarConectividad(lineasDelGateway, false, "sin respuesta a ping");
             return;
         }
 
@@ -194,10 +199,12 @@ public class PASReaderService {
             readAndStorePowerFactor(modbusClient, gateway, modelo, index);
 
             logger.debug("Successfully read meter {} (Unit ID {})", linea.get("lineaMaquina"), deviceId);
+            eventPublisher.publishEvent(new DispositivoConectividadEvent(this, (String) linea.get("lineaMaquina"), true, null, LocalDateTime.now()));
 
         } catch (IOException | ModbusException e) {
             logger.warn("Failed to read meter {} (Unit ID {}): {}", linea.get("lineaMaquina"), deviceId, e.getMessage());
             // Do NOT update arrays on failure - keep last valid value
+            eventPublisher.publishEvent(new DispositivoConectividadEvent(this, (String) linea.get("lineaMaquina"), false, "error de conexión Modbus", LocalDateTime.now()));
         } finally {
             try {
                 modbusClient.Disconnect();
@@ -349,4 +356,13 @@ public class PASReaderService {
         }
     }
 
+    /** Reporta a AlarmaEvaluatorService (regla DISPOSITIVO_NO_DISPONIBLE) que ninguna línea de
+     * este gateway pudo leerse este ciclo (ping fallido antes de intentar conectar por Modbus). */
+    private void publicarConectividad(List<Map<String, Object>> lineas, boolean conectado, String motivo) {
+        LocalDateTime ahora = LocalDateTime.now();
+        for (Map<String, Object> linea : lineas) {
+            String nombreLinea = (String) linea.get("lineaMaquina");
+            eventPublisher.publishEvent(new DispositivoConectividadEvent(this, nombreLinea, conectado, motivo, ahora));
+        }
+    }
 }

@@ -7,6 +7,7 @@ import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.repository.AlarmaEventoRepository;
 import com.example.dataacquisition.FactorPotenciaUtil;
 import com.example.dataacquisition.event.MaquinaDataUpdateEvent;
+import com.example.dataacquisition.event.DispositivoConectividadEvent;
 import com.example.dataacquisition.event.MaquinaEstadoCambioEvent;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.event.SensorDataUpdateEvent;
@@ -40,6 +41,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   alarma normal (AlarmaEvento + notificación), sin cambios.
  * - TEMPERATURA_ALTA: valor de sensor por encima del máximo (TemperaturaAgua).
  * - FACTOR_POTENCIA_BAJO: |PF| bajo el mínimo (KWhPlanta1, Trafo1, Trafo2).
+ * - DISPOSITIVO_NO_DISPONIBLE: el PLC/gateway de una línea no respondió esta lectura (ping o
+ *   Modbus). Se dispara desde el primer fallo; si se repite N lecturas consecutivas (configurable
+ *   por línea, default 3) el mismo AlarmaEvento escala a "urgente" sin cerrarse y reabrirse.
  *
  * DETENCION y CICLO_COMPRESOR publican MaquinaEstadoCambioEvent en cada transición
  * real de estado, que es lo que consume HorometroService para acumular horas.
@@ -54,6 +58,7 @@ public class AlarmaEvaluatorService {
     private static final int MINUTOS_MAX_DEFAULT = 15;
     private static final double TEMPERATURA_MAX_DEFAULT = 13.0;
     public static final double FACTOR_POTENCIA_MIN_DEFAULT = 0.94;
+    private static final int LECTURAS_URGENTE_DEFAULT = 3;
     private static final DateTimeFormatter FECHA_FORMATTER = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
     private final AlarmaConfigRepository configRepository;
@@ -64,6 +69,7 @@ public class AlarmaEvaluatorService {
     private final ConcurrentHashMap<String, LocalDateTime> inicioRachaBajoUmbral = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> detenidaConfirmada = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LocalDateTime> inicioEncendido = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicInteger> lecturasFallidasConsecutivas = new ConcurrentHashMap<>();
 
     public AlarmaEvaluatorService(AlarmaConfigRepository configRepository, AlarmaEventoRepository eventoRepository,
                                    ApplicationEventPublisher eventPublisher) {
@@ -183,6 +189,61 @@ public class AlarmaEvaluatorService {
         } else {
             resolverAlarma(sensor, TipoAlarma.TEMPERATURA_ALTA, ahora);
         }
+    }
+
+    @EventListener
+    public void onDispositivoConectividadEvent(DispositivoConectividadEvent event) {
+        evaluarDisponibilidad(event.getNombreMaquina(), event.isConectado(), event.getMotivo(), event.getFecha());
+    }
+
+    private void evaluarDisponibilidad(String linea, boolean conectado, String motivo, LocalDateTime fecha) {
+        AlarmaConfig config = configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE).orElse(null);
+        if (config == null || !config.isHabilitada()) {
+            return;
+        }
+
+        if (conectado) {
+            lecturasFallidasConsecutivas.remove(linea);
+            resolverAlarma(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE, fecha);
+            return;
+        }
+
+        int fallos = lecturasFallidasConsecutivas.computeIfAbsent(linea, k -> new AtomicInteger()).incrementAndGet();
+        int umbralUrgente = config.getLecturasConsecutivasUrgente() != null
+                ? config.getLecturasConsecutivasUrgente() : LECTURAS_URGENTE_DEFAULT;
+        boolean urgente = fallos >= umbralUrgente;
+
+        String mensaje = urgente
+                ? String.format("%s no responde (%s) hace %d lecturas consecutivas — revisión urgente", linea, motivo, fallos)
+                : String.format("%s no responde (%s), lectura fallida %d", linea, motivo, fallos);
+
+        dispararOEscalarDisponibilidad(linea, fecha, mensaje, urgente);
+    }
+
+    /** A diferencia de dispararAlarma(), acá el AlarmaEvento activo se actualiza en cada lectura
+     * fallida (mensaje + contador), en vez de ignorar las repeticiones, para que la fila refleje
+     * cuántas lecturas seguidas lleva caído y escale a urgente sin cerrar/reabrir el evento. */
+    private void dispararOEscalarDisponibilidad(String linea, LocalDateTime fecha, String mensaje, boolean urgente) {
+        eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE)
+                .ifPresentOrElse(evento -> {
+                    boolean escalaAUrgente = urgente && !evento.isUrgente();
+                    evento.setMensaje(mensaje);
+                    evento.setUrgente(urgente);
+                    eventoRepository.save(evento);
+                    if (escalaAUrgente) {
+                        logger.warn("🔴 ALARMA URGENTE: {}", mensaje);
+                    }
+                }, () -> {
+                    AlarmaEvento evento = new AlarmaEvento();
+                    evento.setLineaMaquina(linea);
+                    evento.setTipoAlarma(TipoAlarma.DISPOSITIVO_NO_DISPONIBLE);
+                    evento.setMensaje(mensaje);
+                    evento.setFechaInicio(fecha);
+                    evento.setActiva(true);
+                    evento.setUrgente(urgente);
+                    eventoRepository.save(evento);
+                    logger.warn("🚨 ALARMA disparada: {}", mensaje);
+                });
     }
 
     private boolean dispararAlarma(String linea, TipoAlarma tipo, LocalDateTime fechaInicio, String mensaje) {

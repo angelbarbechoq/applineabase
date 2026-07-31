@@ -69,6 +69,7 @@ public class AlarmasHistorialCompletoView extends VerticalLayout {
 
         GrillaAlarmaEventoUtil.agregarColumnasInicioLineaTipo(grid);
         grid.addColumn(e -> e.isActiva() ? "Activa" : "Resuelta").setHeader("Estado").setAutoWidth(true);
+        GrillaAlarmaEventoUtil.agregarColumnaUrgente(grid);
         GrillaAlarmaEventoUtil.agregarColumnaDetalle(grid);
         grid.setSizeFull();
 
@@ -110,12 +111,13 @@ public class AlarmasHistorialCompletoView extends VerticalLayout {
     private InputStream generarCsv() {
         StringBuilder sb = new StringBuilder();
         sb.append((char) 0xFEFF); // BOM UTF-8, para que Excel muestre bien tildes/ñ
-        sb.append("Inicio;Línea/Máquina;Tipo;Estado;Detalle\r\n");
+        sb.append("Inicio;Línea/Máquina;Tipo;Estado;Urgente;Detalle\r\n");
         for (AlarmaEvento evento : obtenerEventosFiltrados()) {
             sb.append(evento.getFechaInicio() == null ? "" : evento.getFechaInicio().format(FORMATO_FECHA_CSV)).append(';')
                     .append(CsvUtil.escape(evento.getLineaMaquina())).append(';')
                     .append(evento.getTipoAlarma()).append(';')
                     .append(evento.isActiva() ? "Activa" : "Resuelta").append(';')
+                    .append(evento.isUrgente() ? "Sí" : "No").append(';')
                     .append(CsvUtil.escape(evento.getMensaje())).append("\r\n");
         }
         return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));

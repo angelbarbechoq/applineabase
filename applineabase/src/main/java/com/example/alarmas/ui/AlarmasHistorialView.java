@@ -55,6 +55,7 @@ public class AlarmasHistorialView extends VerticalLayout implements BeforeEnterO
         add(acciones);
 
         GrillaAlarmaEventoUtil.agregarColumnasInicioLineaTipo(grid);
+        GrillaAlarmaEventoUtil.agregarColumnaUrgente(grid);
         GrillaAlarmaEventoUtil.agregarColumnaDetalle(grid);
         grid.setSizeFull();
 

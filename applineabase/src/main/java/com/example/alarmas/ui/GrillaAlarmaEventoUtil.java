@@ -29,4 +29,8 @@ final class GrillaAlarmaEventoUtil {
     static void agregarColumnaDetalle(Grid<AlarmaEvento> grid) {
         grid.addColumn(AlarmaEvento::getMensaje).setHeader("Detalle").setFlexGrow(1);
     }
+
+    static void agregarColumnaUrgente(Grid<AlarmaEvento> grid) {
+        grid.addColumn(e -> e.isUrgente() ? "🔴 Urgente" : "").setHeader("").setAutoWidth(true);
+    }
 }

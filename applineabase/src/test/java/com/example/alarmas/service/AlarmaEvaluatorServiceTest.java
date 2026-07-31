@@ -1,9 +1,11 @@
 package com.example.alarmas.service;
 
 import com.example.alarmas.model.AlarmaConfig;
+import com.example.alarmas.model.AlarmaEvento;
 import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.alarmas.repository.AlarmaEventoRepository;
+import com.example.dataacquisition.event.DispositivoConectividadEvent;
 import com.example.dataacquisition.event.MaquinaDataUpdateEvent;
 import com.example.dataacquisition.event.MaquinaEstadoCambioEvent;
 import com.example.dataacquisition.event.SensorDataUpdateEvent;
@@ -16,6 +18,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.event.EventListener;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -170,6 +173,48 @@ class AlarmaEvaluatorServiceTest {
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(sensor, TipoAlarma.TEMPERATURA_ALTA))
                 .as("9.0 <= 13.0 debe resolver la alarma")
                 .isEmpty();
+    }
+
+    @Test
+    void dispositivo_no_disponible_se_dispara_en_el_primer_fallo_y_escala_a_urgente_tras_el_umbral() {
+        String linea = "Linea02"; // AlarmaConfigSeeder ahora siembra DISPOSITIVO_NO_DISPONIBLE para toda línea
+        AlarmaConfig config = configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE).orElseThrow();
+        config.setLecturasConsecutivasUrgente(2);
+        configRepository.save(config);
+
+        eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, false, "sin respuesta a ping", LocalDateTime.now()));
+        AlarmaEvento evento = eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE)
+                .orElseThrow(() -> new AssertionError("debe disparar la alarma desde el primer fallo"));
+        assertThat(evento.isUrgente()).as("con umbral=2, un solo fallo todavía no es urgente").isFalse();
+
+        eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, false, "sin respuesta a ping", LocalDateTime.now()));
+        AlarmaEvento eventoEscalado = eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE)
+                .orElseThrow();
+        assertThat(eventoEscalado.getId()).as("debe seguir siendo el mismo evento, no uno nuevo").isEqualTo(evento.getId());
+        assertThat(eventoEscalado.isUrgente()).as("2do fallo consecutivo con umbral=2 debe escalar a urgente").isTrue();
+
+        eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, true, null, LocalDateTime.now()));
+        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE))
+                .as("debe resolverse en cuanto el dispositivo vuelve a responder")
+                .isEmpty();
+    }
+
+    @Test
+    void dispositivo_no_disponible_reinicia_el_contador_de_fallos_al_reconectar() {
+        String linea = "Linea02";
+        AlarmaConfig config = configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE).orElseThrow();
+        config.setLecturasConsecutivasUrgente(2);
+        configRepository.save(config);
+
+        eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, false, "sin respuesta a ping", LocalDateTime.now()));
+        eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, true, null, LocalDateTime.now()));
+        eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, false, "sin respuesta a ping", LocalDateTime.now()));
+
+        AlarmaEvento evento = eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE)
+                .orElseThrow();
+        assertThat(evento.isUrgente())
+                .as("la reconexión intermedia debe reiniciar el contador: este fallo es el 1ro de una racha nueva, no el 2do")
+                .isFalse();
     }
 
     @TestConfiguration

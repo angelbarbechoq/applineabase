@@ -41,6 +41,10 @@ public class AlarmaEvento {
     @Column(nullable = false)
     private boolean activa = true;
 
+    /** true si escaló a revisión urgente (DISPOSITIVO_NO_DISPONIBLE tras N lecturas fallidas seguidas). */
+    @Column(nullable = false)
+    private boolean urgente = false;
+
     public AlarmaEvento() {
     }
 
@@ -94,5 +98,13 @@ public class AlarmaEvento {
 
     public void setActiva(boolean activa) {
         this.activa = activa;
+    }
+
+    public boolean isUrgente() {
+        return urgente;
+    }
+
+    public void setUrgente(boolean urgente) {
+        this.urgente = urgente;
     }
 }

@@ -2,6 +2,7 @@ package com.example.dataacquisition.service;
 
 import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.RutaArchivosEnergia;
+import com.example.dataacquisition.event.DispositivoConectividadEvent;
 import com.example.dataacquisition.event.SensorDataUpdateEvent;
 import com.example.dataacquisition.model.PLCS7200x;
 import de.re.easymodbus.modbusclient.ModbusClient;
@@ -143,6 +144,7 @@ public class PLCDataAcquisitionService {
         // Check connectivity via ping
         if (!ModbusUtil.isIPAvailable(plcIP)) {
             logger.warn("IP {} not available for PLC {}", plcIP, plcName);
+            publicarConectividad(lineasDelPLC, false, "sin respuesta a ping");
             return;
         }
         //{"KWh", "VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF", "KWhR"};
@@ -276,8 +278,11 @@ public class PLCDataAcquisitionService {
                 }
             }
 
+            publicarConectividad(lineasDelPLC, true, null);
+
         } catch (Exception e) {
             logger.error("Failed to read PLC {} at {}: {}", plcName, plcIP, e.getMessage());
+            publicarConectividad(lineasDelPLC, false, "error de conexión Modbus");
         } finally {
             try {
                 modbusClientPLC.Disconnect();
@@ -300,5 +305,15 @@ public class PLCDataAcquisitionService {
             byteToBigDecimal[ix] = ModbusUtil.registroIntToBigDecimal(regIntX);
         }
         return byteToBigDecimal;
+    }
+
+    /** Reporta a AlarmaEvaluatorService (regla DISPOSITIVO_NO_DISPONIBLE) si este ciclo pudo
+     * leer o no cada línea de este PLC, para el ping fallido y el fallo de conexión Modbus. */
+    private void publicarConectividad(List<Map<String, Object>> lineas, boolean conectado, String motivo) {
+        LocalDateTime ahora = LocalDateTime.now();
+        for (Map<String, Object> linea : lineas) {
+            String nombreLinea = (String) linea.get("lineaMaquina");
+            eventPublisher.publishEvent(new DispositivoConectividadEvent(this, nombreLinea, conectado, motivo, ahora));
+        }
     }
 }
