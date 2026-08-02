@@ -46,6 +46,7 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -401,16 +402,25 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle(maquina != null ? "Recalcular " + maquina : "Recalcular todas las máquinas");
 
-        DatePicker mesPicker = new DatePicker("Mes a recalcular (cualquier día de ese mes)");
-        mesPicker.setValue(LocalDate.now());
-        mesPicker.setWidth("260px");
+        List<YearMonth> meses = new ArrayList<>(horometroBackfillRunner.mesesDisponibles());
+        Collections.reverse(meses); // más reciente primero, es lo que más se recalcula
+        ComboBox<YearMonth> mesCombo = new ComboBox<>("Mes a recalcular");
+        mesCombo.setItems(meses);
+        mesCombo.setItemLabelGenerator(this::nombreMes);
+        mesCombo.setWidth("260px");
+        if (!meses.isEmpty()) {
+            mesCombo.setValue(meses.contains(YearMonth.now()) ? YearMonth.now() : meses.get(0));
+        }
 
         Button btnMes = new Button("Recalcular ese mes", e -> {
-            YearMonth mes = YearMonth.from(mesPicker.getValue() != null ? mesPicker.getValue() : LocalDate.now());
-            ejecutarRecalculo(maquina, mes);
+            if (mesCombo.getValue() == null) {
+                return;
+            }
+            ejecutarRecalculo(maquina, mesCombo.getValue());
             dialog.close();
         });
         btnMes.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        btnMes.setEnabled(!meses.isEmpty());
 
         Button btnTodo = new Button("Recalcular todo el histórico", e -> {
             ejecutarRecalculo(maquina, null);
@@ -424,7 +434,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
 
         Button btnCancelar = new Button("Cancelar", e -> dialog.close());
 
-        VerticalLayout contenido = new VerticalLayout(mesPicker,
+        VerticalLayout contenido = new VerticalLayout(mesCombo,
                 new HorizontalLayout(btnMes, btnTodo, btnCancelar), nota);
         contenido.setPadding(false);
         dialog.add(contenido);

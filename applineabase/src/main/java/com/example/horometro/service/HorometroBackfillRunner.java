@@ -98,6 +98,11 @@ public class HorometroBackfillRunner implements ApplicationRunner {
         logger.info("Backfill de horómetro completado");
     }
 
+    /** Meses (año+mes) para los que hay datos guardados, de más antiguo a más reciente — para poblar el selector de mes del recálculo. */
+    public List<YearMonth> mesesDisponibles() {
+        return databaseInitializationService.listarMesesDisponibles();
+    }
+
     /**
      * Recalcula TODO el histórico de una línea con el umbral/ventana que tenga configurado en
      * este momento, ignorando los días ya calculados — relee todos los datos guardados desde
