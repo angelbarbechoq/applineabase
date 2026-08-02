@@ -222,6 +222,16 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
                 .distinct().sorted().collect(Collectors.toList());
     }
 
+    /** Meses del año en curso, de Enero al mes actual — usado por la tabla y el CSV mensual. */
+    private List<YearMonth> mesesDelAnioActual() {
+        LocalDate hoy = LocalDate.now();
+        List<YearMonth> meses = new ArrayList<>();
+        for (int mes = 1; mes <= hoy.getMonthValue(); mes++) {
+            meses.add(YearMonth.of(hoy.getYear(), mes));
+        }
+        return meses;
+    }
+
     /**
      * Tabla pivote: una fila por máquina, una columna por mes del año en curso (Enero hasta el
      * mes actual) — igual al formato que se usa a mano para comparar contra el horómetro
@@ -229,11 +239,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
      * primer poll después de un rollover de mes con la app corriendo), no en cada poll.
      */
     private void refrescarTablaMensual() {
-        LocalDate hoy = LocalDate.now();
-        List<YearMonth> meses = new ArrayList<>();
-        for (int mes = 1; mes <= hoy.getMonthValue(); mes++) {
-            meses.add(YearMonth.of(hoy.getYear(), mes));
-        }
+        List<YearMonth> meses = mesesDelAnioActual();
 
         if (!meses.equals(mesesTablaMensual)) {
             mesesTablaMensual = meses;
@@ -471,7 +477,8 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         fechaSemanaPicker.setValue(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)));
         fechaSemanaPicker.setWidth("220px");
 
-        filaTitulo.add(crearLinkDescargaCsv(fechaSemanaPicker),
+        Button btnDescargarCsv = new Button("Descargar CSV", e -> abrirDialogoDescargaCsv(fechaSemanaPicker));
+        filaTitulo.add(btnDescargarCsv,
                 new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class),
                 crearBotonRecalcularTodos());
 
@@ -484,20 +491,61 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     }
 
     /**
-     * Exportador CSV semanal, solo ADMIN. Ancla las 4 columnas al domingo de la semana
-     * elegida (por defecto el último domingo completo), para que el reporte coincida con
-     * la rutina real: cada lunes se toma el horómetro físico de la semana que acaba de
-     * terminar. "Horas totales" se reconstruye histórico hasta esa fecha, no es el valor
-     * actual — así sirve para comparar contra la lectura física de cualquier semana pasada.
+     * Diálogo de exportación, solo ADMIN: elegir entre el CSV semanal (una máquina por fila,
+     * ancla la semana elegida en el DatePicker de arriba) o la tabla mensual por máquina (igual
+     * a la pestaña "Horas por mes (tabla)", un mes por columna). Cada opción es un enlace de
+     * descarga real (StreamResource), no un botón que dispare la descarga por otro lado — así
+     * el navegador la maneja de forma nativa, sin depender de JS extra.
      */
-    private Anchor crearLinkDescargaCsv(DatePicker fechaSemanaPicker) {
-        StreamResource recurso = new StreamResource("horometro-semanal.csv",
-                () -> generarCsv(fechaSemanaPicker.getValue()));
-        recurso.setContentType("text/csv; charset=UTF-8");
+    private void abrirDialogoDescargaCsv(DatePicker fechaSemanaPicker) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Descargar CSV");
 
-        Anchor descargarLink = new Anchor(recurso, "Descargar CSV semanal");
-        descargarLink.getElement().setAttribute("download", true);
-        return descargarLink;
+        StreamResource recursoSemanal = new StreamResource("horometro-semanal.csv",
+                () -> generarCsv(fechaSemanaPicker.getValue()));
+        recursoSemanal.setContentType("text/csv; charset=UTF-8");
+        Anchor linkSemanal = new Anchor(recursoSemanal, "Horas semanales (por máquina)");
+        linkSemanal.getElement().setAttribute("download", true);
+        linkSemanal.getElement().addEventListener("click", e -> dialog.close());
+
+        StreamResource recursoMensual = new StreamResource("horometro-mensual.csv", this::generarCsvMensual);
+        recursoMensual.setContentType("text/csv; charset=UTF-8");
+        Anchor linkMensual = new Anchor(recursoMensual, "Tabla mensual por máquina (año en curso)");
+        linkMensual.getElement().setAttribute("download", true);
+        linkMensual.getElement().addEventListener("click", e -> dialog.close());
+
+        Button btnCancelar = new Button("Cancelar", e -> dialog.close());
+
+        VerticalLayout contenido = new VerticalLayout(linkSemanal, linkMensual, btnCancelar);
+        contenido.setPadding(false);
+        dialog.add(contenido);
+        dialog.open();
+    }
+
+    /**
+     * CSV de la tabla mensual (una fila por máquina, una columna por mes del año en curso) —
+     * mismos datos que la pestaña "Horas por mes (tabla)", reusando mesesDelAnioActual y
+     * horometroService.horasDelMes en vez de duplicar esa lógica.
+     */
+    private InputStream generarCsvMensual() {
+        List<YearMonth> meses = mesesDelAnioActual();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append('﻿'); // BOM UTF-8, para que Excel muestre bien tildes/ñ
+        sb.append("Linea");
+        for (YearMonth mes : meses) {
+            sb.append(';').append(nombreMesCorto(mes));
+        }
+        sb.append("\r\n");
+
+        for (String maquina : maquinasConHorometro()) {
+            sb.append(CsvUtil.escape(maquina));
+            for (YearMonth mes : meses) {
+                sb.append(';').append(formatoDecimalExcel(horometroService.horasDelMes(maquina, mes)));
+            }
+            sb.append("\r\n");
+        }
+        return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     private static final String[] NOMBRES_DIA_CORTOS = {"Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"};
