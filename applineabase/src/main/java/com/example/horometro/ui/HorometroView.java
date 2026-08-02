@@ -105,7 +105,11 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     // porque solo se muestra una a la vez.
     private static final String ID_CHART_MENSUAL_MAQUINA = "chartdiv_horo_mensual_maquina";
     private final ComboBox<String> comboMaquinaMensual = new ComboBox<>("Máquina");
-    private final Grid<FilaMensual> gridMensual = new Grid<>(FilaMensual.class, false);
+    private final Grid<FilaMensualPivot> gridMensual = new Grid<>(FilaMensualPivot.class, false);
+    // Meses (año en curso) con columna ya creada en gridMensual — para no reconstruir las
+    // columnas en cada poll, solo cuando cambian (arranque, o el primer poll tras un
+    // rollover de mes/año mientras la app sigue corriendo).
+    private List<YearMonth> mesesTablaMensual = List.of();
 
     public HorometroView(HorometroService horometroService, HorometroBackfillRunner horometroBackfillRunner,
                           LineaAccessService lineaAccessService, AlarmaConfigRepository alarmaConfigRepository) {
@@ -118,9 +122,14 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         setPadding(true);
         setSpacing(true);
 
-        add(new H3("Horómetro de Máquinas"));
+        H3 titulo = new H3("Horómetro de Máquinas");
+        titulo.getStyle().set("margin", "0");
+        HorizontalLayout filaTitulo = new HorizontalLayout(titulo);
+        filaTitulo.setAlignItems(Alignment.CENTER);
+        filaTitulo.setSpacing(true);
+        add(filaTitulo);
         if (lineaAccessService.esAdmin()) {
-            agregarAccionesAdmin();
+            agregarAccionesAdmin(filaTitulo);
         }
 
         grid.addColumn(HorometroRow::maquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
@@ -141,9 +150,6 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         maquinasMezcla = maquinasPorCampo(lineasPermitidas, "zona", "Mezcla");
         maquinasCasaFuerza = maquinasPorCampo(lineasPermitidas, "grupo", GRUPO_CASA_FUERZA);
 
-        gridMensual.addColumn(FilaMensual::maquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
-        gridMensual.addColumn(f -> nombreMes(f.mes())).setHeader("Mes").setAutoWidth(true).setSortable(true);
-        gridMensual.addColumn(f -> formatoHoras(f.horas())).setHeader("Horas").setAutoWidth(true).setSortable(true);
         gridMensual.setSizeFull();
 
         TabSheet tabSheetPrincipal = new TabSheet();
@@ -214,13 +220,37 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
                 .distinct().sorted().collect(Collectors.toList());
     }
 
-    /** Historial mensual de todas las máquinas con horómetro, para la pestaña "Horas por mes (tabla)". */
+    /**
+     * Tabla pivote: una fila por máquina, una columna por mes del año en curso (Enero hasta el
+     * mes actual) — igual al formato que se usa a mano para comparar contra el horómetro
+     * físico. Las columnas se reconstruyen solo cuando cambia la lista de meses (arranque, o el
+     * primer poll después de un rollover de mes con la app corriendo), no en cada poll.
+     */
     private void refrescarTablaMensual() {
-        List<FilaMensual> filas = new ArrayList<>();
-        for (String maquina : maquinasConHorometro()) {
-            for (HorometroService.HistorialMes h : horometroService.historialMensual(maquina)) {
-                filas.add(new FilaMensual(h.linea(), h.mes(), h.horas()));
+        LocalDate hoy = LocalDate.now();
+        List<YearMonth> meses = new ArrayList<>();
+        for (int mes = 1; mes <= hoy.getMonthValue(); mes++) {
+            meses.add(YearMonth.of(hoy.getYear(), mes));
+        }
+
+        if (!meses.equals(mesesTablaMensual)) {
+            mesesTablaMensual = meses;
+            gridMensual.removeAllColumns();
+            gridMensual.addColumn(FilaMensualPivot::maquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true).setFrozen(true);
+            for (int i = 0; i < meses.size(); i++) {
+                int indice = i;
+                gridMensual.addColumn(f -> formatoHoras(f.horasPorMes().get(indice)))
+                        .setHeader(nombreMesCorto(meses.get(indice))).setAutoWidth(true).setSortable(true);
             }
+        }
+
+        List<FilaMensualPivot> filas = new ArrayList<>();
+        for (String maquina : maquinasConHorometro()) {
+            List<Double> horasPorMes = new ArrayList<>();
+            for (YearMonth mes : meses) {
+                horasPorMes.add(horometroService.horasDelMes(maquina, mes));
+            }
+            filas.add(new FilaMensualPivot(maquina, horasPorMes));
         }
         gridMensual.setItems(filas);
     }
@@ -381,14 +411,18 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     }
 
     /**
-     * Fila de la semana (con su aclaración en letra chica al lado, no como etiqueta principal)
-     * y, debajo, la fila de acciones rápidas en el orden pedido: descargar CSV, ajustar
-     * umbrales, recalcular todas.
+     * Acciones rápidas (descargar CSV, ajustar umbrales, recalcular todas) en la MISMA fila
+     * que el título, para ganar una fila entera de alto — antes iban en una fila propia debajo
+     * del selector de semana. El selector de semana sigue en su fila aparte, justo debajo.
      */
-    private void agregarAccionesAdmin() {
+    private void agregarAccionesAdmin(HorizontalLayout filaTitulo) {
         DatePicker fechaSemanaPicker = new DatePicker("Semana a reportar");
         fechaSemanaPicker.setValue(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)));
         fechaSemanaPicker.setWidth("220px");
+
+        filaTitulo.add(crearLinkDescargaCsv(fechaSemanaPicker),
+                new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class),
+                crearBotonRecalcularTodos());
 
         Span notaSemana = new Span("Cualquier día de esa semana; se usa el domingo que la contiene");
         notaSemana.getStyle().set("font-size", "12px").set("color", "var(--lumo-secondary-text-color)");
@@ -396,13 +430,6 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         HorizontalLayout filaSemana = new HorizontalLayout(fechaSemanaPicker, notaSemana);
         filaSemana.setAlignItems(Alignment.CENTER);
         add(filaSemana);
-
-        HorizontalLayout filaAcciones = new HorizontalLayout(
-                crearLinkDescargaCsv(fechaSemanaPicker),
-                new RouterLink("Ajustar umbrales de encendido/apagado", AlarmasConfigView.class),
-                crearBotonRecalcularTodos());
-        filaAcciones.setAlignItems(Alignment.CENTER);
-        add(filaAcciones);
     }
 
     /**
@@ -422,72 +449,72 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         return descargarLink;
     }
 
+    private static final String[] NOMBRES_DIA_CORTOS = {"Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"};
+
     /**
-     * CSV semanal con desglose día a día. Cuando la semana cruza de mes, separa los días en dos
-     * tramos (días del mes que termina / días del mes que empieza), cada uno con su fecha y su
-     * subtotal, y agrega el total del mes que se cierra en esa semana — así se puede verificar
-     * a mano cómo se repartió la semana entre los dos meses, no solo el resultado final.
+     * CSV semanal, una fila fija por máquina (igual que el formato original, para poder
+     * tratarlo como tabla en Excel — filtrar, ordenar, sumar). El desglose día a día pedido va
+     * en 7 columnas fijas (Lun..Dom, siempre esa semana), en vez de filas variables: como la
+     * fecha de "Lunes" ya está en la fila, la fecha de cada columna se deduce por posición, sin
+     * romper la estructura de una fila = una máquina. La columna del mes que se cierra en esa
+     * semana solo aparece si la semana elegida cruza de mes — es la misma semana para todas las
+     * máquinas del reporte, así que la cabecera no varía fila a fila.
      */
     private InputStream generarCsv(LocalDate fechaSeleccionada) {
         LocalDate fecha = fechaSeleccionada != null ? fechaSeleccionada : LocalDate.now();
+        LocalDate domingo = fecha.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        LocalDate lunes = domingo.minusDays(6);
+        YearMonth mesQueTermina = YearMonth.from(lunes);
+        boolean semanaCruzaMes = !mesQueTermina.equals(YearMonth.from(domingo));
 
         StringBuilder sb = new StringBuilder();
         sb.append('﻿'); // BOM UTF-8, para que Excel muestre bien tildes/ñ
-        sb.append("Linea;Fecha;Horas;Detalle\r\n");
+        sb.append("Linea;Lunes;Domingo;");
+        for (String nombreDia : NOMBRES_DIA_CORTOS) {
+            sb.append("Horas ").append(nombreDia).append(';');
+        }
+        sb.append("Horas semana;");
+        if (semanaCruzaMes) {
+            sb.append("Horas ").append(nombreMes(mesQueTermina)).append(" (mes completo);");
+        }
+        sb.append("Horas totales acumuladas\r\n");
 
         for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
             if (buscarConfigHorometro(maquina).isEmpty()) {
                 continue;
             }
             HorometroService.ReporteSemanalDetallado r = horometroService.generarReporteDetallado(maquina, fecha);
-            String linea = CsvUtil.escape(maquina);
+            List<HorometroService.DiaHoras> semana = new ArrayList<>(r.diasMesQueTermina());
+            semana.addAll(r.diasMesQueEmpieza());
 
-            sb.append(linea).append(";;;")
-                    .append(CsvUtil.escape("Semana " + r.lunes().format(FORMATO_FECHA_CORTA)
-                            + " a " + r.domingo().format(FORMATO_FECHA_CORTA)))
-                    .append("\r\n");
-
-            escribirDetalleDias(sb, linea, r.diasMesQueTermina());
-            escribirSubtotal(sb, linea, "Subtotal " + nombreMes(YearMonth.from(r.lunes())),
-                    r.diasMesQueTermina().stream().mapToDouble(HorometroService.DiaHoras::horas).sum());
-
-            if (r.semanaCruzaMes()) {
-                escribirDetalleDias(sb, linea, r.diasMesQueEmpieza());
-                escribirSubtotal(sb, linea, "Subtotal " + nombreMes(YearMonth.from(r.domingo())),
-                        r.diasMesQueEmpieza().stream().mapToDouble(HorometroService.DiaHoras::horas).sum());
+            sb.append(CsvUtil.escape(maquina)).append(';')
+                    .append(r.lunes().format(FORMATO_FECHA_CORTA)).append(';')
+                    .append(r.domingo().format(FORMATO_FECHA_CORTA)).append(';');
+            for (HorometroService.DiaHoras dia : semana) {
+                sb.append(formatoDecimalExcel(dia.horas())).append(';');
             }
-
-            escribirSubtotal(sb, linea, "Horas semana", r.horasSemana());
-            if (r.semanaCruzaMes()) {
-                escribirSubtotal(sb, linea, "Horas " + nombreMes(r.mesQueTermina()) + " (mes completo)",
-                        r.horasMesQueTermina());
+            sb.append(formatoDecimalExcel(r.horasSemana())).append(';');
+            if (semanaCruzaMes) {
+                sb.append(formatoDecimalExcel(r.horasMesQueTermina())).append(';');
             }
-            escribirSubtotal(sb, linea, "Horas totales acumuladas", r.horasTotal());
-            sb.append("\r\n");
+            sb.append(formatoDecimalExcel(r.horasTotal())).append("\r\n");
         }
         return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
-    }
-
-    private void escribirDetalleDias(StringBuilder sb, String linea, List<HorometroService.DiaHoras> dias) {
-        for (HorometroService.DiaHoras dia : dias) {
-            sb.append(linea).append(';')
-                    .append(dia.fecha().format(FORMATO_FECHA_CORTA)).append(';')
-                    .append(formatoDecimalExcel(dia.horas())).append(";\r\n");
-        }
-    }
-
-    private void escribirSubtotal(StringBuilder sb, String linea, String etiqueta, double horas) {
-        sb.append(linea).append(";;")
-                .append(formatoDecimalExcel(horas)).append(';')
-                .append(CsvUtil.escape(etiqueta)).append("\r\n");
     }
 
     private static final Locale LOCALE_ES = Locale.of("es", "ES");
     private static final DateTimeFormatter FORMATO_FECHA_CORTA = DateTimeFormatter.ofPattern("dd-MM-yyyy");
     private static final DateTimeFormatter FORMATO_MES = DateTimeFormatter.ofPattern("MMMM yyyy", LOCALE_ES);
+    private static final DateTimeFormatter FORMATO_MES_SOLO = DateTimeFormatter.ofPattern("MMMM", LOCALE_ES);
 
     private String nombreMes(YearMonth mes) {
         return mes.atDay(1).format(FORMATO_MES);
+    }
+
+    /** Nombre del mes solo (sin año), con mayúscula inicial — para encabezados de columna. */
+    private String nombreMesCorto(YearMonth mes) {
+        String nombre = mes.atDay(1).format(FORMATO_MES_SOLO);
+        return Character.toUpperCase(nombre.charAt(0)) + nombre.substring(1);
     }
 
     private String formatoDecimalExcel(double valor) {
@@ -537,6 +564,6 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
                                  java.time.LocalDateTime desdeCuandoCuentaTotal) {
     }
 
-    private record FilaMensual(String maquina, YearMonth mes, double horas) {
+    private record FilaMensualPivot(String maquina, List<Double> horasPorMes) {
     }
 }
