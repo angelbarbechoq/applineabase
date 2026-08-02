@@ -732,10 +732,13 @@ public class GraficaModel {
                 "yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });" +
                 "var serieHoras = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Horas trabajadas en el mes', xAxis: xAxis, yAxis: yAxis, valueYField: 'horas', categoryXField: 'categoria' }));" +
                 "serieHoras.columns.template.setAll({ fill: am5.color(0x29b6f6), stroke: am5.color(0x29b6f6), strokeOpacity: 0, width: am5.percent(60), cornerRadiusTL: 4, cornerRadiusTR: 4, tooltipText: '{categoryX}: {valueY.formatNumber(\\u0022#.##\\u0022)} h' });" +
+                // locationY: 0.5 + centerY: p50 ubica el bullet en la mitad de la altura de la
+                // columna (no arriba de ella): con columnas altas (cerca del techo de 720h) una
+                // etiqueta por encima quedaba cortada por el borde del gráfico.
                 "serieHoras.bullets.push(function() {" +
-                "  return am5.Bullet.new(root, { locationY: 1, sprite: am5.Label.new(root, {" +
+                "  return am5.Bullet.new(root, { locationY: 0.5, sprite: am5.Label.new(root, {" +
                 "    text: '{valueY.formatNumber(\\u0022#.##\\u0022)}'," +
-                "    centerX: am5.p50, centerY: am5.p100, dy: -8, fontSize: '11px', fill: am5.color(0x52514e), populateText: true" +
+                "    centerX: am5.p50, centerY: am5.p50, fontSize: '11px', fontWeight: 'bold', fill: am5.color(0xffffff), populateText: true" +
                 "  }) });" +
                 "});" +
                 "serieHoras.data.setAll(datos);" +

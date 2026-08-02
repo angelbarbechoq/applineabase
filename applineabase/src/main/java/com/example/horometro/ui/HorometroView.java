@@ -93,6 +93,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private Tab tabExtrusion;
     private Tab tabMezcla;
     private Tab tabCasaFuerza;
+    private Tab tabMensualTabla;
     private Tab tabMensualGrafico;
     // Solo se refresca el grafico de la pestaña de grupo actualmente visible (nunca las tres a
     // la vez): asi el gráfico amCharts5 recien se crea (am5.Root.new) cuando su contenedor ya
@@ -164,7 +165,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         if (!maquinasCasaFuerza.isEmpty()) {
             tabCasaFuerza = tabSheetPrincipal.add(GRUPO_CASA_FUERZA, crearPanelGrupo(ID_CHART_CASA_FUERZA));
         }
-        tabSheetPrincipal.add("Horas por mes (tabla)", gridMensual);
+        tabMensualTabla = tabSheetPrincipal.add("Horas por mes (tabla)", gridMensual);
         tabMensualGrafico = tabSheetPrincipal.add("Horas por mes (gráfico)", crearPanelGraficoMensual());
         add(tabSheetPrincipal);
         setFlexGrow(1, tabSheetPrincipal);
@@ -179,7 +180,6 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
             ui.setPollInterval(POLL_INTERVAL_MS);
             ui.addPollListener(pollEvent -> {
                 refrescarGrid();
-                refrescarTablaMensual();
                 refrescoGrupoActual.run();
             });
         });
@@ -268,9 +268,13 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     }
 
     /**
-     * Cambia qué gráfico de grupo se refresca en cada poll (nunca los tres a la vez) y, para la
-     * pestaña recién seleccionada, lo dispara de inmediato — así el gráfico se crea recién
-     * cuando su contenedor ya está visible, en vez de precargarse oculto y quedar en blanco.
+     * Cambia qué contenido (gráfico de grupo o tabla/gráfico mensual) se refresca en cada poll
+     * — nunca más de uno a la vez — y, para la pestaña recién seleccionada, lo dispara de
+     * inmediato. Además de crear los gráficos amCharts5 recién cuando su contenedor ya está
+     * visible (evita que queden en blanco), esto evita que la tabla mensual (que consulta
+     * horasDelMes por cada máquina y cada mes del año) haga esas consultas cada 30s aunque
+     * nadie esté mirando esa pestaña — esa carga de fondo competía con operaciones pesadas como
+     * "Recalcular todas las máquinas" y las hacía notablemente más lentas.
      */
     private void onTabSeleccionadaCambio(TabSheet.SelectedChangeEvent event) {
         Tab seleccionada = event.getSelectedTab();
@@ -280,6 +284,8 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
             refrescoGrupoActual = () -> refrescarGraficoGrupo(ID_CHART_MEZCLA, maquinasMezcla);
         } else if (seleccionada == tabCasaFuerza) {
             refrescoGrupoActual = () -> refrescarGraficoGrupo(ID_CHART_CASA_FUERZA, maquinasCasaFuerza);
+        } else if (seleccionada == tabMensualTabla) {
+            refrescoGrupoActual = this::refrescarTablaMensual;
         } else if (seleccionada == tabMensualGrafico) {
             refrescoGrupoActual = this::refrescarGraficoMensual;
         } else {
