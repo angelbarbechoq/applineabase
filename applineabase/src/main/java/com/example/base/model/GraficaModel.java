@@ -319,11 +319,15 @@ public class GraficaModel {
      * datos reales lo superan), y arma el batch de JS. Única función para esta orquestación:
      * la usan tanto la gráfica en vivo (ChartsView) como el histórico (HistoricoView), para
      * que ambas grafiquen siempre igual a partir de los mismos datos.
+     *
+     * Sin media móvil: en vivo la ventana deslizante se nota como un lag visible cada vez que
+     * llega un punto nuevo (probado y descartado — ver el overload de abajo, que sí la aplica,
+     * para el histórico).
      */
     public ResultadoGrafica graficarSerieKWh(String containerId, List<Map<String, Object>> datos,
                                               boolean conDiferencia, String maquina,
                                               String[] seriesNames, boolean limitarPuntos) {
-        return graficarSerieKWh(containerId, datos, conDiferencia, maquina, seriesNames, limitarPuntos, true);
+        return graficarSerieKWh(containerId, datos, conDiferencia, maquina, seriesNames, limitarPuntos, true, false);
     }
 
     /**
@@ -331,22 +335,36 @@ public class GraficaModel {
      * con la opción de saltear el filtro de atípicos ({@code filtrarAtipicos = false}) y
      * graficar la serie tal cual viene. Usado por la pestaña "Sin filtrar" de HistoricoView,
      * que muestra los mismos datos que "Filtrado" pero sin el suavizado de ruido, para que se
-     * pueda comparar una contra la otra.
+     * pueda comparar una contra la otra. Con {@code filtrarAtipicos = true} también aplica
+     * media móvil (ver overload de abajo) — a diferencia de la gráfica en vivo, en Histórico ya
+     * se tienen todos los datos de antemano, así que no hay lag perceptible al cargar.
      */
     public ResultadoGrafica graficarSerieKWh(String containerId, List<Map<String, Object>> datos,
                                               boolean conDiferencia, String maquina,
                                               String[] seriesNames, boolean limitarPuntos,
                                               boolean filtrarAtipicos) {
+        return graficarSerieKWh(containerId, datos, conDiferencia, maquina, seriesNames, limitarPuntos,
+                filtrarAtipicos, filtrarAtipicos);
+    }
+
+    /**
+     * Variante completa: filtrarAtipicos y suavizarMediaMovil se controlan por separado, para
+     * poder aplicar una sin la otra (caso de la gráfica en vivo, que quiere atípicos limpios
+     * pero sin el lag de la media móvil).
+     */
+    public ResultadoGrafica graficarSerieKWh(String containerId, List<Map<String, Object>> datos,
+                                              boolean conDiferencia, String maquina,
+                                              String[] seriesNames, boolean limitarPuntos,
+                                              boolean filtrarAtipicos, boolean suavizarMediaMovil) {
         setSeriesNames(seriesNames);
         SerieKWh serie = calcularSerieKWh(datos, conDiferencia);
 
-        List<Float> valores = serie.valores();
-        if (filtrarAtipicos) {
-            // Primero se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
-            // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala de la
-            // media móvil siguiente. Después, la media móvil suaviza el serrucho normal del
-            // KWh/min que queda incluso sin atípicos (ver comentario de mediaMovil).
-            valores = limpiarAtipicos(valores, FACTOR_ATIPICO);
+        // Primero se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
+        // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala de la
+        // media móvil siguiente. Después, si corresponde, la media móvil suaviza el serrucho
+        // normal del KWh/min que queda incluso sin atípicos (ver comentario de mediaMovil).
+        List<Float> valores = filtrarAtipicos ? limpiarAtipicos(serie.valores(), FACTOR_ATIPICO) : serie.valores();
+        if (suavizarMediaMovil) {
             valores = mediaMovil(valores, VENTANA_MEDIA_MOVIL);
         }
 
