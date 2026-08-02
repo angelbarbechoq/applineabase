@@ -265,9 +265,12 @@ public class HistoricoView extends VerticalLayout {
             GraficaModel.ResultadoGrafica filtrado = graficaKWh.graficarSerieKWh(
                     ID_CHART_FILTRADO, datos, conDiferencia, maquina, new String[]{"Datos"}, false, true);
             getElement().executeJs(filtrado.script());
+            getElement().executeJs(graficaKWh.getZoomXInicialScript(ID_CHART_FILTRADO, filtrado.puntosGraficados()));
+
             GraficaModel.ResultadoGrafica crudo = graficaKWh.graficarSerieKWh(
                     ID_CHART_CRUDO, datos, conDiferencia, maquina, new String[]{"Datos"}, false, false);
             getElement().executeJs(crudo.script());
+            getElement().executeJs(graficaKWh.getZoomXInicialScript(ID_CHART_CRUDO, crudo.puntosGraficados()));
 
             mensajeSpan.setText("");
             huboConsultaExitosa = true;
@@ -364,10 +367,11 @@ public class HistoricoView extends VerticalLayout {
 
         StringBuilder script = new StringBuilder();
         script.append(graficaActiva.getInitScript2(containerId));
-        for (int i = 0; i < timestamps.size(); i++) {
-            script.append(graficaActiva.getAddDataScript(containerId, timestamps.get(i), valoresPorFilaFinal.get(i), false));
-        }
+        script.append(graficaActiva.getSetAllDataScript(containerId, timestamps, valoresPorFilaFinal));
         script.append(graficaActiva.getAplicarZoomInicialScript(containerId));
+        // No recorta ni descarta puntos: solo cambia qué ventana del rango completo se ve
+        // primero (el resto queda navegable con el scrollbar horizontal).
+        script.append(graficaActiva.getZoomXInicialScript(containerId, timestamps.size()));
         getElement().executeJs(script.toString());
     }
 

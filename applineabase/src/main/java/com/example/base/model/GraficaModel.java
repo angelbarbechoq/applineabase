@@ -26,6 +26,12 @@ public class GraficaModel {
     // relación a la máquina que más horas tenga.
     public static final int HORAS_MES_COMPLETO = 720;
 
+    // Tope de puntos para la gráfica en vivo (ChartsView): 24h a 1 punto/minuto. Usado tanto al
+    // recortar el string de las actualizaciones incrementales (getAddDataScript) como al cargar
+    // el lote inicial "hoy hasta ahora" (graficarSerieKWh con limitarPuntos=true) — en la
+    // práctica casi nunca se activa ahí porque "hoy" ya trae como mucho esta misma cantidad.
+    private static final int MAX_PUNTOS_VIVO_24H = 1440;
+
     // Por defecto null (se usa la paleta roja/azul/verde de siempre, la que ya usan Histórico y
     // KWh/PF general) y sin leyenda (una sola serie no la necesita). Solo los gráficos que
     // explícitamente pidan otra cosa (ver ChartsView, pestaña Temperatura) llaman estos setters;
@@ -342,14 +348,26 @@ public class GraficaModel {
         // El preset actúa como piso; si los datos reales lo superan, se amplía el eje.
         setMaxY(calcularMaxYConMargen(valores, getMaxY()));
 
+        List<Long> timestamps = serie.timestamps();
+        List<Float[]> filas = new ArrayList<>();
+        for (Float v : valores) {
+            filas.add(new Float[]{v});
+        }
+        // limitarPuntos conserva su sentido original (recorte a las últimas 24h) también con la
+        // carga masiva: en la práctica solo importa para ChartsView ("hoy hasta ahora" ya viene
+        // en ese rango de por sí); Histórico pasa false porque quiere el rango completo pedido.
+        if (limitarPuntos && timestamps.size() > MAX_PUNTOS_VIVO_24H) {
+            int desde = timestamps.size() - MAX_PUNTOS_VIVO_24H;
+            timestamps = timestamps.subList(desde, timestamps.size());
+            filas = filas.subList(desde, filas.size());
+        }
+
         StringBuilder script = new StringBuilder();
         script.append(getInitScript2(containerId));
-        for (int i = 0; i < serie.timestamps().size(); i++) {
-            script.append(getAddDataScript(containerId, serie.timestamps().get(i), new Float[]{valores.get(i)}, limitarPuntos));
-        }
+        script.append(getSetAllDataScript(containerId, timestamps, filas));
         script.append(getAplicarZoomInicialScript(containerId));
 
-        return new ResultadoGrafica(script.toString(), serie.timestamps().size());
+        return new ResultadoGrafica(script.toString(), timestamps.size());
     }
 
     /**
@@ -410,7 +428,6 @@ public class GraficaModel {
     }
 
     public String getAddDataScript(String containerId, long timestamp, Float[] dato, boolean limit) {
-        int maxPoints = 1440; // 24 horas a 1 punto/minuto
         StringBuilder sb = new StringBuilder();
 
         sb.append("if (window.am5Charts && window.am5Charts['").append(containerId).append("']) {")
@@ -423,7 +440,7 @@ public class GraficaModel {
                   .append("    s.data.push({ date: ").append(timestamp).append(", value: ").append(dato[ix]).append(" });");
 
                 if (limit) {
-                    sb.append("    if (s.data.length > ").append(maxPoints).append(") { s.data.shift(); }");
+                    sb.append("    if (s.data.length > ").append(MAX_PUNTOS_VIVO_24H).append(") { s.data.shift(); }");
                 }
 
                 sb.append("    s.markDirtyValues();")
@@ -434,6 +451,65 @@ public class GraficaModel {
         sb.append("}");
 
         return sb.toString();
+    }
+
+    /**
+     * Carga TODOS los puntos de una sola vez vía {@code series.data.setAll(...)}, en vez de un
+     * {@code push()} + {@code markDirtyValues()} por punto como hace getAddDataScript — para
+     * lotes grandes (un mes de histórico puede superar los 40.000 puntos a 1 lectura/minuto),
+     * miles de llamadas individuales con su propio redibujado son mucho más lentas que una sola
+     * asignación masiva nativa de amCharts5. Pensado para cargas completas de una vez
+     * (graficarSerieKWh, el histórico VIP de HistoricoView); las actualizaciones incrementales
+     * en vivo (un punto nuevo por ciclo de lectura del PLC) siguen usando getAddDataScript, que
+     * ahí sí tiene sentido porque agrega un único punto por vez.
+     */
+    public String getSetAllDataScript(String containerId, List<Long> timestamps, List<Float[]> valoresPorFila) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("if (window.am5Charts && window.am5Charts['").append(containerId).append("']) {")
+          .append("var inst = window.am5Charts['").append(containerId).append("'];");
+
+        for (int ix = 0; ix < nGraficas; ix++) {
+            sb.append("if (inst.seriesList[").append(ix).append("]) {")
+              .append("inst.seriesList[").append(ix).append("].data.setAll([");
+            boolean primero = true;
+            for (int i = 0; i < timestamps.size(); i++) {
+                Float[] fila = valoresPorFila.get(i);
+                Float valor = ix < fila.length ? fila[ix] : null;
+                if (valor == null) {
+                    continue; // mismo criterio que getAddDataScript: un hueco no agrega punto
+                }
+                if (!primero) {
+                    sb.append(',');
+                }
+                sb.append("{date:").append(timestamps.get(i)).append(",value:").append(valor).append('}');
+                primero = false;
+            }
+            sb.append("]);}");
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+    // A partir de este número de puntos, mostrar el rango completo de entrada satura la vista
+    // (puntos superpuestos, poco legible) aunque ya se hayan cargado en bloque — ver
+    // getZoomXInicialScript, que muestra solo los últimos PUNTOS_VISIBLES_ZOOM_INICIAL de
+    // entrada y deja el resto navegable con el scrollbar horizontal que ya trae el gráfico.
+    public static final int PUNTOS_VISIBLES_ZOOM_INICIAL = 2000;
+
+    /**
+     * Zoomea el eje X para mostrar solo los últimos PUNTOS_VISIBLES_ZOOM_INICIAL puntos de un
+     * total de puntosTotales — no se descarta ningún dato, todos siguen cargados en el gráfico
+     * y navegables deslizando el scrollbar; esto solo decide qué se ve primero. Devuelve script
+     * vacío si el total ya entra cómodo, para no aplicar zoom donde no hace falta.
+     */
+    public String getZoomXInicialScript(String containerId, int puntosTotales) {
+        if (puntosTotales <= PUNTOS_VISIBLES_ZOOM_INICIAL) {
+            return "";
+        }
+        double startFraction = 1.0 - ((double) PUNTOS_VISIBLES_ZOOM_INICIAL / puntosTotales);
+        return "if (window.am5Charts && window.am5Charts['" + containerId + "']) {"
+                + "  window.am5Charts['" + containerId + "'].xAxis.zoom(" + startFraction + ", 1);"
+                + "}";
     }
 
     private static final int MAX_MARCADORES_HISTORIAL = 100;
