@@ -13,6 +13,7 @@ public interface HorometroDiarioRepository extends JpaRepository<HorometroDiario
     Optional<HorometroDiario> findByLineaMaquinaAndFecha(String lineaMaquina, LocalDate fecha);
     boolean existsByLineaMaquinaAndFecha(String lineaMaquina, LocalDate fecha);
     List<HorometroDiario> findByLineaMaquinaOrderByFechaDesc(String lineaMaquina);
+    List<HorometroDiario> findByLineaMaquinaAndFechaBetweenOrderByFecha(String lineaMaquina, LocalDate desde, LocalDate hasta);
 
     /** Reconstruye el total acumulado tal como estaba al cierre de una fecha pasada. */
     @Query("SELECT COALESCE(SUM(h.horas), 0) FROM HorometroDiario h "

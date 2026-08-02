@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.IsoFields;
 import java.time.temporal.TemporalAdjusters;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -205,6 +206,22 @@ public class HorometroService {
         return mensualRepository.findByLineaMaquinaAndAnioMes(linea, anioMes).map(HorometroMensual::getHoras).orElse(0.0);
     }
 
+    /**
+     * Histórico completo de horas mensuales de una máquina, en orden cronológico ascendente
+     * (más viejo primero) — a diferencia del repositorio (que trae más nuevo primero), este
+     * orden es el que necesitan tanto la tabla como el gráfico de barras por mes.
+     */
+    public List<HistorialMes> historialMensual(String linea) {
+        List<HistorialMes> historial = mensualRepository.findByLineaMaquinaOrderByAnioMesDesc(linea).stream()
+                .map(m -> new HistorialMes(linea, YearMonth.parse(m.getAnioMes()), m.getHoras()))
+                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+        java.util.Collections.reverse(historial);
+        return historial;
+    }
+
+    public record HistorialMes(String linea, YearMonth mes, double horas) {
+    }
+
     private void publicarActualizacion(String linea) {
         HorometroSnapshot snapshot = calcularSnapshot(linea, LocalDateTime.now());
         eventPublisher.publishEvent(new HorometroUpdateEvent(this, linea, snapshot.encendida(),
@@ -251,31 +268,56 @@ public class HorometroService {
     }
 
     /**
-     * Reporte histórico anclado al domingo de la semana pedida: horas de ese domingo, de esa
-     * semana completa, del mes que contiene ese domingo, y el total acumulado hasta esa fecha
-     * (reconstruido sumando el histórico diario, ya que el total ya no se reinicia nunca).
-     * Usado para el CSV semanal — no depende del estado en vivo, es 100% histórico/reproducible.
+     * Reporte histórico anclado al domingo de la semana pedida, con desglose día a día —
+     * cuando la semana cruza de mes (lunes y domingo caen en meses distintos), separa los días
+     * en dos tramos (días del mes que termina / días del mes que empieza) para que se pueda ver
+     * la fecha y el aporte de cada día a cada mes, no solo el subtotal. Como el mes que termina
+     * siempre queda cerrado dentro de esta misma semana cuando hay cruce (su último día cae
+     * entre lunes y domingo), ese caso también trae el total de ese mes completo. No depende del
+     * estado en vivo (usa el histórico diario ya persistido), por eso sirve para cualquier
+     * semana pasada, no solo la actual. Usado para el CSV semanal.
      */
-    public ReporteSemanal generarReporte(String linea, LocalDate cualquierDiaDeLaSemana) {
+    public ReporteSemanalDetallado generarReporteDetallado(String linea, LocalDate cualquierDiaDeLaSemana) {
         LocalDate domingo = cualquierDiaDeLaSemana.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
         LocalDate lunes = domingo.minusDays(6);
+        YearMonth mesQueTermina = YearMonth.from(lunes);
+        LocalDate finMesQueTermina = mesQueTermina.atEndOfMonth();
+        boolean semanaCruzaMes = !mesQueTermina.equals(YearMonth.from(domingo));
 
-        double horasDomingo = diarioRepository.findByLineaMaquinaAndFecha(linea, domingo)
-                .map(HorometroDiario::getHoras).orElse(0.0);
-        double horasSemana = semanalRepository.findByLineaMaquinaAndSemanaId(linea, semanaId(domingo))
-                .map(HorometroSemanal::getHoras).orElse(0.0);
-        double horasMes = mensualRepository.findByLineaMaquinaAndAnioMes(linea, anioMes(domingo))
-                .map(HorometroMensual::getHoras).orElse(0.0);
+        java.util.Map<LocalDate, Double> horasPorDia = diarioRepository
+                .findByLineaMaquinaAndFechaBetweenOrderByFecha(linea, lunes, domingo).stream()
+                .collect(java.util.stream.Collectors.toMap(HorometroDiario::getFecha, HorometroDiario::getHoras));
+
+        List<DiaHoras> diasMesQueTermina = new java.util.ArrayList<>();
+        List<DiaHoras> diasMesQueEmpieza = new java.util.ArrayList<>();
+        for (LocalDate dia = lunes; !dia.isAfter(domingo); dia = dia.plusDays(1)) {
+            double horas = horasPorDia.getOrDefault(dia, 0.0);
+            if (!dia.isAfter(finMesQueTermina)) {
+                diasMesQueTermina.add(new DiaHoras(dia, horas));
+            } else {
+                diasMesQueEmpieza.add(new DiaHoras(dia, horas));
+            }
+        }
+
+        double horasSemana = diasMesQueTermina.stream().mapToDouble(DiaHoras::horas).sum()
+                + diasMesQueEmpieza.stream().mapToDouble(DiaHoras::horas).sum();
+        double horasMesQueTermina = semanaCruzaMes ? horasDelMes(linea, mesQueTermina) : 0.0;
         double horasTotal = diarioRepository.sumHorasHastaFecha(linea, domingo);
 
-        return new ReporteSemanal(linea, lunes, domingo, horasDomingo, horasSemana, horasMes, horasTotal);
+        return new ReporteSemanalDetallado(linea, lunes, domingo, diasMesQueTermina, diasMesQueEmpieza,
+                horasSemana, semanaCruzaMes, mesQueTermina, horasMesQueTermina, horasTotal);
     }
 
     public record HorometroSnapshot(String linea, boolean encendida, double horasHoy, double horasMes,
                                      double horasTotal, LocalDateTime desdeCuandoCuentaTotal) {
     }
 
-    public record ReporteSemanal(String linea, LocalDate lunes, LocalDate domingo, double horasDomingo,
-                                  double horasSemana, double horasMes, double horasTotal) {
+    public record DiaHoras(LocalDate fecha, double horas) {
+    }
+
+    public record ReporteSemanalDetallado(String linea, LocalDate lunes, LocalDate domingo,
+                                           List<DiaHoras> diasMesQueTermina, List<DiaHoras> diasMesQueEmpieza,
+                                           double horasSemana, boolean semanaCruzaMes, YearMonth mesQueTermina,
+                                           double horasMesQueTermina, double horasTotal) {
     }
 }

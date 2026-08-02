@@ -14,6 +14,7 @@ import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Anchor;
@@ -92,10 +93,19 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private Tab tabExtrusion;
     private Tab tabMezcla;
     private Tab tabCasaFuerza;
+    private Tab tabMensualGrafico;
     // Solo se refresca el grafico de la pestaña de grupo actualmente visible (nunca las tres a
     // la vez): asi el gráfico amCharts5 recien se crea (am5.Root.new) cuando su contenedor ya
     // esta visible/con tamaño, evitando que quede en blanco hasta el proximo dato.
     private Runnable refrescoGrupoActual = () -> { };
+
+    // Pestaña "Horas por mes" (gráfico): historial completo por mes de UNA máquina elegida por
+    // el usuario, a diferencia de los gráficos de grupo de arriba (que comparan varias máquinas
+    // pero solo en el mes actual). Mismo id fijo de contenedor: no hace falta uno por máquina
+    // porque solo se muestra una a la vez.
+    private static final String ID_CHART_MENSUAL_MAQUINA = "chartdiv_horo_mensual_maquina";
+    private final ComboBox<String> comboMaquinaMensual = new ComboBox<>("Máquina");
+    private final Grid<FilaMensual> gridMensual = new Grid<>(FilaMensual.class, false);
 
     public HorometroView(HorometroService horometroService, HorometroBackfillRunner horometroBackfillRunner,
                           LineaAccessService lineaAccessService, AlarmaConfigRepository alarmaConfigRepository) {
@@ -131,6 +141,11 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         maquinasMezcla = maquinasPorCampo(lineasPermitidas, "zona", "Mezcla");
         maquinasCasaFuerza = maquinasPorCampo(lineasPermitidas, "grupo", GRUPO_CASA_FUERZA);
 
+        gridMensual.addColumn(FilaMensual::maquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
+        gridMensual.addColumn(f -> nombreMes(f.mes())).setHeader("Mes").setAutoWidth(true).setSortable(true);
+        gridMensual.addColumn(f -> formatoHoras(f.horas())).setHeader("Horas").setAutoWidth(true).setSortable(true);
+        gridMensual.setSizeFull();
+
         TabSheet tabSheetPrincipal = new TabSheet();
         tabSheetPrincipal.setSizeFull();
         tabSheetPrincipal.add("Tabla", grid);
@@ -143,21 +158,83 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         if (!maquinasCasaFuerza.isEmpty()) {
             tabCasaFuerza = tabSheetPrincipal.add(GRUPO_CASA_FUERZA, crearPanelGrupo(ID_CHART_CASA_FUERZA));
         }
+        tabSheetPrincipal.add("Horas por mes (tabla)", gridMensual);
+        tabMensualGrafico = tabSheetPrincipal.add("Horas por mes (gráfico)", crearPanelGraficoMensual());
         add(tabSheetPrincipal);
         setFlexGrow(1, tabSheetPrincipal);
 
         tabSheetPrincipal.addSelectedChangeListener(this::onTabSeleccionadaCambio);
 
         refrescarGrid();
+        refrescarTablaMensual();
 
         addAttachListener(e -> {
             UI ui = e.getUI();
             ui.setPollInterval(POLL_INTERVAL_MS);
             ui.addPollListener(pollEvent -> {
                 refrescarGrid();
+                refrescarTablaMensual();
                 refrescoGrupoActual.run();
             });
         });
+    }
+
+    /**
+     * Panel de la pestaña "Horas por mes (gráfico)": selector de máquina + contenedor del
+     * gráfico de barras. A diferencia de los gráficos de grupo (una barra por máquina, mes
+     * actual), acá cada barra es un mes distinto de la máquina elegida — historial completo.
+     */
+    private VerticalLayout crearPanelGraficoMensual() {
+        List<String> maquinas = maquinasConHorometro();
+        comboMaquinaMensual.setItems(maquinas);
+        comboMaquinaMensual.setWidth("300px");
+        if (!maquinas.isEmpty()) {
+            comboMaquinaMensual.setValue(maquinas.get(0));
+        }
+        comboMaquinaMensual.addValueChangeListener(e -> refrescarGraficoMensual());
+
+        VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
+        panel.setPadding(false);
+
+        Div chartDiv = new Div();
+        chartDiv.setId(ID_CHART_MENSUAL_MAQUINA);
+        chartDiv.setWidthFull();
+        chartDiv.setHeight("100%");
+
+        panel.add(comboMaquinaMensual, chartDiv);
+        panel.setFlexGrow(1, chartDiv);
+        return panel;
+    }
+
+    /** Máquinas visibles para el usuario que tienen horómetro configurado, en orden alfabético. */
+    private List<String> maquinasConHorometro() {
+        return lineaAccessService.getMaquinasPermitidas().stream()
+                .filter(m -> buscarConfigHorometro(m).isPresent())
+                .distinct().sorted().collect(Collectors.toList());
+    }
+
+    /** Historial mensual de todas las máquinas con horómetro, para la pestaña "Horas por mes (tabla)". */
+    private void refrescarTablaMensual() {
+        List<FilaMensual> filas = new ArrayList<>();
+        for (String maquina : maquinasConHorometro()) {
+            for (HorometroService.HistorialMes h : horometroService.historialMensual(maquina)) {
+                filas.add(new FilaMensual(h.linea(), h.mes(), h.horas()));
+            }
+        }
+        gridMensual.setItems(filas);
+    }
+
+    /** Gráfico de barras (una barra por mes) de la máquina actualmente elegida en el combo. */
+    private void refrescarGraficoMensual() {
+        String maquina = comboMaquinaMensual.getValue();
+        if (maquina == null) {
+            return;
+        }
+        List<HorometroService.HistorialMes> historial = horometroService.historialMensual(maquina);
+        List<String> categorias = historial.stream().map(h -> nombreMes(h.mes())).collect(Collectors.toList());
+        List<Double> horas = historial.stream().map(HorometroService.HistorialMes::horas).collect(Collectors.toList());
+        getElement().executeJs(GraficaModel.getBarChartScript(ID_CHART_MENSUAL_MAQUINA, categorias, horas));
     }
 
     /**
@@ -173,6 +250,8 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
             refrescoGrupoActual = () -> refrescarGraficoGrupo(ID_CHART_MEZCLA, maquinasMezcla);
         } else if (seleccionada == tabCasaFuerza) {
             refrescoGrupoActual = () -> refrescarGraficoGrupo(ID_CHART_CASA_FUERZA, maquinasCasaFuerza);
+        } else if (seleccionada == tabMensualGrafico) {
+            refrescoGrupoActual = this::refrescarGraficoMensual;
         } else {
             refrescoGrupoActual = () -> { };
             return;
@@ -343,45 +422,64 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         return descargarLink;
     }
 
+    /**
+     * CSV semanal con desglose día a día. Cuando la semana cruza de mes, separa los días en dos
+     * tramos (días del mes que termina / días del mes que empieza), cada uno con su fecha y su
+     * subtotal, y agrega el total del mes que se cierra en esa semana — así se puede verificar
+     * a mano cómo se repartió la semana entre los dos meses, no solo el resultado final.
+     */
     private InputStream generarCsv(LocalDate fechaSeleccionada) {
         LocalDate fecha = fechaSeleccionada != null ? fechaSeleccionada : LocalDate.now();
-        LocalDate domingo = fecha.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
-        LocalDate lunes = domingo.minusDays(6);
-        YearMonth mesDeLunes = YearMonth.from(lunes);
-        YearMonth mesDeDomingo = YearMonth.from(domingo);
-        boolean semanaCruzaMes = !mesDeLunes.equals(mesDeDomingo);
 
         StringBuilder sb = new StringBuilder();
         sb.append('﻿'); // BOM UTF-8, para que Excel muestre bien tildes/ñ
-        sb.append("Linea;Lunes;Domingo;Horas domingo;Horas semana;");
-        if (semanaCruzaMes) {
-            sb.append("Horas ").append(nombreMes(mesDeLunes)).append(';')
-                    .append("Horas ").append(nombreMes(mesDeDomingo)).append(';');
-        } else {
-            sb.append("Horas ").append(nombreMes(mesDeDomingo)).append(';');
-        }
-        sb.append("Horas totales\r\n");
+        sb.append("Linea;Fecha;Horas;Detalle\r\n");
 
         for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
             if (buscarConfigHorometro(maquina).isEmpty()) {
                 continue;
             }
-            HorometroService.ReporteSemanal r = horometroService.generarReporte(maquina, fecha);
-            sb.append(CsvUtil.escape(maquina)).append(';')
-                    .append(r.lunes().format(FORMATO_FECHA_CORTA)).append(';')
-                    .append(r.domingo().format(FORMATO_FECHA_CORTA)).append(';')
-                    .append(formatoDecimalExcel(r.horasDomingo())).append(';')
-                    .append(formatoDecimalExcel(r.horasSemana())).append(';');
-            if (semanaCruzaMes) {
-                double horasMesInicio = horometroService.horasDelMes(maquina, mesDeLunes);
-                sb.append(formatoDecimalExcel(horasMesInicio)).append(';')
-                        .append(formatoDecimalExcel(r.horasMes())).append(';');
-            } else {
-                sb.append(formatoDecimalExcel(r.horasMes())).append(';');
+            HorometroService.ReporteSemanalDetallado r = horometroService.generarReporteDetallado(maquina, fecha);
+            String linea = CsvUtil.escape(maquina);
+
+            sb.append(linea).append(";;;")
+                    .append(CsvUtil.escape("Semana " + r.lunes().format(FORMATO_FECHA_CORTA)
+                            + " a " + r.domingo().format(FORMATO_FECHA_CORTA)))
+                    .append("\r\n");
+
+            escribirDetalleDias(sb, linea, r.diasMesQueTermina());
+            escribirSubtotal(sb, linea, "Subtotal " + nombreMes(YearMonth.from(r.lunes())),
+                    r.diasMesQueTermina().stream().mapToDouble(HorometroService.DiaHoras::horas).sum());
+
+            if (r.semanaCruzaMes()) {
+                escribirDetalleDias(sb, linea, r.diasMesQueEmpieza());
+                escribirSubtotal(sb, linea, "Subtotal " + nombreMes(YearMonth.from(r.domingo())),
+                        r.diasMesQueEmpieza().stream().mapToDouble(HorometroService.DiaHoras::horas).sum());
             }
-            sb.append(formatoDecimalExcel(r.horasTotal())).append("\r\n");
+
+            escribirSubtotal(sb, linea, "Horas semana", r.horasSemana());
+            if (r.semanaCruzaMes()) {
+                escribirSubtotal(sb, linea, "Horas " + nombreMes(r.mesQueTermina()) + " (mes completo)",
+                        r.horasMesQueTermina());
+            }
+            escribirSubtotal(sb, linea, "Horas totales acumuladas", r.horasTotal());
+            sb.append("\r\n");
         }
         return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void escribirDetalleDias(StringBuilder sb, String linea, List<HorometroService.DiaHoras> dias) {
+        for (HorometroService.DiaHoras dia : dias) {
+            sb.append(linea).append(';')
+                    .append(dia.fecha().format(FORMATO_FECHA_CORTA)).append(';')
+                    .append(formatoDecimalExcel(dia.horas())).append(";\r\n");
+        }
+    }
+
+    private void escribirSubtotal(StringBuilder sb, String linea, String etiqueta, double horas) {
+        sb.append(linea).append(";;")
+                .append(formatoDecimalExcel(horas)).append(';')
+                .append(CsvUtil.escape(etiqueta)).append("\r\n");
     }
 
     private static final Locale LOCALE_ES = Locale.of("es", "ES");
@@ -437,5 +535,8 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     private record HorometroRow(String maquina, boolean encendida, double pwActual, double umbralKw,
                                  double horasHoy, double horasMes, double horasTotal,
                                  java.time.LocalDateTime desdeCuandoCuentaTotal) {
+    }
+
+    private record FilaMensual(String maquina, YearMonth mes, double horas) {
     }
 }
