@@ -25,8 +25,12 @@ public class AlarmaConfig {
     @Column(nullable = false)
     private String lineaMaquina;
 
+    // columnDefinition explicito: sin esto, Hibernate mapea @Enumerated(STRING) a un ENUM
+    // nativo de H2 con la lista de constantes vigente al crear la columna, y ddl-auto=update
+    // no la ensancha cuando se agrega una constante nueva a TipoAlarma (paso justo con
+    // DISPOSITIVO_NO_DISPONIBLE). VARCHAR evita que vuelva a pasar con futuros valores.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(40)")
     private TipoAlarma tipoAlarma;
 
     @Column(nullable = false)

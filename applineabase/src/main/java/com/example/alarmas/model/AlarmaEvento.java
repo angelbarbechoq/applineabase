@@ -26,8 +26,10 @@ public class AlarmaEvento {
     @Column(nullable = false)
     private String lineaMaquina;
 
+    // Ver comentario equivalente en AlarmaConfig: VARCHAR explicito para que ddl-auto=update
+    // no se trabe cuando TipoAlarma sume una constante nueva mas adelante.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(40)")
     private TipoAlarma tipoAlarma;
 
     @Column(nullable = false)
