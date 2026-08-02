@@ -3,6 +3,7 @@ package com.example.base.model;
 import com.example.dataacquisition.RutaArchivosEnergia;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -339,9 +340,15 @@ public class GraficaModel {
         setSeriesNames(seriesNames);
         SerieKWh serie = calcularSerieKWh(datos, conDiferencia);
 
-        // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
-        // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
-        List<Float> valores = filtrarAtipicos ? limpiarAtipicos(serie.valores(), FACTOR_ATIPICO) : serie.valores();
+        List<Float> valores = serie.valores();
+        if (filtrarAtipicos) {
+            // Primero se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
+            // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala de la
+            // media móvil siguiente. Después, la media móvil suaviza el serrucho normal del
+            // KWh/min que queda incluso sin atípicos (ver comentario de mediaMovil).
+            valores = limpiarAtipicos(valores, FACTOR_ATIPICO);
+            valores = mediaMovil(valores, VENTANA_MEDIA_MOVIL_KWH);
+        }
 
         setMinY(0.0);
         aplicarRangosPredefinidos(maquina);
@@ -761,6 +768,39 @@ public class GraficaModel {
             limpio.set(i, reemplazo);
         }
         return limpio;
+    }
+
+    // Ventana (en muestras) de la media móvil que suaviza el serrucho visual de KWh/min — a
+    // ~1 lectura/minuto, 30 muestras ≈ 30 minutos, el mismo valor que ya se usaba a mano en la
+    // versión anterior (NetBeans) para este mismo gráfico.
+    public static final int VENTANA_MEDIA_MOVIL_KWH = 30;
+
+    /**
+     * Media móvil simple de ventana fija, con suma deslizante O(n) — a diferencia de la versión
+     * anterior (NetBeans), que recalculaba la suma completa de la ventana en cada punto. Al
+     * principio de la serie, antes de juntar una ventana completa, promedia con lo que haya
+     * disponible (ventana creciente) en vez de saltear esos puntos: así no se pierden los
+     * primeros minutos de cada consulta ni se acorta la línea en rangos cortos donde la ventana
+     * casi no entraría.
+     *
+     * Complementa a limpiarAtipicos/limpiarCeroAislado, no los reemplaza: aquellos corrigen
+     * atípicos puntuales (un pico por falla de comunicación), esta suaviza el ruido normal
+     * punto a punto que queda incluso sin ningún atípico — son problemas distintos, y las dos
+     * técnicas se aplican en conjunto (atípicos primero, media móvil después).
+     */
+    public static List<Float> mediaMovil(List<Float> valores, int ventana) {
+        List<Float> resultado = new ArrayList<>(valores.size());
+        ArrayDeque<Float> ventanaActual = new ArrayDeque<>();
+        double suma = 0;
+        for (Float v : valores) {
+            ventanaActual.addLast(v);
+            suma += v;
+            if (ventanaActual.size() > ventana) {
+                suma -= ventanaActual.removeFirst();
+            }
+            resultado.add((float) (suma / ventanaActual.size()));
+        }
+        return resultado;
     }
 
     /**
