@@ -19,12 +19,14 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -71,8 +73,18 @@ public class HistoricoView extends VerticalLayout {
     private ComboBox<String> variableCombo;
     private Button consultarBtn;
     private Span mensajeSpan;
-    private Div chartContainer;
     private Div datosActualesCard;
+
+    // Dos pestañas con los mismos datos: "Filtrado" (limpiarAtipicos/limpiarCeroAislado, el
+    // comportamiento de siempre) y "Sin filtrar" (la serie cruda, para comparar contra la
+    // filtrada cuando hay dudas de si el filtro está ocultando algo real). Cada una vive en su
+    // propio contenedor amCharts — un mismo id no puede tener dos gráficos independientes.
+    private static final String ID_CHART_FILTRADO = "chartdiv_historico_filtrado";
+    private static final String ID_CHART_CRUDO = "chartdiv_historico_crudo";
+    // Cuando el usuario cambia de pestaña, si esa pestaña nunca recibió datos porque estaba
+    // oculta la última vez que se consultó (amCharts no puede dimensionarse en un contenedor
+    // con display:none), se vuelve a correr la última consulta para esa pestaña recién visible.
+    private boolean huboConsultaExitosa = false;
 
     public HistoricoView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
                           PLCDataQueryService plcDataQueryService) {
@@ -119,12 +131,28 @@ public class HistoricoView extends VerticalLayout {
         mensajeSpan = new Span("Seleccione los filtros y presione Consultar");
         add(mensajeSpan);
 
-        chartContainer = new Div();
-        chartContainer.setId("chartdiv_historico");
-        chartContainer.setWidthFull();
-        chartContainer.setHeight("500px");
-        add(chartContainer);
-        setFlexGrow(1, chartContainer);
+        TabSheet tabSheetFiltro = new TabSheet();
+        tabSheetFiltro.setSizeFull();
+        tabSheetFiltro.add("Filtrado", crearPanelGrafico(ID_CHART_FILTRADO));
+        tabSheetFiltro.add("Sin filtrar", crearPanelGrafico(ID_CHART_CRUDO));
+        // Si la pestaña recién visible nunca se renderizó con datos reales (estaba oculta la
+        // última vez que se consultó), se repite esa misma consulta ahora que ya se puede
+        // dimensionar correctamente.
+        tabSheetFiltro.addSelectedChangeListener(e -> {
+            if (huboConsultaExitosa) {
+                consultar();
+            }
+        });
+        add(tabSheetFiltro);
+        setFlexGrow(1, tabSheetFiltro);
+    }
+
+    private Div crearPanelGrafico(String containerId) {
+        Div chartDiv = new Div();
+        chartDiv.setId(containerId);
+        chartDiv.setWidthFull();
+        chartDiv.setHeight("500px");
+        return chartDiv;
     }
 
     private HorizontalLayout buildFiltrosLayout() {
@@ -229,14 +257,20 @@ public class HistoricoView extends VerticalLayout {
                 // que haya quedado de la última consulta exitosa sobre esta misma instancia.
                 graficaKWh.setMinY(0.0);
                 graficaKWh.aplicarRangosPredefinidos(maquina);
-                getElement().executeJs(graficaKWh.getInitScript2("chartdiv_historico"));
+                getElement().executeJs(graficaKWh.getInitScript2(ID_CHART_FILTRADO));
+                getElement().executeJs(graficaKWh.getInitScript2(ID_CHART_CRUDO));
                 return;
             }
 
-            GraficaModel.ResultadoGrafica resultado = graficaKWh.graficarSerieKWh(
-                    "chartdiv_historico", datos, conDiferencia, maquina, new String[]{"Datos"}, false);
-            getElement().executeJs(resultado.script());
-            mensajeSpan.setText(resultado.puntosGraficados() + " puntos graficados");
+            GraficaModel.ResultadoGrafica filtrado = graficaKWh.graficarSerieKWh(
+                    ID_CHART_FILTRADO, datos, conDiferencia, maquina, new String[]{"Datos"}, false, true);
+            getElement().executeJs(filtrado.script());
+            GraficaModel.ResultadoGrafica crudo = graficaKWh.graficarSerieKWh(
+                    ID_CHART_CRUDO, datos, conDiferencia, maquina, new String[]{"Datos"}, false, false);
+            getElement().executeJs(crudo.script());
+
+            mensajeSpan.setText("");
+            huboConsultaExitosa = true;
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());
         }
@@ -255,15 +289,16 @@ public class HistoricoView extends VerticalLayout {
                 // Resetear al piso por defecto: si no, el gráfico vacío hereda el zoom que
                 // haya quedado de la última consulta exitosa sobre esta misma instancia.
                 graficaActiva.setMaxY(maxYDefaultPorTipo(tipoVar));
-                getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
+                getElement().executeJs(graficaActiva.getInitScript2(ID_CHART_FILTRADO));
+                getElement().executeJs(graficaActiva.getInitScript2(ID_CHART_CRUDO));
                 return;
             }
 
             graficaActiva.setSeriesNames(seriesNamesPorTipo(tipoVar));
 
             SimpleDateFormat sdf = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
-            List<Long> timestamps = new java.util.ArrayList<>();
-            List<Float[]> valoresPorFila = new java.util.ArrayList<>();
+            List<Long> timestamps = new ArrayList<>();
+            List<Float[]> valoresPorFila = new ArrayList<>();
 
             for (Map<String, Object> row : datos) {
                 try {
@@ -274,49 +309,66 @@ public class HistoricoView extends VerticalLayout {
                 } catch (Exception ignored) {}
             }
 
-            // Se limpia el atípico de cada serie por separado (VAB, VAC, VBC, etc. pueden
-            // tener picos por falla de comunicación en momentos distintos), reemplazándolo
-            // por una interpolación de sus vecinos. Se limpia además el cero aislado (lectura
-            // inválida del PLC, no un apagado real) en las cuatro variables — Voltajes,
-            // Corrientes, PW y también PF, ya que el mismo glitch de comunicación que da un cero
-            // espurio en las otras tres suele darlo también en PF en esa misma lectura.
             int nSeries = graficaActiva.getnGraficas();
-            List<List<Float>> columnasLimpias = new java.util.ArrayList<>();
-            List<Float> valoresParaEscala = new java.util.ArrayList<>();
-            for (int s = 0; s < nSeries; s++) {
-                List<Float> columna = new java.util.ArrayList<>();
-                for (Float[] fila : valoresPorFila) columna.add(fila[s]);
-                columna = GraficaModel.limpiarCeroAislado(columna);
-                List<Float> columnaLimpia = GraficaModel.limpiarAtipicos(columna, GraficaModel.FACTOR_ATIPICO);
-                columnasLimpias.add(columnaLimpia);
-                for (Float v : columnaLimpia) {
-                    if (v != null && v > 0) valoresParaEscala.add(v);
-                }
-            }
-            List<Float[]> valoresPorFilaLimpio = new java.util.ArrayList<>();
-            for (int i = 0; i < valoresPorFila.size(); i++) {
-                Float[] filaLimpia = new Float[nSeries];
-                for (int s = 0; s < nSeries; s++) filaLimpia[s] = columnasLimpias.get(s).get(i);
-                valoresPorFilaLimpio.add(filaLimpia);
-            }
+            renderizarVIP(ID_CHART_FILTRADO, tipoVar, timestamps, valoresPorFila, nSeries, true);
+            renderizarVIP(ID_CHART_CRUDO, tipoVar, timestamps, valoresPorFila, nSeries, false);
 
-            // Establecer maxY dinámico ANTES de generar el script de inicialización:
-            // el piso por defecto se amplía si los datos reales lo superan.
-            graficaActiva.setMaxY(GraficaModel.calcularMaxYConMargen(valoresParaEscala, maxYDefaultPorTipo(tipoVar)));
-
-            StringBuilder batchScript = new StringBuilder();
-            batchScript.append(graficaActiva.getInitScript2("chartdiv_historico"));
-            for (int i = 0; i < timestamps.size(); i++) {
-                batchScript.append(graficaActiva.getAddDataScript(
-                        "chartdiv_historico", timestamps.get(i), valoresPorFilaLimpio.get(i), false));
-            }
-            batchScript.append(graficaActiva.getAplicarZoomInicialScript("chartdiv_historico"));
-
-            getElement().executeJs(batchScript.toString());
-            mensajeSpan.setText(datos.size() + " puntos graficados para " + tipoVar);
+            mensajeSpan.setText("");
+            huboConsultaExitosa = true;
         } catch (Exception e) {
             mensajeSpan.setText("Error: " + e.getMessage());
         }
+    }
+
+    /**
+     * Arma y ejecuta el script de un gráfico VIP en un contenedor puntual, aplicando o no el
+     * filtro de ruido (limpiarCeroAislado + limpiarAtipicos) según {@code aplicarFiltro} —
+     * única función para esta orquestación, la usan tanto la pestaña "Filtrado" como "Sin
+     * filtrar" en vez de repetir la lógica de armado del script para cada una.
+     *
+     * Se limpia el atípico de cada serie por separado (VAB, VAC, VBC, etc. pueden tener picos
+     * por falla de comunicación en momentos distintos), reemplazándolo por una interpolación de
+     * sus vecinos. Se limpia además el cero aislado (lectura inválida del PLC, no un apagado
+     * real) en las cuatro variables — Voltajes, Corrientes, PW y también PF, ya que el mismo
+     * glitch de comunicación que da un cero espurio en las otras tres suele darlo también en PF
+     * en esa misma lectura.
+     */
+    private void renderizarVIP(String containerId, String tipoVar, List<Long> timestamps,
+                                List<Float[]> valoresPorFila, int nSeries, boolean aplicarFiltro) {
+        List<List<Float>> columnas = new ArrayList<>();
+        List<Float> valoresParaEscala = new ArrayList<>();
+        for (int s = 0; s < nSeries; s++) {
+            List<Float> columna = new ArrayList<>();
+            for (Float[] fila : valoresPorFila) columna.add(fila[s]);
+            if (aplicarFiltro) {
+                columna = GraficaModel.limpiarCeroAislado(columna);
+                columna = GraficaModel.limpiarAtipicos(columna, GraficaModel.FACTOR_ATIPICO);
+            }
+            columnas.add(columna);
+            for (Float v : columna) {
+                if (v != null && v > 0) valoresParaEscala.add(v);
+            }
+        }
+        List<Float[]> valoresPorFilaFinal = new ArrayList<>();
+        for (int i = 0; i < valoresPorFila.size(); i++) {
+            Float[] fila = new Float[nSeries];
+            for (int s = 0; s < nSeries; s++) fila[s] = columnas.get(s).get(i);
+            valoresPorFilaFinal.add(fila);
+        }
+
+        // Establecer maxY dinámico ANTES de generar el script de inicialización: el piso por
+        // defecto se amplía si los datos reales lo superan. Se calcula por separado en cada
+        // contenedor porque "Sin filtrar" puede tener atípicos que inflen la escala más que
+        // "Filtrado" — cada pestaña debe verse bien con sus propios datos, no compartir eje.
+        graficaActiva.setMaxY(GraficaModel.calcularMaxYConMargen(valoresParaEscala, maxYDefaultPorTipo(tipoVar)));
+
+        StringBuilder script = new StringBuilder();
+        script.append(graficaActiva.getInitScript2(containerId));
+        for (int i = 0; i < timestamps.size(); i++) {
+            script.append(graficaActiva.getAddDataScript(containerId, timestamps.get(i), valoresPorFilaFinal.get(i), false));
+        }
+        script.append(graficaActiva.getAplicarZoomInicialScript(containerId));
+        getElement().executeJs(script.toString());
     }
 
     /** Piso por defecto del eje Y para cada variable VIP (se amplía con el percentil 95 si los datos reales lo superan). */
@@ -369,7 +421,8 @@ public class HistoricoView extends VerticalLayout {
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
-        getElement().executeJs(graficaActiva.getInitScript2("chartdiv_historico"));
+        getElement().executeJs(graficaActiva.getInitScript2(ID_CHART_FILTRADO));
+        getElement().executeJs(graficaActiva.getInitScript2(ID_CHART_CRUDO));
 
         this.getUI().ifPresent(ui -> TarjetasEstadoActual.mostrarUltimoClickCard(ui, true));
         limpiarTarjetas();
@@ -382,7 +435,8 @@ public class HistoricoView extends VerticalLayout {
     }
 
     private void resetZoom() {
-        getElement().executeJs(graficaActiva.getResetZoomScript("chartdiv_historico"));
+        getElement().executeJs(graficaActiva.getResetZoomScript(ID_CHART_FILTRADO));
+        getElement().executeJs(graficaActiva.getResetZoomScript(ID_CHART_CRUDO));
     }
 
     @ClientCallable

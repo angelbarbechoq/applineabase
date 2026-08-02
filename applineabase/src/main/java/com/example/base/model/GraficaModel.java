@@ -316,22 +316,36 @@ public class GraficaModel {
     public ResultadoGrafica graficarSerieKWh(String containerId, List<Map<String, Object>> datos,
                                               boolean conDiferencia, String maquina,
                                               String[] seriesNames, boolean limitarPuntos) {
+        return graficarSerieKWh(containerId, datos, conDiferencia, maquina, seriesNames, limitarPuntos, true);
+    }
+
+    /**
+     * Igual que {@link #graficarSerieKWh(String, List, boolean, String, String[], boolean)},
+     * con la opción de saltear el filtro de atípicos ({@code filtrarAtipicos = false}) y
+     * graficar la serie tal cual viene. Usado por la pestaña "Sin filtrar" de HistoricoView,
+     * que muestra los mismos datos que "Filtrado" pero sin el suavizado de ruido, para que se
+     * pueda comparar una contra la otra.
+     */
+    public ResultadoGrafica graficarSerieKWh(String containerId, List<Map<String, Object>> datos,
+                                              boolean conDiferencia, String maquina,
+                                              String[] seriesNames, boolean limitarPuntos,
+                                              boolean filtrarAtipicos) {
         setSeriesNames(seriesNames);
         SerieKWh serie = calcularSerieKWh(datos, conDiferencia);
 
         // Se reemplazan los atípicos (p.ej. por una falla de comunicación) por una
         // interpolación de sus vecinos, para que ni se grafiquen ni inflen la escala.
-        List<Float> valoresLimpios = limpiarAtipicos(serie.valores(), FACTOR_ATIPICO);
+        List<Float> valores = filtrarAtipicos ? limpiarAtipicos(serie.valores(), FACTOR_ATIPICO) : serie.valores();
 
         setMinY(0.0);
         aplicarRangosPredefinidos(maquina);
         // El preset actúa como piso; si los datos reales lo superan, se amplía el eje.
-        setMaxY(calcularMaxYConMargen(valoresLimpios, getMaxY()));
+        setMaxY(calcularMaxYConMargen(valores, getMaxY()));
 
         StringBuilder script = new StringBuilder();
         script.append(getInitScript2(containerId));
         for (int i = 0; i < serie.timestamps().size(); i++) {
-            script.append(getAddDataScript(containerId, serie.timestamps().get(i), new Float[]{valoresLimpios.get(i)}, limitarPuntos));
+            script.append(getAddDataScript(containerId, serie.timestamps().get(i), new Float[]{valores.get(i)}, limitarPuntos));
         }
         script.append(getAplicarZoomInicialScript(containerId));
 
