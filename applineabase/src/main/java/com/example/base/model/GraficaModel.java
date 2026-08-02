@@ -347,7 +347,7 @@ public class GraficaModel {
             // media móvil siguiente. Después, la media móvil suaviza el serrucho normal del
             // KWh/min que queda incluso sin atípicos (ver comentario de mediaMovil).
             valores = limpiarAtipicos(valores, FACTOR_ATIPICO);
-            valores = mediaMovil(valores, VENTANA_MEDIA_MOVIL_KWH);
+            valores = mediaMovil(valores, VENTANA_MEDIA_MOVIL);
         }
 
         setMinY(0.0);
@@ -770,10 +770,11 @@ public class GraficaModel {
         return limpio;
     }
 
-    // Ventana (en muestras) de la media móvil que suaviza el serrucho visual de KWh/min — a
-    // ~1 lectura/minuto, 30 muestras ≈ 30 minutos, el mismo valor que ya se usaba a mano en la
-    // versión anterior (NetBeans) para este mismo gráfico.
-    public static final int VENTANA_MEDIA_MOVIL_KWH = 30;
+    // Ventana (en muestras) de la media móvil que suaviza el serrucho visual de las gráficas —
+    // a ~1 lectura/minuto, 30 muestras ≈ 30 minutos, el mismo valor que ya se usaba a mano en la
+    // versión anterior (NetBeans) para KWh; se reusa igual para Voltajes/Corrientes/PW/PF, que
+    // tienen el mismo tipo de ruido punto a punto a la misma frecuencia de muestreo.
+    public static final int VENTANA_MEDIA_MOVIL = 30;
 
     /**
      * Media móvil simple de ventana fija, con suma deslizante O(n) — a diferencia de la versión
@@ -787,18 +788,30 @@ public class GraficaModel {
      * atípicos puntuales (un pico por falla de comunicación), esta suaviza el ruido normal
      * punto a punto que queda incluso sin ningún atípico — son problemas distintos, y las dos
      * técnicas se aplican en conjunto (atípicos primero, media móvil después).
+     *
+     * Un valor null en la entrada (lectura faltante — a diferencia de KWh, Voltajes/Corrientes/
+     * PW/PF sí pueden traer huecos) no participa de la suma ni de la cuenta de la ventana, y solo
+     * da null en el resultado si TODA la ventana en esa posición está vacía.
      */
     public static List<Float> mediaMovil(List<Float> valores, int ventana) {
         List<Float> resultado = new ArrayList<>(valores.size());
         ArrayDeque<Float> ventanaActual = new ArrayDeque<>();
         double suma = 0;
+        int cuenta = 0;
         for (Float v : valores) {
             ventanaActual.addLast(v);
-            suma += v;
-            if (ventanaActual.size() > ventana) {
-                suma -= ventanaActual.removeFirst();
+            if (v != null) {
+                suma += v;
+                cuenta++;
             }
-            resultado.add((float) (suma / ventanaActual.size()));
+            if (ventanaActual.size() > ventana) {
+                Float saliente = ventanaActual.removeFirst();
+                if (saliente != null) {
+                    suma -= saliente;
+                    cuenta--;
+                }
+            }
+            resultado.add(cuenta > 0 ? (float) (suma / cuenta) : null);
         }
         return resultado;
     }

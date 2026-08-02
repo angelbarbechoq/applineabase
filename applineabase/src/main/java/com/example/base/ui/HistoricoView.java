@@ -325,16 +325,18 @@ public class HistoricoView extends VerticalLayout {
 
     /**
      * Arma y ejecuta el script de un gráfico VIP en un contenedor puntual, aplicando o no el
-     * filtro de ruido (limpiarCeroAislado + limpiarAtipicos) según {@code aplicarFiltro} —
-     * única función para esta orquestación, la usan tanto la pestaña "Filtrado" como "Sin
-     * filtrar" en vez de repetir la lógica de armado del script para cada una.
+     * filtro de ruido (limpiarCeroAislado + limpiarAtipicos + mediaMovil) según
+     * {@code aplicarFiltro} — única función para esta orquestación, la usan tanto la pestaña
+     * "Filtrado" como "Sin filtrar" en vez de repetir la lógica de armado del script para cada
+     * una.
      *
      * Se limpia el atípico de cada serie por separado (VAB, VAC, VBC, etc. pueden tener picos
      * por falla de comunicación en momentos distintos), reemplazándolo por una interpolación de
      * sus vecinos. Se limpia además el cero aislado (lectura inválida del PLC, no un apagado
      * real) en las cuatro variables — Voltajes, Corrientes, PW y también PF, ya que el mismo
      * glitch de comunicación que da un cero espurio en las otras tres suele darlo también en PF
-     * en esa misma lectura.
+     * en esa misma lectura. Por último, la media móvil suaviza el ruido normal punto a punto que
+     * queda incluso sin ningún atípico — mismo tratamiento que ya se le da a KWh.
      */
     private void renderizarVIP(String containerId, String tipoVar, List<Long> timestamps,
                                 List<Float[]> valoresPorFila, int nSeries, boolean aplicarFiltro) {
@@ -346,6 +348,7 @@ public class HistoricoView extends VerticalLayout {
             if (aplicarFiltro) {
                 columna = GraficaModel.limpiarCeroAislado(columna);
                 columna = GraficaModel.limpiarAtipicos(columna, GraficaModel.FACTOR_ATIPICO);
+                columna = GraficaModel.mediaMovil(columna, GraficaModel.VENTANA_MEDIA_MOVIL);
             }
             columnas.add(columna);
             for (Float v : columna) {
