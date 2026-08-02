@@ -16,6 +16,7 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.Div;
@@ -373,47 +374,81 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
     }
 
     /**
-     * Fuerza el recálculo completo del histórico de una máquina con el umbral vigente en
-     * este momento. Necesario porque el backfill normal se salta los días ya calculados —
-     * si acabas de ajustar el umbral en AlarmasConfigView, los días viejos quedarían con el
-     * cálculo hecho con el umbral anterior hasta el próximo reinicio de la app, a menos que
-     * uses este botón.
+     * Botón "Recalcular" de una máquina puntual: abre el diálogo de alcance (un mes vs. todo
+     * el histórico) en vez de recalcular todo directamente — antes siempre releía el histórico
+     * completo, lo que lo hacía cada vez más lento a medida que se acumulaban meses.
      */
     private Button botonRecalcular(HorometroRow r) {
-        Button btn = new Button("Recalcular", e -> {
-            horometroBackfillRunner.recalcularLinea(r.maquina());
-            Notification.show("Horas de " + r.maquina() + " recalculadas con el umbral actual",
-                    3000, Notification.Position.BOTTOM_END).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            refrescarGrid();
-        });
+        Button btn = new Button("Recalcular", e -> abrirDialogoRecalculo(r.maquina()));
         btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
         return btn;
     }
 
-    /**
-     * Recalcula TODAS las máquinas visibles, una por una. Es notoriamente más lento que
-     * el botón individual — cada línea implica volver a leer sus archivos SQLite mensuales
-     * completos, y ese costo no se comparte entre líneas (cada una vive en su propia tabla).
-     * Útil después de reparar la base de energía completa (ver "Reparar VIP Mensual") en vez
-     * de tener que entrar línea por línea.
-     */
+    /** Botón "Recalcular todas las máquinas": mismo diálogo de alcance, aplicado a todas. */
     private Button crearBotonRecalcularTodos() {
-        Button btn = new Button("Recalcular todas las máquinas", e -> {
-            int total = 0;
-            for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
-                if (buscarConfigHorometro(maquina).isEmpty()) {
-                    continue;
-                }
-                horometroBackfillRunner.recalcularLinea(maquina);
-                total++;
-            }
-            Notification.show(total + " máquinas recalculadas con el umbral actual",
-                            3000, Notification.Position.BOTTOM_END)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            refrescarGrid();
-        });
+        Button btn = new Button("Recalcular todas las máquinas", e -> abrirDialogoRecalculo(null));
         btn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         return btn;
+    }
+
+    /**
+     * Diálogo de alcance del recálculo: un mes puntual (rápido, sólo relee ese mes) o todo el
+     * histórico (relee todos los datos guardados desde el primer mes disponible — cada vez más
+     * lento cuanta más historia acumule la línea). {@code maquina} null significa "todas las
+     * máquinas visibles con horómetro" (igual criterio que buscarConfigHorometro en todos lados).
+     */
+    private void abrirDialogoRecalculo(String maquina) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle(maquina != null ? "Recalcular " + maquina : "Recalcular todas las máquinas");
+
+        DatePicker mesPicker = new DatePicker("Mes a recalcular (cualquier día de ese mes)");
+        mesPicker.setValue(LocalDate.now());
+        mesPicker.setWidth("260px");
+
+        Button btnMes = new Button("Recalcular ese mes", e -> {
+            YearMonth mes = YearMonth.from(mesPicker.getValue() != null ? mesPicker.getValue() : LocalDate.now());
+            ejecutarRecalculo(maquina, mes);
+            dialog.close();
+        });
+        btnMes.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+        Button btnTodo = new Button("Recalcular todo el histórico", e -> {
+            ejecutarRecalculo(maquina, null);
+            dialog.close();
+        });
+        btnTodo.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+        Span nota = new Span("Todo el histórico relee todos los datos guardados desde el primer mes "
+                + "disponible — puede demorar bastante si hay mucha historia.");
+        nota.getStyle().set("font-size", "12px").set("color", "var(--lumo-secondary-text-color)");
+
+        Button btnCancelar = new Button("Cancelar", e -> dialog.close());
+
+        VerticalLayout contenido = new VerticalLayout(mesPicker,
+                new HorizontalLayout(btnMes, btnTodo, btnCancelar), nota);
+        contenido.setPadding(false);
+        dialog.add(contenido);
+        dialog.open();
+    }
+
+    /**
+     * Ejecuta el recálculo elegido (un mes puntual si {@code mes} no es null, todo el
+     * histórico si lo es) para una máquina puntual o para todas las visibles con horómetro.
+     */
+    private void ejecutarRecalculo(String maquinaUnica, YearMonth mes) {
+        List<String> maquinas = maquinaUnica != null ? List.of(maquinaUnica) : maquinasConHorometro();
+        for (String maquina : maquinas) {
+            if (mes != null) {
+                horometroBackfillRunner.recalcularMes(maquina, mes);
+            } else {
+                horometroBackfillRunner.recalcularLinea(maquina);
+            }
+        }
+        String alcance = mes != null ? nombreMes(mes) : "todo el histórico";
+        Notification.show(maquinas.size() + " máquina(s) recalculadas (" + alcance + ")",
+                        3000, Notification.Position.BOTTOM_END)
+                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+        refrescarGrid();
     }
 
     /**

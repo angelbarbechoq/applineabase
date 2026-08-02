@@ -99,20 +99,33 @@ public class HorometroBackfillRunner implements ApplicationRunner {
     }
 
     /**
-     * Recalcula TODO el histórico de una línea con el umbral/ventana que tenga configurado
-     * en este momento, ignorando los días ya calculados. Para cuando el ADMIN ajusta el
-     * umbral en AlarmasConfigView y quiere ver el efecto en las horas sin esperar al
-     * próximo reinicio de la app.
+     * Recalcula TODO el histórico de una línea con el umbral/ventana que tenga configurado en
+     * este momento, ignorando los días ya calculados — relee todos los datos guardados desde
+     * el primer mes disponible, así que cuanto más historial tenga la línea más tarda. Preferir
+     * {@link #recalcularMes} cuando solo hace falta corregir un mes puntual (p. ej. tras
+     * ajustar el umbral y querer ver el efecto sin esperar al próximo reinicio).
      */
     public void recalcularLinea(String linea) {
+        List<YearMonth> meses = databaseInitializationService.listarMesesDisponibles();
+        LocalDate hasta = LocalDate.now();
+        LocalDate desde = meses.isEmpty() ? hasta : meses.get(0).atDay(1);
+        recalcularRango(linea, desde, hasta);
+    }
+
+    /** Recalcula un único mes calendario de una línea — mucho más rápido que el histórico completo. */
+    public void recalcularMes(String linea, YearMonth mes) {
+        LocalDate hoy = LocalDate.now();
+        LocalDate desde = mes.atDay(1);
+        LocalDate hasta = mes.atEndOfMonth().isAfter(hoy) ? hoy : mes.atEndOfMonth();
+        recalcularRango(linea, desde, hasta);
+    }
+
+    private void recalcularRango(String linea, LocalDate desde, LocalDate hasta) {
         Optional<AlarmaConfig> config = configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.DETENCION)
                 .or(() -> configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.CICLO_COMPRESOR));
         if (config.isEmpty()) {
             return;
         }
-        List<YearMonth> meses = databaseInitializationService.listarMesesDisponibles();
-        LocalDate hasta = LocalDate.now();
-        LocalDate desde = meses.isEmpty() ? hasta : meses.get(0).atDay(1);
         logger.info("Recálculo manual de horómetro para {}, rango {} a {}", linea, desde, hasta);
         backfillLinea(linea, config.get(), desde, hasta, true);
     }
