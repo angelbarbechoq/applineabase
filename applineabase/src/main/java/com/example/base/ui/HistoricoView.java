@@ -29,6 +29,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @PageTitle("Historico de Graficas | LineaBase")
 @Route(value = "historico", layout = MainLayout.class)
@@ -86,11 +88,22 @@ public class HistoricoView extends VerticalLayout {
     // con display:none), se vuelve a correr la última consulta para esa pestaña recién visible.
     private boolean huboConsultaExitosa = false;
 
+    // Mezcladores/Molino/Pulverizador (zona "Mezcla" en linea-id-config.json, mismo campo que ya
+    // usa HorometroView para agrupar sus gráficos) trabajan con arranques/paradas más bruscos y
+    // frecuentes que Extrusión — a pedido, la media móvil ahí aplana justo esos escalones reales
+    // que se quieren ver, así que se excluyen de "Filtrado" (siguen con limpiarCeroAislado y
+    // limpiarAtipicos, solo se saltea el suavizado).
+    private final Set<String> maquinasSinMediaMovil;
+
     public HistoricoView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
                           PLCDataQueryService plcDataQueryService) {
         this.configLoaderService = configLoaderService;
         this.lineaAccessService = lineaAccessService;
         this.plcDataQueryService = plcDataQueryService;
+        this.maquinasSinMediaMovil = lineaAccessService.getLineasPermitidas().stream()
+                .filter(l -> "Mezcla".equalsIgnoreCase(String.valueOf(l.get("zona"))))
+                .map(l -> (String) l.get("lineaMaquina"))
+                .collect(Collectors.toSet());
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -263,7 +276,8 @@ public class HistoricoView extends VerticalLayout {
             }
 
             GraficaModel.ResultadoGrafica filtrado = graficaKWh.graficarSerieKWh(
-                    ID_CHART_FILTRADO, datos, conDiferencia, maquina, new String[]{"Datos"}, false, true);
+                    ID_CHART_FILTRADO, datos, conDiferencia, maquina, new String[]{"Datos"}, false,
+                    true, aplicaMediaMovil(maquina));
             getElement().executeJs(filtrado.script());
             getElement().executeJs(graficaKWh.getZoomXInicialScript(ID_CHART_FILTRADO, filtrado.puntosGraficados()));
 
@@ -313,8 +327,8 @@ public class HistoricoView extends VerticalLayout {
             }
 
             int nSeries = graficaActiva.getnGraficas();
-            renderizarVIP(ID_CHART_FILTRADO, tipoVar, timestamps, valoresPorFila, nSeries, true);
-            renderizarVIP(ID_CHART_CRUDO, tipoVar, timestamps, valoresPorFila, nSeries, false);
+            renderizarVIP(ID_CHART_FILTRADO, maquina, tipoVar, timestamps, valoresPorFila, nSeries, true);
+            renderizarVIP(ID_CHART_CRUDO, maquina, tipoVar, timestamps, valoresPorFila, nSeries, false);
 
             mensajeSpan.setText("");
             huboConsultaExitosa = true;
@@ -335,10 +349,11 @@ public class HistoricoView extends VerticalLayout {
      * sus vecinos. Se limpia además el cero aislado (lectura inválida del PLC, no un apagado
      * real) en las cuatro variables — Voltajes, Corrientes, PW y también PF, ya que el mismo
      * glitch de comunicación que da un cero espurio en las otras tres suele darlo también en PF
-     * en esa misma lectura. Por último, la media móvil suaviza el ruido normal punto a punto que
-     * queda incluso sin ningún atípico — mismo tratamiento que ya se le da a KWh.
+     * en esa misma lectura. Por último, si la máquina no está en maquinasSinMediaMovil, la media
+     * móvil suaviza el ruido normal punto a punto que queda incluso sin ningún atípico — mismo
+     * tratamiento que ya se le da a KWh.
      */
-    private void renderizarVIP(String containerId, String tipoVar, List<Long> timestamps,
+    private void renderizarVIP(String containerId, String maquina, String tipoVar, List<Long> timestamps,
                                 List<Float[]> valoresPorFila, int nSeries, boolean aplicarFiltro) {
         List<List<Float>> columnas = new ArrayList<>();
         List<Float> valoresParaEscala = new ArrayList<>();
@@ -348,7 +363,9 @@ public class HistoricoView extends VerticalLayout {
             if (aplicarFiltro) {
                 columna = GraficaModel.limpiarCeroAislado(columna);
                 columna = GraficaModel.limpiarAtipicos(columna, GraficaModel.FACTOR_ATIPICO);
-                columna = GraficaModel.mediaMovil(columna, GraficaModel.VENTANA_MEDIA_MOVIL);
+                if (aplicaMediaMovil(maquina)) {
+                    columna = GraficaModel.mediaMovil(columna, GraficaModel.VENTANA_MEDIA_MOVIL);
+                }
             }
             columnas.add(columna);
             for (Float v : columna) {
@@ -376,6 +393,11 @@ public class HistoricoView extends VerticalLayout {
         // primero (el resto queda navegable con el scrollbar horizontal).
         script.append(graficaActiva.getZoomXInicialScript(containerId, timestamps.size()));
         getElement().executeJs(script.toString());
+    }
+
+    /** Ver comentario de maquinasSinMediaMovil: Mezcladores/Molino/Pulverizador quedan afuera del suavizado. */
+    private boolean aplicaMediaMovil(String maquina) {
+        return !maquinasSinMediaMovil.contains(maquina);
     }
 
     /** Piso por defecto del eje Y para cada variable VIP (se amplía con el percentil 95 si los datos reales lo superan). */
