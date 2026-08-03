@@ -160,12 +160,26 @@ public class HistoricoView extends VerticalLayout {
         setFlexGrow(1, tabSheetFiltro);
     }
 
-    private Div crearPanelGrafico(String containerId) {
+    /**
+     * Envuelve el Div del gráfico en un VerticalLayout con altura 100% + flexGrow (mismo patrón
+     * que HorometroView.crearPanelGrupo) en vez de una altura fija en px — con un tamaño fijo,
+     * si la ventana del navegador es más baja que ese valor el contenido se pasa del alto
+     * disponible del TabSheet y aparece la barra de scroll vertical de la página, en vez de que
+     * el gráfico simplemente se achique junto con la ventana.
+     */
+    private VerticalLayout crearPanelGrafico(String containerId) {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
+        panel.setPadding(false);
+
         Div chartDiv = new Div();
         chartDiv.setId(containerId);
         chartDiv.setWidthFull();
-        chartDiv.setHeight("500px");
-        return chartDiv;
+        chartDiv.setHeight("100%");
+        panel.add(chartDiv);
+        panel.setFlexGrow(1, chartDiv);
+
+        return panel;
     }
 
     private HorizontalLayout buildFiltrosLayout() {
