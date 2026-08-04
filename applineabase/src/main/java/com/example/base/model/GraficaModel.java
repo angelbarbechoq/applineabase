@@ -805,10 +805,9 @@ public class GraficaModel {
     }
 
     // Ventana (en muestras) de la media móvil que suaviza el serrucho visual de las gráficas —
-    // a ~1 lectura/minuto, 30 muestras ≈ 30 minutos, el mismo valor que ya se usaba a mano en la
-    // versión anterior (NetBeans) para KWh; se reusa igual para Voltajes/Corrientes/PW/PF, que
-    // tienen el mismo tipo de ruido punto a punto a la misma frecuencia de muestreo.
-    public static final int VENTANA_MEDIA_MOVIL = 30;
+    // a ~1 lectura/minuto, ajustada de 30 a 10 muestras (~10 minutos) porque 30 perdía detalles
+    // reales; el usuario la puede ajustar desde HistoricoView, este valor es solo el default.
+    public static final int VENTANA_MEDIA_MOVIL = 10;
 
     /**
      * Media móvil simple de ventana fija, con suma deslizante O(n) — a diferencia de la versión
