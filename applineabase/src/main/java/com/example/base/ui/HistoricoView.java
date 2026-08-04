@@ -7,19 +7,27 @@ import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.grid.HeaderRow;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.TabSheet;
+import com.vaadin.flow.component.textfield.IntegerField;
+import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
@@ -73,9 +81,79 @@ public class HistoricoView extends VerticalLayout {
     private DatePicker desdeDate;
     private DatePicker hastaDate;
     private ComboBox<String> variableCombo;
+    private IntegerField ventanaMediaMovilField;
     private Button consultarBtn;
     private Span mensajeSpan;
     private Div datosActualesCard;
+
+    // Tabla de análisis (solo ADMIN, ver lineaAccessService.esAdmin()): cada click sobre el
+    // gráfico cierra un tramo con el click anterior (Inicio = click anterior, Fin = click
+    // actual) y agrega una fila; el click actual queda como "anterior" para la fila siguiente.
+    // null/no creada para usuarios no-admin, así registrarClickEnGrafica no hace nada extra.
+    private Grid<FilaAnalisis> analisisGrid;
+    private final List<FilaAnalisis> filasAnalisis = new ArrayList<>();
+    private TarjetasEstadoActual.PuntoClick puntoAnteriorAnalisis;
+
+    /** Una fila de la tabla de análisis: tramo Inicio→Fin entre dos clicks consecutivos. */
+    private record FilaAnalisis(String fechaInicio, String horaInicio, String kwhInicio,
+                                 String fechaFin, String horaFin, String kwhFin) {
+    }
+
+    // Modo "Con arranque": una sola tabla de 12 columnas (Inicio, Fin Purga, Normalizado, Fin)
+    // en vez de dos tablas separadas — reemplaza a la tabla de "Sin arranque" en vez de convivir
+    // al lado (evita el problema de layout de tener dos grids side-by-side). Se llena progresivo:
+    // cada click completa las 3 columnas que le corresponden, las demas quedan vacias hasta que
+    // les toque su click.
+    private Checkbox modoCheckbox;
+    private boolean modoConArranque = false;
+    private Grid<FilaArranque> arranqueGrid;
+    private final List<FilaArranque> filasArranque = new ArrayList<>();
+    // Clicks acumulados del ciclo actual en modo "Con arranque" (0 a 4). Al llegar a 4 el ciclo
+    // queda cerrado y clicks siguientes no hacen nada hasta el doble-click (limpiarTarjetas), que
+    // lo reabre. Ver registrarClickConArranque.
+    private final List<TarjetasEstadoActual.PuntoClick> clicksArranque = new ArrayList<>();
+
+    /**
+     * Fila unica de la tabla "Con arranque": mantiene los encabezados de las DOS tablas
+     * originales intactos, uno al lado del otro, en vez de fusionarlos en un set nuevo de
+     * columnas. Grupo 1 (t1*) = tabla clasica Inicio/Fin: Inicio=click1, Fin=click4. Grupo 2
+     * (t2*) = tabla Inicio/Fin Purga/Normalizado: Inicio=click1 (el mismo dato del grupo 1,
+     * repetido a proposito porque las dos tablas originales lo tenian cada una por su lado),
+     * Fin Purga=click2, Normalizado=click3. Columnas de un click que todavia no paso quedan en "".
+     */
+    private record FilaArranque(String t1FechaInicio, String t1HoraInicio, String t1KwhInicio,
+                                 String t1FechaFin, String t1HoraFin, String t1KwhFin,
+                                 String t2FechaInicio, String t2HoraInicio, String t2KwhInicio,
+                                 String t2FechaFinPurga, String t2HoraFinPurga, String t2KwhFinPurga,
+                                 String t2FechaNormalizado, String t2HoraNormalizado, String t2KwhNormalizado) {
+    }
+
+    // Tabla al lado del gráfico "Filtrado" (solo ADMIN): fila por fila, los datos tal como vienen
+    // de la base de datos para la variable actualmente consultada — no aplica el filtro de
+    // atípicos/media móvil que sí usa el gráfico. Columnas dinámicas (Fecha + los campos de la
+    // variable activa), se reconstruyen en cada consulta porque cambian según KWh/Voltajes/etc.
+    private Grid<Map<String, Object>> datosGrid;
+
+    // Tabla al lado del gráfico "Sin filtrar" (solo ADMIN): la diferencia de KWh de TODAS las
+    // máquinas de la base (una fila por máquina, no solo la seleccionada en el combo), para el
+    // mismo rango de fechas consultado — no depende de qué Variable esté activa, siempre usa la
+    // serie KWh de cada máquina. Solo 4 columnas a propósito (sin fecha/hora de detalle): lo que
+    // se pidió ver acá es la diferencia, no el desglose. diferenciaKwh = ultimo valor valido -
+    // primer valor valido; si el primero/ultimo dato está en 0 (sin lectura real, ver
+    // buscarKWhValido), se camina al siguiente/anterior hasta encontrar un valor aceptable (mismo
+    // criterio que renderizarVIP: KWh > 0 es válido). Máquinas sin ningún valor válido en el rango
+    // simplemente no aparecen (en vez de una fila con guiones).
+    private Grid<FilaEnergia> energiaGrid;
+    private final List<FilaEnergia> filasEnergia = new ArrayList<>();
+    // A pedido: NO se recalcula en cada Consultar, solo cuando cambia el rango de fechas (Desde/
+    // Hasta) respecto de la última vez que se calculó — cambiar de máquina y volver a consultar
+    // con el mismo rango deja la tabla tal como está (no depende de la máquina de todos modos,
+    // ver actualizarTablaEnergia).
+    private LocalDate energiaUltimoDesde;
+    private LocalDate energiaUltimoHasta;
+
+    private record FilaEnergia(String maquina, String kwhInicial, String kwhFinal, String diferenciaKwh) {
+    }
 
     // Dos pestañas con los mismos datos: "Filtrado" (limpiarAtipicos/limpiarCeroAislado, el
     // comportamiento de siempre) y "Sin filtrar" (la serie cruda, para comparar contra la
@@ -137,7 +215,16 @@ public class HistoricoView extends VerticalLayout {
         HorizontalLayout encabezado = new HorizontalLayout(new H3("Historico de Graficas"), datosActualesCard);
         encabezado.setAlignItems(FlexComponent.Alignment.CENTER);
         encabezado.getStyle().set("flex-wrap", "wrap");
+        if (lineaAccessService.esAdmin()) {
+            modoCheckbox = new Checkbox("Con arranque");
+            modoCheckbox.addValueChangeListener(e -> cambiarModoAnalisis(e.getValue()));
+            encabezado.add(modoCheckbox);
+        }
         add(encabezado);
+
+        if (lineaAccessService.esAdmin()) {
+            add(buildAnalisisSection());
+        }
 
         add(buildFiltrosLayout());
 
@@ -146,14 +233,15 @@ public class HistoricoView extends VerticalLayout {
 
         TabSheet tabSheetFiltro = new TabSheet();
         tabSheetFiltro.setSizeFull();
-        tabSheetFiltro.add("Filtrado", crearPanelGrafico(ID_CHART_FILTRADO));
-        tabSheetFiltro.add("Sin filtrar", crearPanelGrafico(ID_CHART_CRUDO));
+        boolean esAdmin = lineaAccessService.esAdmin();
+        tabSheetFiltro.add("Sin filtrar", crearPanelGrafico(ID_CHART_CRUDO, esAdmin ? buildEnergiaGrid() : null));
+        tabSheetFiltro.add("Filtrado", crearPanelGrafico(ID_CHART_FILTRADO, esAdmin ? buildDatosGrid() : null));
         // Si la pestaña recién visible nunca se renderizó con datos reales (estaba oculta la
         // última vez que se consultó), se repite esa misma consulta ahora que ya se puede
         // dimensionar correctamente.
         tabSheetFiltro.addSelectedChangeListener(e -> {
             if (huboConsultaExitosa) {
-                consultar();
+                consultar(false);
             }
         });
         add(tabSheetFiltro);
@@ -166,8 +254,12 @@ public class HistoricoView extends VerticalLayout {
      * si la ventana del navegador es más baja que ese valor el contenido se pasa del alto
      * disponible del TabSheet y aparece la barra de scroll vertical de la página, en vez de que
      * el gráfico simplemente se achique junto con la ventana.
+     *
+     * tablaLateral (solo ADMIN, null para el resto) queda a la derecha del gráfico en un ancho
+     * fijo — el gráfico se lleva el espacio que sobra (flexGrow 1), la tabla no se achica
+     * (flexShrink 0). Sin tabla, devuelve el panel del gráfico solo, sin la fila extra alrededor.
      */
-    private VerticalLayout crearPanelGrafico(String containerId) {
+    private Component crearPanelGrafico(String containerId, Component tablaLateral) {
         VerticalLayout panel = new VerticalLayout();
         panel.setSizeFull();
         panel.setPadding(false);
@@ -179,7 +271,248 @@ public class HistoricoView extends VerticalLayout {
         panel.add(chartDiv);
         panel.setFlexGrow(1, chartDiv);
 
-        return panel;
+        if (tablaLateral == null) {
+            return panel;
+        }
+
+        HorizontalLayout fila = new HorizontalLayout(panel, tablaLateral);
+        fila.setSizeFull();
+        fila.setPadding(false);
+        fila.setSpacing(true);
+        fila.setFlexGrow(1, panel);
+        fila.setFlexGrow(0, tablaLateral);
+        tablaLateral.getElement().getStyle().set("width", "320px");
+        tablaLateral.getElement().getStyle().set("flex-shrink", "0");
+        return fila;
+    }
+
+    /**
+     * Tabla junto al gráfico "Filtrado": arranca sin columnas, actualizarTablaDatos las arma cada
+     * vez que hay una consulta nueva (dependen de la Variable elegida: KWh, Voltajes, etc.).
+     */
+    private Grid<Map<String, Object>> buildDatosGrid() {
+        datosGrid = new Grid<>();
+        datosGrid.addThemeVariants(GridVariant.LUMO_COMPACT, GridVariant.LUMO_NO_BORDER, GridVariant.LUMO_ROW_STRIPES);
+        datosGrid.getStyle().set("font-size", "12px");
+        datosGrid.setHeightFull();
+        return datosGrid;
+    }
+
+    /** Tabla junto al gráfico "Sin filtrar": diferencia de KWh, sin desglose (ver comentario del campo energiaGrid). */
+    private Grid<FilaEnergia> buildEnergiaGrid() {
+        energiaGrid = new Grid<>(FilaEnergia.class, false);
+        energiaGrid.addColumn(FilaEnergia::maquina).setHeader("Maquina").setAutoWidth(true).setFlexGrow(0);
+        energiaGrid.addColumn(FilaEnergia::kwhInicial).setHeader("KWh Inicial").setAutoWidth(true).setFlexGrow(0);
+        energiaGrid.addColumn(FilaEnergia::kwhFinal).setHeader("KWh Final").setAutoWidth(true).setFlexGrow(0);
+        energiaGrid.addColumn(FilaEnergia::diferenciaKwh).setHeader("Diferencia kWh").setAutoWidth(true).setFlexGrow(0);
+        energiaGrid.setItems(new ListDataProvider<>(filasEnergia));
+        energiaGrid.addThemeVariants(GridVariant.LUMO_COMPACT, GridVariant.LUMO_NO_BORDER, GridVariant.LUMO_ROW_STRIPES);
+        energiaGrid.getStyle().set("font-size", "12px");
+        energiaGrid.setHeightFull();
+        return energiaGrid;
+    }
+
+    /**
+     * Reconstruye las columnas de datosGrid para la variable activa (Fecha + los campos de esa
+     * variable, mismos nombres que usa extractValues/seriesNamesPorTipo) y carga las filas tal
+     * como vinieron de la base — sin limpiarAtipicos/mediaMovil, esos solo se aplican al gráfico.
+     */
+    private void actualizarTablaDatos(List<Map<String, Object>> datos, String variable) {
+        if (datosGrid == null) {
+            return;
+        }
+        datosGrid.getColumns().forEach(datosGrid::removeColumn);
+        datosGrid.addColumn(fila -> String.valueOf(fila.get("fecha"))).setHeader("Fecha").setAutoWidth(true).setFlexGrow(0);
+
+        String[] campos = switch (variable) {
+            case "KWh" -> new String[]{"kwh"};
+            case "Voltajes" -> new String[]{"VAB", "VAC", "VBC"};
+            case "Corrientes" -> new String[]{"IA", "IB", "IC"};
+            case "PW" -> new String[]{"PW"};
+            case "PF" -> new String[]{"PF"};
+            default -> new String[0];
+        };
+        for (String campo : campos) {
+            datosGrid.addColumn(fila -> formatearValorCelda(fila.get(campo))).setHeader(campo).setAutoWidth(true).setFlexGrow(0);
+        }
+        datosGrid.setItems(datos);
+    }
+
+    private static String formatearValorCelda(Object valor) {
+        if (valor instanceof Number numero) {
+            return GraficaModel.formatearDecimal(numero.doubleValue());
+        }
+        return valor == null ? "" : valor.toString();
+    }
+
+    /**
+     * Diferencia de KWh de TODAS las máquinas de la base (ver comentario del campo energiaGrid),
+     * para el rango consultado — independiente de la máquina seleccionada en el combo y de la
+     * Variable activa. lineaAccessService.getMaquinasPermitidas() para un ADMIN devuelve todas
+     * las líneas configuradas (ver LineaAccessService.getLineasPermitidas), así que no hace falta
+     * una fuente aparte solo para esta tabla.
+     *
+     * A pedido, solo se recalcula si el rango de fechas cambió respecto de la última vez (ver
+     * energiaUltimoDesde/energiaUltimoHasta) — cambiar de máquina y volver a consultar con el
+     * mismo rango no la toca, a diferencia de actualizarTablaDatos, que sí se repite siempre.
+     */
+    private void actualizarTablaEnergia(LocalDate desde, LocalDate hasta) {
+        if (energiaGrid == null || (desde.equals(energiaUltimoDesde) && hasta.equals(energiaUltimoHasta))) {
+            return;
+        }
+        energiaUltimoDesde = desde;
+        energiaUltimoHasta = hasta;
+        filasEnergia.clear();
+        for (String maquina : lineaAccessService.getMaquinasPermitidas()) {
+            try {
+                List<Map<String, Object>> datosKWh = plcDataQueryService.getHistoricoKWhByRango(maquina, desde, hasta);
+                Map<String, Object> primero = buscarKWhValido(datosKWh, false);
+                Map<String, Object> ultimo = buscarKWhValido(datosKWh, true);
+                if (primero != null && ultimo != null) {
+                    double kwhInicio = ((Number) primero.get("kwh")).doubleValue();
+                    double kwhFin = ((Number) ultimo.get("kwh")).doubleValue();
+                    filasEnergia.add(new FilaEnergia(maquina,
+                            GraficaModel.formatearDecimal(kwhInicio), GraficaModel.formatearDecimal(kwhFin),
+                            GraficaModel.formatearDecimal(kwhFin - kwhInicio)));
+                }
+            } catch (Exception ignored) {
+                // Sin datos de KWh para esta máquina/rango: se omite esa fila y sigue con las demás.
+            }
+        }
+        energiaGrid.getDataProvider().refreshAll();
+    }
+
+    /** Primer (desdeElFinal=false) o último (desdeElFinal=true) registro con KWh > 0 — mismo
+     * criterio que renderizarVIP para descartar lecturas inválidas (0 = sin lectura real, no un
+     * consumo genuino en cero). Camina al siguiente/anterior hasta encontrar uno aceptable. */
+    private static Map<String, Object> buscarKWhValido(List<Map<String, Object>> datos, boolean desdeElFinal) {
+        int inicio = desdeElFinal ? datos.size() - 1 : 0;
+        int paso = desdeElFinal ? -1 : 1;
+        for (int i = inicio; i >= 0 && i < datos.size(); i += paso) {
+            Object valor = datos.get(i).get("kwh");
+            if (valor instanceof Number numero && numero.doubleValue() > 0) {
+                return datos.get(i);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Contenedor de la sección de análisis: las dos tablas, pero solo una visible a la vez según
+     * el modo (el checkbox "Con arranque" vive en el encabezado, junto al título — ver
+     * constructor). Antes convivían las dos lado a lado; ahora "Con arranque" reemplaza a la de
+     * "Sin arranque" con su propia tabla de 12 columnas en vez de compartir espacio con ella.
+     */
+    private VerticalLayout buildAnalisisSection() {
+        VerticalLayout seccion = new VerticalLayout();
+        seccion.setPadding(false);
+        seccion.setSpacing(false);
+        seccion.getStyle().set("gap", "6px");
+        seccion.getStyle().set("align-self", "flex-start");
+
+        seccion.add(buildAnalisisGrid(), buildArranqueGrid());
+        return seccion;
+    }
+
+    /** Cambia entre Sin arranque (tabla de 6 columnas, cadena continua) y Con arranque (tabla de
+     * 12 columnas, ciclo fijo de 4 clicks) — ver registrarClickEnGrafica. Solo una de las dos
+     * tablas queda visible según el modo. Cambiar de modo a mitad de un ciclo no tiene un estado
+     * consistente que conservar, así que limpia todo (igual que el doble-click). */
+    private void cambiarModoAnalisis(boolean conArranque) {
+        modoConArranque = conArranque;
+        analisisGrid.setVisible(!conArranque);
+        arranqueGrid.setVisible(conArranque);
+        limpiarTarjetas();
+    }
+
+    /**
+     * Tabla de análisis solo-ADMIN: un tramo Inicio→Fin por cada par de clicks consecutivos
+     * sobre el gráfico (ver puntoAnteriorAnalisis en registrarClickEnGrafica). Fila más nueva
+     * arriba. Se vacía con el doble-click en el gráfico o al cambiar de máquina, igual que la
+     * tarjeta de último click (ver limpiarTarjetas).
+     *
+     * Columnas angostas (autoWidth + flexGrow 0, en vez del ancho parejo por defecto que
+     * estiraba cada columna a lo ancho de la pantalla) y tema compacto para que ocupe lo mínimo.
+     * setAllRowsVisible en vez de una altura fija: con 1-2 filas no deja hueco vacío debajo, y
+     * crece sola a medida que se acumulan clicks.
+     */
+    private Grid<FilaAnalisis> buildAnalisisGrid() {
+        analisisGrid = new Grid<>(FilaAnalisis.class, false);
+        analisisGrid.addColumn(FilaAnalisis::fechaInicio).setHeader("Fecha Inicio").setAutoWidth(true).setFlexGrow(0);
+        analisisGrid.addColumn(FilaAnalisis::horaInicio).setHeader("Hora Inicio").setAutoWidth(true).setFlexGrow(0);
+        analisisGrid.addColumn(FilaAnalisis::kwhInicio).setHeader("KWh Inic").setAutoWidth(true).setFlexGrow(0);
+        analisisGrid.addColumn(FilaAnalisis::fechaFin).setHeader("Fecha Fin").setAutoWidth(true).setFlexGrow(0);
+        analisisGrid.addColumn(FilaAnalisis::horaFin).setHeader("Hora Fin").setAutoWidth(true).setFlexGrow(0);
+        analisisGrid.addColumn(FilaAnalisis::kwhFin).setHeader("KWh Fin").setAutoWidth(true).setFlexGrow(0);
+        analisisGrid.setItems(new ListDataProvider<>(filasAnalisis));
+        analisisGrid.addThemeVariants(GridVariant.LUMO_COMPACT, GridVariant.LUMO_NO_BORDER, GridVariant.LUMO_ROW_STRIPES);
+        analisisGrid.setAllRowsVisible(true);
+        analisisGrid.getStyle().set("font-size", "12px");
+        // No setWidthFull(): que se achique al ancho real de las columnas en vez de estirarse
+        // a lo ancho de la pantalla (align-self propio, VerticalLayout por defecto estira los hijos).
+        analisisGrid.getStyle().set("align-self", "flex-start");
+        analisisGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
+        // Click en una fila = copiarla al portapapeles como TSV (tabulaciones), para pegar en
+        // Excel con cada dato en su propia celda — no hay forma nativa de copiar filas de un
+        // vaadin-grid virtualizado con Ctrl+C, así que se arma el texto a mano.
+        analisisGrid.addItemClickListener(e -> copiarFilaAlPortapapeles(e.getItem()));
+        return analisisGrid;
+    }
+
+    private void copiarFilaAlPortapapeles(FilaAnalisis fila) {
+        String tsv = String.join("\t", fila.fechaInicio(), fila.horaInicio(), fila.kwhInicio(),
+                fila.fechaFin(), fila.horaFin(), fila.kwhFin());
+        getElement().executeJs("navigator.clipboard.writeText($0)", tsv);
+        Notification.show("Fila copiada — pegar en Excel", 1500, Notification.Position.BOTTOM_END);
+    }
+
+    /**
+     * Tabla "Con arranque": una sola fila con los 4 clicks del ciclo, llenada progresivamente
+     * (ver registrarClickConArranque), pero con las columnas de las DOS tablas originales
+     * intactas y agrupadas visualmente con una fila de encabezado superior (Grid.HeaderRow.join)
+     * para que se distingan una de la otra en vez de leerse como un solo set de 15 columnas.
+     */
+    private Grid<FilaArranque> buildArranqueGrid() {
+        arranqueGrid = new Grid<>(FilaArranque.class, false);
+        Grid.Column<FilaArranque> c1 = arranqueGrid.addColumn(FilaArranque::t1FechaInicio).setHeader("Fecha Inicio").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c2 = arranqueGrid.addColumn(FilaArranque::t1HoraInicio).setHeader("Hora Inicio").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c3 = arranqueGrid.addColumn(FilaArranque::t1KwhInicio).setHeader("KWh Inic").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c4 = arranqueGrid.addColumn(FilaArranque::t1FechaFin).setHeader("Fecha Fin").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c5 = arranqueGrid.addColumn(FilaArranque::t1HoraFin).setHeader("Hora Fin").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c6 = arranqueGrid.addColumn(FilaArranque::t1KwhFin).setHeader("KWh Fin").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c7 = arranqueGrid.addColumn(FilaArranque::t2FechaInicio).setHeader("Fecha Inicio").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c8 = arranqueGrid.addColumn(FilaArranque::t2HoraInicio).setHeader("Hora Inicio").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c9 = arranqueGrid.addColumn(FilaArranque::t2KwhInicio).setHeader("KWh Inicio").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c10 = arranqueGrid.addColumn(FilaArranque::t2FechaFinPurga).setHeader("Fecha Fin Purga").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c11 = arranqueGrid.addColumn(FilaArranque::t2HoraFinPurga).setHeader("Hora Fin Purga").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c12 = arranqueGrid.addColumn(FilaArranque::t2KwhFinPurga).setHeader("KWh Fin Purga").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c13 = arranqueGrid.addColumn(FilaArranque::t2FechaNormalizado).setHeader("Fecha Normalizado").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c14 = arranqueGrid.addColumn(FilaArranque::t2HoraNormalizado).setHeader("Hora Normalizado").setAutoWidth(true).setFlexGrow(0);
+        Grid.Column<FilaArranque> c15 = arranqueGrid.addColumn(FilaArranque::t2KwhNormalizado).setHeader("KWh Normalizado").setAutoWidth(true).setFlexGrow(0);
+
+        HeaderRow grupos = arranqueGrid.prependHeaderRow();
+        grupos.join(c1, c2, c3, c4, c5, c6).setText("Tabla Inicio / Fin");
+        grupos.join(c7, c8, c9, c10, c11, c12, c13, c14, c15).setText("Tabla Inicio / Fin Purga / Normalizado");
+
+        arranqueGrid.setItems(new ListDataProvider<>(filasArranque));
+        arranqueGrid.addThemeVariants(GridVariant.LUMO_COMPACT, GridVariant.LUMO_NO_BORDER, GridVariant.LUMO_ROW_STRIPES);
+        arranqueGrid.setAllRowsVisible(true);
+        arranqueGrid.getStyle().set("font-size", "12px");
+        arranqueGrid.getStyle().set("align-self", "flex-start");
+        arranqueGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
+        arranqueGrid.addItemClickListener(e -> copiarFilaArranqueAlPortapapeles(e.getItem()));
+        arranqueGrid.setVisible(false);
+        return arranqueGrid;
+    }
+
+    private void copiarFilaArranqueAlPortapapeles(FilaArranque fila) {
+        String tsv = String.join("\t", fila.t1FechaInicio(), fila.t1HoraInicio(), fila.t1KwhInicio(),
+                fila.t1FechaFin(), fila.t1HoraFin(), fila.t1KwhFin(),
+                fila.t2FechaInicio(), fila.t2HoraInicio(), fila.t2KwhInicio(),
+                fila.t2FechaFinPurga(), fila.t2HoraFinPurga(), fila.t2KwhFinPurga(),
+                fila.t2FechaNormalizado(), fila.t2HoraNormalizado(), fila.t2KwhNormalizado());
+        getElement().executeJs("navigator.clipboard.writeText($0)", tsv);
+        Notification.show("Fila copiada — pegar en Excel", 1500, Notification.Position.BOTTOM_END);
     }
 
     private HorizontalLayout buildFiltrosLayout() {
@@ -207,6 +540,18 @@ public class HistoricoView extends VerticalLayout {
         variableCombo.setValue("KWh");
         variableCombo.setWidth("160px");
 
+        // Ventana de la media móvil de la pestaña "Filtrado", ajustable a pedido: una ventana
+        // chica pierde menos detalle (picos/caídas cortas) pero suaviza menos ruido; una grande
+        // suaviza más pero puede tapar detalles reales cortos. En muestras (~1 lectura/minuto,
+        // igual criterio que GraficaModel.VENTANA_MEDIA_MOVIL), no en minutos, para que el
+        // número coincida exactamente con lo que hace mediaMovil.
+        ventanaMediaMovilField = new IntegerField("Ventana media móvil");
+        ventanaMediaMovilField.setValue(GraficaModel.VENTANA_MEDIA_MOVIL);
+        ventanaMediaMovilField.setMin(1);
+        ventanaMediaMovilField.setStepButtonsVisible(true);
+        ventanaMediaMovilField.setWidth("140px");
+        ventanaMediaMovilField.setHelperText("muestras, ~1/min");
+
         consultarBtn = new Button("Consultar", e -> consultar());
         consultarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
@@ -214,13 +559,30 @@ public class HistoricoView extends VerticalLayout {
         resetZoomBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
         HorizontalLayout layout = new HorizontalLayout(
-                maquinaCombo, desdeDate, hastaDate, variableCombo, consultarBtn, resetZoomBtn);
+                maquinaCombo, desdeDate, hastaDate, variableCombo, ventanaMediaMovilField, consultarBtn, resetZoomBtn);
         layout.setAlignItems(FlexComponent.Alignment.END);
         layout.setSpacing(true);
         return layout;
     }
 
+    /** Ventana de media móvil actualmente configurada — 1 si el campo quedó vacío o inválido. */
+    private int ventanaMediaMovilActual() {
+        Integer valor = ventanaMediaMovilField.getValue();
+        return valor != null && valor >= 1 ? valor : 1;
+    }
+
     private void consultar() {
+        consultar(true);
+    }
+
+    /**
+     * actualizarTablas=false es el caso del cambio de pestaña (ver tabSheetFiltro
+     * addSelectedChangeListener): ahí solo hace falta re-renderizar el gráfico para que amCharts
+     * pueda dimensionar el contenedor recién visible — repetir actualizarTablaDatos y sobre todo
+     * actualizarTablaEnergia (que recorre TODAS las máquinas) en cada cambio de pestaña es trabajo
+     * repetido e innecesario, y es lo que hacía lenta esa acción.
+     */
+    private void consultar(boolean actualizarTablas) {
         String maquina = maquinaCombo.getValue();
         LocalDate desde = desdeDate.getValue();
         LocalDate hasta = hastaDate.getValue();
@@ -245,33 +607,37 @@ public class HistoricoView extends VerticalLayout {
         switch (variable) {
             case "KWh":
                 graficaActiva = graficaKWh;
-                consultarKWh(maquina, desde, hasta);
+                consultarKWh(maquina, desde, hasta, actualizarTablas);
                 break;
             case "Voltajes":
                 graficaActiva = graficaVoltajes;
-                consultarVIP(maquina, desde, hasta, "Voltajes");
+                consultarVIP(maquina, desde, hasta, "Voltajes", actualizarTablas);
                 break;
             case "Corrientes":
                 graficaActiva = graficaCorrientes;
-                consultarVIP(maquina, desde, hasta, "Corrientes");
+                consultarVIP(maquina, desde, hasta, "Corrientes", actualizarTablas);
                 break;
             case "PW":
                 graficaActiva = graficaPW;
-                consultarVIP(maquina, desde, hasta, "PW");
+                consultarVIP(maquina, desde, hasta, "PW", actualizarTablas);
                 break;
             case "PF":
                 graficaActiva = graficaPF;
-                consultarVIP(maquina, desde, hasta, "PF");
+                consultarVIP(maquina, desde, hasta, "PF", actualizarTablas);
                 break;
         }
     }
-    private void consultarKWh(String maquina, LocalDate desde, LocalDate hasta) {
+    private void consultarKWh(String maquina, LocalDate desde, LocalDate hasta, boolean actualizarTablas) {
         try {
             if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
                 mensajeSpan.setText("Sin acceso a esta máquina");
                 return;
             }
             List<Map<String, Object>> datos = plcDataQueryService.getHistoricoKWhByRango(maquina, desde, hasta);
+            if (actualizarTablas) {
+                actualizarTablaDatos(datos, "KWh");
+                actualizarTablaEnergia(desde, hasta);
+            }
 
             boolean conDiferencia = graficaKWh.clasificarYFijarUnidad(maquina);
 
@@ -291,7 +657,7 @@ public class HistoricoView extends VerticalLayout {
 
             GraficaModel.ResultadoGrafica filtrado = graficaKWh.graficarSerieKWh(
                     ID_CHART_FILTRADO, datos, conDiferencia, maquina, new String[]{"Datos"}, false,
-                    true, aplicaMediaMovil(maquina));
+                    true, aplicaMediaMovil(maquina), ventanaMediaMovilActual());
             getElement().executeJs(filtrado.script());
             getElement().executeJs(graficaKWh.getZoomXInicialScript(ID_CHART_FILTRADO, filtrado.puntosGraficados()));
 
@@ -307,13 +673,17 @@ public class HistoricoView extends VerticalLayout {
         }
     }
 
-    private void consultarVIP(String maquina, LocalDate desde, LocalDate hasta, String tipoVar) {
+    private void consultarVIP(String maquina, LocalDate desde, LocalDate hasta, String tipoVar, boolean actualizarTablas) {
         try {
             if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
                 mensajeSpan.setText("Sin acceso a esta máquina");
                 return;
             }
             List<Map<String, Object>> datos = plcDataQueryService.getHistoricoVIPByRango(maquina, desde, hasta);
+            if (actualizarTablas) {
+                actualizarTablaDatos(datos, tipoVar);
+                actualizarTablaEnergia(desde, hasta);
+            }
 
             if (datos.isEmpty()) {
                 mensajeSpan.setText("No hay datos en el rango seleccionado");
@@ -378,7 +748,7 @@ public class HistoricoView extends VerticalLayout {
                 columna = GraficaModel.limpiarCeroAislado(columna);
                 columna = GraficaModel.limpiarAtipicos(columna, GraficaModel.FACTOR_ATIPICO);
                 if (aplicaMediaMovil(maquina)) {
-                    columna = GraficaModel.mediaMovil(columna, GraficaModel.VENTANA_MEDIA_MOVIL);
+                    columna = GraficaModel.mediaMovil(columna, ventanaMediaMovilActual());
                 }
             }
             columnas.add(columna);
@@ -487,11 +857,83 @@ public class HistoricoView extends VerticalLayout {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             TarjetasEstadoActual.limpiarUltimoClickHistorico((MainLayout) this.getParent().get(), datosActualesCard);
         }
+        puntoAnteriorAnalisis = null;
+        if (analisisGrid != null) {
+            filasAnalisis.clear();
+            analisisGrid.getDataProvider().refreshAll();
+        }
+        clicksArranque.clear();
+        if (arranqueGrid != null) {
+            filasArranque.clear();
+            arranqueGrid.getDataProvider().refreshAll();
+        }
     }
 
     @ClientCallable
     public void registrarClickEnGrafica(long timestamp) {
-        actualizarTarjetaUltimoClick(timestamp);
+        TarjetasEstadoActual.PuntoClick actual = actualizarTarjetaUltimoClick(timestamp);
+        if (modoConArranque) {
+            registrarClickConArranque(actual);
+        } else {
+            registrarFilaAnalisis(actual);
+        }
+    }
+
+    /**
+     * Encadena el click actual con el anterior en un tramo Inicio→Fin (ver puntoAnteriorAnalisis
+     * arriba). La tabla nunca crece: cada click a partir del segundo REEMPLAZA la única fila
+     * existente en vez de agregar una nueva (a pedido — antes se acumulaba una fila por click).
+     * analisisGrid es null para usuarios no-admin, así que ahí no hace nada.
+     */
+    private void registrarFilaAnalisis(TarjetasEstadoActual.PuntoClick actual) {
+        if (actual == null || analisisGrid == null) {
+            return;
+        }
+        if (puntoAnteriorAnalisis != null) {
+            filasAnalisis.clear();
+            filasAnalisis.add(new FilaAnalisis(
+                    puntoAnteriorAnalisis.fecha(), puntoAnteriorAnalisis.hora(), puntoAnteriorAnalisis.kwh(),
+                    actual.fecha(), actual.hora(), actual.kwh()));
+            analisisGrid.getDataProvider().refreshAll();
+        }
+        puntoAnteriorAnalisis = actual;
+    }
+
+    /**
+     * Modo "Con arranque": ciclo fijo de 4 clicks (Inicio, Fin Purga, Normalizado, Fin). Cada
+     * click actualiza los campos que le corresponden en las DOS mitades de la fila (ver
+     * FilaArranque) — click1 (Inicio) va tanto al grupo t1 como al t2, ya que las dos tablas
+     * originales tenian su propio "Inicio" con el mismo dato. Campos de un click que todavia no
+     * paso quedan en "". Al llegar al 4to el ciclo queda cerrado: clicks siguientes no hacen nada
+     * hasta el doble-click (limpiarTarjetas), que lo reabre.
+     */
+    private void registrarClickConArranque(TarjetasEstadoActual.PuntoClick actual) {
+        if (actual == null || arranqueGrid == null || clicksArranque.size() >= 4) {
+            return;
+        }
+        clicksArranque.add(actual);
+
+        TarjetasEstadoActual.PuntoClick inicio = clicksArranque.size() > 0 ? clicksArranque.get(0) : null;
+        TarjetasEstadoActual.PuntoClick finPurga = clicksArranque.size() > 1 ? clicksArranque.get(1) : null;
+        TarjetasEstadoActual.PuntoClick normalizado = clicksArranque.size() > 2 ? clicksArranque.get(2) : null;
+        TarjetasEstadoActual.PuntoClick fin = clicksArranque.size() > 3 ? clicksArranque.get(3) : null;
+
+        filasArranque.clear();
+        filasArranque.add(new FilaArranque(
+                // Grupo 1: Inicio/Fin.
+                campo(inicio, TarjetasEstadoActual.PuntoClick::fecha), campo(inicio, TarjetasEstadoActual.PuntoClick::hora), campo(inicio, TarjetasEstadoActual.PuntoClick::kwh),
+                campo(fin, TarjetasEstadoActual.PuntoClick::fecha), campo(fin, TarjetasEstadoActual.PuntoClick::hora), campo(fin, TarjetasEstadoActual.PuntoClick::kwh),
+                // Grupo 2: Inicio (mismo click1)/Fin Purga/Normalizado.
+                campo(inicio, TarjetasEstadoActual.PuntoClick::fecha), campo(inicio, TarjetasEstadoActual.PuntoClick::hora), campo(inicio, TarjetasEstadoActual.PuntoClick::kwh),
+                campo(finPurga, TarjetasEstadoActual.PuntoClick::fecha), campo(finPurga, TarjetasEstadoActual.PuntoClick::hora), campo(finPurga, TarjetasEstadoActual.PuntoClick::kwh),
+                campo(normalizado, TarjetasEstadoActual.PuntoClick::fecha), campo(normalizado, TarjetasEstadoActual.PuntoClick::hora), campo(normalizado, TarjetasEstadoActual.PuntoClick::kwh)));
+        arranqueGrid.getDataProvider().refreshAll();
+    }
+
+    /** "" si el punto todavia no llego (ese click del ciclo no paso), el campo pedido si ya llego. */
+    private static String campo(TarjetasEstadoActual.PuntoClick punto,
+                                 java.util.function.Function<TarjetasEstadoActual.PuntoClick, String> extractor) {
+        return punto == null ? "" : extractor.apply(punto);
     }
 
     /**
@@ -500,12 +942,13 @@ public class HistoricoView extends VerticalLayout {
      * ChartsView, acá el punto clickeado puede ser de cualquier día del rango consultado, así
      * que usa la variante "Historico" (busca en el archivo mensual correspondiente).
      */
-    private void actualizarTarjetaUltimoClick(long timestamp) {
+    private TarjetasEstadoActual.PuntoClick actualizarTarjetaUltimoClick(long timestamp) {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             MainLayout layout = (MainLayout) this.getParent().get();
-            TarjetasEstadoActual.actualizarUltimoClickHistorico(lineaAccessService, plcDataQueryService,
+            return TarjetasEstadoActual.actualizarUltimoClickHistorico(lineaAccessService, plcDataQueryService,
                     graficaActiva, maquinaCombo.getValue(), layout, datosActualesCard, timestamp);
         }
+        return null;
     }
 
 }
