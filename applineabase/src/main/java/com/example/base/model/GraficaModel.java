@@ -350,12 +350,28 @@ public class GraficaModel {
     /**
      * Variante completa: filtrarAtipicos y suavizarMediaMovil se controlan por separado, para
      * poder aplicar una sin la otra (caso de la gráfica en vivo, que quiere atípicos limpios
-     * pero sin el lag de la media móvil).
+     * pero sin el lag de la media móvil). Usa la ventana por defecto (VENTANA_MEDIA_MOVIL); ver
+     * el overload de abajo para elegir una ventana puntual.
      */
     public ResultadoGrafica graficarSerieKWh(String containerId, List<Map<String, Object>> datos,
                                               boolean conDiferencia, String maquina,
                                               String[] seriesNames, boolean limitarPuntos,
                                               boolean filtrarAtipicos, boolean suavizarMediaMovil) {
+        return graficarSerieKWh(containerId, datos, conDiferencia, maquina, seriesNames, limitarPuntos,
+                filtrarAtipicos, suavizarMediaMovil, VENTANA_MEDIA_MOVIL);
+    }
+
+    /**
+     * Igual que el overload anterior, con la ventana de la media móvil como parámetro — a
+     * pedido, el usuario quiere poder ajustarla (una ventana más chica pierde menos detalle
+     * pero suaviza menos; una más grande suaviza más pero puede tapar picos reales cortos).
+     * Ignorado si suavizarMediaMovil es false.
+     */
+    public ResultadoGrafica graficarSerieKWh(String containerId, List<Map<String, Object>> datos,
+                                              boolean conDiferencia, String maquina,
+                                              String[] seriesNames, boolean limitarPuntos,
+                                              boolean filtrarAtipicos, boolean suavizarMediaMovil,
+                                              int ventanaMediaMovil) {
         setSeriesNames(seriesNames);
         SerieKWh serie = calcularSerieKWh(datos, conDiferencia);
 
@@ -365,7 +381,7 @@ public class GraficaModel {
         // normal del KWh/min que queda incluso sin atípicos (ver comentario de mediaMovil).
         List<Float> valores = filtrarAtipicos ? limpiarAtipicos(serie.valores(), FACTOR_ATIPICO) : serie.valores();
         if (suavizarMediaMovil) {
-            valores = mediaMovil(valores, VENTANA_MEDIA_MOVIL);
+            valores = mediaMovil(valores, ventanaMediaMovil);
         }
 
         setMinY(0.0);
@@ -963,7 +979,7 @@ public class GraficaModel {
             html.append("<span>")
                     .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(": </span>")
                     .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
-                    .append(String.format("%.2f", valores[i]))
+                    .append(formatearDecimal(valores[i]))
                     .append("</span>")
                     .append("</span>");
         }
@@ -995,13 +1011,19 @@ public class GraficaModel {
             html.append("<span>")
                     .append("<span style='font-size: 12px; color: #898781;'>").append(labelsExtra[i]).append(": </span>")
                     .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
-                    .append(String.format("%.2f", valoresExtra[i]))
+                    .append(formatearDecimal(valoresExtra[i]))
                     .append("</span>")
                     .append("</span>");
         }
 
         html.append("</div>");
         return html.toString();
+    }
+
+    /** Decimal con coma (convención local), no punto — fijo en Locale.US antes de reemplazar el
+     * separador para que el resultado no dependa del Locale por defecto de la JVM donde corra. */
+    public static String formatearDecimal(double valor) {
+        return String.format(java.util.Locale.US, "%.2f", valor).replace('.', ',');
     }
 
     private static double toDoubleSeguro(Object valor) {
