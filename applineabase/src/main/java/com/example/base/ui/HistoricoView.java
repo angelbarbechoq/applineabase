@@ -249,30 +249,37 @@ public class HistoricoView extends VerticalLayout {
     }
 
     /**
-     * Div del gráfico con altura fija (500px) — probamos altura 100% + flexGrow para evitar la
-     * barra de scroll vertical de la página en ventanas bajas, pero se revirtió a pedido hasta
-     * encontrar otra solución. Ver commit "Sacar la barra de scroll vertical en Historico usando
-     * altura 100% en vez de fija" para el intento anterior.
+     * Envuelve el Div del gráfico en un VerticalLayout con altura 100% + flexGrow (mismo patrón
+     * que HorometroView.crearPanelGrupo) en vez de una altura fija en px — con un tamaño fijo,
+     * si la ventana del navegador es más baja que ese valor el contenido se pasa del alto
+     * disponible del TabSheet y aparece la barra de scroll vertical de la página, en vez de que
+     * el gráfico simplemente se achique junto con la ventana.
      *
      * tablaLateral (solo ADMIN, null para el resto) queda a la derecha del gráfico en un ancho
      * fijo — el gráfico se lleva el espacio que sobra (flexGrow 1), la tabla no se achica
-     * (flexShrink 0). Sin tabla, devuelve el Div del gráfico solo, sin la fila extra alrededor.
+     * (flexShrink 0). Sin tabla, devuelve el panel del gráfico solo, sin la fila extra alrededor.
      */
     private Component crearPanelGrafico(String containerId, Component tablaLateral) {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
+        panel.setPadding(false);
+
         Div chartDiv = new Div();
         chartDiv.setId(containerId);
         chartDiv.setWidthFull();
-        chartDiv.setHeight("500px");
+        chartDiv.setHeight("100%");
+        panel.add(chartDiv);
+        panel.setFlexGrow(1, chartDiv);
 
         if (tablaLateral == null) {
-            return chartDiv;
+            return panel;
         }
 
-        HorizontalLayout fila = new HorizontalLayout(chartDiv, tablaLateral);
-        fila.setWidthFull();
+        HorizontalLayout fila = new HorizontalLayout(panel, tablaLateral);
+        fila.setSizeFull();
         fila.setPadding(false);
         fila.setSpacing(true);
-        fila.setFlexGrow(1, chartDiv);
+        fila.setFlexGrow(1, panel);
         fila.setFlexGrow(0, tablaLateral);
         tablaLateral.getElement().getStyle().set("width", "320px");
         tablaLateral.getElement().getStyle().set("flex-shrink", "0");
