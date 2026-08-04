@@ -236,12 +236,14 @@ public class HistoricoView extends VerticalLayout {
         boolean esAdmin = lineaAccessService.esAdmin();
         tabSheetFiltro.add("Sin filtrar", crearPanelGrafico(ID_CHART_CRUDO, esAdmin ? buildEnergiaGrid() : null));
         tabSheetFiltro.add("Filtrado", crearPanelGrafico(ID_CHART_FILTRADO, esAdmin ? buildDatosGrid() : null));
-        // Si la pestaña recién visible nunca se renderizó con datos reales (estaba oculta la
-        // última vez que se consultó), se repite esa misma consulta ahora que ya se puede
-        // dimensionar correctamente.
+        // Si la pestaña recién visible estaba oculta (display:none) cuando se cargaron los
+        // datos, amCharts no detectó el tamaño real del contenedor — se fuerza un resize en vez
+        // de repetir la consulta completa a la base de datos (los datos ya están cargados en el
+        // gráfico, no hace falta volver a pedirlos ni volver a calcular atípicos/media móvil).
         tabSheetFiltro.addSelectedChangeListener(e -> {
-            if (huboConsultaExitosa) {
-                consultar(false);
+            if (huboConsultaExitosa && graficaActiva != null) {
+                getElement().executeJs(graficaActiva.getResizeScript(ID_CHART_FILTRADO));
+                getElement().executeJs(graficaActiva.getResizeScript(ID_CHART_CRUDO));
             }
         });
         add(tabSheetFiltro);
@@ -572,17 +574,6 @@ public class HistoricoView extends VerticalLayout {
     }
 
     private void consultar() {
-        consultar(true);
-    }
-
-    /**
-     * actualizarTablas=false es el caso del cambio de pestaña (ver tabSheetFiltro
-     * addSelectedChangeListener): ahí solo hace falta re-renderizar el gráfico para que amCharts
-     * pueda dimensionar el contenedor recién visible — repetir actualizarTablaDatos y sobre todo
-     * actualizarTablaEnergia (que recorre TODAS las máquinas) en cada cambio de pestaña es trabajo
-     * repetido e innecesario, y es lo que hacía lenta esa acción.
-     */
-    private void consultar(boolean actualizarTablas) {
         String maquina = maquinaCombo.getValue();
         LocalDate desde = desdeDate.getValue();
         LocalDate hasta = hastaDate.getValue();
@@ -607,37 +598,36 @@ public class HistoricoView extends VerticalLayout {
         switch (variable) {
             case "KWh":
                 graficaActiva = graficaKWh;
-                consultarKWh(maquina, desde, hasta, actualizarTablas);
+                consultarKWh(maquina, desde, hasta);
                 break;
             case "Voltajes":
                 graficaActiva = graficaVoltajes;
-                consultarVIP(maquina, desde, hasta, "Voltajes", actualizarTablas);
+                consultarVIP(maquina, desde, hasta, "Voltajes");
                 break;
             case "Corrientes":
                 graficaActiva = graficaCorrientes;
-                consultarVIP(maquina, desde, hasta, "Corrientes", actualizarTablas);
+                consultarVIP(maquina, desde, hasta, "Corrientes");
                 break;
             case "PW":
                 graficaActiva = graficaPW;
-                consultarVIP(maquina, desde, hasta, "PW", actualizarTablas);
+                consultarVIP(maquina, desde, hasta, "PW");
                 break;
             case "PF":
                 graficaActiva = graficaPF;
-                consultarVIP(maquina, desde, hasta, "PF", actualizarTablas);
+                consultarVIP(maquina, desde, hasta, "PF");
                 break;
         }
     }
-    private void consultarKWh(String maquina, LocalDate desde, LocalDate hasta, boolean actualizarTablas) {
+
+    private void consultarKWh(String maquina, LocalDate desde, LocalDate hasta) {
         try {
             if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
                 mensajeSpan.setText("Sin acceso a esta máquina");
                 return;
             }
             List<Map<String, Object>> datos = plcDataQueryService.getHistoricoKWhByRango(maquina, desde, hasta);
-            if (actualizarTablas) {
-                actualizarTablaDatos(datos, "KWh");
-                actualizarTablaEnergia(desde, hasta);
-            }
+            actualizarTablaDatos(datos, "KWh");
+            actualizarTablaEnergia(desde, hasta);
 
             boolean conDiferencia = graficaKWh.clasificarYFijarUnidad(maquina);
 
@@ -662,7 +652,7 @@ public class HistoricoView extends VerticalLayout {
             getElement().executeJs(graficaKWh.getZoomXInicialScript(ID_CHART_FILTRADO, filtrado.puntosGraficados()));
 
             GraficaModel.ResultadoGrafica crudo = graficaKWh.graficarSerieKWh(
-                    ID_CHART_CRUDO, datos, conDiferencia, maquina, new String[]{"Datos"}, false, false);
+                    ID_CHART_CRUDO, datos, conDiferencia, maquina, new String[]{"Datos"}, false, true, false);
             getElement().executeJs(crudo.script());
             getElement().executeJs(graficaKWh.getZoomXInicialScript(ID_CHART_CRUDO, crudo.puntosGraficados()));
 
@@ -673,17 +663,15 @@ public class HistoricoView extends VerticalLayout {
         }
     }
 
-    private void consultarVIP(String maquina, LocalDate desde, LocalDate hasta, String tipoVar, boolean actualizarTablas) {
+    private void consultarVIP(String maquina, LocalDate desde, LocalDate hasta, String tipoVar) {
         try {
             if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
                 mensajeSpan.setText("Sin acceso a esta máquina");
                 return;
             }
             List<Map<String, Object>> datos = plcDataQueryService.getHistoricoVIPByRango(maquina, desde, hasta);
-            if (actualizarTablas) {
-                actualizarTablaDatos(datos, tipoVar);
-                actualizarTablaEnergia(desde, hasta);
-            }
+            actualizarTablaDatos(datos, tipoVar);
+            actualizarTablaEnergia(desde, hasta);
 
             if (datos.isEmpty()) {
                 mensajeSpan.setText("No hay datos en el rango seleccionado");
@@ -722,34 +710,34 @@ public class HistoricoView extends VerticalLayout {
     }
 
     /**
-     * Arma y ejecuta el script de un gráfico VIP en un contenedor puntual, aplicando o no el
-     * filtro de ruido (limpiarCeroAislado + limpiarAtipicos + mediaMovil) según
-     * {@code aplicarFiltro} — única función para esta orquestación, la usan tanto la pestaña
-     * "Filtrado" como "Sin filtrar" en vez de repetir la lógica de armado del script para cada
-     * una.
+     * Arma y ejecuta el script de un gráfico VIP en un contenedor puntual. El tratamiento de
+     * ruido puntual (limpiarCeroAislado + limpiarAtipicos) se aplica SIEMPRE, en las dos
+     * pestañas — "Sin filtrar" no quiere decir "datos crudos sin ningún tratamiento", sino
+     * "sin el suavizado de media móvil"; un atípico por falla de comunicación no es un dato
+     * real que valga la pena mostrar en ninguna de las dos vistas. Lo único que
+     * {@code suavizarMediaMovil} decide es si además se aplica la media móvil (solo
+     * "Filtrado", y solo si la máquina no está en maquinasSinMediaMovil) — única función para
+     * esta orquestación, la usan tanto "Filtrado" como "Sin filtrar" en vez de repetir la
+     * lógica de armado del script para cada una.
      *
      * Se limpia el atípico de cada serie por separado (VAB, VAC, VBC, etc. pueden tener picos
      * por falla de comunicación en momentos distintos), reemplazándolo por una interpolación de
      * sus vecinos. Se limpia además el cero aislado (lectura inválida del PLC, no un apagado
      * real) en las cuatro variables — Voltajes, Corrientes, PW y también PF, ya que el mismo
      * glitch de comunicación que da un cero espurio en las otras tres suele darlo también en PF
-     * en esa misma lectura. Por último, si la máquina no está en maquinasSinMediaMovil, la media
-     * móvil suaviza el ruido normal punto a punto que queda incluso sin ningún atípico — mismo
-     * tratamiento que ya se le da a KWh.
+     * en esa misma lectura.
      */
     private void renderizarVIP(String containerId, String maquina, String tipoVar, List<Long> timestamps,
-                                List<Float[]> valoresPorFila, int nSeries, boolean aplicarFiltro) {
+                                List<Float[]> valoresPorFila, int nSeries, boolean suavizarMediaMovil) {
         List<List<Float>> columnas = new ArrayList<>();
         List<Float> valoresParaEscala = new ArrayList<>();
         for (int s = 0; s < nSeries; s++) {
             List<Float> columna = new ArrayList<>();
             for (Float[] fila : valoresPorFila) columna.add(fila[s]);
-            if (aplicarFiltro) {
-                columna = GraficaModel.limpiarCeroAislado(columna);
-                columna = GraficaModel.limpiarAtipicos(columna, GraficaModel.FACTOR_ATIPICO);
-                if (aplicaMediaMovil(maquina)) {
-                    columna = GraficaModel.mediaMovil(columna, ventanaMediaMovilActual());
-                }
+            columna = GraficaModel.limpiarCeroAislado(columna);
+            columna = GraficaModel.limpiarAtipicos(columna, GraficaModel.FACTOR_ATIPICO);
+            if (suavizarMediaMovil && aplicaMediaMovil(maquina)) {
+                columna = GraficaModel.mediaMovil(columna, ventanaMediaMovilActual());
             }
             columnas.add(columna);
             for (Float v : columna) {

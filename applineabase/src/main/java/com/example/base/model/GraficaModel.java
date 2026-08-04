@@ -313,6 +313,21 @@ public class GraficaModel {
     }
 
     /**
+     * Fuerza a amCharts a recalcular el tamaño del contenedor — necesario cuando un gráfico se
+     * inicializó/cargó con datos mientras su pestaña estaba oculta (display:none dentro de un
+     * TabSheet): el resize sensor nativo no detecta el cambio de tamaño en ese caso, así que al
+     * mostrar la pestaña el gráfico queda con dimensiones 0. Se usa al cambiar de pestaña en vez
+     * de repetir la consulta completa a la base de datos, que era el workaround anterior (lento
+     * e innecesario: los datos ya están cargados en el gráfico, solo falta que se redimensione).
+     */
+    public String getResizeScript(String containerId) {
+        return
+                "if (window.am5Charts && window.am5Charts['" + containerId + "'] && window.am5Charts['" + containerId + "'].root) {" +
+                "  window.am5Charts['" + containerId + "'].root.resize();" +
+                "}";
+    }
+
+    /**
      * Arma el script completo (init + todos los puntos + zoom inicial) para graficar una
      * serie de KWh: calcula la serie (diferencia o valor directo), limpia atípicos, aplica
      * el preset por máquina como piso del eje Y (ampliándolo con el percentil 95 si los
