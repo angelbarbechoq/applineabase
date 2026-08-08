@@ -18,6 +18,7 @@ import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.HeaderRow;
+import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
@@ -30,8 +31,12 @@ import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.PermitAll;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -133,6 +138,12 @@ public class HistoricoView extends VerticalLayout {
     // atípicos/media móvil que sí usa el gráfico. Columnas dinámicas (Fecha + los campos de la
     // variable activa), se reconstruyen en cada consulta porque cambian según KWh/Voltajes/etc.
     private Grid<Map<String, Object>> datosGrid;
+    // Última consulta exitosa (solo ADMIN): misma lista que muestra datosGrid, guardada acá para
+    // que el botón de descarga CSV arme el archivo con exactamente lo mismo que se ve en pantalla,
+    // sin tener que volver a consultar la base de datos.
+    private List<Map<String, Object>> ultimosDatosConsultados;
+    private String ultimaVariableConsultada;
+    private String ultimaMaquinaConsultada;
 
     // Tabla al lado del gráfico "Sin filtrar" (solo ADMIN): la diferencia de KWh de TODAS las
     // máquinas de la base (una fila por máquina, no solo la seleccionada en el combo), para el
@@ -319,14 +330,26 @@ public class HistoricoView extends VerticalLayout {
      * variable, mismos nombres que usa extractValues/seriesNamesPorTipo) y carga las filas tal
      * como vinieron de la base — sin limpiarAtipicos/mediaMovil, esos solo se aplican al gráfico.
      */
-    private void actualizarTablaDatos(List<Map<String, Object>> datos, String variable) {
+    private void actualizarTablaDatos(List<Map<String, Object>> datos, String variable, String maquina) {
+        ultimosDatosConsultados = datos;
+        ultimaVariableConsultada = variable;
+        ultimaMaquinaConsultada = maquina;
+
         if (datosGrid == null) {
             return;
         }
         datosGrid.getColumns().forEach(datosGrid::removeColumn);
         datosGrid.addColumn(fila -> String.valueOf(fila.get("fecha"))).setHeader("Fecha").setAutoWidth(true).setFlexGrow(0);
 
-        String[] campos = switch (variable) {
+        for (String campo : camposPorVariable(variable)) {
+            datosGrid.addColumn(fila -> formatearValorCelda(fila.get(campo))).setHeader(campo).setAutoWidth(true).setFlexGrow(0);
+        }
+        datosGrid.setItems(datos);
+    }
+
+    /** Campos (ademas de "fecha") que trae cada variable — mismo set que usan datosGrid y la descarga CSV. */
+    private static String[] camposPorVariable(String variable) {
+        return switch (variable) {
             case "KWh" -> new String[]{"kwh"};
             case "Voltajes" -> new String[]{"VAB", "VAC", "VBC"};
             case "Corrientes" -> new String[]{"IA", "IB", "IC"};
@@ -334,10 +357,6 @@ public class HistoricoView extends VerticalLayout {
             case "PF" -> new String[]{"PF"};
             default -> new String[0];
         };
-        for (String campo : campos) {
-            datosGrid.addColumn(fila -> formatearValorCelda(fila.get(campo))).setHeader(campo).setAutoWidth(true).setFlexGrow(0);
-        }
-        datosGrid.setItems(datos);
     }
 
     private static String formatearValorCelda(Object valor) {
@@ -464,8 +483,26 @@ public class HistoricoView extends VerticalLayout {
     private void copiarFilaAlPortapapeles(FilaAnalisis fila) {
         String tsv = String.join("\t", fila.fechaInicio(), fila.horaInicio(), fila.kwhInicio(),
                 fila.fechaFin(), fila.horaFin(), fila.kwhFin());
-        getElement().executeJs("navigator.clipboard.writeText($0)", tsv);
-        Notification.show("Fila copiada — pegar en Excel", 1500, Notification.Position.BOTTOM_END);
+        copiarAlPortapapeles(tsv);
+    }
+
+    /**
+     * navigator.clipboard.writeText requiere contexto seguro (HTTPS o localhost) — esta app se
+     * sirve por HTTP plano en la LAN de planta, así que el navegador la bloquea sin avisar (la
+     * promesa se rechaza en silencio). document.execCommand('copy') sobre un textarea temporal sí
+     * funciona en HTTP plano, por eso se usa acá en vez de la Clipboard API moderna.
+     */
+    private void copiarAlPortapapeles(String texto) {
+        getElement().executeJs(
+                "var ta = document.createElement('textarea');" +
+                        "ta.value = $0;" +
+                        "ta.style.position = 'fixed'; ta.style.opacity = '0';" +
+                        "document.body.appendChild(ta);" +
+                        "ta.focus(); ta.select();" +
+                        "try { document.execCommand('copy'); } catch (e) { console.error('Error copiando al portapapeles:', e); }" +
+                        "document.body.removeChild(ta);",
+                texto);
+        Notification.show("Copiado — pegar en Excel", 1500, Notification.Position.BOTTOM_END);
     }
 
     /**
@@ -493,8 +530,10 @@ public class HistoricoView extends VerticalLayout {
         Grid.Column<FilaArranque> c15 = arranqueGrid.addColumn(FilaArranque::t2KwhNormalizado).setHeader("KWh Normalizado").setAutoWidth(true).setFlexGrow(0);
 
         HeaderRow grupos = arranqueGrid.prependHeaderRow();
-        grupos.join(c1, c2, c3, c4, c5, c6).setText("Tabla Inicio / Fin");
-        grupos.join(c7, c8, c9, c10, c11, c12, c13, c14, c15).setText("Tabla Inicio / Fin Purga / Normalizado");
+        grupos.join(c1, c2, c3, c4, c5, c6).setComponent(
+                encabezadoConCopiar("Tabla Inicio / Fin", this::copiarGrupoT1AlPortapapeles));
+        grupos.join(c7, c8, c9, c10, c11, c12, c13, c14, c15).setComponent(
+                encabezadoConCopiar("Tabla Inicio / Fin Purga / Normalizado", this::copiarGrupoT2AlPortapapeles));
 
         arranqueGrid.setItems(new ListDataProvider<>(filasArranque));
         arranqueGrid.addThemeVariants(GridVariant.LUMO_COMPACT, GridVariant.LUMO_NO_BORDER, GridVariant.LUMO_ROW_STRIPES);
@@ -513,8 +552,45 @@ public class HistoricoView extends VerticalLayout {
                 fila.t2FechaInicio(), fila.t2HoraInicio(), fila.t2KwhInicio(),
                 fila.t2FechaFinPurga(), fila.t2HoraFinPurga(), fila.t2KwhFinPurga(),
                 fila.t2FechaNormalizado(), fila.t2HoraNormalizado(), fila.t2KwhNormalizado());
-        getElement().executeJs("navigator.clipboard.writeText($0)", tsv);
-        Notification.show("Fila copiada — pegar en Excel", 1500, Notification.Position.BOTTOM_END);
+        copiarAlPortapapeles(tsv);
+    }
+
+    /** Etiqueta del grupo + boton "Copiar" chico, para meter en una celda de encabezado unida
+     * (HeaderRow.join(...).setComponent(...)) — cada grupo de la tabla "Con arranque" copia solo
+     * sus propias columnas, en vez de las 15 juntas (eso ya lo hace el click en la fila). */
+    private HorizontalLayout encabezadoConCopiar(String texto, Runnable alCopiar) {
+        Span label = new Span(texto);
+        Button copiarBtn = new Button("Copiar", e -> alCopiar.run());
+        copiarBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+        HorizontalLayout layout = new HorizontalLayout(label, copiarBtn);
+        layout.setAlignItems(FlexComponent.Alignment.CENTER);
+        layout.setSpacing(true);
+        return layout;
+    }
+
+    /** Copia solo las columnas del grupo "Inicio / Fin" (t1) de la unica fila de arranqueGrid. */
+    private void copiarGrupoT1AlPortapapeles() {
+        if (filasArranque.isEmpty()) {
+            Notification.show("No hay datos para copiar", 1500, Notification.Position.BOTTOM_END);
+            return;
+        }
+        FilaArranque fila = filasArranque.get(0);
+        String tsv = String.join("\t", fila.t1FechaInicio(), fila.t1HoraInicio(), fila.t1KwhInicio(),
+                fila.t1FechaFin(), fila.t1HoraFin(), fila.t1KwhFin());
+        copiarAlPortapapeles(tsv);
+    }
+
+    /** Copia solo las columnas del grupo "Inicio / Fin Purga / Normalizado" (t2) de la unica fila de arranqueGrid. */
+    private void copiarGrupoT2AlPortapapeles() {
+        if (filasArranque.isEmpty()) {
+            Notification.show("No hay datos para copiar", 1500, Notification.Position.BOTTOM_END);
+            return;
+        }
+        FilaArranque fila = filasArranque.get(0);
+        String tsv = String.join("\t", fila.t2FechaInicio(), fila.t2HoraInicio(), fila.t2KwhInicio(),
+                fila.t2FechaFinPurga(), fila.t2HoraFinPurga(), fila.t2KwhFinPurga(),
+                fila.t2FechaNormalizado(), fila.t2HoraNormalizado(), fila.t2KwhNormalizado());
+        copiarAlPortapapeles(tsv);
     }
 
     private HorizontalLayout buildFiltrosLayout() {
@@ -562,9 +638,52 @@ public class HistoricoView extends VerticalLayout {
 
         HorizontalLayout layout = new HorizontalLayout(
                 maquinaCombo, desdeDate, hastaDate, variableCombo, ventanaMediaMovilField, consultarBtn, resetZoomBtn);
+        if (lineaAccessService.esAdmin()) {
+            layout.add(crearLinkDescargaCsv());
+        }
         layout.setAlignItems(FlexComponent.Alignment.END);
         layout.setSpacing(true);
         return layout;
+    }
+
+    /**
+     * Descarga (solo ADMIN) de la maquina/variable/rango de la ultima consulta exitosa — el mismo
+     * contenido que ya se ve en datosGrid (pestaña Filtrado), sin volver a consultar la base.
+     * Mismo patron que AlarmasHistorialCompletoView.crearLinkDescargaCsv (StreamResource + Anchor
+     * con atributo download), separador ";" y BOM UTF-8 para que Excel lo abra bien.
+     */
+    private Anchor crearLinkDescargaCsv() {
+        StreamResource recurso = new StreamResource("historico.csv", this::generarCsvDatos);
+        recurso.setContentType("text/csv; charset=UTF-8");
+        Anchor descargarLink = new Anchor(recurso, "CSV");
+        descargarLink.getElement().setAttribute("download", true);
+        descargarLink.getElement().getThemeList().add("button");
+        descargarLink.getElement().getThemeList().add("tertiary");
+        return descargarLink;
+    }
+
+    private InputStream generarCsvDatos() {
+        StringBuilder sb = new StringBuilder();
+        sb.append((char) 0xFEFF);
+        if (ultimosDatosConsultados == null || ultimosDatosConsultados.isEmpty()) {
+            sb.append("Sin datos - presione Consultar primero\r\n");
+            return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
+        }
+        String[] campos = camposPorVariable(ultimaVariableConsultada);
+        sb.append("Maquina;").append(CsvUtil.escape(ultimaMaquinaConsultada)).append("\r\n");
+        sb.append("Fecha");
+        for (String campo : campos) {
+            sb.append(';').append(campo);
+        }
+        sb.append("\r\n");
+        for (Map<String, Object> fila : ultimosDatosConsultados) {
+            sb.append(CsvUtil.escape(String.valueOf(fila.get("fecha"))));
+            for (String campo : campos) {
+                sb.append(';').append(formatearValorCelda(fila.get(campo)));
+            }
+            sb.append("\r\n");
+        }
+        return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     /** Ventana de media móvil actualmente configurada — 1 si el campo quedó vacío o inválido. */
@@ -626,7 +745,7 @@ public class HistoricoView extends VerticalLayout {
                 return;
             }
             List<Map<String, Object>> datos = plcDataQueryService.getHistoricoKWhByRango(maquina, desde, hasta);
-            actualizarTablaDatos(datos, "KWh");
+            actualizarTablaDatos(datos, "KWh", maquina);
             actualizarTablaEnergia(desde, hasta);
 
             boolean conDiferencia = graficaKWh.clasificarYFijarUnidad(maquina);
@@ -670,7 +789,7 @@ public class HistoricoView extends VerticalLayout {
                 return;
             }
             List<Map<String, Object>> datos = plcDataQueryService.getHistoricoVIPByRango(maquina, desde, hasta);
-            actualizarTablaDatos(datos, tipoVar);
+            actualizarTablaDatos(datos, tipoVar, maquina);
             actualizarTablaEnergia(desde, hasta);
 
             if (datos.isEmpty()) {

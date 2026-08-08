@@ -113,6 +113,12 @@ final class TarjetasEstadoActual {
     private record FechaHora(String fecha, String hora) {
     }
 
+    /** Fecha/hora/KWh de un click sobre el gráfico, tal como quedan en la tarjeta compartida —
+     * expuesto para que HistoricoView pueda además encadenarlos en la tabla de análisis
+     * (cada click cierra un tramo Inicio→Fin con el click anterior). */
+    record PuntoClick(String fecha, String hora, String kwh) {
+    }
+
     /** Anota el click en graficaActiva (si no es null) y separa el timestamp en fecha/hora —
      * igual en ChartsView e HistoricoView, así que queda una sola vez acá. */
     private static FechaHora registrarClickYFormatear(GraficaModel graficaActiva, long timestamp) {
@@ -141,7 +147,7 @@ final class TarjetasEstadoActual {
             if (maquina != null && lineaAccessService.tieneAccesoAMaquina(maquina)) {
                 Map<String, Object> data = plcDataQueryService.getKWhByFechaExacta(maquina, fechaStr + " " + horaStr);
                 if (data.containsKey("kwh")) {
-                    valorStr = String.format("%.2f", data.get("kwh"));
+                    valorStr = GraficaModel.formatearDecimal(((Number) data.get("kwh")).doubleValue());
                 }
             }
         } catch (Exception e) {
@@ -160,9 +166,9 @@ final class TarjetasEstadoActual {
      * Además, a pedido, actualiza también la franja de valores completa (KWh/VAB/VAC/etc.) con
      * los valores de ESE momento en vez de los últimos en vivo.
      */
-    static void actualizarUltimoClickHistorico(LineaAccessService lineaAccessService, PLCDataQueryService plcDataQueryService,
-                                                GraficaModel graficaActiva, String maquina, MainLayout layout,
-                                                Div franjaValores, long timestamp) {
+    static PuntoClick actualizarUltimoClickHistorico(LineaAccessService lineaAccessService, PLCDataQueryService plcDataQueryService,
+                                                       GraficaModel graficaActiva, String maquina, MainLayout layout,
+                                                       Div franjaValores, long timestamp) {
         FechaHora fechaHora = registrarClickYFormatear(graficaActiva, timestamp);
         String fechaStr = fechaHora.fecha();
         String horaStr = fechaHora.hora();
@@ -176,7 +182,7 @@ final class TarjetasEstadoActual {
             try {
                 Map<String, Object> datosKWh = plcDataQueryService.getKWhByFechaExactaHistorico(maquina, fechaHoraStr);
                 if (datosKWh.containsKey("kwh")) {
-                    valorStr = String.format("%.2f", datosKWh.get("kwh"));
+                    valorStr = GraficaModel.formatearDecimal(((Number) datosKWh.get("kwh")).doubleValue());
                 }
 
                 Map<String, Object> datosVIP = plcDataQueryService.getVIPByFechaExactaHistorico(maquina, fechaHoraStr);
@@ -199,6 +205,7 @@ final class TarjetasEstadoActual {
 
         layout.getUltimoClickCard().getElement().setProperty("innerHTML",
                 GraficaModel.construirHtmlUltimoClick(fechaStr, horaStr, valorStr));
+        return new PuntoClick(fechaStr, horaStr, valorStr);
     }
 
     /**
