@@ -245,8 +245,8 @@ public class HistoricoView extends VerticalLayout {
         TabSheet tabSheetFiltro = new TabSheet();
         tabSheetFiltro.setSizeFull();
         boolean esAdmin = lineaAccessService.esAdmin();
-        tabSheetFiltro.add("Sin filtrar", crearPanelGrafico(ID_CHART_CRUDO, esAdmin ? buildEnergiaGrid() : null));
-        tabSheetFiltro.add("Filtrado", crearPanelGrafico(ID_CHART_FILTRADO, esAdmin ? buildDatosGrid() : null));
+        tabSheetFiltro.add("Sin filtrar", PanelGraficoUtil.crearPanelGrafico(ID_CHART_CRUDO, esAdmin ? buildEnergiaGrid() : null));
+        tabSheetFiltro.add("Filtrado", PanelGraficoUtil.crearPanelGrafico(ID_CHART_FILTRADO, esAdmin ? buildDatosGrid() : null));
         // Si la pestaña recién visible estaba oculta (display:none) cuando se cargaron los
         // datos, amCharts no detectó el tamaño real del contenedor — se fuerza un resize en vez
         // de repetir la consulta completa a la base de datos (los datos ya están cargados en el
@@ -261,43 +261,6 @@ public class HistoricoView extends VerticalLayout {
         setFlexGrow(1, tabSheetFiltro);
     }
 
-    /**
-     * Envuelve el Div del gráfico en un VerticalLayout con altura 100% + flexGrow (mismo patrón
-     * que HorometroView.crearPanelGrupo) en vez de una altura fija en px — con un tamaño fijo,
-     * si la ventana del navegador es más baja que ese valor el contenido se pasa del alto
-     * disponible del TabSheet y aparece la barra de scroll vertical de la página, en vez de que
-     * el gráfico simplemente se achique junto con la ventana.
-     *
-     * tablaLateral (solo ADMIN, null para el resto) queda a la derecha del gráfico en un ancho
-     * fijo — el gráfico se lleva el espacio que sobra (flexGrow 1), la tabla no se achica
-     * (flexShrink 0). Sin tabla, devuelve el panel del gráfico solo, sin la fila extra alrededor.
-     */
-    private Component crearPanelGrafico(String containerId, Component tablaLateral) {
-        VerticalLayout panel = new VerticalLayout();
-        panel.setSizeFull();
-        panel.setPadding(false);
-
-        Div chartDiv = new Div();
-        chartDiv.setId(containerId);
-        chartDiv.setWidthFull();
-        chartDiv.setHeight("100%");
-        panel.add(chartDiv);
-        panel.setFlexGrow(1, chartDiv);
-
-        if (tablaLateral == null) {
-            return panel;
-        }
-
-        HorizontalLayout fila = new HorizontalLayout(panel, tablaLateral);
-        fila.setSizeFull();
-        fila.setPadding(false);
-        fila.setSpacing(true);
-        fila.setFlexGrow(1, panel);
-        fila.setFlexGrow(0, tablaLateral);
-        tablaLateral.getElement().getStyle().set("width", "320px");
-        tablaLateral.getElement().getStyle().set("flex-shrink", "0");
-        return fila;
-    }
 
     /**
      * Tabla junto al gráfico "Filtrado": arranca sin columnas, actualizarTablaDatos las arma cada

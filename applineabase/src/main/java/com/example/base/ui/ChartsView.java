@@ -183,13 +183,7 @@ public class ChartsView extends VerticalLayout {
             }
         });
 
-        chartContainer = new Div();
-        chartContainer.setId("chartdiv_industrial");
-        chartContainer.setWidthFull();
-        chartContainer.setHeight("500px");
-
-        panel.add(chartContainer);
-        panel.setFlexGrow(1, chartContainer);
+        chartContainer = PanelGraficoUtil.agregarDivGrafico(panel, "chartdiv_industrial");
         this.addDetachListener(event ->
                 this.getUI().ifPresent(ui -> TarjetasEstadoActual.mostrarUltimoClickCard(ui, false)));
         this.addAttachListener(event -> {
@@ -218,12 +212,7 @@ public class ChartsView extends VerticalLayout {
         temperaturaMensajeSpan = new Span();
         panel.add(temperaturaMensajeSpan);
 
-        Div temperaturaChartContainer = new Div();
-        temperaturaChartContainer.setId("chartdiv_temperatura");
-        temperaturaChartContainer.setWidthFull();
-        temperaturaChartContainer.setHeight("500px");
-        panel.add(temperaturaChartContainer);
-        panel.setFlexGrow(1, temperaturaChartContainer);
+        PanelGraficoUtil.agregarDivGrafico(panel, "chartdiv_temperatura");
 
         return panel;
     }
@@ -281,12 +270,7 @@ public class ChartsView extends VerticalLayout {
         pfGeneralMensajeSpan = new Span();
         panel.add(pfGeneralMensajeSpan);
 
-        Div pfGeneralChartContainer = new Div();
-        pfGeneralChartContainer.setId("chartdiv_pfgeneral");
-        pfGeneralChartContainer.setWidthFull();
-        pfGeneralChartContainer.setHeight("500px");
-        panel.add(pfGeneralChartContainer);
-        panel.setFlexGrow(1, pfGeneralChartContainer);
+        PanelGraficoUtil.agregarDivGrafico(panel, "chartdiv_pfgeneral");
 
         return panel;
     }
