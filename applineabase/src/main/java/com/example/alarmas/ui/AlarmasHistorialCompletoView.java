@@ -68,7 +68,7 @@ public class AlarmasHistorialCompletoView extends VerticalLayout {
         filtros.setAlignItems(Alignment.END);
 
         GrillaAlarmaEventoUtil.agregarColumnasInicioLineaTipo(grid);
-        grid.addColumn(e -> e.isActiva() ? "Activa" : "Resuelta").setHeader("Estado").setAutoWidth(true);
+        grid.addColumn(e -> e.isActiva() ? "Activa" : "Resuelta").setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
         GrillaAlarmaEventoUtil.agregarColumnaUrgente(grid);
         GrillaAlarmaEventoUtil.agregarColumnaDetalle(grid);
         grid.setSizeFull();

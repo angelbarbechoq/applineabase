@@ -41,9 +41,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   alarma normal (AlarmaEvento + notificación), sin cambios.
  * - TEMPERATURA_ALTA: valor de sensor por encima del máximo (TemperaturaAgua).
  * - FACTOR_POTENCIA_BAJO: |PF| bajo el mínimo (KWhPlanta1, Trafo1, Trafo2).
- * - DISPOSITIVO_NO_DISPONIBLE: el PLC/gateway de una línea no respondió esta lectura (ping o
- *   Modbus). Se dispara desde el primer fallo; si se repite N lecturas consecutivas (configurable
- *   por línea, default 3) el mismo AlarmaEvento escala a "urgente" sin cerrarse y reabrirse.
+ * - DISPOSITIVO_NO_DISPONIBLE: el PLC/gateway de una línea no respondió esta lectura (ping, o
+ *   Modbus en el caso puntual de un medidor PAS600L). No se avisa por una lectura aislada: recién
+ *   se dispara (ya como urgente) cuando el fallo se repite N lecturas consecutivas seguidas
+ *   (configurable por línea, default 3). Mientras no se llega al umbral solo se cuenta.
  *
  * DETENCION y CICLO_COMPRESOR publican MaquinaEstadoCambioEvent en cada transición
  * real de estado, que es lo que consume HorometroService para acumular horas.
@@ -64,15 +65,18 @@ public class AlarmaEvaluatorService {
     private final AlarmaConfigRepository configRepository;
     private final AlarmaEventoRepository eventoRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final AlarmaTrayNotifierService trayNotifierService;
 
     private final ConcurrentHashMap<String, AtomicInteger> ciclosBajoUmbral = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LocalDateTime> inicioRachaBajoUmbral = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> detenidaConfirmada = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LocalDateTime> inicioEncendido = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicInteger> lecturasFallidasConsecutivas = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, LocalDateTime> inicioFallasConsecutivas = new ConcurrentHashMap<>();
 
     public AlarmaEvaluatorService(AlarmaConfigRepository configRepository, AlarmaEventoRepository eventoRepository,
-                                   ApplicationEventPublisher eventPublisher) {
+                                   ApplicationEventPublisher eventPublisher, AlarmaTrayNotifierService trayNotifierService) {
+        this.trayNotifierService = trayNotifierService;
         this.configRepository = configRepository;
         this.eventoRepository = eventoRepository;
         this.eventPublisher = eventPublisher;
@@ -204,45 +208,45 @@ public class AlarmaEvaluatorService {
 
         if (conectado) {
             lecturasFallidasConsecutivas.remove(linea);
+            inicioFallasConsecutivas.remove(linea);
             resolverAlarma(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE, fecha);
             return;
         }
 
+        LocalDateTime inicioFalla = inicioFallasConsecutivas.computeIfAbsent(linea, k -> fecha);
         int fallos = lecturasFallidasConsecutivas.computeIfAbsent(linea, k -> new AtomicInteger()).incrementAndGet();
-        int umbralUrgente = config.getLecturasConsecutivasUrgente() != null
+        int umbralAviso = config.getLecturasConsecutivasUrgente() != null
                 ? config.getLecturasConsecutivasUrgente() : LECTURAS_URGENTE_DEFAULT;
-        boolean urgente = fallos >= umbralUrgente;
 
-        String mensaje = urgente
-                ? String.format("%s no responde (%s) hace %d lecturas consecutivas — revisión urgente", linea, motivo, fallos)
-                : String.format("%s no responde (%s), lectura fallida %d", linea, motivo, fallos);
+        if (fallos < umbralAviso) {
+            // Todavía no se confirma el fallo: una lectura aislada no avisa, solo se cuenta.
+            return;
+        }
 
-        dispararOEscalarDisponibilidad(linea, fecha, mensaje, urgente);
+        String mensaje = String.format("%s no responde (%s) hace %d lecturas consecutivas — revisión urgente", linea, motivo, fallos);
+        dispararOActualizarDisponibilidad(linea, inicioFalla, mensaje);
     }
 
     /** A diferencia de dispararAlarma(), acá el AlarmaEvento activo se actualiza en cada lectura
-     * fallida (mensaje + contador), en vez de ignorar las repeticiones, para que la fila refleje
-     * cuántas lecturas seguidas lleva caído y escale a urgente sin cerrar/reabrir el evento. */
-    private void dispararOEscalarDisponibilidad(String linea, LocalDateTime fecha, String mensaje, boolean urgente) {
+     * fallida (mensaje + contador) en vez de ignorar las repeticiones, para que la fila refleje
+     * cuántas lecturas seguidas lleva caído. La fecha de inicio se reporta retroactiva, desde la
+     * primera lectura fallida de la racha (no desde que se confirmó al llegar al umbral). */
+    private void dispararOActualizarDisponibilidad(String linea, LocalDateTime inicioFalla, String mensaje) {
         eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE)
                 .ifPresentOrElse(evento -> {
-                    boolean escalaAUrgente = urgente && !evento.isUrgente();
                     evento.setMensaje(mensaje);
-                    evento.setUrgente(urgente);
                     eventoRepository.save(evento);
-                    if (escalaAUrgente) {
-                        logger.warn("🔴 ALARMA URGENTE: {}", mensaje);
-                    }
                 }, () -> {
                     AlarmaEvento evento = new AlarmaEvento();
                     evento.setLineaMaquina(linea);
                     evento.setTipoAlarma(TipoAlarma.DISPOSITIVO_NO_DISPONIBLE);
                     evento.setMensaje(mensaje);
-                    evento.setFechaInicio(fecha);
+                    evento.setFechaInicio(inicioFalla);
                     evento.setActiva(true);
-                    evento.setUrgente(urgente);
+                    evento.setUrgente(true);
                     eventoRepository.save(evento);
                     logger.warn("🚨 ALARMA disparada: {}", mensaje);
+                    trayNotifierService.notificarUrgente(linea, mensaje);
                 });
     }
 

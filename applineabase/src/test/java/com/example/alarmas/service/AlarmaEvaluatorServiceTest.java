@@ -176,22 +176,21 @@ class AlarmaEvaluatorServiceTest {
     }
 
     @Test
-    void dispositivo_no_disponible_se_dispara_en_el_primer_fallo_y_escala_a_urgente_tras_el_umbral() {
+    void dispositivo_no_disponible_no_avisa_por_una_lectura_aislada_y_se_dispara_recien_al_llegar_al_umbral() {
         String linea = "Linea02"; // AlarmaConfigSeeder ahora siembra DISPOSITIVO_NO_DISPONIBLE para toda línea
         AlarmaConfig config = configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE).orElseThrow();
         config.setLecturasConsecutivasUrgente(2);
         configRepository.save(config);
 
         eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, false, "sin respuesta a ping", LocalDateTime.now()));
-        AlarmaEvento evento = eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE)
-                .orElseThrow(() -> new AssertionError("debe disparar la alarma desde el primer fallo"));
-        assertThat(evento.isUrgente()).as("con umbral=2, un solo fallo todavía no es urgente").isFalse();
+        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE))
+                .as("con umbral=2, un solo fallo todavía no debe avisar")
+                .isEmpty();
 
         eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, false, "sin respuesta a ping", LocalDateTime.now()));
-        AlarmaEvento eventoEscalado = eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE)
-                .orElseThrow();
-        assertThat(eventoEscalado.getId()).as("debe seguir siendo el mismo evento, no uno nuevo").isEqualTo(evento.getId());
-        assertThat(eventoEscalado.isUrgente()).as("2do fallo consecutivo con umbral=2 debe escalar a urgente").isTrue();
+        AlarmaEvento evento = eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE)
+                .orElseThrow(() -> new AssertionError("2do fallo consecutivo con umbral=2 debe disparar la alarma"));
+        assertThat(evento.isUrgente()).as("toda alarma de disponibilidad ya confirmada se reporta como urgente").isTrue();
 
         eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, true, null, LocalDateTime.now()));
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE))
@@ -201,7 +200,11 @@ class AlarmaEvaluatorServiceTest {
 
     @Test
     void dispositivo_no_disponible_reinicia_el_contador_de_fallos_al_reconectar() {
-        String linea = "Linea02";
+        // Línea distinta de la usada en el test anterior: lecturasFallidasConsecutivas vive en
+        // un ConcurrentHashMap de instancia de AlarmaEvaluatorService que @Transactional no
+        // resetea entre @Test (solo hace rollback de la base) — compartir línea contamina el
+        // contador de un test a otro.
+        String linea = "Linea03";
         AlarmaConfig config = configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE).orElseThrow();
         config.setLecturasConsecutivasUrgente(2);
         configRepository.save(config);
@@ -210,11 +213,9 @@ class AlarmaEvaluatorServiceTest {
         eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, true, null, LocalDateTime.now()));
         eventPublisher.publishEvent(new DispositivoConectividadEvent(this, linea, false, "sin respuesta a ping", LocalDateTime.now()));
 
-        AlarmaEvento evento = eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE)
-                .orElseThrow();
-        assertThat(evento.isUrgente())
-                .as("la reconexión intermedia debe reiniciar el contador: este fallo es el 1ro de una racha nueva, no el 2do")
-                .isFalse();
+        assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(linea, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE))
+                .as("la reconexión intermedia debe reiniciar el contador: este fallo es el 1ro de una racha nueva, no el 2do, no debe avisar todavía")
+                .isEmpty();
     }
 
     @TestConfiguration

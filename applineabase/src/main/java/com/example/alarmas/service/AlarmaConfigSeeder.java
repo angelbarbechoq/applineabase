@@ -77,8 +77,9 @@ public class AlarmaConfigSeeder implements CommandLineRunner {
                 seedSiNoExiste(nombre, TipoAlarma.FACTOR_POTENCIA_BAJO, config -> config.setFactorPotenciaMinimo(0.94));
             }
 
-            // Toda línea viene de un PLC o gateway PAS600L, así que la conectividad aplica por igual
-            // a sensores virtuales y a máquinas reales.
+            // Toda línea viene de un PLC o gateway PAS600L: para PLC solo se reporta el ping propio
+            // del PLC (sin acceso a la máquina individual); para el gateway PAS600L se suma la
+            // lectura Modbus por medidor. Ver PLCDataAcquisitionService / PASReaderService.
             seedSiNoExiste(nombre, TipoAlarma.DISPOSITIVO_NO_DISPONIBLE, config -> config.setLecturasConsecutivasUrgente(3));
         }
     }

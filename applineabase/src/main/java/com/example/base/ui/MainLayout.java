@@ -143,9 +143,35 @@ public final class MainLayout extends AppLayout {
 
         List<AlarmaEvento> nuevas = alarmaEventoRepository.findByFechaInicioAfterOrderByFechaInicioDesc(desde);
         for (AlarmaEvento alarma : nuevas) {
-            Notification.show("🚨 " + alarma.getMensaje(), 8000, Notification.Position.TOP_END)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            if (alarma.isUrgente()) {
+                Notification.show("🔴 URGENTE: " + alarma.getMensaje(), 20000, Notification.Position.TOP_END)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                sonarAlarma();
+            } else {
+                Notification.show("🚨 " + alarma.getMensaje(), 8000, Notification.Position.TOP_END)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
         }
+    }
+
+    /** Doble beep via Web Audio API, sin depender de ningún archivo de sonido empaquetado
+     * aparte. Solo para alarmas urgentes: las demás siguen siendo silenciosas, como antes. */
+    private void sonarAlarma() {
+        getElement().executeJs(
+                "try {" +
+                        "  const ctx = new (window.AudioContext || window.webkitAudioContext)();" +
+                        "  const beep = (start) => {" +
+                        "    const o = ctx.createOscillator();" +
+                        "    const g = ctx.createGain();" +
+                        "    o.connect(g); g.connect(ctx.destination);" +
+                        "    o.frequency.value = 880;" +
+                        "    g.gain.setValueAtTime(0.3, ctx.currentTime + start);" +
+                        "    o.start(ctx.currentTime + start);" +
+                        "    o.stop(ctx.currentTime + start + 0.35);" +
+                        "  };" +
+                        "  beep(0); beep(0.45);" +
+                        "} catch (e) { /* audio no disponible en este navegador, ignorar */ }"
+        );
     }
 
     private String nombreUsuarioActual() {

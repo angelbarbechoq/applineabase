@@ -51,7 +51,8 @@ public class AlarmaConfig {
     /** Factor de potencia mínimo, comparado en valor absoluto (FACTOR_POTENCIA_BAJO). */
     private Double factorPotenciaMinimo;
 
-    /** Lecturas fallidas consecutivas antes de escalar a urgente (DISPOSITIVO_NO_DISPONIBLE). */
+    /** Lecturas fallidas consecutivas antes de avisar (DISPOSITIVO_NO_DISPONIBLE); una lectura
+     * aislada no dispara alarma, solo se cuenta hasta llegar a este umbral. */
     private Integer lecturasConsecutivasUrgente;
 
     public AlarmaConfig() {
