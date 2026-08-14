@@ -1,5 +1,40 @@
 # Instrucciones de trabajo para Claude Code en este repositorio
 
+> Estas reglas se complementan con las reglas globales en
+> `~/.claude/CLAUDE.md`, que aplican a todas las sesiones/repos del
+> usuario. Force-push a `master`, merge con `--allow-unrelated-histories`
+> y `git branch -D` sobre una rama no fusionada están **bloqueados por
+> un hook** (`~/.claude/hooks/block-dangerous-git.sh`), no solo
+> documentados — no depende de que el modelo se acuerde.
+
+## CI/CD y empaquetado
+
+El build, los tests y el empaquetado ya están automatizados en
+`.github/workflows/`:
+
+- [e2e.yml](.github/workflows/e2e.yml): en cada push/PR compila con
+  Maven (`./mvnw package`, corre los tests de Java) y además corre la
+  suite de regresión E2E con Playwright contra la app levantada.
+
+El empaquetado del ejecutable portable (perfil `windows-app-image` en
+`pom.xml`, jpackage) se corre local con `mvn package` en Windows, no
+hay CI para eso — no hay release automático. Se descartó el intento de
+ejecutable nativo con GraalVM (perfil `native`, `native:compile`): no
+daba resultado, se sacó del proyecto (dependencia `svm` y el workflow
+`compilar-nativo.yml`). No reintroducir GraalVM native-image sin que el
+usuario lo pida explícitamente.
+
+Como el flujo es trunk-based sin PRs, el CI corre *después* del push.
+Si un push rompe el CI, la prioridad es arreglarlo hacia adelante o
+revertir — no seguir trabajando en otra cosa sin avisar que `master`
+quedó roto. No agregues `-DskipTests` al CI existente ni pipelines
+nuevos redundantes sin revisar primero los que ya existen.
+
+Esto es infraestructura ya existente, no una exigencia mía: el usuario
+es el test, tanto en código como en deploy. No propongo agregar tests
+nuevos ni condiciono una entrega a que "pasen los tests" — verifico que
+compila/arranca, la validación de comportamiento la hace él.
+
 ## Flujo de git: una sola línea activa (trunk-based)
 
 El dueño de este proyecto trabaja solo, no quiere ramas de feature de larga
@@ -12,7 +47,8 @@ justamente lo que generó semanas de acumulación y confusión (ver commits
 Si esta sesión trabaja en una rama separada (comportamiento por defecto del
 entorno, ej. `claude/<slug>`), **antes de terminar la tarea**:
 
-1. Verificar que compila y pasan los tests existentes.
+1. Verificar que compila (la validación de comportamiento es manual,
+   la hace el usuario).
 2. Fusionar la rama de la sesión a `master` (merge normal, no hace falta
    squash) y pushear `master`.
 3. Intentar borrar la rama ya fusionada en el remoto:
