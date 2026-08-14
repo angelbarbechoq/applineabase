@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -20,13 +21,16 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, AdminSessionTimeoutFilter adminSessionTimeoutFilter) throws Exception {
         http.with(VaadinSecurityConfigurer.vaadin(), configurer -> {
             configurer.loginView(LoginView.class);
             // Las rutas propias (/api/plc/**, incluido el stream SSE) solo requieren
             // estar autenticado; por defecto Vaadin las deniega al no reconocerlas.
             configurer.anyRequest(authorizedUrl -> authorizedUrl.authenticated());
         });
+        // Después de SecurityContextHolderFilter para que ya esté disponible la
+        // Authentication de la sesión (ver AdminSessionTimeoutFilter).
+        http.addFilterAfter(adminSessionTimeoutFilter, SecurityContextHolderFilter.class);
         return http.build();
     }
 }
