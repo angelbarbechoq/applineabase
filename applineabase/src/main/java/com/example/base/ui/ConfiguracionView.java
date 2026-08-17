@@ -1,6 +1,7 @@
 package com.example.base.ui;
 
 import com.example.dataacquisition.service.ConfigLoaderService;
+import com.example.dataacquisition.service.PLCIdWriterService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -44,6 +45,7 @@ import java.util.stream.Stream;
 public class ConfiguracionView extends VerticalLayout {
 
     private final ConfigLoaderService configLoaderService;
+    private final PLCIdWriterService plcIdWriterService;
 
     private List<Map<String, Object>> lineas;
     private List<Map<String, Object>> plcs;
@@ -53,13 +55,21 @@ public class ConfiguracionView extends VerticalLayout {
     private final Grid<Map<String, Object>> plcsGrid = new Grid<>();
     private final Grid<Map<String, Object>> gatewaysGrid = new Grid<>();
 
-    public ConfiguracionView(ConfigLoaderService configLoaderService) {
+    public ConfiguracionView(ConfigLoaderService configLoaderService, PLCIdWriterService plcIdWriterService) {
         this.configLoaderService = configLoaderService;
+        this.plcIdWriterService = plcIdWriterService;
         setSizeFull();
         setPadding(true);
         setSpacing(true);
 
-        add(new H3("Configuración de Líneas, PLCs y Gateways"));
+        HorizontalLayout header = new HorizontalLayout(new H3("Configuración de Líneas, PLCs y Gateways"));
+        header.setWidthFull();
+        header.setJustifyContentMode(JustifyContentMode.BETWEEN);
+        header.setDefaultVerticalComponentAlignment(com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CENTER);
+        Button escribirIdsBtn = new Button("Escribir dispositivos a PLCs", VaadinIcon.UPLOAD.create(), e -> escribirIdsATodosLosPLCs());
+        escribirIdsBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        header.add(escribirIdsBtn);
+        add(header);
         add(crearAvisoReinicio());
 
         TabSheet tabSheet = new TabSheet();
@@ -476,6 +486,28 @@ public class ConfiguracionView extends VerticalLayout {
         Notification.show(mensaje, 3500, Notification.Position.BOTTOM_END)
                 .addThemeVariants(lineasAfectadas == 0 ? NotificationVariant.LUMO_SUCCESS : NotificationVariant.LUMO_ERROR);
         cargarTodo();
+    }
+
+    // ================= Escritura de IDs a PLCs =================
+
+    private void escribirIdsATodosLosPLCs() {
+        Map<String, String> resultados = plcIdWriterService.escribirIdsATodosLosPLCs();
+
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Resultado de escritura de dispositivos");
+        VerticalLayout contenido = new VerticalLayout();
+        contenido.setPadding(false);
+        contenido.setSpacing(false);
+        resultados.forEach((plc, resultado) -> contenido.add(new Span(plc + ": " + resultado)));
+        dialog.add(contenido);
+        Button cerrarBtn = new Button("Cerrar", e -> dialog.close());
+        dialog.getFooter().add(cerrarBtn);
+        dialog.open();
+
+        boolean huboError = resultados.values().stream().anyMatch(r -> !r.startsWith("OK"));
+        Notification.show(huboError ? "Escritura completada con avisos, revisá el detalle" : "Dispositivos escritos correctamente",
+                        3000, Notification.Position.BOTTOM_END)
+                .addThemeVariants(huboError ? NotificationVariant.LUMO_ERROR : NotificationVariant.LUMO_SUCCESS);
     }
 
     // ================= Comun =================
