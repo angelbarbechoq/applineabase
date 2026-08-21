@@ -12,12 +12,21 @@ public class SensorDataUpdateEvent extends ApplicationEvent {
     private final String nombreSensor;
     private final double valor;
     private final String fecha;
+    private final Double derivadaPorMinuto;
 
-    public SensorDataUpdateEvent(Object source, String nombreSensor, double valor, String fecha) {
+    /**
+     * derivadaPorMinuto viene ya calculada por PLCDataAcquisitionService (cuánto varió el valor
+     * de este sensor por minuto respecto a la lectura anterior, con el tiempo real transcurrido
+     * entre ciclos) para que el frontend no tenga que inferirlo a partir de cada cuánto llegan
+     * los eventos SSE. Null en la primera lectura de cada sensor, cuando todavía no hay una
+     * lectura anterior con la que compararlo.
+     */
+    public SensorDataUpdateEvent(Object source, String nombreSensor, double valor, String fecha, Double derivadaPorMinuto) {
         super(source);
         this.nombreSensor = nombreSensor;
         this.valor = valor;
         this.fecha = fecha;
+        this.derivadaPorMinuto = derivadaPorMinuto;
     }
 
     public String getNombreSensor() {
@@ -30,5 +39,9 @@ public class SensorDataUpdateEvent extends ApplicationEvent {
 
     public String getFecha() {
         return fecha;
+    }
+
+    public Double getDerivadaPorMinuto() {
+        return derivadaPorMinuto;
     }
 }

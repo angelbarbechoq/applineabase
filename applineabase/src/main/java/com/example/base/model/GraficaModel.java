@@ -1005,6 +1005,9 @@ public class GraficaModel {
 
         String[] labelsExtra = {"Temp. Agua", "Temp. Ambiente", "PF general"};
         String[] camposExtra = {"temperaturaAgua", "temperaturaAmbiente", "pfGeneral"};
+        // Solo los sensores de temperatura muestran derivada (°C/min) junto al valor; PF general
+        // (índice 2) no la tiene, de ahí el null.
+        String[] camposDerivadaExtra = {"derivadaTemperaturaAgua", "derivadaTemperaturaAmbiente", null};
         Double[] valoresExtra = {temperaturaAgua, temperaturaAmbiente, pfGeneral};
         boolean primeroExtra = true;
         for (int i = 0; i < labelsExtra.length; i++) {
@@ -1033,8 +1036,14 @@ public class GraficaModel {
                     .append("<span class='dato-valor' data-campo='").append(camposExtra[i])
                     .append("' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
                     .append(formatearDecimal(valoresExtra[i]))
-                    .append("</span>")
                     .append("</span>");
+            // Empieza oculta: recién se completa cuando llega el primer punto por SSE con una
+            // derivada real (ChartsView.iniciarSSETemperatura), nunca en esta carga inicial.
+            if (camposDerivadaExtra[i] != null) {
+                html.append("<span class='dato-derivada' data-campo='").append(camposDerivadaExtra[i])
+                        .append("' style='display: none; font-size: 10px; font-weight: 600; margin-left: 4px; opacity: 0.7;'></span>");
+            }
+            html.append("</span>");
         }
 
         html.append("</div>");

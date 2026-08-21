@@ -248,16 +248,18 @@ public class ChartsView extends VerticalLayout {
     /**
      * Streams independientes por sensor (cada uno actualiza su propia serie del mismo gráfico).
      * También actualizan en vivo el texto de la franja (data-campo="temperaturaAgua"/
-     * "temperaturaAmbiente"), que antes solo se pintaba una vez al cargar la vista.
+     * "temperaturaAmbiente"), que antes solo se pintaba una vez al cargar la vista, y la derivada
+     * por minuto (data-campo="derivadaTemperaturaAgua"/"derivadaTemperaturaAmbiente") que ya viene
+     * calculada por PLCDataAcquisitionService en cada evento sensorUpdate.
      */
     private void iniciarSSETemperatura() {
         String baseUrl = getBaseUrl();
         getElement().executeJs(construirScriptSSESerie(
                 baseUrl + "/api/plc/stream/TemperaturaAgua", "sensorUpdate", "chartdiv_temperatura",
-                0, "data.valor", "eventSourceTempAgua", "temperaturaAgua", null));
+                0, "data.valor", "eventSourceTempAgua", "temperaturaAgua", null, "derivadaTemperaturaAgua"));
         getElement().executeJs(construirScriptSSESerie(
                 baseUrl + "/api/plc/stream/TemperaturaAmbiente", "sensorUpdate", "chartdiv_temperatura",
-                1, "data.valor", "eventSourceTempAmbiente", "temperaturaAmbiente", null));
+                1, "data.valor", "eventSourceTempAmbiente", "temperaturaAmbiente", null, "derivadaTemperaturaAmbiente"));
     }
 
     // ================= PF general (KWhPlanta1) =================
@@ -327,7 +329,7 @@ public class ChartsView extends VerticalLayout {
         getElement().executeJs(construirScriptSSESerie(
                 baseUrl + "/api/plc/stream/KWhPlanta1", "dataUpdate", "chartdiv_pfgeneral", 0,
                 "(data.PF !== undefined && data.PF !== null) ? Math.abs(data.PF) / 100 : null", "eventSourcePF",
-                "pfGeneral", umbralPF));
+                "pfGeneral", umbralPF, null));
     }
 
     /**
@@ -356,10 +358,14 @@ public class ChartsView extends VerticalLayout {
      * umbralPFMinimo solo aplica al campo "pfGeneral" (mismo umbral 0-1 que usa
      * TarjetasEstadoActual/AlarmaEvaluatorService); null para los demás campos, que no cambian de
      * color en vivo.
+     * campoDerivada es el data-campo del span secundario de derivada (°C/min, ver
+     * GraficaModel.construirHtmlValoresActuales), que lee data.derivadaPorMinuto — ya calculada en
+     * PLCDataAcquisitionService, así el cliente no tiene que inferir el intervalo real entre
+     * lecturas. Null para streams sin derivada asociada (PF general).
      */
     private String construirScriptSSESerie(String streamUrl, String eventoNombre, String containerId,
                                             int indiceSerie, String expresionValorJs, String varGlobal,
-                                            String campoTexto, Double umbralPFMinimo) {
+                                            String campoTexto, Double umbralPFMinimo, String campoDerivada) {
         String actualizarTexto = "";
         if (campoTexto != null) {
             actualizarTexto =
@@ -369,6 +375,21 @@ public class ChartsView extends VerticalLayout {
                 (umbralPFMinimo != null
                         ? "          spanTexto.style.color = Math.abs(valor) < " + umbralPFMinimo + " ? '#e34948' : '#1a3c8c';"
                         : "") +
+                "        }";
+        }
+        String actualizarDerivada = "";
+        if (campoDerivada != null) {
+            actualizarDerivada =
+                "        var spanDerivada = document.querySelector('#datosActualesCard [data-campo=\"" + campoDerivada + "\"]');" +
+                "        if (spanDerivada) {" +
+                "          if (data.derivadaPorMinuto !== undefined && data.derivadaPorMinuto !== null && data.derivadaPorMinuto !== 0 && isFinite(data.derivadaPorMinuto)) {" +
+                "            var subiendo = data.derivadaPorMinuto > 0;" +
+                "            spanDerivada.textContent = Math.abs(data.derivadaPorMinuto).toFixed(2) + ' °C/min ' + (subiendo ? '▲' : '▼');" +
+                "            spanDerivada.style.color = subiendo ? '#8b1e2f' : '#1a3c8c';" +
+                "            spanDerivada.style.display = '';" +
+                "          } else {" +
+                "            spanDerivada.style.display = 'none';" +
+                "          }" +
                 "        }";
         }
         return
@@ -386,6 +407,7 @@ public class ChartsView extends VerticalLayout {
             "        inst.seriesList[" + indiceSerie + "].markDirtyValues();" +
             "        inst.aplicarZoomCalculado();" +
             actualizarTexto +
+            actualizarDerivada +
             "      }" +
             "    }" +
             "  } catch(e) { console.error('Error procesando SSE:', e); }" +
