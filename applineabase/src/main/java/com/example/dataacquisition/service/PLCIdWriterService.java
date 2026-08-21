@@ -33,12 +33,25 @@ public class PLCIdWriterService {
 
     /** Escribe los IDs de linea en cada PLC (PLC1/2/3, sin gateways). Devuelve el resultado por PLC. */
     public Map<String, String> escribirIdsATodosLosPLCs() {
+        return escribirIdsEnPLCs(null);
+    }
+
+    /**
+     * Escribe los IDs de linea en los PLCs indicados (sin gateways).
+     *
+     * @param nombresPlcs nombres de PLC a escribir, o null/vacio para escribir en todos
+     * @return resultado por PLC
+     */
+    public Map<String, String> escribirIdsEnPLCs(List<String> nombresPlcs) {
         List<Map<String, Object>> plcConfig = configLoaderService.loadPLCConfig();
         List<Map<String, Object>> lineaIdConfig = configLoaderService.loadLineaIDConfig();
 
         Map<String, String> resultados = new LinkedHashMap<>();
         for (Map<String, Object> plc : plcConfig) {
             String nombre = (String) plc.get("nombre");
+            if (nombresPlcs != null && !nombresPlcs.isEmpty() && !nombresPlcs.contains(nombre)) {
+                continue;
+            }
             String ip = (String) plc.get("ipAddress");
             resultados.put(nombre, escribirIdsEnPLC(nombre, ip, lineaIdConfig));
         }

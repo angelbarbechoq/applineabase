@@ -4,6 +4,7 @@ import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCIdWriterService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.CheckboxGroup;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
@@ -26,6 +27,7 @@ import jakarta.annotation.security.RolesAllowed;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -66,7 +68,7 @@ public class ConfiguracionView extends VerticalLayout {
         header.setWidthFull();
         header.setJustifyContentMode(JustifyContentMode.BETWEEN);
         header.setDefaultVerticalComponentAlignment(com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CENTER);
-        Button escribirIdsBtn = new Button("Escribir dispositivos a PLCs", VaadinIcon.UPLOAD.create(), e -> escribirIdsATodosLosPLCs());
+        Button escribirIdsBtn = new Button("Escribir dispositivos a PLCs", VaadinIcon.UPLOAD.create(), e -> abrirDialogoSeleccionPLCs());
         escribirIdsBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         header.add(escribirIdsBtn);
         add(header);
@@ -490,8 +492,41 @@ public class ConfiguracionView extends VerticalLayout {
 
     // ================= Escritura de IDs a PLCs =================
 
-    private void escribirIdsATodosLosPLCs() {
-        Map<String, String> resultados = plcIdWriterService.escribirIdsATodosLosPLCs();
+    private void abrirDialogoSeleccionPLCs() {
+        List<String> nombresPlcs = plcs.stream().map(p -> String.valueOf(p.get("nombre"))).collect(Collectors.toList());
+
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("¿A qué PLCs escribir?");
+
+        CheckboxGroup<String> seleccion = new CheckboxGroup<>();
+        seleccion.setItems(nombresPlcs);
+        seleccion.select(nombresPlcs);
+
+        Button todosBtn = new Button("Todos", e -> seleccion.select(nombresPlcs));
+        Button ningunoBtn = new Button("Ninguno", e -> seleccion.deselectAll());
+        HorizontalLayout atajos = new HorizontalLayout(todosBtn, ningunoBtn);
+
+        VerticalLayout contenido = new VerticalLayout(atajos, seleccion);
+        contenido.setPadding(false);
+        dialog.add(contenido);
+
+        Button cancelarBtn = new Button("Cancelar", e -> dialog.close());
+        Button escribirBtn = new Button("Escribir", e -> {
+            if (seleccion.getSelectedItems().isEmpty()) {
+                NotificacionesUtil.mostrarError("Seleccioná al menos un PLC");
+                return;
+            }
+            dialog.close();
+            escribirIdsEnPLCs(seleccion.getSelectedItems());
+        });
+        escribirBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        dialog.getFooter().add(cancelarBtn, escribirBtn);
+
+        dialog.open();
+    }
+
+    private void escribirIdsEnPLCs(Set<String> nombresPlcs) {
+        Map<String, String> resultados = plcIdWriterService.escribirIdsEnPLCs(List.copyOf(nombresPlcs));
 
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Resultado de escritura de dispositivos");
