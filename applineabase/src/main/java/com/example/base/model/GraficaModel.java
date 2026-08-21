@@ -969,6 +969,10 @@ public class GraficaModel {
                                                         Double temperaturaAgua, Double temperaturaAmbiente, Double pfGeneral,
                                                         double umbralPFMinimo) {
         String[] labels = {"KWh", "VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF"};
+        // Mismo orden que labels: identificador estable para que el SSE en ChartsView pueda
+        // encontrar cada span por atributo (querySelector('[data-campo=...]')) en vez de por
+        // posición numérica, que se desalinea apenas cambia el orden o el número de campos.
+        String[] campos = {"kwh", "vab", "vac", "vbc", "ia", "ib", "ic", "pw", "pf"};
         double[] valores = {
                 toDoubleSeguro(datosKWh.get("kwh")),
                 toDoubleSeguro(datosVIP.get("VAB")),
@@ -992,13 +996,15 @@ public class GraficaModel {
             String colorValor = esCorriente ? "#e34948" : esVoltaje ? "#1a3c8c" : "#0b0b0b";
             html.append("<span>")
                     .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(": </span>")
-                    .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
+                    .append("<span class='dato-valor' data-campo='").append(campos[i])
+                    .append("' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
                     .append(formatearDecimal(valores[i]))
                     .append("</span>")
                     .append("</span>");
         }
 
         String[] labelsExtra = {"Temp. Agua", "Temp. Ambiente", "PF general"};
+        String[] camposExtra = {"temperaturaAgua", "temperaturaAmbiente", "pfGeneral"};
         Double[] valoresExtra = {temperaturaAgua, temperaturaAmbiente, pfGeneral};
         boolean primeroExtra = true;
         for (int i = 0; i < labelsExtra.length; i++) {
@@ -1024,7 +1030,8 @@ public class GraficaModel {
             }
             html.append("<span>")
                     .append("<span style='font-size: 12px; color: #898781;'>").append(labelsExtra[i]).append(": </span>")
-                    .append("<span class='dato-valor' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
+                    .append("<span class='dato-valor' data-campo='").append(camposExtra[i])
+                    .append("' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
                     .append(formatearDecimal(valoresExtra[i]))
                     .append("</span>")
                     .append("</span>");
