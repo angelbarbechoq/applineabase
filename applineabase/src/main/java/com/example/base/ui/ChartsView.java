@@ -245,15 +245,19 @@ public class ChartsView extends VerticalLayout {
         }
     }
 
-    /** Streams independientes por sensor (cada uno actualiza su propia serie del mismo gráfico). */
+    /**
+     * Streams independientes por sensor (cada uno actualiza su propia serie del mismo gráfico).
+     * También actualizan en vivo el texto de la franja (data-campo="temperaturaAgua"/
+     * "temperaturaAmbiente"), que antes solo se pintaba una vez al cargar la vista.
+     */
     private void iniciarSSETemperatura() {
         String baseUrl = getBaseUrl();
         getElement().executeJs(construirScriptSSESerie(
                 baseUrl + "/api/plc/stream/TemperaturaAgua", "sensorUpdate", "chartdiv_temperatura",
-                0, "data.valor", "eventSourceTempAgua"));
+                0, "data.valor", "eventSourceTempAgua", "temperaturaAgua", null));
         getElement().executeJs(construirScriptSSESerie(
                 baseUrl + "/api/plc/stream/TemperaturaAmbiente", "sensorUpdate", "chartdiv_temperatura",
-                1, "data.valor", "eventSourceTempAmbiente"));
+                1, "data.valor", "eventSourceTempAmbiente", "temperaturaAmbiente", null));
     }
 
     // ================= PF general (KWhPlanta1) =================
@@ -311,12 +315,19 @@ public class ChartsView extends VerticalLayout {
         }
     }
 
-    /** dataUpdate ya lo publica KWhDifferenceService.publicarDatosActuales para KWhPlanta1 (incluye PF). */
+    /**
+     * dataUpdate ya lo publica KWhDifferenceService.publicarDatosActuales para KWhPlanta1 (incluye PF).
+     * También actualiza en vivo el texto "PF general" (data-campo="pfGeneral") de la franja, con
+     * el mismo umbral de color que ya usa TarjetasEstadoActual/AlarmaEvaluatorService — el valor
+     * que llega acá (Math.abs(data.PF) / 100) ya está en la misma escala 0-1 que ese umbral.
+     */
     private void iniciarSSEPFGeneral() {
         String baseUrl = getBaseUrl();
+        double umbralPF = TarjetasEstadoActual.umbralPFMinimo(alarmaConfigRepository);
         getElement().executeJs(construirScriptSSESerie(
                 baseUrl + "/api/plc/stream/KWhPlanta1", "dataUpdate", "chartdiv_pfgeneral", 0,
-                "(data.PF !== undefined && data.PF !== null) ? Math.abs(data.PF) / 100 : null", "eventSourcePF"));
+                "(data.PF !== undefined && data.PF !== null) ? Math.abs(data.PF) / 100 : null", "eventSourcePF",
+                "pfGeneral", umbralPF));
     }
 
     /**
@@ -337,9 +348,29 @@ public class ChartsView extends VerticalLayout {
      * inicializado (sin recargar nada), reutilizado por Temperatura (2 sensores, una serie cada
      * uno) y PF general (1 serie). expresionValorJs se evalúa contra la variable `data` ya
      * parseada del evento; si da null/NaN, ese punto se descarta sin romper el resto del stream.
+     *
+     * campoTexto es el data-campo (ver GraficaModel.construirHtmlValoresActuales) del span de la
+     * franja de valores en vivo que hay que mantener sincronizado con el mismo punto que recibe
+     * el gráfico — antes esos spans se pintaban una sola vez y quedaban desactualizados en cada
+     * refresco del gráfico. Null si ese stream no tiene un texto asociado en la franja.
+     * umbralPFMinimo solo aplica al campo "pfGeneral" (mismo umbral 0-1 que usa
+     * TarjetasEstadoActual/AlarmaEvaluatorService); null para los demás campos, que no cambian de
+     * color en vivo.
      */
     private String construirScriptSSESerie(String streamUrl, String eventoNombre, String containerId,
-                                            int indiceSerie, String expresionValorJs, String varGlobal) {
+                                            int indiceSerie, String expresionValorJs, String varGlobal,
+                                            String campoTexto, Double umbralPFMinimo) {
+        String actualizarTexto = "";
+        if (campoTexto != null) {
+            actualizarTexto =
+                "        var spanTexto = document.querySelector('#datosActualesCard [data-campo=\"" + campoTexto + "\"]');" +
+                "        if (spanTexto) {" +
+                "          spanTexto.textContent = valor.toFixed(2);" +
+                (umbralPFMinimo != null
+                        ? "          spanTexto.style.color = Math.abs(valor) < " + umbralPFMinimo + " ? '#e34948' : '#1a3c8c';"
+                        : "") +
+                "        }";
+        }
         return
             "if(window." + varGlobal + ") { window." + varGlobal + ".close(); }" +
             "window." + varGlobal + " = new EventSource('" + streamUrl + "');" +
@@ -354,6 +385,7 @@ public class ChartsView extends VerticalLayout {
             "        inst.seriesList[" + indiceSerie + "].data.push({ date: timestamp, value: valor });" +
             "        inst.seriesList[" + indiceSerie + "].markDirtyValues();" +
             "        inst.aplicarZoomCalculado();" +
+            actualizarTexto +
             "      }" +
             "    }" +
             "  } catch(e) { console.error('Error procesando SSE:', e); }" +
@@ -487,17 +519,12 @@ public class ChartsView extends VerticalLayout {
             "    var data = JSON.parse(event.data);" +
             "    console.log('📈 Datos actualizados:', data);" +
             "    var tarjetasDiv = document.getElementById('datosActualesCard');" +
-            "    var valores = tarjetasDiv ? tarjetasDiv.querySelectorAll('.dato-valor') : [];" +
-            "    if(valores.length > 0) {" +
-            "        valores[0].textContent = (data.KWh || 0).toFixed(2);" +
-            "        valores[1].textContent = (data.VAB || 0).toFixed(2);" +
-            "        valores[2].textContent = (data.VAC || 0).toFixed(2);" +
-            "        valores[3].textContent = (data.VBC || 0).toFixed(2);" +
-            "        valores[4].textContent = (data.IA || 0).toFixed(2);" +
-            "        valores[5].textContent = (data.IB || 0).toFixed(2);" +
-            "        valores[6].textContent = (data.IC || 0).toFixed(2);" +
-            "        valores[7].textContent = (data.PW || 0).toFixed(2);" +
-            "        valores[8].textContent = (data.PF || 0).toFixed(2);" +
+            "    if(tarjetasDiv) {" +
+            "        var camposDato = {kwh: data.KWh, vab: data.VAB, vac: data.VAC, vbc: data.VBC, ia: data.IA, ib: data.IB, ic: data.IC, pw: data.PW, pf: data.PF};" +
+            "        Object.keys(camposDato).forEach(function(campo) {" +
+            "          var span = tarjetasDiv.querySelector('[data-campo=\"' + campo + '\"]');" +
+            "          if (span) { span.textContent = (camposDato[campo] || 0).toFixed(2); }" +
+            "        });" +
             "        console.log('✅ Tarjetas actualizadas en tiempo real');" +
             "    }" +
             "  } catch(e) {" +

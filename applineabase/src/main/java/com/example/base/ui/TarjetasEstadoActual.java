@@ -59,8 +59,10 @@ final class TarjetasEstadoActual {
     /**
      * Mismo umbral que usa el sistema de alarmas (AlarmaEvaluatorService) para KWhPlanta1 —
      * configurable por AlarmasConfigView, con el mismo valor por defecto si no hay regla.
+     * Package-visible: ChartsView la reutiliza para colorear en vivo el texto de PF general
+     * que llega por SSE, en vez de recalcular el umbral por su cuenta.
      */
-    private static double umbralPFMinimo(AlarmaConfigRepository alarmaConfigRepository) {
+    static double umbralPFMinimo(AlarmaConfigRepository alarmaConfigRepository) {
         return alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(MaquinasVirtuales.KWH_PLANTA_1, TipoAlarma.FACTOR_POTENCIA_BAJO)
                 .map(AlarmaConfig::getFactorPotenciaMinimo)
                 .filter(java.util.Objects::nonNull)
