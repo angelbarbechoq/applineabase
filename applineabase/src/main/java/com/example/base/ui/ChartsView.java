@@ -382,10 +382,12 @@ public class ChartsView extends VerticalLayout {
             actualizarDerivada =
                 "        var spanDerivada = document.querySelector('#datosActualesCard [data-campo=\"" + campoDerivada + "\"]');" +
                 "        if (spanDerivada) {" +
-                "          if (data.derivadaPorMinuto !== undefined && data.derivadaPorMinuto !== null && data.derivadaPorMinuto !== 0 && isFinite(data.derivadaPorMinuto)) {" +
-                "            var subiendo = data.derivadaPorMinuto > 0;" +
-                "            spanDerivada.textContent = Math.abs(data.derivadaPorMinuto).toFixed(2) + ' °C/min ' + (subiendo ? '▲' : '▼');" +
-                "            spanDerivada.style.color = subiendo ? '#8b1e2f' : '#1a3c8c';" +
+                "          if (data.derivadaPorMinuto !== undefined && data.derivadaPorMinuto !== null && isFinite(data.derivadaPorMinuto)) {" +
+                "            var d = data.derivadaPorMinuto;" +
+                "            var flecha = d > 0 ? ' ▲' : (d < 0 ? ' ▼' : '');" +
+                "            var color = d > 0 ? '#8b1e2f' : (d < 0 ? '#1a3c8c' : '#898781');" +
+                "            spanDerivada.textContent = Math.abs(d).toFixed(1) + ' °C/min' + flecha;" +
+                "            spanDerivada.style.color = color;" +
                 "            spanDerivada.style.display = '';" +
                 "          } else {" +
                 "            spanDerivada.style.display = 'none';" +
