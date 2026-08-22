@@ -94,6 +94,12 @@ public class ChartsView extends VerticalLayout {
         tabSheet.add("KWh", panelKwh);
         if (mostrarTemperatura) {
             tabTemperatura = tabSheet.add("Temperatura", crearPanelTemperatura());
+            // Arranca ya, sin esperar a que se abra la pestaña: la franja de valores en vivo
+            // (datosActualesCard, en el encabezado) muestra Temp. Agua/Ambiente y su derivada
+            // fuera de esta pestaña, así que necesita el stream corriendo desde el arranque. El
+            // gráfico amCharts5 en sí sigue cargándose recién al abrir la pestaña (ver
+            // cargarTemperaturaChart) para no inicializarlo en un contenedor oculto sin tamaño.
+            iniciarSSETemperatura();
         }
         if (mostrarPFGeneral) {
             tabPFGeneral = tabSheet.add("PF general", crearPanelPFGeneral());
@@ -239,7 +245,6 @@ public class ChartsView extends VerticalLayout {
                 getElement().executeJs(resultado.script());
                 temperaturaMensajeSpan.setText("");
             }
-            iniciarSSETemperatura();
         } catch (Exception e) {
             temperaturaMensajeSpan.setText("Error: " + e.getMessage());
         }
@@ -250,7 +255,9 @@ public class ChartsView extends VerticalLayout {
      * También actualizan en vivo el texto de la franja (data-campo="temperaturaAgua"/
      * "temperaturaAmbiente"), que antes solo se pintaba una vez al cargar la vista, y la derivada
      * por minuto (data-campo="derivadaTemperaturaAgua"/"derivadaTemperaturaAmbiente") que ya viene
-     * calculada por PLCDataAcquisitionService en cada evento sensorUpdate.
+     * calculada por PLCDataAcquisitionService en cada evento sensorUpdate. Se llama desde el
+     * constructor (no desde cargarTemperaturaChart) para que la franja del encabezado se
+     * mantenga en vivo aunque el usuario nunca abra la pestaña Temperatura.
      */
     private void iniciarSSETemperatura() {
         String baseUrl = getBaseUrl();
@@ -400,17 +407,21 @@ public class ChartsView extends VerticalLayout {
             "window." + varGlobal + ".addEventListener('" + eventoNombre + "', function(event) {" +
             "  try {" +
             "    var data = JSON.parse(event.data);" +
-            "    if(window.am5Charts && window.am5Charts['" + containerId + "'] && window.am5Charts['" + containerId + "'].seriesList && window.am5Charts['" + containerId + "'].seriesList[" + indiceSerie + "]) {" +
-            "      var inst = window.am5Charts['" + containerId + "'];" +
-            scriptParsearFechaATimestamp("data.fecha") +
-            "      var valor = " + expresionValorJs + ";" +
-            "      if (valor !== null && valor !== undefined && isFinite(valor)) {" +
-            "        inst.seriesList[" + indiceSerie + "].data.push({ date: timestamp, value: valor });" +
-            "        inst.seriesList[" + indiceSerie + "].markDirtyValues();" +
-            "        inst.aplicarZoomCalculado();" +
+            "    var valor = " + expresionValorJs + ";" +
+            // La franja del encabezado (texto + derivada) se actualiza siempre que llegue un valor
+            // válido, sin depender de que el gráfico amCharts5 de esta pestaña esté inicializado —
+            // antes esto vivía adentro del if de más abajo y por eso no se actualizaba si el
+            // usuario nunca abría la pestaña con el gráfico (Temperatura/PF general).
+            "    if (valor !== null && valor !== undefined && isFinite(valor)) {" +
             actualizarTexto +
             actualizarDerivada +
-            "      }" +
+            "    }" +
+            "    if(valor !== null && valor !== undefined && isFinite(valor) && window.am5Charts && window.am5Charts['" + containerId + "'] && window.am5Charts['" + containerId + "'].seriesList && window.am5Charts['" + containerId + "'].seriesList[" + indiceSerie + "]) {" +
+            "      var inst = window.am5Charts['" + containerId + "'];" +
+            scriptParsearFechaATimestamp("data.fecha") +
+            "      inst.seriesList[" + indiceSerie + "].data.push({ date: timestamp, value: valor });" +
+            "      inst.seriesList[" + indiceSerie + "].markDirtyValues();" +
+            "      inst.aplicarZoomCalculado();" +
             "    }" +
             "  } catch(e) { console.error('Error procesando SSE:', e); }" +
             "});";
