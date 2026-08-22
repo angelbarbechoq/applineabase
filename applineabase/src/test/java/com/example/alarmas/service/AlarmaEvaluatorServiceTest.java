@@ -164,12 +164,12 @@ class AlarmaEvaluatorServiceTest {
     void temperatura_alta_se_dispara_sobre_el_maximo_configurado() {
         String sensor = "TemperaturaAgua"; // sembrada como TEMPERATURA_ALTA (máximo 13.0)
 
-        eventPublisher.publishEvent(new SensorDataUpdateEvent(this, sensor, 15.0, "fecha"));
+        eventPublisher.publishEvent(new SensorDataUpdateEvent(this, sensor, 15.0, "fecha", null));
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(sensor, TipoAlarma.TEMPERATURA_ALTA))
                 .as("15.0 > 13.0 debe disparar la alarma")
                 .isPresent();
 
-        eventPublisher.publishEvent(new SensorDataUpdateEvent(this, sensor, 9.0, "fecha"));
+        eventPublisher.publishEvent(new SensorDataUpdateEvent(this, sensor, 9.0, "fecha", null));
         assertThat(eventoRepository.findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(sensor, TipoAlarma.TEMPERATURA_ALTA))
                 .as("9.0 <= 13.0 debe resolver la alarma")
                 .isEmpty();
