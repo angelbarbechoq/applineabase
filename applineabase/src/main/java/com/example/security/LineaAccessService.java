@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 public class LineaAccessService {
 
     private static final String ZONA_MANTENIMIENTO = "Mantenimiento";
+    private static final String ZONA_MEZCLA = "Mezcla";
 
     private final ConfigLoaderService configLoaderService;
 
@@ -60,6 +61,11 @@ public class LineaAccessService {
     /** Las alarmas solo son visibles para ADMIN y usuarios de la zona Mantenimiento. */
     public boolean puedeVerAlarmas() {
         return esAdmin() || ZONA_MANTENIMIENTO.equalsIgnoreCase(zonaUsuarioActual());
+    }
+
+    /** Configuración de mezcladores: solo ADMIN y usuarios de la zona Mezcla. */
+    public boolean puedeVerMezcladores() {
+        return esAdmin() || ZONA_MEZCLA.equalsIgnoreCase(zonaUsuarioActual());
     }
 
     public boolean esAdmin() {

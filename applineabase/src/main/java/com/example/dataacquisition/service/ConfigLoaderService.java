@@ -34,6 +34,7 @@ public class ConfigLoaderService {
     private static final Logger logger = LoggerFactory.getLogger(ConfigLoaderService.class);
     private static final String PLC_CONFIG_FILE = "plc-config.json";
     private static final String LINEA_CONFIG_FILE = "linea-id-config.json";
+    private static final String MEZCLADORES_CONFIG_FILE = "mezcladores-config.json";
 
     private final ObjectMapper objectMapper;
 
@@ -48,6 +49,7 @@ public class ConfigLoaderService {
     void sembrarArchivosExternos() {
         sembrarSiNoExiste(PLC_CONFIG_FILE);
         sembrarSiNoExiste(LINEA_CONFIG_FILE);
+        sembrarSiNoExiste(MEZCLADORES_CONFIG_FILE);
     }
 
     private void sembrarSiNoExiste(String nombreArchivo) {
@@ -149,5 +151,17 @@ public class ConfigLoaderService {
         Map<String, Object> contenido = new LinkedHashMap<>();
         contenido.put("lineas", lineas);
         escribirArchivo(LINEA_CONFIG_FILE, contenido);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> loadMezcladoresConfig() {
+        Object mezcladores = leerArchivo(MEZCLADORES_CONFIG_FILE).get("mezcladores");
+        return mezcladores != null ? (List<Map<String, Object>>) mezcladores : List.of();
+    }
+
+    public void saveMezcladoresConfig(List<Map<String, Object>> mezcladores) {
+        Map<String, Object> contenido = new LinkedHashMap<>();
+        contenido.put("mezcladores", mezcladores);
+        escribirArchivo(MEZCLADORES_CONFIG_FILE, contenido);
     }
 }

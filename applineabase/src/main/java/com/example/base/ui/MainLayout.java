@@ -236,6 +236,9 @@ public final class MainLayout extends AppLayout {
             nav.addItem(alarmas);
             colapsarAlSalirDelMouse(alarmas);
         }
+        if (lineaAccessService.puedeVerMezcladores()) {
+            nav.addItem(new SideNavItem("Configuración Mezcladores", "mezcladores/config", VaadinIcon.FIRE.create()));
+        }
         if (lineaAccessService.esAdmin()) {
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
             nav.addItem(new SideNavItem("Reparar VIP Mensual", "admin/reparar-vip", VaadinIcon.WRENCH.create()));
