@@ -365,10 +365,10 @@ public class ChartsView extends VerticalLayout {
      * umbralPFMinimo solo aplica al campo "pfGeneral" (mismo umbral 0-1 que usa
      * TarjetasEstadoActual/AlarmaEvaluatorService); null para los demás campos, que no cambian de
      * color en vivo.
-     * campoDerivada es el data-campo del span secundario de derivada (°C/min, ver
-     * GraficaModel.construirHtmlValoresActuales), que lee data.derivadaPorMinuto — ya calculada en
-     * PLCDataAcquisitionService, así el cliente no tiene que inferir el intervalo real entre
-     * lecturas. Null para streams sin derivada asociada (PF general).
+     * campoDerivada es el data-campo del span secundario de derivada (°C/h, ver
+     * GraficaModel.construirHtmlValoresActuales), que lee data.derivadaPorHora — ya calculada en
+     * PLCDataQueryService.calcularDerivadaPorHora, así el cliente no tiene que inferir el
+     * intervalo real entre lecturas. Null para streams sin derivada asociada (PF general).
      */
     private String construirScriptSSESerie(String streamUrl, String eventoNombre, String containerId,
                                             int indiceSerie, String expresionValorJs, String varGlobal,
@@ -389,11 +389,11 @@ public class ChartsView extends VerticalLayout {
             actualizarDerivada =
                 "        var spanDerivada = document.querySelector('#datosActualesCard [data-campo=\"" + campoDerivada + "\"]');" +
                 "        if (spanDerivada) {" +
-                "          if (data.derivadaPorMinuto !== undefined && data.derivadaPorMinuto !== null && isFinite(data.derivadaPorMinuto)) {" +
-                "            var d = data.derivadaPorMinuto;" +
+                "          if (data.derivadaPorHora !== undefined && data.derivadaPorHora !== null && isFinite(data.derivadaPorHora)) {" +
+                "            var d = data.derivadaPorHora;" +
                 "            var flecha = d > 0 ? ' ▲' : (d < 0 ? ' ▼' : '');" +
                 "            var color = d > 0 ? '#8b1e2f' : (d < 0 ? '#1a3c8c' : '#898781');" +
-                "            spanDerivada.textContent = Math.abs(d).toFixed(1) + ' °C/min' + flecha;" +
+                "            spanDerivada.textContent = Math.abs(d).toFixed(1) + ' °C/h' + flecha;" +
                 "            spanDerivada.style.color = color;" +
                 "            spanDerivada.style.display = '';" +
                 "          } else {" +

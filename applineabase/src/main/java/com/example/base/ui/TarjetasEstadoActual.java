@@ -42,15 +42,24 @@ final class TarjetasEstadoActual {
             // de "máquina virtual" que usa ChartsView para sus pestañas Temperatura y PF general
             // (ver mostrarTemperatura/mostrarPFGeneral).
             boolean accesoTemperatura = lineaAccessService.tieneAccesoAMaquina(MaquinasVirtuales.TEMPERATURA_AGUA);
-            Double temperaturaAgua = accesoTemperatura
-                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MaquinasVirtuales.TEMPERATURA_AGUA)) : null;
-            Double temperaturaAmbiente = accesoTemperatura
-                    ? extraerKwh(plcDataQueryService.getLatestKWhDataByMaquina(MaquinasVirtuales.TEMPERATURA_AMBIENTE)) : null;
+            Map<String, Object> ultimoAgua = accesoTemperatura
+                    ? plcDataQueryService.getLatestKWhDataByMaquina(MaquinasVirtuales.TEMPERATURA_AGUA) : null;
+            Map<String, Object> ultimoAmbiente = accesoTemperatura
+                    ? plcDataQueryService.getLatestKWhDataByMaquina(MaquinasVirtuales.TEMPERATURA_AMBIENTE) : null;
+            Double temperaturaAgua = extraerKwh(ultimoAgua);
+            Double temperaturaAmbiente = extraerKwh(ultimoAmbiente);
+            // Derivada calculada ya en la carga inicial (no solo cuando llega el primer evento
+            // SSE) usando el mismo método que la lectura en vivo (PLCDataQueryService.
+            // calcularDerivadaPorHora), así la franja no arranca vacía hasta el próximo ciclo.
+            Double derivadaAgua = temperaturaAgua != null
+                    ? plcDataQueryService.calcularDerivadaPorHora(MaquinasVirtuales.TEMPERATURA_AGUA, temperaturaAgua, parsearFecha(ultimoAgua)) : null;
+            Double derivadaAmbiente = temperaturaAmbiente != null
+                    ? plcDataQueryService.calcularDerivadaPorHora(MaquinasVirtuales.TEMPERATURA_AMBIENTE, temperaturaAmbiente, parsearFecha(ultimoAmbiente)) : null;
             Double pfGeneral = lineaAccessService.tieneAccesoAMaquina(MaquinasVirtuales.KWH_PLANTA_1)
                     ? extraerPFGeneral(plcDataQueryService.getLatestVIPDataByMaquina(MaquinasVirtuales.KWH_PLANTA_1)) : null;
             double umbralPF = umbralPFMinimo(alarmaConfigRepository);
 
-            mostrarDatosActuales(card, datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral, umbralPF);
+            mostrarDatosActuales(card, datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, derivadaAgua, derivadaAmbiente, pfGeneral, umbralPF);
         } catch (Exception e) {
             card.setVisible(false);
         }
@@ -71,7 +80,13 @@ final class TarjetasEstadoActual {
 
     /** El "kwh" de estas máquinas virtuales guarda en realidad temperatura, según el caso. */
     private static Double extraerKwh(Map<String, Object> datos) {
-        return datos.containsKey("kwh") ? ((Number) datos.get("kwh")).doubleValue() : null;
+        return datos != null && datos.containsKey("kwh") ? ((Number) datos.get("kwh")).doubleValue() : null;
+    }
+
+    /** Fecha de la última lectura, para PLCDataQueryService.calcularDerivadaPorHora. */
+    private static java.time.LocalDateTime parsearFecha(Map<String, Object> datos) {
+        return java.time.LocalDateTime.parse((String) datos.get("fecha"),
+                java.time.format.DateTimeFormatter.ofPattern(com.example.dataacquisition.RutaArchivosEnergia.FORMATO_FECHA_HORA));
     }
 
     /**
@@ -85,11 +100,13 @@ final class TarjetasEstadoActual {
     }
 
     private static void mostrarDatosActuales(Div card, Map<String, Object> datosVIP, Map<String, Object> datosKWh,
-                                              Double temperaturaAgua, Double temperaturaAmbiente, Double pfGeneral,
+                                              Double temperaturaAgua, Double temperaturaAmbiente,
+                                              Double derivadaAgua, Double derivadaAmbiente, Double pfGeneral,
                                               double umbralPFMinimo) {
         if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
             card.getElement().setProperty("innerHTML",
-                    GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente, pfGeneral, umbralPFMinimo));
+                    GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, temperaturaAgua, temperaturaAmbiente,
+                            derivadaAgua, derivadaAmbiente, pfGeneral, umbralPFMinimo));
             card.setVisible(true);
         } else {
             card.setVisible(false);
@@ -191,7 +208,7 @@ final class TarjetasEstadoActual {
                 if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
                     franjaValores.getElement().setProperty("innerHTML",
                             // pfGeneral va null (ver comentario arriba), así que el umbral no se usa acá.
-                            GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, null, null, null,
+                            GraficaModel.construirHtmlValoresActuales(datosVIP, datosKWh, null, null, null, null, null,
                                     AlarmaEvaluatorService.FACTOR_POTENCIA_MIN_DEFAULT));
                     franjaValores.setVisible(true);
                 } else {

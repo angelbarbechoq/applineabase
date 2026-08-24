@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -50,10 +49,6 @@ public class PLCDataAcquisitionService {
     private final Map<String, BigDecimal> lastKWhValues = new HashMap<>();
     private final Map<String, ModbusClient> activeConnections = new ConcurrentHashMap<>();
     private final PASGatewayConfigService gatewayConfigService;
-    // Última lectura de cada sensor auxiliar (TemperaturaAgua/Ambiente, etc.), para calcular la
-    // derivada por minuto en calcularDerivadaPorMinuto sin depender de que el frontend infiera el
-    // intervalo real entre lecturas (el ciclo nominal es cada 60s, ver DataAcquisitionTask).
-    private final Map<String, PuntoSensor> ultimoPuntoSensor = new ConcurrentHashMap<>();
 
     public PLCDataAcquisitionService(ConfigLoaderService configLoaderService, ApplicationEventPublisher eventPublisher,
                                     DatabaseInitializationService databaseInitializationService, KWhDifferenceService kwhDifferenceService,
@@ -212,8 +207,8 @@ public class PLCDataAcquisitionService {
                         databaseInitializationService.guardarDatoBatch(dataDiario, nombreTablax, "DAILY");
                         databaseInitializationService.guardarDatoBatch(dataDiario, nombreTablax, "MONTHLY");
 
-                        Double derivadaPorMinuto = calcularDerivadaPorMinuto(nombreTablax, valor, ahora);
-                        eventPublisher.publishEvent(new SensorDataUpdateEvent(this, nombreTablax, valor, timestamp, derivadaPorMinuto));
+                        Double derivadaPorHora = plcDataQueryService.calcularDerivadaPorHora(nombreTablax, valor, ahora);
+                        eventPublisher.publishEvent(new SensorDataUpdateEvent(this, nombreTablax, valor, timestamp, derivadaPorHora));
                     });
                 }
             }
@@ -324,26 +319,4 @@ public class PLCDataAcquisitionService {
         }
     }
 
-    /** Última lectura registrada de un sensor auxiliar, para calcularDerivadaPorMinuto. */
-    private record PuntoSensor(double valor, LocalDateTime momento) {
-    }
-
-    /**
-     * Derivada por minuto de un sensor auxiliar (TemperaturaAgua/Ambiente, etc.) entre esta
-     * lectura y la anterior, usando el tiempo real transcurrido (Duration) en vez de asumir
-     * siempre el intervalo nominal de 60s de DataAcquisitionTask — así un ciclo salteado (error
-     * de lectura del PLC) no infla ni achica el resultado. Null en la primera lectura de cada
-     * sensor, cuando todavía no hay una lectura anterior con la que compararlo.
-     */
-    private Double calcularDerivadaPorMinuto(String sensor, double valorActual, LocalDateTime momentoActual) {
-        PuntoSensor anterior = ultimoPuntoSensor.put(sensor, new PuntoSensor(valorActual, momentoActual));
-        if (anterior == null) {
-            return null;
-        }
-        double minutosTranscurridos = Duration.between(anterior.momento(), momentoActual).toMillis() / 60000.0;
-        if (minutosTranscurridos <= 0) {
-            return null;
-        }
-        return (valorActual - anterior.valor()) / minutosTranscurridos;
-    }
 }

@@ -11,9 +11,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -171,6 +174,62 @@ public class PLCDataQueryService {
         }
 
         return result;
+    }
+
+    private static final DateTimeFormatter FECHA_FORMATTER = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
+
+    /** Minutos hacia atrás usados como base para la derivada — ver calcularDerivadaPorHora.
+     * Independiente de la unidad en la que se exprese el resultado (°C/h): esto solo define qué
+     * tan lejos se busca el punto de comparación, no cómo se escala la pendiente resultante. */
+    private static final int LOOKBACK_MINUTOS_DERIVADA = 5;
+
+    /**
+     * Derivada por hora de un sensor tipo KWh (TemperaturaAgua/Ambiente, que en realidad guardan
+     * temperatura en la columna "kwh") entre valorActual/momentoActual y un punto de hace
+     * ~{@value #LOOKBACK_MINUTOS_DERIVADA} minutos dentro de las lecturas de HOY.
+     *
+     * Se usa una ventana de varios minutos en vez del punto inmediatamente anterior (un solo
+     * ciclo de 60s) porque comparar solo dos lecturas consecutivas hace que la derivada oscile
+     * entre un valor real y ~0 apenas el sensor se queda quieto un ciclo (ruido/cuantización de
+     * una sola lectura) — promediar sobre varios minutos filtra ese ruido.
+     *
+     * Se apoya en la misma tabla DIARY que ya usa getTodayKWhDataByMaquina (para el gráfico y la
+     * carga inicial de la franja), así que el valor coincide entre la carga inicial (HTML) y las
+     * actualizaciones en vivo por SSE, sin depender de un estado en memoria que se pierda al
+     * reiniciar la aplicación.
+     *
+     * @return null si hoy no hay ningún punto anterior a momentoActual (primera lectura del día)
+     */
+    public Double calcularDerivadaPorHora(String maquina, double valorActual, LocalDateTime momentoActual) {
+        List<Map<String, Object>> puntosHoy = getTodayKWhDataByMaquina(maquina);
+        if (puntosHoy.isEmpty()) {
+            return null;
+        }
+
+        LocalDateTime umbral = momentoActual.minusMinutes(LOOKBACK_MINUTOS_DERIVADA);
+        Map<String, Object> puntoBase = null;
+        for (Map<String, Object> punto : puntosHoy) {
+            LocalDateTime fecha = LocalDateTime.parse((String) punto.get("fecha"), FECHA_FORMATTER);
+            if (!fecha.isBefore(momentoActual)) {
+                break; // ignora el propio punto actual (si ya está persistido) y cualquier lectura futura
+            }
+            if (puntoBase == null || !fecha.isAfter(umbral)) {
+                puntoBase = punto; // se sigue reemplazando: al salir del loop queda el punto más cercano a "hace 5 min" sin pasarse
+            } else {
+                break;
+            }
+        }
+        if (puntoBase == null) {
+            return null;
+        }
+
+        LocalDateTime fechaBase = LocalDateTime.parse((String) puntoBase.get("fecha"), FECHA_FORMATTER);
+        double valorBase = ((Number) puntoBase.get("kwh")).doubleValue();
+        double horasTranscurridas = Duration.between(fechaBase, momentoActual).toMillis() / 3600000.0;
+        if (horasTranscurridas <= 0) {
+            return null;
+        }
+        return (valorActual - valorBase) / horasTranscurridas;
     }
 
     private String buildMonthlyPath(YearMonth ym, boolean vip) {

@@ -966,13 +966,17 @@ public class GraficaModel {
      * se muestra (ver TarjetasEstadoActual, que ya filtra por acceso antes de llamar acá).
      */
     public static String construirHtmlValoresActuales(Map<String, Object> datosVIP, Map<String, Object> datosKWh,
-                                                        Double temperaturaAgua, Double temperaturaAmbiente, Double pfGeneral,
+                                                        Double temperaturaAgua, Double temperaturaAmbiente,
+                                                        Double derivadaAgua, Double derivadaAmbiente, Double pfGeneral,
                                                         double umbralPFMinimo) {
         String[] labels = {"KWh", "VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF"};
         // Mismo orden que labels: identificador estable para que el SSE en ChartsView pueda
         // encontrar cada span por atributo (querySelector('[data-campo=...]')) en vez de por
         // posición numérica, que se desalinea apenas cambia el orden o el número de campos.
         String[] campos = {"kwh", "vab", "vac", "vbc", "ia", "ib", "ic", "pw", "pf"};
+        // Agrupa VAB/VAC/VBC y IA/IB/IC bajo el mismo separador "|" (uno por grupo, no uno por
+        // valor) — mismo orden que labels/campos.
+        String[] grupos = {"kwh", "voltaje", "voltaje", "voltaje", "corriente", "corriente", "corriente", "pw", "pf"};
         double[] valores = {
                 toDoubleSeguro(datosKWh.get("kwh")),
                 toDoubleSeguro(datosVIP.get("VAB")),
@@ -988,11 +992,11 @@ public class GraficaModel {
         StringBuilder html = new StringBuilder();
         html.append("<div style='display: flex; gap: 14px; flex-wrap: wrap; align-items: baseline;'>");
         for (int i = 0; i < labels.length; i++) {
-            if (i > 0) {
+            if (i > 0 && !grupos[i].equals(grupos[i - 1])) {
                 html.append("<span style='color: #c3c2b7;'>|</span>");
             }
-            boolean esCorriente = labels[i].equals("IA") || labels[i].equals("IB") || labels[i].equals("IC");
-            boolean esVoltaje = labels[i].equals("VAB") || labels[i].equals("VAC") || labels[i].equals("VBC");
+            boolean esCorriente = grupos[i].equals("corriente");
+            boolean esVoltaje = grupos[i].equals("voltaje");
             String colorValor = esCorriente ? "#e34948" : esVoltaje ? "#1a3c8c" : "#0b0b0b";
             html.append("<span>")
                     .append("<span style='font-size: 12px; color: #898781;'>").append(labels[i]).append(": </span>")
@@ -1005,9 +1009,10 @@ public class GraficaModel {
 
         String[] labelsExtra = {"Temp. Agua", "Temp. Ambiente", "PF general"};
         String[] camposExtra = {"temperaturaAgua", "temperaturaAmbiente", "pfGeneral"};
-        // Solo los sensores de temperatura muestran derivada (°C/min) junto al valor; PF general
+        // Solo los sensores de temperatura muestran derivada (°C/h) junto al valor; PF general
         // (índice 2) no la tiene, de ahí el null.
         String[] camposDerivadaExtra = {"derivadaTemperaturaAgua", "derivadaTemperaturaAmbiente", null};
+        Double[] derivadasExtra = {derivadaAgua, derivadaAmbiente, null};
         Double[] valoresExtra = {temperaturaAgua, temperaturaAmbiente, pfGeneral};
         boolean primeroExtra = true;
         for (int i = 0; i < labelsExtra.length; i++) {
@@ -1037,17 +1042,49 @@ public class GraficaModel {
                     .append("' style='font-size: 14px; font-weight: 600; color: ").append(colorValor).append(";'>")
                     .append(formatearDecimal(valoresExtra[i]))
                     .append("</span>");
-            // Empieza oculta: recién se completa cuando llega el primer punto por SSE con una
-            // derivada real (ChartsView.iniciarSSETemperatura), nunca en esta carga inicial.
+            // Ya se pinta con la derivada calculada en la carga inicial (ver
+            // TarjetasEstadoActual.cargarDatosActuales/PLCDataQueryService.calcularDerivadaPorHora),
+            // no solo cuando llega el primer punto por SSE — mismo color/flecha que usa el JS en
+            // ChartsView.construirScriptSSESerie para las actualizaciones en vivo posteriores.
             if (camposDerivadaExtra[i] != null) {
+                Double derivada = derivadasExtra[i];
                 html.append("<span class='dato-derivada' data-campo='").append(camposDerivadaExtra[i])
-                        .append("' style='display: none; font-size: 10px; font-weight: 600; margin-left: 4px; opacity: 0.7;'></span>");
+                        .append("' style='").append(derivada == null ? "display: none; " : "")
+                        .append("font-size: 10px; font-weight: 600; margin-left: 4px; opacity: 0.7; color: ")
+                        .append(colorDerivada(derivada)).append(";'>")
+                        .append(textoDerivada(derivada))
+                        .append("</span>");
             }
             html.append("</span>");
         }
 
         html.append("</div>");
         return html.toString();
+    }
+
+    /** Mismo criterio de color que ChartsView.construirScriptSSESerie (JS) para la derivada:
+     * lacre si sube, azul marino si baja, gris si está estable o no hay dato todavía. */
+    private static String colorDerivada(Double derivada) {
+        if (derivada == null) {
+            return "#898781";
+        }
+        if (derivada > 0) {
+            return "#8b1e2f";
+        }
+        if (derivada < 0) {
+            return "#1a3c8c";
+        }
+        return "#898781";
+    }
+
+    /** Mismo formato que ChartsView.construirScriptSSESerie (JS): valor absoluto a 1 decimal +
+     * unidad + flecha de tendencia. Vacío si todavía no hay derivada calculada. */
+    private static String textoDerivada(Double derivada) {
+        if (derivada == null) {
+            return "";
+        }
+        String flecha = derivada > 0 ? " ▲" : (derivada < 0 ? " ▼" : "");
+        return String.format(java.util.Locale.US, "%.1f °C/h%s", Math.abs(derivada), flecha);
     }
 
     /** Decimal con coma (convención local), no punto — fijo en Locale.US antes de reemplazar el

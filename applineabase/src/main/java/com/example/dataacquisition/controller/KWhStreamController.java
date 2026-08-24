@@ -87,9 +87,10 @@ public class KWhStreamController {
         eventData.put("maquina", sensor);
         eventData.put("fecha", event.getFecha());
         eventData.put("valor", event.getValor());
-        // Ya calculada en PLCDataAcquisitionService (valor/min real entre esta lectura y la
-        // anterior del mismo sensor); null en la primera lectura de cada sensor.
-        eventData.put("derivadaPorMinuto", event.getDerivadaPorMinuto());
+        // Ya calculada en PLCDataQueryService.calcularDerivadaPorHora (valor/h contra el punto
+        // de hace ~5 min, para suavizar ruido de una sola lectura); null en la primera lectura
+        // del día para ese sensor.
+        eventData.put("derivadaPorHora", event.getDerivadaPorHora());
         emitirATodos(sensor, "sensorUpdate", eventData);
     }
 
