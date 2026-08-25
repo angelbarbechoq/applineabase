@@ -65,6 +65,15 @@ public class ChartsView extends VerticalLayout {
     private Tab tabPFGeneral;
     private boolean pfGeneralCargada;
 
+    // --- Mezcladores (DTB48: PV/SV de calentamiento+enfriamiento del mezclador elegido) ---
+    private boolean mostrarMezcladores;
+    private GraficaModel graficaMezcladores;
+    private ComboBox<String> mezcladorCombo;
+    private Span mezcladorMensajeSpan;
+    private Tab tabMezcladores;
+    private boolean mezcladorCargado;
+    private String mezcladorSeleccionado;
+
     public ChartsView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
                        PLCDataQueryService plcDataQueryService, AlarmaConfigRepository alarmaConfigRepository) {
         this.graficaModel = new GraficaModel(1);
@@ -80,6 +89,8 @@ public class ChartsView extends VerticalLayout {
         // la misma regla de acceso por zona que ya aplica al resto de la app, no una nueva.
         mostrarTemperatura = lineaAccessService.tieneAccesoAMaquina(MaquinasVirtuales.TEMPERATURA_AGUA);
         mostrarPFGeneral = lineaAccessService.tieneAccesoAMaquina(MaquinasVirtuales.KWH_PLANTA_1);
+        // Mezcladores: misma regla de acceso que la pantalla de configuración (ADMIN + zona Mezcla).
+        mostrarMezcladores = lineaAccessService.puedeVerMezcladores();
 
         // crearPanelKwh() deja armado datosActualesCard (las tarjetas KWh/VAB/VAC/etc.); se
         // arma antes para poder ponerlo junto al título, en vez de junto al selector de máquina.
@@ -104,6 +115,9 @@ public class ChartsView extends VerticalLayout {
         if (mostrarPFGeneral) {
             tabPFGeneral = tabSheet.add("PF general", crearPanelPFGeneral());
         }
+        if (mostrarMezcladores) {
+            tabMezcladores = tabSheet.add("Mezcladores", crearPanelMezcladores());
+        }
         add(tabSheet);
         setFlexGrow(1, tabSheet);
 
@@ -120,6 +134,11 @@ public class ChartsView extends VerticalLayout {
             } else if (seleccionada == tabPFGeneral && !pfGeneralCargada) {
                 pfGeneralCargada = true;
                 cargarPFGeneralChart();
+            } else if (seleccionada == tabMezcladores && !mezcladorCargado) {
+                mezcladorCargado = true;
+                if (mezcladorSeleccionado != null) {
+                    cargarMezcladorChart(mezcladorSeleccionado);
+                }
             }
         });
     }
@@ -339,6 +358,123 @@ public class ChartsView extends VerticalLayout {
                 "pfGeneral", umbralPF, null));
     }
 
+    // ================= Mezcladores (DTB48: PV/SV calentamiento+enfriamiento) =================
+
+    private static final String[] SERIES_MEZCLADOR = {
+            "Calentamiento (PV)", "Calentamiento (SV)", "Enfriamiento (PV)", "Enfriamiento (SV)"};
+    // Calentamiento en rojo oscuro, enfriamiento en celeste (mismo celeste que ya usa la
+    // pestaña Temperatura para distinguir series); SV punteado del mismo color que su PV
+    // (ver setSeriesDiscontinuas) en vez de un color aparte, para leerlo como "la misma
+    // variable, el objetivo vs. el valor real" en lugar de una serie más a identificar.
+    private static final String[] COLORES_MEZCLADOR = {"0x8b1e2f", "0x8b1e2f", "0x29b6f6", "0x29b6f6"};
+    private static final boolean[] DISCONTINUAS_MEZCLADOR = {false, true, false, true};
+
+    private VerticalLayout crearPanelMezcladores() {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
+        panel.setPadding(false);
+
+        graficaMezcladores = new GraficaModel(4);
+        graficaMezcladores.setSeriesNames(SERIES_MEZCLADOR);
+        graficaMezcladores.setUnidad("°C");
+        graficaMezcladores.setColoresPersonalizados(COLORES_MEZCLADOR);
+        graficaMezcladores.setSeriesDiscontinuas(DISCONTINUAS_MEZCLADOR);
+        graficaMezcladores.setMostrarLeyenda(true);
+
+        List<String> mezcladores = configLoaderService.loadMezcladoresConfig().stream()
+                .map(m -> String.valueOf(m.get("nombre")))
+                .sorted()
+                .collect(Collectors.toList());
+
+        mezcladorCombo = new ComboBox<>("Mezclador");
+        mezcladorCombo.setItems(mezcladores);
+        mezcladorCombo.setWidth("250px");
+
+        mezcladorMensajeSpan = new Span();
+
+        HorizontalLayout selectorLayout = new HorizontalLayout(mezcladorCombo, mezcladorMensajeSpan);
+        selectorLayout.setAlignItems(Alignment.CENTER);
+        panel.add(selectorLayout);
+
+        if (mezcladores.isEmpty()) {
+            mezcladorMensajeSpan.setText("No hay mezcladores configurados");
+        } else {
+            mezcladorSeleccionado = mezcladores.getFirst();
+            mezcladorCombo.setValue(mezcladorSeleccionado);
+        }
+
+        mezcladorCombo.addValueChangeListener(e -> {
+            if (e.getValue() != null) {
+                mezcladorSeleccionado = e.getValue();
+                cargarMezcladorChart(mezcladorSeleccionado);
+            }
+        });
+
+        PanelGraficoUtil.agregarDivGrafico(panel, "chartdiv_mezcladores");
+
+        return panel;
+    }
+
+    /**
+     * PV/SV de calentamiento y enfriamiento no comparten timestamp exacto con nada más (cada
+     * canal del DTB48 se lee con su propia conexión Modbus, ver MezcladorReaderService), pero sí
+     * entre sí sí lo suelen compartir aproximado dentro del mismo ciclo — se reusa
+     * graficarSeriesCrudasAlineadas iguel que Temperatura. Cada serie se remapea a la clave
+     * "kwh" porque esa función lee esa clave a fuego (mismo truco que ya usa PF general con el
+     * PF de KWhPlanta1).
+     */
+    private void cargarMezcladorChart(String nombreMezclador) {
+        try {
+            String tablaCal = ConfigLoaderService.nombreTablaCanalMezclador(nombreMezclador, "Calentamiento");
+            String tablaEnf = ConfigLoaderService.nombreTablaCanalMezclador(nombreMezclador, "Enfriamiento");
+
+            List<Map<String, Object>> calPV = remapAKwh(plcDataQueryService.getTodayValorPorColumna(tablaCal, "PV"), "PV");
+            List<Map<String, Object>> calSV = remapAKwh(plcDataQueryService.getTodayValorPorColumna(tablaCal, "SV"), "SV");
+            List<Map<String, Object>> enfPV = remapAKwh(plcDataQueryService.getTodayValorPorColumna(tablaEnf, "PV"), "PV");
+            List<Map<String, Object>> enfSV = remapAKwh(plcDataQueryService.getTodayValorPorColumna(tablaEnf, "SV"), "SV");
+
+            if (calPV.isEmpty() && calSV.isEmpty() && enfPV.isEmpty() && enfSV.isEmpty()) {
+                mezcladorMensajeSpan.setText("No hay datos de " + nombreMezclador + " para la fecha actual");
+                getElement().executeJs(graficaMezcladores.getInitScript2("chartdiv_mezcladores"));
+            } else {
+                GraficaModel.ResultadoGrafica resultado = graficaMezcladores.graficarSeriesCrudasAlineadas(
+                        "chartdiv_mezcladores", List.of(calPV, calSV, enfPV, enfSV), SERIES_MEZCLADOR, 100.0, true);
+                getElement().executeJs(resultado.script());
+                mezcladorMensajeSpan.setText("");
+            }
+            iniciarSSEMezclador(tablaCal, tablaEnf);
+        } catch (Exception e) {
+            mezcladorMensajeSpan.setText("Error: " + e.getMessage());
+        }
+    }
+
+    private List<Map<String, Object>> remapAKwh(List<Map<String, Object>> filas, String columnaOrigen) {
+        List<Map<String, Object>> remapeadas = new ArrayList<>();
+        for (Map<String, Object> fila : filas) {
+            Map<String, Object> punto = new HashMap<>();
+            punto.put("fecha", fila.get("fecha"));
+            punto.put("kwh", fila.get(columnaOrigen));
+            remapeadas.add(punto);
+        }
+        return remapeadas;
+    }
+
+    /**
+     * Solo PV se actualiza en vivo (índices 0 y 2, los mismos que graficarSeriesCrudasAlineadas
+     * les asignó): MezcladorReaderService publica SensorDataUpdateEvent con el PV de cada canal,
+     * no con el SV (el setpoint no cambia solo, no hace falta empujarlo por SSE) — SV se
+     * actualiza recién si el usuario vuelve a cambiar de mezclador o recarga la pestaña.
+     */
+    private void iniciarSSEMezclador(String tablaCal, String tablaEnf) {
+        String baseUrl = getBaseUrl();
+        getElement().executeJs(construirScriptSSESerie(
+                baseUrl + "/api/plc/stream/" + tablaCal, "sensorUpdate", "chartdiv_mezcladores",
+                0, "data.valor", "eventSourceMezcladorCal", null, null, null));
+        getElement().executeJs(construirScriptSSESerie(
+                baseUrl + "/api/plc/stream/" + tablaEnf, "sensorUpdate", "chartdiv_mezcladores",
+                2, "data.valor", "eventSourceMezcladorEnf", null, null, null));
+    }
+
     /**
      * JS que parsea una fecha "dd-MM-yyyy HH:mm:ss" (el formato que usa todo el proyecto) al
      * timestamp epoch que espera amCharts5, declarando `var timestamp = ...;`. expresionFecha es
@@ -486,11 +622,13 @@ public class ChartsView extends VerticalLayout {
     protected void onDetach(com.vaadin.flow.component.DetachEvent detachEvent) {
         super.onDetach(detachEvent);
         detenerSSE();
-        if (mostrarTemperatura || mostrarPFGeneral) {
+        if (mostrarTemperatura || mostrarPFGeneral || mostrarMezcladores) {
             getElement().executeJs(
                 "if(window.eventSourcePF) { window.eventSourcePF.close(); window.eventSourcePF = null; }" +
                 "if(window.eventSourceTempAgua) { window.eventSourceTempAgua.close(); window.eventSourceTempAgua = null; }" +
-                "if(window.eventSourceTempAmbiente) { window.eventSourceTempAmbiente.close(); window.eventSourceTempAmbiente = null; }");
+                "if(window.eventSourceTempAmbiente) { window.eventSourceTempAmbiente.close(); window.eventSourceTempAmbiente = null; }" +
+                "if(window.eventSourceMezcladorCal) { window.eventSourceMezcladorCal.close(); window.eventSourceMezcladorCal = null; }" +
+                "if(window.eventSourceMezcladorEnf) { window.eventSourceMezcladorEnf.close(); window.eventSourceMezcladorEnf = null; }");
         }
     }
 

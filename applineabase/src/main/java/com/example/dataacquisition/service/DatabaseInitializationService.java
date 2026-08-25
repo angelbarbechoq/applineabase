@@ -71,13 +71,17 @@ public class DatabaseInitializationService {
             this.monthlyPath = monthPath + "\\" +monthName;
             this.monthlyVIPPath = monthPath + "\\"+ monthName + "VIP";
 
-            String[] lineas = obtenerLineas();
-
-            for (String linea : lineas) {
+            for (String linea : obtenerLineas()) {
                 creaTabla(dailyPath, linea, RutaArchivosEnergia.CAMPOS_NORMAL);
                 creaTabla(dailyVIPPath, linea, RutaArchivosEnergia.CAMPOS_VIP);
                 creaTabla(monthlyPath, linea, RutaArchivosEnergia.CAMPOS_NORMAL);
                 creaTabla(monthlyVIPPath, linea, RutaArchivosEnergia.CAMPOS_VIP);
+            }
+
+            // Mezcladores: esquema propio (PV/SV), sin variante VIP (no son medidores eléctricos).
+            for (String tablaCanal : configLoaderService.listarNombresTablasMezcladores()) {
+                creaTabla(dailyPath, tablaCanal, ConfigLoaderService.CAMPOS_MEZCLADOR);
+                creaTabla(monthlyPath, tablaCanal, ConfigLoaderService.CAMPOS_MEZCLADOR);
             }
 
         } catch (Exception e) {

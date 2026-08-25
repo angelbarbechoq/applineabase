@@ -236,9 +236,6 @@ public final class MainLayout extends AppLayout {
             nav.addItem(alarmas);
             colapsarAlSalirDelMouse(alarmas);
         }
-        if (lineaAccessService.puedeVerMezcladores()) {
-            nav.addItem(new SideNavItem("Configuración Mezcladores", "mezcladores/config", VaadinIcon.FIRE.create()));
-        }
         if (lineaAccessService.esAdmin()) {
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
             nav.addItem(new SideNavItem("Reparar VIP Mensual", "admin/reparar-vip", VaadinIcon.WRENCH.create()));
@@ -248,6 +245,7 @@ public final class MainLayout extends AppLayout {
             configuracion.setExpanded(false);
             configuracion.addItem(new SideNavItem("Configuración de alarmas", "alarmas/config", VaadinIcon.BELL.create()));
             configuracion.addItem(new SideNavItem("Configuración de hardware", "configuracion", VaadinIcon.SERVER.create()));
+            configuracion.addItem(new SideNavItem("Configuración Mezcladores", "mezcladores/config", VaadinIcon.FIRE.create()));
             nav.addItem(configuracion);
             colapsarAlSalirDelMouse(configuracion);
         }

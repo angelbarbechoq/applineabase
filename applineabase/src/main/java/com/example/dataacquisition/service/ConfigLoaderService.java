@@ -164,4 +164,31 @@ public class ConfigLoaderService {
         contenido.put("mezcladores", mezcladores);
         escribirArchivo(MEZCLADORES_CONFIG_FILE, contenido);
     }
+
+    /** Esquema de columnas de las tablas de canal de mezclador (PV/SV del DTB48), distinto del
+     * esquema de energía (CAMPOS_NORMAL/CAMPOS_VIP en RutaArchivosEnergia) — no reutiliza la
+     * columna "kwh" porque acá el valor es temperatura, no energía. */
+    public static final String[] CAMPOS_MEZCLADOR = {"PV", "SV"};
+
+    /**
+     * Nombre de tabla SQLite de un canal de mezclador (misma convención de "máquina virtual" que
+     * TemperaturaAgua/Ambiente): el nombre del mezclador (idealmente el mismo que su línea de
+     * energía, ej. "Mixer01") + sufijo de canal, para que quede claro a qué máquina física
+     * corresponde sin mezclar su config con linea-id-config.json (que es específico de energía).
+     */
+    public static String nombreTablaCanalMezclador(String nombreMezclador, String canal) {
+        return nombreMezclador + "_" + canal;
+    }
+
+    /** Nombres de las tablas SQLite (calentamiento + enfriamiento) de todos los mezcladores configurados. */
+    public List<String> listarNombresTablasMezcladores() {
+        return loadMezcladoresConfig().stream()
+                .flatMap(m -> {
+                    String nombre = String.valueOf(m.get("nombre"));
+                    return java.util.stream.Stream.of(
+                            nombreTablaCanalMezclador(nombre, "Calentamiento"),
+                            nombreTablaCanalMezclador(nombre, "Enfriamiento"));
+                })
+                .collect(Collectors.toList());
+    }
 }

@@ -149,28 +149,39 @@ public class PLCDataQueryService {
     }
 
     public java.util.List<Map<String, Object>> getTodayKWhDataByMaquina(String nombreMaquina) {
+        return getTodayValorPorColumna(nombreMaquina, "kwh");
+    }
+
+    /**
+     * Igual que getTodayKWhDataByMaquina pero para cualquier columna de una sola columna de
+     * valor + fecha (ej. "PV"/"SV" de las tablas de mezcladores) — generalizado para no atar
+     * calcularDerivadaPorHora al nombre "kwh", que en las tablas de mezcladores no existe.
+     * columna no viene de request de usuario (siempre literal en el código llamante), pero se
+     * valida igual que nombreMaquina por consistencia con el resto de la clase.
+     */
+    public java.util.List<Map<String, Object>> getTodayValorPorColumna(String nombreMaquina, String columna) {
         java.util.List<Map<String, Object>> result = new java.util.ArrayList<>();
-        if (!esNombreMaquinaValido(nombreMaquina)) {
-            logger.warn("Nombre de máquina inválido: {}", nombreMaquina);
+        if (!esNombreMaquinaValido(nombreMaquina) || !esNombreMaquinaValido(columna)) {
+            logger.warn("Nombre de máquina o columna inválido: {} / {}", nombreMaquina, columna);
             return result;
         }
 
         try {
             String dbPath = databaseInitializationService.getDailyPath();
             try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
-                 PreparedStatement pstmt = conn.prepareStatement("SELECT fecha, kwh FROM " + nombreMaquina + " ORDER BY fecha ASC");
+                 PreparedStatement pstmt = conn.prepareStatement("SELECT fecha, " + columna + " FROM " + nombreMaquina + " ORDER BY fecha ASC");
                  ResultSet rs = pstmt.executeQuery()) {
 
                 while (rs.next()) {
                     Map<String, Object> row = new HashMap<>();
                     row.put("fecha", rs.getString("fecha"));
-                    row.put("kwh", rs.getDouble("kwh"));
+                    row.put(columna, rs.getDouble(columna));
                     result.add(row);
                 }
-                logger.debug("Retrieved {} KWh records for {} today", result.size(), nombreMaquina);
+                logger.debug("Retrieved {} records ({}) for {} today", result.size(), columna, nombreMaquina);
             }
         } catch (SQLException e) {
-            logger.error("Error retrieving KWh data for {}: {}", nombreMaquina, e.getMessage());
+            logger.error("Error retrieving {} data for {}: {}", columna, nombreMaquina, e.getMessage());
         }
 
         return result;
@@ -201,7 +212,13 @@ public class PLCDataQueryService {
      * @return null si hoy no hay ningún punto anterior a momentoActual (primera lectura del día)
      */
     public Double calcularDerivadaPorHora(String maquina, double valorActual, LocalDateTime momentoActual) {
-        List<Map<String, Object>> puntosHoy = getTodayKWhDataByMaquina(maquina);
+        return calcularDerivadaPorHora(maquina, "kwh", valorActual, momentoActual);
+    }
+
+    /** Igual que calcularDerivadaPorHora(maquina, valorActual, momentoActual) pero sobre una
+     * columna distinta de "kwh" (ej. "PV" de una tabla de canal de mezclador). */
+    public Double calcularDerivadaPorHora(String maquina, String columna, double valorActual, LocalDateTime momentoActual) {
+        List<Map<String, Object>> puntosHoy = getTodayValorPorColumna(maquina, columna);
         if (puntosHoy.isEmpty()) {
             return null;
         }
@@ -224,7 +241,7 @@ public class PLCDataQueryService {
         }
 
         LocalDateTime fechaBase = LocalDateTime.parse((String) puntoBase.get("fecha"), FECHA_FORMATTER);
-        double valorBase = ((Number) puntoBase.get("kwh")).doubleValue();
+        double valorBase = ((Number) puntoBase.get(columna)).doubleValue();
         double horasTranscurridas = Duration.between(fechaBase, momentoActual).toMillis() / 3600000.0;
         if (horasTranscurridas <= 0) {
             return null;

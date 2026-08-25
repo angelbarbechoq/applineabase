@@ -5,6 +5,8 @@ import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * Scheduled task that runs every second to acquire data from PLCs and PAS600L.
  *
@@ -20,15 +22,27 @@ public class DataAcquisitionTask {
 
     private volatile int secondCounter = 59;
 
+    // El pool de @Scheduled tiene 2 hilos (ver Application.taskScheduler): fixedRate no espera a
+    // que termine una ejecución antes de disparar la siguiente, así que si el ciclo de lectura
+    // completo (PLCs + PAS600L + Mezcladores, con sus timeouts Modbus) tarda más de 60s, el
+    // próximo disparo puede arrancar en el otro hilo mientras el anterior sigue corriendo. Las
+    // conexiones batch de DatabaseInitializationService son campos de instancia compartidos sin
+    // sincronización — dos ciclos superpuestos se pisan entre sí ("Connection is null or closed").
+    // Este guard evita que un segundo ciclo arranque mientras el anterior no terminó.
+    private final AtomicBoolean cicloEnCurso = new AtomicBoolean(false);
+
     private final PLCDataAcquisitionService plcDataAcquisitionService;
     private final PASReaderService pasReaderService;
+    private final MezcladorReaderService mezcladorReaderService;
     private final DatabaseInitializationService databaseInitializationService;
 
     public DataAcquisitionTask(PLCDataAcquisitionService plcDataAcquisitionService,
                                PASReaderService pasReaderService,
+                               MezcladorReaderService mezcladorReaderService,
                                DatabaseInitializationService databaseInitializationService) {
         this.plcDataAcquisitionService = plcDataAcquisitionService;
         this.pasReaderService = pasReaderService;
+        this.mezcladorReaderService = mezcladorReaderService;
         this.databaseInitializationService = databaseInitializationService;
         logger.info("DataAcquisitionTask initialized - reading cycle every {} seconds", CYCLE_INTERVAL);
     }
@@ -44,20 +58,30 @@ public class DataAcquisitionTask {
 
             // Every 60 seconds, read PLCs and PAS600L
             if (secondCounter >= CYCLE_INTERVAL) {
-                logger.info(">>> READING CYCLE (every {} seconds) <<<", CYCLE_INTERVAL);
-
-                // Verify and create databases if needed
-                databaseInitializationService.verifyAndCreate();
-
-                // Read all PLCs with lines filtering
-                plcDataAcquisitionService.readAllPLCs();
-
-                // Read PAS600L
-                pasReaderService.readPAS600L();
-
-                // Reset counter
                 secondCounter = 0;
-                //logger.info(">>> END READING CYCLE - secondCounter resetted to 0 <<<");
+
+                if (!cicloEnCurso.compareAndSet(false, true)) {
+                    logger.warn("Ciclo de lectura anterior todavía en curso, se saltea este disparo");
+                    return;
+                }
+                try {
+                    logger.info(">>> READING CYCLE (every {} seconds) <<<", CYCLE_INTERVAL);
+
+                    // Verify and create databases if needed
+                    databaseInitializationService.verifyAndCreate();
+
+                    // Read all PLCs with lines filtering
+                    plcDataAcquisitionService.readAllPLCs();
+
+                    // Read PAS600L
+                    pasReaderService.readPAS600L();
+
+                    //Read Mezcladores (DTB48, gateway separado del PAS600L)
+                    mezcladorReaderService.readMezcladores();
+                    //logger.info(">>> END READING CYCLE - secondCounter resetted to 0 <<<");
+                } finally {
+                    cicloEnCurso.set(false);
+                }
             } else {
                 //logger.debug("⏱️ secondCounter: {}/{}", secondCounter, CYCLE_INTERVAL);
             }

@@ -2,29 +2,29 @@
   "mezcladores": [
     {
       "numero": 1,
-      "nombre": "Mezclador 1",
-      "gatewayNombre": "GteWay01",
+      "nombre": "Mixer01",
+      "gatewayNombre": "",
       "idCalentamiento": 1,
       "idEnfriamiento": 2
     },
     {
       "numero": 2,
-      "nombre": "Mezclador 2",
-      "gatewayNombre": "GteWay01",
+      "nombre": "Mixer02",
+      "gatewayNombre": "",
       "idCalentamiento": 3,
       "idEnfriamiento": 4
     },
     {
       "numero": 3,
-      "nombre": "Mezclador 3",
-      "gatewayNombre": "GteWay01",
+      "nombre": "Mixer03",
+      "gatewayNombre": "",
       "idCalentamiento": 5,
       "idEnfriamiento": 6
     },
     {
       "numero": 4,
-      "nombre": "Mezclador 4",
-      "gatewayNombre": "GteWay01",
+      "nombre": "Mixer04",
+      "gatewayNombre": "",
       "idCalentamiento": 7,
       "idEnfriamiento": 8
     }

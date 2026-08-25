@@ -39,9 +39,17 @@ public class GraficaModel {
     // el resto de las pantallas que reusan GraficaModel/getInitScript2 no se ven afectadas.
     private String[] coloresPersonalizados;
     private boolean mostrarLeyenda = false;
+    // Por defecto null (todas las series con línea sólida, como siempre). Solo la pestaña
+    // Mezcladores la usa, para dibujar el SV (setpoint) punteado y distinguirlo del PV (valor
+    // real) del mismo color — el resto de los gráficos no se ve afectado.
+    private boolean[] seriesDiscontinuas;
 
     public void setColoresPersonalizados(String[] coloresPersonalizados) {
         this.coloresPersonalizados = coloresPersonalizados;
+    }
+
+    public void setSeriesDiscontinuas(boolean[] seriesDiscontinuas) {
+        this.seriesDiscontinuas = seriesDiscontinuas;
     }
 
     public void setMostrarLeyenda(boolean mostrarLeyenda) {
@@ -86,6 +94,15 @@ public class GraficaModel {
             coloresJs.append("am5.color(").append(hexColores[i]).append(")");
         }
         String colors = "var colors = [" + coloresJs + "];";
+        StringBuilder discontinuasJs = new StringBuilder();
+        if (seriesDiscontinuas != null) {
+            discontinuasJs.append("var discontinuas = [");
+            for (int i = 0; i < seriesDiscontinuas.length; i++) {
+                if (i > 0) discontinuasJs.append(", ");
+                discontinuasJs.append(seriesDiscontinuas[i]);
+            }
+            discontinuasJs.append("];");
+        }
         StringBuilder seriesNamesJs = new StringBuilder("var seriesNames = [");
         String unidadJs = "var unidad = '" + unidad + "';";
         for (int i = 0; i < seriesNames.length; i++) {
@@ -124,6 +141,7 @@ public class GraficaModel {
 
                         // PASO 6: Definir colores y nombres
                         colors +
+                        discontinuasJs.toString() +
                         seriesNamesJs.toString() +
                         unidadJs +
                         // PASO 7: CREAR SERIES con tooltips individuales
@@ -138,7 +156,9 @@ public class GraficaModel {
                         // extra solo aplica cuando alguien llamó setColoresPersonalizados — el resto
                         // de las pantallas queda exactamente como estaba antes de este ajuste.
                         (coloresPersonalizados != null ? "  series.set('stroke', colors[i % colors.length]);" : "") +
-                        "  series.strokes.template.setAll({ stroke: colors[i % colors.length] });" +
+                        "  series.strokes.template.setAll({ stroke: colors[i % colors.length]" +
+                        (seriesDiscontinuas != null ? ", strokeDasharray: (discontinuas[i] ? [6, 4] : undefined)" : "") +
+                        " });" +
                         // dy escalonado por serie: con 2+ series cuyos valores quedan cerca en
                         // pantalla (p.ej. VAB/VAC/VBC), cada tooltip se dibuja independiente y sin
                         // este corrimiento terminan superpuestos — solo se alcanza a leer el de la

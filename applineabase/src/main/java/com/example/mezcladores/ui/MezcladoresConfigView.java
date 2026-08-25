@@ -125,12 +125,14 @@ public class MezcladoresConfigView extends VerticalLayout implements BeforeEnter
                             ((Number) m.get("idEnfriamiento")).intValue()))
                     .max(Integer::compareTo).orElse(0);
             numeroField.setValue(siguienteNumero);
-            nombreField.setValue("Mezclador " + siguienteNumero);
+            // Nombre sugerido con el mismo formato que la línea de energía del mismo mezclador
+            // físico (ej. "Mixer01" en linea-id-config.json), para que las tablas de temperatura
+            // queden asociadas a simple vista con su máquina. Editable si no calza.
+            nombreField.setValue(String.format("Mixer%02d", siguienteNumero));
             calentamientoField.setValue(siguienteId + 1);
             enfriamientoField.setValue(siguienteId + 2);
-            if (!gateways.isEmpty()) {
-                gatewayField.setValue(String.valueOf(gateways.get(0).get("nombre")));
-            }
+            // Sin gateway preseleccionado: el primero de la lista podría ser el del PAS600L
+            // (energía), no el del Link150 de los mezcladores — que el usuario elija a propósito.
         }
 
         FormLayout form = new FormLayout(numeroField, nombreField, gatewayField, calentamientoField, enfriamientoField);
