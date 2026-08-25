@@ -37,6 +37,15 @@ public class Usuario {
     @Column(nullable = false)
     private boolean habilitado = true;
 
+    /**
+     * Acceso a la Configuración y pestaña de Mezcladores (temperatura DTB48), independiente de
+     * la zona: la zona "Mezcla" solo filtra qué líneas de energía ve el usuario, no implica
+     * automáticamente que deba ver temperatura de mezcladores (puede haber operadores de zona
+     * Mezcla que no deban verla). Ignorado cuando el rol es ADMIN, que ya ve todo.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean verMezcladores = false;
+
     public Usuario() {
     }
 
@@ -82,6 +91,14 @@ public class Usuario {
 
     public void setHabilitado(boolean habilitado) {
         this.habilitado = habilitado;
+    }
+
+    public boolean isVerMezcladores() {
+        return verMezcladores;
+    }
+
+    public void setVerMezcladores(boolean verMezcladores) {
+        this.verMezcladores = verMezcladores;
     }
 
     public enum Rol {

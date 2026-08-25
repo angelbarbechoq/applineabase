@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -59,6 +60,9 @@ public class MezcladorReaderService {
         this.eventPublisher = eventPublisher;
     }
 
+    private record LecturaCanal(String nombreTabla, double pv, double sv) {
+    }
+
     public void readMezcladores() {
         List<Map<String, Object>> mezcladores = configLoaderService.loadMezcladoresConfig();
         if (mezcladores.isEmpty()) {
@@ -75,33 +79,55 @@ public class MezcladorReaderService {
         Map<String, List<Map<String, Object>>> mezcladoresPorGateway = mezcladores.stream()
                 .collect(Collectors.groupingBy(m -> String.valueOf(m.get("gatewayNombre"))));
 
+        // Fase 1: toda la lectura Modbus por red, SIN transacción SQLite abierta. Con un Link150
+        // intermitente esto puede tardar bastante (timeouts de 5s por canal); si la transacción
+        // batch estuviera abierta durante toda esta fase (como antes), cualquier consulta de
+        // ChartsView contra las mismas bases diarias/mensuales queda esperando ese lock — de ahí
+        // la demora al cambiar de pestaña que se reportó.
+        List<LecturaCanal> lecturas = new ArrayList<>();
+        mezcladoresPorGateway.forEach((gatewayNombre, mezcladoresDelGateway) -> {
+            String gatewayIP = gatewayIPsPorNombre.get(gatewayNombre);
+            if (gatewayIP == null) {
+                logger.warn("Gateway {} no está configurado (mezcladores: {})", gatewayNombre, mezcladoresDelGateway.size());
+                return;
+            }
+            if (!ModbusUtil.isIPAvailable(gatewayIP)) {
+                logger.warn("Gateway {} ({}) sin respuesta a ping", gatewayNombre, gatewayIP);
+                return;
+            }
+            lecturas.addAll(leerGateway(gatewayIP, mezcladoresDelGateway));
+        });
+
+        if (lecturas.isEmpty()) {
+            return;
+        }
+
         LocalDateTime ahora = LocalDateTime.now();
         String timestamp = ahora.format(DATE_FORMATTER);
 
+        // Fase 2: persistir todo junto, transacción corta (solo inserts, sin I/O de red adentro).
         databaseInitializationService.beginBatch();
         try {
-            mezcladoresPorGateway.forEach((gatewayNombre, mezcladoresDelGateway) -> {
-                String gatewayIP = gatewayIPsPorNombre.get(gatewayNombre);
-                if (gatewayIP == null) {
-                    logger.warn("Gateway {} no está configurado (mezcladores: {})", gatewayNombre, mezcladoresDelGateway.size());
-                    return;
-                }
-                if (!ModbusUtil.isIPAvailable(gatewayIP)) {
-                    logger.warn("Gateway {} ({}) sin respuesta a ping", gatewayNombre, gatewayIP);
-                    return;
-                }
-                leerGateway(gatewayIP, mezcladoresDelGateway, ahora, timestamp);
-            });
+            for (LecturaCanal l : lecturas) {
+                databaseInitializationService.guardarDatoBatch(new Object[]{timestamp, l.pv(), l.sv()}, l.nombreTabla(), "DAILY");
+                databaseInitializationService.guardarDatoBatch(new Object[]{timestamp, l.pv(), l.sv()}, l.nombreTabla(), "MONTHLY");
+            }
         } finally {
             databaseInitializationService.endBatch();
+        }
+
+        // Fase 3: derivada + evento en vivo, ya con los datos persistidos.
+        for (LecturaCanal l : lecturas) {
+            Double derivadaPorHora = plcDataQueryService.calcularDerivadaPorHora(l.nombreTabla(), "PV", l.pv(), ahora);
+            eventPublisher.publishEvent(new SensorDataUpdateEvent(this, l.nombreTabla(), l.pv(), timestamp, derivadaPorHora));
         }
     }
 
     /** Una sola conexión TCP para todos los canales (calentamiento+enfriamiento de cada
      * mezclador) de este gateway; si un canal individual falla, se loguea y se sigue con el
-     * próximo sin cortar la conexión entera. */
-    private void leerGateway(String gatewayIP, List<Map<String, Object>> mezcladoresDelGateway,
-                              LocalDateTime ahora, String timestamp) {
+     * próximo sin cortar la conexión entera. Sin acceso a SQLite acá — solo lectura Modbus. */
+    private List<LecturaCanal> leerGateway(String gatewayIP, List<Map<String, Object>> mezcladoresDelGateway) {
+        List<LecturaCanal> lecturas = new ArrayList<>();
         ModbusClient modbusClient = new ModbusClient();
         modbusClient.setipAddress(gatewayIP);
         modbusClient.setConnectionTimeout(5000);
@@ -110,8 +136,10 @@ public class MezcladorReaderService {
             modbusClient.Connect();
             for (Map<String, Object> mezclador : mezcladoresDelGateway) {
                 String nombre = String.valueOf(mezclador.get("nombre"));
-                leerCanal(modbusClient, nombre, "Calentamiento", ((Number) mezclador.get("idCalentamiento")).intValue(), ahora, timestamp);
-                leerCanal(modbusClient, nombre, "Enfriamiento", ((Number) mezclador.get("idEnfriamiento")).intValue(), ahora, timestamp);
+                leerCanal(modbusClient, nombre, "Calentamiento", ((Number) mezclador.get("idCalentamiento")).intValue())
+                        .ifPresent(lecturas::add);
+                leerCanal(modbusClient, nombre, "Enfriamiento", ((Number) mezclador.get("idEnfriamiento")).intValue())
+                        .ifPresent(lecturas::add);
             }
         } catch (IOException e) {
             logger.warn("Error conectando a gateway {}: {}", gatewayIP, e.getMessage());
@@ -122,10 +150,10 @@ public class MezcladorReaderService {
                 logger.debug("Error desconectando de {}: {}", gatewayIP, e.getMessage());
             }
         }
+        return lecturas;
     }
 
-    private void leerCanal(ModbusClient modbusClient, String nombreMezclador, String canal, int unitId,
-                            LocalDateTime ahora, String timestamp) {
+    private java.util.Optional<LecturaCanal> leerCanal(ModbusClient modbusClient, String nombreMezclador, String canal, int unitId) {
         String nombreTabla = ConfigLoaderService.nombreTablaCanalMezclador(nombreMezclador, canal);
         modbusClient.setUnitIdentifier((byte) unitId);
 
@@ -133,21 +161,17 @@ public class MezcladorReaderService {
             // REGISTRO_PV y REGISTRO_SV son contiguos (1000h/1001h): un solo read de 2 registros.
             int[] registros = modbusClient.ReadHoldingRegisters(REGISTRO_PV, 2);
             if (registros == null || registros.length < 2) {
-                return;
+                return java.util.Optional.empty();
             }
             // DTB48: PV/SV con 1 decimal (ajustar el divisor si el punto decimal configurado en
             // el controlador es distinto). Cast a short para reinterpretar el registro como
             // complemento a 2 con signo (temperaturas bajo cero).
             double pv = ((short) registros[0]) / 10.0;
             double sv = ((short) registros[1]) / 10.0;
-
-            databaseInitializationService.guardarDatoBatch(new Object[]{timestamp, pv, sv}, nombreTabla, "DAILY");
-            databaseInitializationService.guardarDatoBatch(new Object[]{timestamp, pv, sv}, nombreTabla, "MONTHLY");
-
-            Double derivadaPorHora = plcDataQueryService.calcularDerivadaPorHora(nombreTabla, "PV", pv, ahora);
-            eventPublisher.publishEvent(new SensorDataUpdateEvent(this, nombreTabla, pv, timestamp, derivadaPorHora));
+            return java.util.Optional.of(new LecturaCanal(nombreTabla, pv, sv));
         } catch (IOException | ModbusException e) {
             logger.warn("Error leyendo {} (Unit ID {}): {}", nombreTabla, unitId, e.getMessage());
+            return java.util.Optional.empty();
         }
     }
 }

@@ -40,6 +40,7 @@ public class UsuariosView extends VerticalLayout {
     private final Select<Usuario.Rol> rolSelect = new Select<>();
     private final ComboBox<String> zonaCombo = new ComboBox<>("Zona");
     private final Checkbox habilitadoCheckbox = new Checkbox("Habilitado", true);
+    private final Checkbox verMezcladoresCheckbox = new Checkbox("Ver Mezcladores");
     private final Span formTitle = new Span("Nuevo usuario");
 
     private Usuario usuarioEnEdicion;
@@ -81,7 +82,7 @@ public class UsuariosView extends VerticalLayout {
         nuevoBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
         HorizontalLayout formLayout = new HorizontalLayout(
-                usernameField, passwordField, rolSelect, zonaCombo, habilitadoCheckbox, guardarBtn, nuevoBtn
+                usernameField, passwordField, rolSelect, zonaCombo, habilitadoCheckbox, verMezcladoresCheckbox, guardarBtn, nuevoBtn
         );
         formLayout.setAlignItems(Alignment.END);
         formLayout.getStyle().set("flex-wrap", "wrap");
@@ -93,6 +94,8 @@ public class UsuariosView extends VerticalLayout {
         grid.addColumn(u -> u.getRol() == Usuario.Rol.ADMIN ? "Todas" : (u.getZona() == null ? "-" : u.getZona()))
                 .setHeader("Zona").setAutoWidth(true);
         grid.addColumn(u -> u.isHabilitado() ? "Sí" : "No").setHeader("Habilitado").setAutoWidth(true);
+        grid.addColumn(u -> u.getRol() == Usuario.Rol.ADMIN || u.isVerMezcladores() ? "Sí" : "No")
+                .setHeader("Ver Mezcladores").setAutoWidth(true);
         grid.addComponentColumn(this::crearAccionesColumna).setHeader("Acciones").setAutoWidth(true);
         grid.setSizeFull();
 
@@ -119,6 +122,7 @@ public class UsuariosView extends VerticalLayout {
         zonaCombo.setValue(usuario.getZona() == null ? "" : usuario.getZona());
         zonaCombo.setEnabled(usuario.getRol() != Usuario.Rol.ADMIN);
         habilitadoCheckbox.setValue(usuario.isHabilitado());
+        verMezcladoresCheckbox.setValue(usuario.isVerMezcladores());
     }
 
     private void limpiarFormulario() {
@@ -131,6 +135,7 @@ public class UsuariosView extends VerticalLayout {
         zonaCombo.clear();
         zonaCombo.setEnabled(true);
         habilitadoCheckbox.setValue(true);
+        verMezcladoresCheckbox.setValue(false);
     }
 
     private void guardar() {
@@ -168,6 +173,7 @@ public class UsuariosView extends VerticalLayout {
         usuario.setRol(rol);
         usuario.setZona(rol == Usuario.Rol.ADMIN ? null : zonaCombo.getValue());
         usuario.setHabilitado(habilitadoCheckbox.getValue());
+        usuario.setVerMezcladores(verMezcladoresCheckbox.getValue());
 
         usuarioRepository.save(usuario);
         Notification.show("Usuario guardado", 2500, Notification.Position.BOTTOM_END)

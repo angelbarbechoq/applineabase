@@ -18,7 +18,6 @@ import java.util.stream.Collectors;
 public class LineaAccessService {
 
     private static final String ZONA_MANTENIMIENTO = "Mantenimiento";
-    private static final String ZONA_MEZCLA = "Mezcla";
 
     private final ConfigLoaderService configLoaderService;
 
@@ -63,9 +62,17 @@ public class LineaAccessService {
         return esAdmin() || ZONA_MANTENIMIENTO.equalsIgnoreCase(zonaUsuarioActual());
     }
 
-    /** Configuración de mezcladores: solo ADMIN y usuarios de la zona Mezcla. */
+    /** Configuración y gráficas de mezcladores: ADMIN, o el usuario puntual que tenga marcado
+     * "Ver Mezcladores" (independiente de la zona — ver Usuario.verMezcladores). */
     public boolean puedeVerMezcladores() {
-        return esAdmin() || ZONA_MEZCLA.equalsIgnoreCase(zonaUsuarioActual());
+        if (esAdmin()) {
+            return true;
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {
+            return false;
+        }
+        return principal.getUsuario().isVerMezcladores();
     }
 
     public boolean esAdmin() {

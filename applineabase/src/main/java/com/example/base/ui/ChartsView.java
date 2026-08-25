@@ -50,6 +50,8 @@ public class ChartsView extends VerticalLayout {
     private List<Map<String, Object>> lineas;
     private Div maquinaInfoCard;
     private Div datosActualesCard;
+    private Tab tabKwh;
+    private boolean kwhSSECerrado;
 
     // --- Temperatura (TemperaturaAgua + TemperaturaAmbiente combinadas) ---
     private boolean mostrarTemperatura;
@@ -102,7 +104,7 @@ public class ChartsView extends VerticalLayout {
 
         TabSheet tabSheet = new TabSheet();
         tabSheet.setSizeFull();
-        tabSheet.add("KWh", panelKwh);
+        tabKwh = tabSheet.add("KWh", panelKwh);
         if (mostrarTemperatura) {
             tabTemperatura = tabSheet.add("Temperatura", crearPanelTemperatura());
             // Arranca ya, sin esperar a que se abra la pestaña: la franja de valores en vivo
@@ -128,17 +130,48 @@ public class ChartsView extends VerticalLayout {
         // iniciarSSEPFGeneral), así que solo hace falta cargar una vez por pestaña.
         tabSheet.addSelectedChangeListener(event -> {
             Tab seleccionada = event.getSelectedTab();
+            if (seleccionada == tabKwh) {
+                if (kwhSSECerrado && maquinaSeleccionada != null) {
+                    kwhSSECerrado = false;
+                    iniciarSSE(maquinaSeleccionada);
+                }
+            } else if (!kwhSSECerrado && maquinaSeleccionada != null) {
+                // El KWh de esta franja de la pestaña KWh no se muestra en el encabezado
+                // persistente (a diferencia de Temperatura/PF general), así que no hace falta
+                // mantenerlo abierto fuera de esta pestaña — mismo motivo que Mezcladores más
+                // abajo, y este ya venía acumulándose sin cerrarse desde antes de mezcladores
+                // (con solo 4 streams como máximo nunca llegaba a chocar contra el límite del
+                // navegador; con Mezcladores sí).
+                kwhSSECerrado = true;
+                detenerSSE();
+            }
             if (seleccionada == tabTemperatura && !temperaturaCargada) {
                 temperaturaCargada = true;
                 cargarTemperaturaChart();
             } else if (seleccionada == tabPFGeneral && !pfGeneralCargada) {
                 pfGeneralCargada = true;
                 cargarPFGeneralChart();
-            } else if (seleccionada == tabMezcladores && !mezcladorCargado) {
-                mezcladorCargado = true;
-                if (mezcladorSeleccionado != null) {
-                    cargarMezcladorChart(mezcladorSeleccionado);
+            } else if (seleccionada == tabMezcladores) {
+                if (!mezcladorCargado) {
+                    mezcladorCargado = true;
+                    if (mezcladorSeleccionado != null) {
+                        cargarMezcladorChart(mezcladorSeleccionado);
+                    }
+                } else if (mezcladorSeleccionado != null) {
+                    // Ya se cargó una vez; el SSE se había cerrado al salir de la pestaña
+                    // (ver más abajo), así que solo hace falta reabrirlo, no recargar el gráfico.
+                    reabrirSSEMezclador();
                 }
+            }
+            if (mostrarMezcladores && seleccionada != tabMezcladores) {
+                // Mezcladores no alimenta la franja de arriba (a diferencia de Temperatura/PF
+                // general), así que no hace falta mantener sus 2 EventSource abiertos fuera de
+                // esta pestaña. Cerrarlos acá evita acumular conexiones SSE indefinidamente: el
+                // navegador limita a ~6 conexiones simultáneas por origen (HTTP/1.1), y sumadas
+                // a Temperatura (2) + PF general (1) + KWh (1), Mezcladores llevaba el total a 6
+                // — dejando a Vaadin sin conexión libre para navegar (la barra azul de carga
+                // quedaba parpadeando sin poder completar ningún pedido).
+                cerrarSSEMezclador();
             }
         });
     }
@@ -465,6 +498,22 @@ public class ChartsView extends VerticalLayout {
      * no con el SV (el setpoint no cambia solo, no hace falta empujarlo por SSE) — SV se
      * actualiza recién si el usuario vuelve a cambiar de mezclador o recarga la pestaña.
      */
+    /** Reabre el SSE de mezcladores al volver a esta pestaña (se había cerrado al salir, ver
+     * cerrarSSEMezclador) — no hace falta recargar el gráfico completo, los puntos que se
+     * perdieron mientras estaba cerrado ya quedaron guardados y se ven al re-seleccionar el
+     * mezclador o recargar la página. */
+    private void reabrirSSEMezclador() {
+        String tablaCal = ConfigLoaderService.nombreTablaCanalMezclador(mezcladorSeleccionado, "Calentamiento");
+        String tablaEnf = ConfigLoaderService.nombreTablaCanalMezclador(mezcladorSeleccionado, "Enfriamiento");
+        iniciarSSEMezclador(tablaCal, tablaEnf);
+    }
+
+    private void cerrarSSEMezclador() {
+        getElement().executeJs(
+                "if(window.eventSourceMezcladorCal) { window.eventSourceMezcladorCal.close(); window.eventSourceMezcladorCal = null; }" +
+                "if(window.eventSourceMezcladorEnf) { window.eventSourceMezcladorEnf.close(); window.eventSourceMezcladorEnf = null; }");
+    }
+
     private void iniciarSSEMezclador(String tablaCal, String tablaEnf) {
         String baseUrl = getBaseUrl();
         getElement().executeJs(construirScriptSSESerie(

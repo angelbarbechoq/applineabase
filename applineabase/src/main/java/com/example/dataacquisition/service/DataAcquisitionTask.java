@@ -66,19 +66,29 @@ public class DataAcquisitionTask {
                 }
                 try {
                     logger.info(">>> READING CYCLE (every {} seconds) <<<", CYCLE_INTERVAL);
+                    long inicioCiclo = System.currentTimeMillis();
 
                     // Verify and create databases if needed
                     databaseInitializationService.verifyAndCreate();
 
                     // Read all PLCs with lines filtering
+                    long t0 = System.currentTimeMillis();
                     plcDataAcquisitionService.readAllPLCs();
+                    long msPLC = System.currentTimeMillis() - t0;
 
                     // Read PAS600L
+                    t0 = System.currentTimeMillis();
                     pasReaderService.readPAS600L();
+                    long msPAS = System.currentTimeMillis() - t0;
 
                     //Read Mezcladores (DTB48, gateway separado del PAS600L)
+                    t0 = System.currentTimeMillis();
                     mezcladorReaderService.readMezcladores();
-                    //logger.info(">>> END READING CYCLE - secondCounter resetted to 0 <<<");
+                    long msMezcladores = System.currentTimeMillis() - t0;
+
+                    long msTotal = System.currentTimeMillis() - inicioCiclo;
+                    logger.info(">>> END READING CYCLE - PLC: {} ms | PAS600L: {} ms | Mezcladores: {} ms | Total: {} ms <<<",
+                            msPLC, msPAS, msMezcladores, msTotal);
                 } finally {
                     cicloEnCurso.set(false);
                 }
