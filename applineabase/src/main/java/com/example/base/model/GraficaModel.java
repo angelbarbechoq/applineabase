@@ -33,6 +33,17 @@ public class GraficaModel {
     // práctica casi nunca se activa ahí porque "hoy" ya trae como mucho esta misma cantidad.
     private static final int MAX_PUNTOS_VIVO_24H = 1440;
 
+    // Paleta de las 4 series de temperatura de mezcladores (Calentamiento/Enfriamiento x PV/SV):
+    // compartida entre ChartsView (tiempo real) e HistoricoView (histórico), para que se vea
+    // igual en las dos pantallas. Calentamiento en rojo oscuro, enfriamiento en celeste (mismo
+    // celeste que ya usa la pestaña Temperatura de energía); SV punteado del mismo color que su
+    // PV en vez de un color aparte, para leerse como "objetivo vs. valor real" de la misma
+    // variable, no como una serie más a identificar (ver setSeriesDiscontinuas).
+    public static final String[] SERIES_MEZCLADOR = {
+            "Calentamiento (PV)", "Calentamiento (SV)", "Enfriamiento (PV)", "Enfriamiento (SV)"};
+    public static final String[] COLORES_MEZCLADOR = {"0x8b1e2f", "0x8b1e2f", "0x29b6f6", "0x29b6f6"};
+    public static final boolean[] DISCONTINUAS_MEZCLADOR = {false, true, false, true};
+
     // Por defecto null (se usa la paleta roja/azul/verde de siempre, la que ya usan Histórico y
     // KWh/PF general) y sin leyenda (una sola serie no la necesita). Solo los gráficos que
     // explícitamente pidan otra cosa (ver ChartsView, pestaña Temperatura) llaman estos setters;

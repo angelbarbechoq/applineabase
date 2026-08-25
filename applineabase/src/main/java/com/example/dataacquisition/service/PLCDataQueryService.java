@@ -345,6 +345,57 @@ public class PLCDataQueryService {
         }
         return result;
     }
+    /** Igual que getHistoricoKWhByRango pero para cualquier columna de una sola columna de valor +
+     * fecha (ej. "PV"/"SV" de una tabla de canal de mezclador), recorriendo los archivos mensuales
+     * del rango — mismo motivo que getTodayValorPorColumna para el diario. */
+    public List<Map<String, Object>> getHistoricoPorColumnaRango(String maquina, String columna, LocalDate desde, LocalDate hasta) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (!esNombreMaquinaValido(maquina) || !esNombreMaquinaValido(columna)) {
+            logger.warn("Nombre de máquina o columna inválido: {} / {}", maquina, columna);
+            return result;
+        }
+        SimpleDateFormat sdf = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
+
+        YearMonth ymDesde = YearMonth.from(desde);
+        YearMonth ymHasta = YearMonth.from(hasta);
+
+        YearMonth cursor = ymDesde;
+        while (!cursor.isAfter(ymHasta)) {
+            String dbPath = buildMonthlyPath(cursor, false);
+            java.io.File dbFile = new java.io.File(dbPath);
+
+            if (dbFile.exists()) {
+                try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+                     PreparedStatement ps = conn.prepareStatement(
+                             "SELECT fecha, " + columna + " FROM " + maquina + " ORDER BY fecha ASC");
+                     ResultSet rs = ps.executeQuery()) {
+
+                    while (rs.next()) {
+                        String fechaStr = rs.getString("fecha");
+                        try {
+                            Date fechaParsed = sdf.parse(fechaStr);
+                            LocalDate fechaLocal = fechaParsed.toInstant()
+                                    .atZone(ZoneId.systemDefault()).toLocalDate();
+
+                            if (!fechaLocal.isBefore(desde) && !fechaLocal.isAfter(hasta)) {
+                                Map<String, Object> row = new HashMap<>();
+                                row.put("fecha", fechaStr);
+                                row.put(columna, rs.getDouble(columna));
+                                result.add(row);
+                            }
+                        } catch (java.text.ParseException ignored) {}
+                    }
+                } catch (SQLException e) {
+                    logger.error("Error leyendo historico {} {}: {}", columna, dbPath, e.getMessage());
+                }
+            } else {
+                logger.warn("BD mensual no encontrada: {}", dbPath);
+            }
+            cursor = cursor.plusMonths(1);
+        }
+        return result;
+    }
+
     public Map<String, Object> getKWhByFechaExacta(String maquina, String fechaStr) {
         Map<String, Object> result = new HashMap<>();
         if (!esNombreMaquinaValido(maquina)) {

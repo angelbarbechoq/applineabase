@@ -69,12 +69,16 @@ public class HistoricoView extends VerticalLayout {
     // fracción (ej. 0.94) — normalizando antes de graficar, el piso es el mismo para todos.
     // Este sí es un techo real (el PF nunca supera 1 en valor absoluto), no una red de seguridad.
     private static final double PF_MAX_Y_DEFAULT = 1.0;
+    // Solo red de seguridad para el caso sin datos (igual que los de arriba); con datos reales
+    // el percentil 95 domina la escala real.
+    private static final double TEMPERATURA_MAX_Y_DEFAULT = 150.0;
 
     private final GraficaModel graficaKWh = new GraficaModel(1);
     private final GraficaModel graficaVoltajes = new GraficaModel(3);
     private final GraficaModel graficaCorrientes = new GraficaModel(3);
     private final GraficaModel graficaPW = new GraficaModel(1);
     private final GraficaModel graficaPF = new GraficaModel(1);
+    private final GraficaModel graficaTemperatura = new GraficaModel(4);
 
     private GraficaModel graficaActiva;
 
@@ -184,6 +188,12 @@ public class HistoricoView extends VerticalLayout {
     // limpiarAtipicos, solo se saltea el suavizado).
     private final Set<String> maquinasSinMediaMovil;
 
+    // Nombres de mezcladores configurados (mezcladores-config.json) — determina qué máquinas del
+    // combo ofrecen "Temperatura" como variable (ver actualizarOpcionesVariable). Independiente
+    // de linea-id-config.json: un mezclador puede coincidir de nombre con una línea de energía
+    // (hoy Mixer01-04) o no, así que el combo Máquina es la unión de ambas listas.
+    private final Set<String> mezcladoresDisponibles;
+
     public HistoricoView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
                           PLCDataQueryService plcDataQueryService) {
         this.configLoaderService = configLoaderService;
@@ -193,6 +203,15 @@ public class HistoricoView extends VerticalLayout {
                 .filter(l -> "Mezcla".equalsIgnoreCase(String.valueOf(l.get("zona"))))
                 .map(l -> (String) l.get("lineaMaquina"))
                 .collect(Collectors.toSet());
+        // Vacío para quien no tiene el permiso (ver LineaAccessService.puedeVerMezcladores): así
+        // "Temperatura" nunca aparece como opción de Variable para nadie fuera de ADMIN/el
+        // usuario habilitado, sin importar qué máquina elija en el combo (HistoricoView es
+        // @PermitAll, esta es la única barrera acá).
+        this.mezcladoresDisponibles = lineaAccessService.puedeVerMezcladores()
+                ? configLoaderService.loadMezcladoresConfig().stream()
+                        .map(m -> String.valueOf(m.get("nombre")))
+                        .collect(Collectors.toSet())
+                : Set.of();
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -217,6 +236,13 @@ public class HistoricoView extends VerticalLayout {
         graficaPW.setMaxY(PW_MAX_Y_DEFAULT);
         graficaPF.setMinY(0.0);
         graficaPF.setMaxY(PF_MAX_Y_DEFAULT);
+        graficaTemperatura.setMinY(0.0);
+        graficaTemperatura.setMaxY(TEMPERATURA_MAX_Y_DEFAULT);
+        graficaTemperatura.setSeriesNames(GraficaModel.SERIES_MEZCLADOR);
+        graficaTemperatura.setUnidad("°C");
+        graficaTemperatura.setColoresPersonalizados(GraficaModel.COLORES_MEZCLADOR);
+        graficaTemperatura.setSeriesDiscontinuas(GraficaModel.DISCONTINUAS_MEZCLADOR);
+        graficaTemperatura.setMostrarLeyenda(true);
 
         graficaActiva = graficaKWh;
 
@@ -318,6 +344,7 @@ public class HistoricoView extends VerticalLayout {
             case "Corrientes" -> new String[]{"IA", "IB", "IC"};
             case "PW" -> new String[]{"PW"};
             case "PF" -> new String[]{"PF"};
+            case "Temperatura" -> new String[]{"CalentamientoPV", "CalentamientoSV", "EnfriamientoPV", "EnfriamientoSV"};
             default -> new String[0];
         };
     }
@@ -557,7 +584,15 @@ public class HistoricoView extends VerticalLayout {
     }
 
     private HorizontalLayout buildFiltrosLayout() {
-        List<String> maquinas = lineaAccessService.getMaquinasPermitidas();
+        // Unión de líneas de energía + mezcladores: un mezclador puede o no coincidir de nombre
+        // con una línea de energía (hoy Mixer01-04 sí), así que no alcanza con una sola fuente.
+        List<String> maquinas = new ArrayList<>(lineaAccessService.getMaquinasPermitidas());
+        for (String m : mezcladoresDisponibles) {
+            if (!maquinas.contains(m)) {
+                maquinas.add(m);
+            }
+        }
+        java.util.Collections.sort(maquinas);
 
         maquinaCombo = new ComboBox<>("Maquina");
         maquinaCombo.setItems(maquinas);
@@ -566,7 +601,12 @@ public class HistoricoView extends VerticalLayout {
         // Al cambiar de máquina, la tarjeta de último click y la franja de valores quedan
         // referidas a la máquina anterior: se limpian en vez de mostrar datos de otra máquina
         // o "los últimos valores", ya que en Histórico esos valores solo deben venir de un click.
-        maquinaCombo.addValueChangeListener(e -> limpiarTarjetas());
+        // También actualiza qué variables ofrece el combo (ver actualizarOpcionesVariable):
+        // "Temperatura" solo aparece si la máquina elegida es un mezclador.
+        maquinaCombo.addValueChangeListener(e -> {
+            limpiarTarjetas();
+            actualizarOpcionesVariable(e.getValue());
+        });
 
         desdeDate = new DatePicker("Desde");
         desdeDate.setValue(LocalDate.now().minusDays(7));
@@ -577,9 +617,8 @@ public class HistoricoView extends VerticalLayout {
         hastaDate.setWidth("160px");
 
         variableCombo = new ComboBox<>("Variable");
-        variableCombo.setItems("KWh", "Voltajes", "Corrientes", "PW", "PF");
-        variableCombo.setValue("KWh");
         variableCombo.setWidth("160px");
+        actualizarOpcionesVariable(maquinaCombo.getValue());
 
         // Ventana de la media móvil de la pestaña "Filtrado", ajustable a pedido: una ventana
         // chica pierde menos detalle (picos/caídas cortas) pero suaviza menos ruido; una grande
@@ -607,6 +646,23 @@ public class HistoricoView extends VerticalLayout {
         layout.setAlignItems(FlexComponent.Alignment.END);
         layout.setSpacing(true);
         return layout;
+    }
+
+    /**
+     * "Temperatura" solo se ofrece como Variable cuando la máquina elegida es un mezclador (ver
+     * mezcladoresDisponibles) — para el resto de las líneas no hay tablas de calentamiento/
+     * enfriamiento que consultar. Si la variable actualmente elegida deja de estar disponible
+     * (se pasó de un mezclador a una línea normal con "Temperatura" seleccionada), se resetea a
+     * "KWh"; si sigue disponible (ej. se pasó de un mezclador a otro), se conserva tal cual.
+     */
+    private void actualizarOpcionesVariable(String maquina) {
+        List<String> opciones = new ArrayList<>(List.of("KWh", "Voltajes", "Corrientes", "PW", "PF"));
+        if (maquina != null && mezcladoresDisponibles.contains(maquina)) {
+            opciones.add("Temperatura");
+        }
+        String valorActual = variableCombo.getValue();
+        variableCombo.setItems(opciones);
+        variableCombo.setValue(opciones.contains(valorActual) ? valorActual : "KWh");
     }
 
     /**
@@ -698,6 +754,112 @@ public class HistoricoView extends VerticalLayout {
                 graficaActiva = graficaPF;
                 consultarVIP(maquina, desde, hasta, "PF");
                 break;
+            case "Temperatura":
+                graficaActiva = graficaTemperatura;
+                consultarTemperatura(maquina, desde, hasta);
+                break;
+        }
+    }
+
+    /**
+     * Temperatura de mezcladores: a diferencia de KWh/VIP (una sola tabla por máquina), acá son
+     * 2 tablas (Calentamiento/Enfriamiento) con 2 columnas cada una (PV/SV) — se consultan las 4
+     * por separado y se combinan por fecha exacta (mismo timestamp por ciclo de lectura, ver
+     * MezcladorReaderService) en una sola fila con las 4 claves que espera camposPorVariable.
+     * No se aplica limpiarCeroAislado/limpiarAtipicos/mediaMovil (esos filtros son para ruido de
+     * comunicación en variables eléctricas; el SV es un setpoint que cambia a propósito en
+     * escalones reales, filtrarlo como "atípico" borraría justo lo que se quiere ver), así que
+     * "Filtrado" y "Sin filtrar" muestran lo mismo para esta variable — misma razón por la que
+     * ChartsView tampoco filtra nada en su pestaña Mezcladores.
+     */
+    private void consultarTemperatura(String maquina, LocalDate desde, LocalDate hasta) {
+        try {
+            String tablaCal = ConfigLoaderService.nombreTablaCanalMezclador(maquina, "Calentamiento");
+            String tablaEnf = ConfigLoaderService.nombreTablaCanalMezclador(maquina, "Enfriamiento");
+
+            List<Map<String, Object>> calPV = plcDataQueryService.getHistoricoPorColumnaRango(tablaCal, "PV", desde, hasta);
+            List<Map<String, Object>> calSV = plcDataQueryService.getHistoricoPorColumnaRango(tablaCal, "SV", desde, hasta);
+            List<Map<String, Object>> enfPV = plcDataQueryService.getHistoricoPorColumnaRango(tablaEnf, "PV", desde, hasta);
+            List<Map<String, Object>> enfSV = plcDataQueryService.getHistoricoPorColumnaRango(tablaEnf, "SV", desde, hasta);
+
+            List<Map<String, Object>> datos = combinarPorFecha(calPV, calSV, enfPV, enfSV);
+
+            actualizarTablaDatos(datos, "Temperatura", maquina);
+
+            if (datos.isEmpty()) {
+                mensajeSpan.setText("No hay datos en el rango seleccionado");
+                graficaTemperatura.setMaxY(TEMPERATURA_MAX_Y_DEFAULT);
+                getElement().executeJs(graficaTemperatura.getInitScript2(ID_CHART_FILTRADO));
+                getElement().executeJs(graficaTemperatura.getInitScript2(ID_CHART_CRUDO));
+                return;
+            }
+
+            SimpleDateFormat sdf = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
+            List<Long> timestamps = new ArrayList<>();
+            List<Float[]> valoresPorFila = new ArrayList<>();
+            for (Map<String, Object> row : datos) {
+                try {
+                    Float[] valores = {
+                            GraficaModel.toFloat(row.get("CalentamientoPV")), GraficaModel.toFloat(row.get("CalentamientoSV")),
+                            GraficaModel.toFloat(row.get("EnfriamientoPV")), GraficaModel.toFloat(row.get("EnfriamientoSV"))
+                    };
+                    long ts = sdf.parse((String) row.get("fecha")).getTime();
+                    timestamps.add(ts);
+                    valoresPorFila.add(valores);
+                } catch (Exception ignored) {}
+            }
+
+            renderizarTemperatura(ID_CHART_FILTRADO, timestamps, valoresPorFila);
+            renderizarTemperatura(ID_CHART_CRUDO, timestamps, valoresPorFila);
+
+            mensajeSpan.setText("");
+            huboConsultaExitosa = true;
+        } catch (Exception e) {
+            mensajeSpan.setText("Error: " + e.getMessage());
+        }
+    }
+
+    private void renderizarTemperatura(String containerId, List<Long> timestamps, List<Float[]> valoresPorFila) {
+        List<Float> valoresParaEscala = new ArrayList<>();
+        for (Float[] fila : valoresPorFila) {
+            for (Float v : fila) {
+                if (v != null && v > 0) valoresParaEscala.add(v);
+            }
+        }
+        graficaTemperatura.setMaxY(GraficaModel.calcularMaxYConMargen(valoresParaEscala, TEMPERATURA_MAX_Y_DEFAULT));
+
+        StringBuilder script = new StringBuilder();
+        script.append(graficaTemperatura.getInitScript2(containerId));
+        script.append(graficaTemperatura.getSetAllDataScript(containerId, timestamps, valoresPorFila));
+        script.append(graficaTemperatura.getAplicarZoomInicialScript(containerId));
+        script.append(graficaTemperatura.getZoomXInicialScript(containerId, timestamps.size()));
+        getElement().executeJs(script.toString());
+    }
+
+    /** Combina las 4 series (Calentamiento/Enfriamiento x PV/SV) en una sola lista de filas por
+     * fecha exacta, cada una con las 4 claves que espera camposPorVariable("Temperatura") — para
+     * armar una tabla "ancha" (una columna por serie) a partir de consultas que solo devuelven
+     * una columna a la vez (ver getHistoricoPorColumnaRango). Filas ordenadas por fecha (TreeMap). */
+    private static List<Map<String, Object>> combinarPorFecha(List<Map<String, Object>> calPV, List<Map<String, Object>> calSV,
+                                                                List<Map<String, Object>> enfPV, List<Map<String, Object>> enfSV) {
+        java.util.TreeMap<String, Map<String, Object>> porFecha = new java.util.TreeMap<>();
+        agregarColumna(porFecha, calPV, "PV", "CalentamientoPV");
+        agregarColumna(porFecha, calSV, "SV", "CalentamientoSV");
+        agregarColumna(porFecha, enfPV, "PV", "EnfriamientoPV");
+        agregarColumna(porFecha, enfSV, "SV", "EnfriamientoSV");
+        return new ArrayList<>(porFecha.values());
+    }
+
+    private static void agregarColumna(java.util.TreeMap<String, Map<String, Object>> porFecha,
+                                        List<Map<String, Object>> lista, String columnaOrigen, String claveDestino) {
+        for (Map<String, Object> fila : lista) {
+            String fecha = (String) fila.get("fecha");
+            Map<String, Object> row = porFecha.computeIfAbsent(fecha, f -> {
+                Map<String, Object> m = new java.util.HashMap<>();
+                m.put("fecha", f);
+                return m;
+            });
+            row.put(claveDestino, fila.get(columnaOrigen));
         }
     }
 
@@ -861,6 +1023,7 @@ public class HistoricoView extends VerticalLayout {
             case "Corrientes" -> CORRIENTES_MAX_Y_DEFAULT;
             case "PW" -> PW_MAX_Y_DEFAULT;
             case "PF" -> PF_MAX_Y_DEFAULT;
+            case "Temperatura" -> TEMPERATURA_MAX_Y_DEFAULT;
             default -> 0.0;
         };
     }
@@ -941,6 +1104,13 @@ public class HistoricoView extends VerticalLayout {
 
     @ClientCallable
     public void registrarClickEnGrafica(long timestamp) {
+        // La tarjeta de "último click" y las tablas de análisis leen KWh/VIP de la máquina
+        // seleccionada (ver actualizarTarjetaUltimoClick) — para Temperatura mostrarían un dato
+        // de energía de una máquina que en este contexto se está mirando por su temperatura, así
+        // que se saltea en vez de mostrar algo engañoso.
+        if ("Temperatura".equals(variableCombo.getValue())) {
+            return;
+        }
         TarjetasEstadoActual.PuntoClick actual = actualizarTarjetaUltimoClick(timestamp);
         if (modoConArranque) {
             registrarClickConArranque(actual);
