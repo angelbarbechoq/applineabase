@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:www.amcharts.com)"
+      "WebFetch(domain:www.amcharts.com)",
+      "Bash(git branch *)"
     ]
   }
 }

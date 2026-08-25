@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "applineabase-dev",
+      "runtimeExecutable": "C:\\Users\\Mantenim-Electrico\\Documents\\MNTTO2020\\LineaBaseP1\\Productos\\BaseDatos\\LineaBaseLocal\\applineabase\\mvnw.cmd",
+      "runtimeArgs": ["spring-boot:run", "-Dserver.port=8081"],
+      "port": 8081
+    }
+  ]
+}
