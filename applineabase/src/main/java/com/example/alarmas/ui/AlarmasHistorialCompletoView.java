@@ -16,7 +16,6 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.RolesAllowed;
 
 import java.io.ByteArrayInputStream;
@@ -100,12 +99,7 @@ public class AlarmasHistorialCompletoView extends VerticalLayout {
     }
 
     private Anchor crearLinkDescargaCsv() {
-        StreamResource recurso = new StreamResource("alarmas-historial.csv", this::generarCsv);
-        recurso.setContentType("text/csv; charset=UTF-8");
-
-        Anchor descargarLink = new Anchor(recurso, "Descargar CSV");
-        descargarLink.getElement().setAttribute("download", true);
-        return descargarLink;
+        return CsvUtil.crearLinkDescarga("alarmas-historial.csv", this::generarCsv, "Descargar CSV");
     }
 
     private InputStream generarCsv() {

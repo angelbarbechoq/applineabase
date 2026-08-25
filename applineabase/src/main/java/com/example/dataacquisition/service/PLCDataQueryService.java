@@ -298,53 +298,12 @@ public class PLCDataQueryService {
         return result;
     }
 
+    /** Historico mensual de KWh — delega en getHistoricoPorColumnaRango con columna "kwh" fija
+     * (antes repetía el mismo bucle de recorrer meses/parsear fechas letra por letra). */
     public List<Map<String, Object>> getHistoricoKWhByRango(String maquina, LocalDate desde, LocalDate hasta) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        if (!esNombreMaquinaValido(maquina)) {
-            logger.warn("Nombre de máquina inválido: {}", maquina);
-            return result;
-        }
-        SimpleDateFormat sdf = new SimpleDateFormat(RutaArchivosEnergia.FORMATO_FECHA_HORA);
-
-        YearMonth ymDesde = YearMonth.from(desde);
-        YearMonth ymHasta = YearMonth.from(hasta);
-
-        YearMonth cursor = ymDesde;
-        while (!cursor.isAfter(ymHasta)) {
-            String dbPath = buildMonthlyPath(cursor, false);
-            java.io.File dbFile = new java.io.File(dbPath);
-
-            if (dbFile.exists()) {
-                try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
-                     PreparedStatement ps = conn.prepareStatement(
-                             "SELECT fecha, kwh FROM " + maquina + " ORDER BY fecha ASC");
-                     ResultSet rs = ps.executeQuery()) {
-
-                    while (rs.next()) {
-                        String fechaStr = rs.getString("fecha");
-                        try {
-                            Date fechaParsed = sdf.parse(fechaStr);
-                            LocalDate fechaLocal = fechaParsed.toInstant()
-                                    .atZone(ZoneId.systemDefault()).toLocalDate();
-
-                            if (!fechaLocal.isBefore(desde) && !fechaLocal.isAfter(hasta)) {
-                                Map<String, Object> row = new HashMap<>();
-                                row.put("fecha", fechaStr);
-                                row.put("kwh", rs.getDouble("kwh"));
-                                result.add(row);
-                            }
-                        } catch (java.text.ParseException ignored) {}
-                    }
-                } catch (SQLException e) {
-                    logger.error("Error leyendo historico KWh {}: {}", dbPath, e.getMessage());
-                }
-            } else {
-                logger.warn("BD mensual KWh no encontrada: {}", dbPath);
-            }
-            cursor = cursor.plusMonths(1);
-        }
-        return result;
+        return getHistoricoPorColumnaRango(maquina, "kwh", desde, hasta);
     }
+
     /** Igual que getHistoricoKWhByRango pero para cualquier columna de una sola columna de valor +
      * fecha (ej. "PV"/"SV" de una tabla de canal de mezclador), recorriendo los archivos mensuales
      * del rango — mismo motivo que getTodayValorPorColumna para el diario. */

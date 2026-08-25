@@ -34,7 +34,6 @@ import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
-import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.PermitAll;
 
 import java.io.ByteArrayInputStream;
@@ -503,17 +502,12 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Descargar CSV");
 
-        StreamResource recursoSemanal = new StreamResource("horometro-semanal.csv",
-                () -> generarCsv(fechaSemanaPicker.getValue()));
-        recursoSemanal.setContentType("text/csv; charset=UTF-8");
-        Anchor linkSemanal = new Anchor(recursoSemanal, "Horas semanales (por máquina)");
-        linkSemanal.getElement().setAttribute("download", true);
+        Anchor linkSemanal = CsvUtil.crearLinkDescarga("horometro-semanal.csv",
+                () -> generarCsv(fechaSemanaPicker.getValue()), "Horas semanales (por máquina)");
         linkSemanal.getElement().addEventListener("click", e -> dialog.close());
 
-        StreamResource recursoMensual = new StreamResource("horometro-mensual.csv", this::generarCsvMensual);
-        recursoMensual.setContentType("text/csv; charset=UTF-8");
-        Anchor linkMensual = new Anchor(recursoMensual, "Tabla mensual por máquina (año en curso)");
-        linkMensual.getElement().setAttribute("download", true);
+        Anchor linkMensual = CsvUtil.crearLinkDescarga("horometro-mensual.csv", this::generarCsvMensual,
+                "Tabla mensual por máquina (año en curso)");
         linkMensual.getElement().addEventListener("click", e -> dialog.close());
 
         Button btnCancelar = new Button("Cancelar", e -> dialog.close());

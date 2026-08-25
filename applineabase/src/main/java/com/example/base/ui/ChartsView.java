@@ -509,9 +509,7 @@ public class ChartsView extends VerticalLayout {
     }
 
     private void cerrarSSEMezclador() {
-        getElement().executeJs(
-                "if(window.eventSourceMezcladorCal) { window.eventSourceMezcladorCal.close(); window.eventSourceMezcladorCal = null; }" +
-                "if(window.eventSourceMezcladorEnf) { window.eventSourceMezcladorEnf.close(); window.eventSourceMezcladorEnf = null; }");
+        getElement().executeJs(cerrarSSEJs("eventSourceMezcladorCal") + cerrarSSEJs("eventSourceMezcladorEnf"));
     }
 
     private void iniciarSSEMezclador(String tablaCal, String tablaEnf) {
@@ -673,18 +671,21 @@ public class ChartsView extends VerticalLayout {
         detenerSSE();
         if (mostrarTemperatura || mostrarPFGeneral || mostrarMezcladores) {
             getElement().executeJs(
-                "if(window.eventSourcePF) { window.eventSourcePF.close(); window.eventSourcePF = null; }" +
-                "if(window.eventSourceTempAgua) { window.eventSourceTempAgua.close(); window.eventSourceTempAgua = null; }" +
-                "if(window.eventSourceTempAmbiente) { window.eventSourceTempAmbiente.close(); window.eventSourceTempAmbiente = null; }" +
-                "if(window.eventSourceMezcladorCal) { window.eventSourceMezcladorCal.close(); window.eventSourceMezcladorCal = null; }" +
-                "if(window.eventSourceMezcladorEnf) { window.eventSourceMezcladorEnf.close(); window.eventSourceMezcladorEnf = null; }");
+                cerrarSSEJs("eventSourcePF") + cerrarSSEJs("eventSourceTempAgua") + cerrarSSEJs("eventSourceTempAmbiente") +
+                cerrarSSEJs("eventSourceMezcladorCal") + cerrarSSEJs("eventSourceMezcladorEnf"));
         }
     }
 
     private void detenerSSE() {
         if (eventSourceUrl != null) {
-            getElement().executeJs("if(window.eventSource) { window.eventSource.close(); window.eventSource = null; }");
+            getElement().executeJs(cerrarSSEJs("eventSource"));
         }
+    }
+
+    /** JS que cierra y limpia una variable global de EventSource si existe — antes escrito a
+     * mano en cada punto que necesitaba cerrar una (detenerSSE, cerrarSSEMezclador, onDetach). */
+    private static String cerrarSSEJs(String varGlobal) {
+        return "if(window." + varGlobal + ") { window." + varGlobal + ".close(); window." + varGlobal + " = null; }";
     }
 
     private String getBaseUrl() {

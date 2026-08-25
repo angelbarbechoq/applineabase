@@ -31,7 +31,6 @@ import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.PermitAll;
 
 import java.io.ByteArrayInputStream;
@@ -668,14 +667,10 @@ public class HistoricoView extends VerticalLayout {
     /**
      * Descarga (solo ADMIN) de la maquina/variable/rango de la ultima consulta exitosa — el mismo
      * contenido que ya se ve en datosGrid (pestaña Filtrado), sin volver a consultar la base.
-     * Mismo patron que AlarmasHistorialCompletoView.crearLinkDescargaCsv (StreamResource + Anchor
-     * con atributo download), separador ";" y BOM UTF-8 para que Excel lo abra bien.
+     * Separador ";" y BOM UTF-8 (ver generarCsvDatos) para que Excel lo abra bien.
      */
     private Anchor crearLinkDescargaCsv() {
-        StreamResource recurso = new StreamResource("historico.csv", this::generarCsvDatos);
-        recurso.setContentType("text/csv; charset=UTF-8");
-        Anchor descargarLink = new Anchor(recurso, "CSV");
-        descargarLink.getElement().setAttribute("download", true);
+        Anchor descargarLink = CsvUtil.crearLinkDescarga("historico.csv", this::generarCsvDatos, "CSV");
         descargarLink.getElement().getThemeList().add("button");
         descargarLink.getElement().getThemeList().add("tertiary");
         return descargarLink;
@@ -826,14 +821,9 @@ public class HistoricoView extends VerticalLayout {
                 if (v != null && v > 0) valoresParaEscala.add(v);
             }
         }
-        graficaTemperatura.setMaxY(GraficaModel.calcularMaxYConMargen(valoresParaEscala, TEMPERATURA_MAX_Y_DEFAULT));
-
-        StringBuilder script = new StringBuilder();
-        script.append(graficaTemperatura.getInitScript2(containerId));
-        script.append(graficaTemperatura.getSetAllDataScript(containerId, timestamps, valoresPorFila));
-        script.append(graficaTemperatura.getAplicarZoomInicialScript(containerId));
-        script.append(graficaTemperatura.getZoomXInicialScript(containerId, timestamps.size()));
-        getElement().executeJs(script.toString());
+        // graficaActiva == graficaTemperatura acá (la fija consultar() antes de llamar a
+        // consultarTemperatura), así que ejecutarScriptSerie usa la instancia correcta.
+        ejecutarScriptSerie(containerId, timestamps, valoresPorFila, valoresParaEscala, TEMPERATURA_MAX_Y_DEFAULT);
     }
 
     /** Combina las 4 series (Calentamiento/Enfriamiento x PV/SV) en una sola lista de filas por
@@ -995,15 +985,26 @@ public class HistoricoView extends VerticalLayout {
             valoresPorFilaFinal.add(fila);
         }
 
+        ejecutarScriptSerie(containerId, timestamps, valoresPorFilaFinal, valoresParaEscala, maxYDefaultPorTipo(tipoVar));
+    }
+
+    /**
+     * Arma y ejecuta el script final de un gráfico de Histórico (init + carga masiva + zoom
+     * inicial), sobre graficaActiva — última parte compartida entre renderizarVIP y
+     * renderizarTemperatura, que hasta acá difieren en cómo llegan a valoresPorFila/
+     * valoresParaEscala (con o sin limpieza de atípicos/media móvil).
+     */
+    private void ejecutarScriptSerie(String containerId, List<Long> timestamps, List<Float[]> valoresPorFila,
+                                      List<Float> valoresParaEscala, double maxYDefault) {
         // Establecer maxY dinámico ANTES de generar el script de inicialización: el piso por
         // defecto se amplía si los datos reales lo superan. Se calcula por separado en cada
         // contenedor porque "Sin filtrar" puede tener atípicos que inflen la escala más que
         // "Filtrado" — cada pestaña debe verse bien con sus propios datos, no compartir eje.
-        graficaActiva.setMaxY(GraficaModel.calcularMaxYConMargen(valoresParaEscala, maxYDefaultPorTipo(tipoVar)));
+        graficaActiva.setMaxY(GraficaModel.calcularMaxYConMargen(valoresParaEscala, maxYDefault));
 
         StringBuilder script = new StringBuilder();
         script.append(graficaActiva.getInitScript2(containerId));
-        script.append(graficaActiva.getSetAllDataScript(containerId, timestamps, valoresPorFilaFinal));
+        script.append(graficaActiva.getSetAllDataScript(containerId, timestamps, valoresPorFila));
         script.append(graficaActiva.getAplicarZoomInicialScript(containerId));
         // No recorta ni descarta puntos: solo cambia qué ventana del rango completo se ve
         // primero (el resto queda navegable con el scrollbar horizontal).
