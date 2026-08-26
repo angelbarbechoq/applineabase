@@ -35,6 +35,7 @@ public class ConfigLoaderService {
     private static final String PLC_CONFIG_FILE = "plc-config.json";
     private static final String LINEA_CONFIG_FILE = "linea-id-config.json";
     private static final String MEZCLADORES_CONFIG_FILE = "mezcladores-config.json";
+    private static final String EXTRUSION_TAG_CONFIG_FILE = "extrusion-tag-config.json";
 
     private final ObjectMapper objectMapper;
 
@@ -50,6 +51,7 @@ public class ConfigLoaderService {
         sembrarSiNoExiste(PLC_CONFIG_FILE);
         sembrarSiNoExiste(LINEA_CONFIG_FILE);
         sembrarSiNoExiste(MEZCLADORES_CONFIG_FILE);
+        sembrarSiNoExiste(EXTRUSION_TAG_CONFIG_FILE);
     }
 
     private void sembrarSiNoExiste(String nombreArchivo) {
@@ -190,5 +192,65 @@ public class ConfigLoaderService {
                             nombreTablaCanalMezclador(nombre, "Enfriamiento"));
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Catálogo de TAGs ISO 14224 de las líneas de Extrusión (taxonomía RVL-EC-CUE-P1): por
+     * línea, sus equipos (nivel 6) y por cada equipo sus ítems mantenibles (nivel 8). A
+     * diferencia de los demás catálogos, la raíz del archivo es un array (no un objeto con
+     * una clave), por eso no reutiliza {@link #leerArchivo}, que asume un objeto en la raíz.
+     * Cada entrada trae "lineaMaquina" (p. ej. "Linea01"), el mismo valor usado en
+     * linea-id-config.json/HorometroTotal, para poder resolver horas de cualquiera de sus
+     * equipos a partir del horómetro ya existente.
+     */
+    public List<Map<String, Object>> loadExtrusionTagConfig() {
+        Path path = resolverPath(EXTRUSION_TAG_CONFIG_FILE);
+        try (InputStream inputStream = Files.newInputStream(path)) {
+            return objectMapper.readValue(inputStream, new TypeReference<List<Map<String, Object>>>() {});
+        } catch (IOException e) {
+            logger.error("Error leyendo {}: {}", path, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * TAGs de equipo (nivel 6, ej. EXT-L01-XTR) y de ítem mantenible (nivel 8, ej.
+     * EXT-L01-XTR-BYT) de todas las líneas de Extrusión, aplanados en una sola lista — para
+     * poblar el selector de "a qué TAG le pongo este plan de mantenimiento" sin obligar a
+     * elegir un único nivel de granularidad.
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> listarTodosLosTagsExtrusion() {
+        List<String> tags = new java.util.ArrayList<>();
+        for (Map<String, Object> linea : loadExtrusionTagConfig()) {
+            Object equiposObj = linea.get("equipos");
+            if (!(equiposObj instanceof List)) {
+                continue;
+            }
+            for (Object eqObj : (List<Object>) equiposObj) {
+                if (!(eqObj instanceof Map)) {
+                    continue;
+                }
+                Map<String, Object> equipo = (Map<String, Object>) eqObj;
+                Object tag = equipo.get("tag");
+                if (tag != null) {
+                    tags.add(String.valueOf(tag));
+                }
+                Object itemsObj = equipo.get("items");
+                if (!(itemsObj instanceof List)) {
+                    continue;
+                }
+                for (Object itObj : (List<Object>) itemsObj) {
+                    if (!(itObj instanceof Map)) {
+                        continue;
+                    }
+                    Object tagExtendido = ((Map<String, Object>) itObj).get("tagExtendido");
+                    if (tagExtendido != null) {
+                        tags.add(String.valueOf(tagExtendido));
+                    }
+                }
+            }
+        }
+        return tags.stream().distinct().sorted().collect(Collectors.toList());
     }
 }

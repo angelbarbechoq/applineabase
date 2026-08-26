@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:www.amcharts.com)",
-      "Bash(git branch *)"
+      "Bash(git branch *)",
+      "Bash(./mvnw.cmd -q -DskipTests compile)",
+      "Bash(echo \"EXIT_CODE=$?\")"
     ]
   }
 }
