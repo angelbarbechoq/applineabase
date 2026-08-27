@@ -38,6 +38,19 @@ public class MantenimientoRealizado {
     @Column(nullable = false)
     private String usuario;
 
+    /** Que se hizo en concreto, editable en el momento de registrar (por defecto, la tarea
+     * del plan). Un mismo plan puede satisfacerse con mas de una accion (ej. Recalibracion o
+     * Cambio de Barril y Tornillo); cualquiera de las dos reinicia el mismo contador porque es
+     * el mismo registro el que define horasAcumuladasEnMomento de ahi en adelante. */
+    private String tareaRealizada;
+
+    /** Numero de Orden de Trabajo asociada, para trazabilidad contra el sistema de OTs. */
+    private String numeroOt;
+
+    /** Tecnico que ejecuto la tarea en planta, distinto de "usuario" (quien la registro en el
+     * sistema, que puede ser un supervisor cargando el trabajo de otra persona). */
+    private String tecnico;
+
     private String notas;
 
     public MantenimientoRealizado() {
@@ -85,5 +98,29 @@ public class MantenimientoRealizado {
 
     public void setNotas(String notas) {
         this.notas = notas;
+    }
+
+    public String getTareaRealizada() {
+        return tareaRealizada;
+    }
+
+    public void setTareaRealizada(String tareaRealizada) {
+        this.tareaRealizada = tareaRealizada;
+    }
+
+    public String getNumeroOt() {
+        return numeroOt;
+    }
+
+    public void setNumeroOt(String numeroOt) {
+        this.numeroOt = numeroOt;
+    }
+
+    public String getTecnico() {
+        return tecnico;
+    }
+
+    public void setTecnico(String tecnico) {
+        this.tecnico = tecnico;
     }
 }

@@ -12,4 +12,6 @@ public interface MantenimientoRealizadoRepository extends JpaRepository<Mantenim
     Optional<MantenimientoRealizado> findFirstByPlanMantenimientoOrderByFechaRealizadoDesc(PlanMantenimiento planMantenimiento);
 
     List<MantenimientoRealizado> findByPlanMantenimientoOrderByFechaRealizadoDesc(PlanMantenimiento planMantenimiento);
+
+    List<MantenimientoRealizado> findAllByOrderByFechaRealizadoDesc();
 }

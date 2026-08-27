@@ -11,8 +11,10 @@ import com.example.mantenimiento.model.ItemTag;
 import com.example.mantenimiento.model.LineaTag;
 import com.example.mantenimiento.model.MantenimientoRealizado;
 import com.example.mantenimiento.model.PlanMantenimiento;
+import com.example.mantenimiento.model.TecnicoMantenimiento;
 import com.example.mantenimiento.repository.MantenimientoRealizadoRepository;
 import com.example.mantenimiento.repository.PlanMantenimientoRepository;
+import com.example.mantenimiento.repository.TecnicoMantenimientoRepository;
 import com.example.security.LineaAccessService;
 import org.springframework.stereotype.Service;
 
@@ -33,19 +35,60 @@ public class MantenimientoService {
     private final HorometroTotalRepository horometroTotalRepository;
     private final ConfigLoaderService configLoaderService;
     private final LineaAccessService lineaAccessService;
+    private final TecnicoMantenimientoRepository tecnicoRepository;
 
     public MantenimientoService(PlanMantenimientoRepository planRepository,
                                  MantenimientoRealizadoRepository realizadoRepository,
                                  HorometroDiarioRepository horometroDiarioRepository,
                                  HorometroTotalRepository horometroTotalRepository,
                                  ConfigLoaderService configLoaderService,
-                                 LineaAccessService lineaAccessService) {
+                                 LineaAccessService lineaAccessService,
+                                 TecnicoMantenimientoRepository tecnicoRepository) {
         this.planRepository = planRepository;
         this.realizadoRepository = realizadoRepository;
         this.horometroDiarioRepository = horometroDiarioRepository;
         this.horometroTotalRepository = horometroTotalRepository;
         this.configLoaderService = configLoaderService;
         this.lineaAccessService = lineaAccessService;
+        this.tecnicoRepository = tecnicoRepository;
+    }
+
+    public List<String> listarTecnicos() {
+        return tecnicoRepository.findAllByOrderByNombreAsc().stream().map(TecnicoMantenimiento::getNombre).toList();
+    }
+
+    public void agregarTecnico(String ci, String nombre, String especialidad) {
+        if (nombre == null || nombre.isBlank()) {
+            return;
+        }
+        if (ci != null && !ci.isBlank() && tecnicoRepository.existsByCi(ci.trim())) {
+            return;
+        }
+        tecnicoRepository.save(new TecnicoMantenimiento(
+                ci == null ? null : ci.trim(), nombre.trim(), especialidad));
+    }
+
+    public void eliminarTecnico(TecnicoMantenimiento tecnico) {
+        tecnicoRepository.delete(tecnico);
+    }
+
+    public void guardarTecnico(TecnicoMantenimiento tecnico) {
+        tecnicoRepository.save(tecnico);
+    }
+
+    public List<TecnicoMantenimiento> listarTecnicosCompleto() {
+        return tecnicoRepository.findAllByOrderByNombreAsc();
+    }
+
+    /** Especialidades ya usadas en el catalogo de personal, para el combo desplegable de
+     * Especialidad (sigue permitiendo texto libre para una especialidad nueva). */
+    public List<String> listarEspecialidades() {
+        return tecnicoRepository.findAllByOrderByNombreAsc().stream()
+                .map(TecnicoMantenimiento::getEspecialidad)
+                .filter(e -> e != null && !e.isBlank())
+                .distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
     }
 
     public List<PlanMantenimiento> listarPlanes() {
@@ -97,6 +140,45 @@ public class MantenimientoService {
         return planRepository.existsByTagAndTarea(tag, tarea);
     }
 
+    /** Plan configurado para un TAG puntual (para la pantalla operativa, que elige el TAG y
+     * resuelve solo cual plan/intervalo aplica). Si hay mas de un plan para el mismo TAG,
+     * devuelve el primero -- hoy no se da ese caso en ningun TAG real del catalogo. */
+    public Optional<PlanMantenimiento> planPorTag(String tag) {
+        return planRepository.findByTag(tag).stream().findFirst();
+    }
+
+    /** Catalogo de tareas ya usadas (nombre nominal de algun plan, o tarea efectivamente
+     * registrada en el historial), para sugerir en el combo de tarea sin dejar de permitir
+     * texto libre para una tarea nueva. */
+    public List<String> catalogoTareas() {
+        return java.util.stream.Stream.concat(
+                        planRepository.findAll().stream().map(PlanMantenimiento::getTarea),
+                        realizadoRepository.findAll().stream().map(MantenimientoRealizado::getTareaRealizada))
+                .filter(t -> t != null && !t.isBlank())
+                .distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+    }
+
+    /** Horas acumuladas del horometro de la linea del plan al cierre de una fecha, para
+     * sugerir el valor de "Horometro" en el formulario (el usuario puede corregirlo a mano). */
+    public double horasEnFecha(PlanMantenimiento plan, LocalDate fecha) {
+        return horometroDiarioRepository.sumHorasHastaFecha(resolverLineaMaquina(plan.getTag()), fecha);
+    }
+
+    /** Horas acumuladas actuales (ahora mismo) de la linea del plan, para calcular en vivo
+     * "horas transcurridas" y "horas faltantes" de cada fila del historial. */
+    public double horasActuales(PlanMantenimiento plan) {
+        return horometroTotalRepository.findById(resolverLineaMaquina(plan.getTag()))
+                .map(HorometroTotal::getHorasAcumuladas).orElse(0.0);
+    }
+
+    /** Historial completo de tareas ya ejecutadas, mas reciente primero, para la grilla de la
+     * pantalla operativa. */
+    public List<MantenimientoRealizado> listarHistorial() {
+        return realizadoRepository.findAllByOrderByFechaRealizadoDesc();
+    }
+
     /**
      * Crea un plan nuevo, sin ningún registro de MantenimientoRealizado todavía — cuándo se
      * hizo la tarea por última vez es un evento operativo, se carga aparte (vista de "marcar
@@ -113,22 +195,28 @@ public class MantenimientoService {
     }
 
     /**
-     * Registra que la tarea se realizo en una fecha (evento operativo, vista de mantenimiento).
-     * Crea siempre un registro NUEVO en el historial (no edita el anterior) para conservar
-     * trazabilidad de cada vez que se hizo la tarea. Las horas acumuladas de ese registro se
-     * reconstruyen con el historico del horometro (HorometroDiario.sumHorasHastaFecha) tal
-     * como estaban al cierre de esa fecha, no con las horas actuales, ya que la fecha puede
-     * ser pasada (la tarea se hizo antes y recien ahora se carga en el sistema).
+     * Registra que la tarea se realizo (log de tareas ya ejecutadas: no valida reglas de
+     * negocio, solo registra lo que paso en planta). Crea siempre un registro NUEVO en el
+     * historial (no edita el anterior) para conservar trazabilidad. El horometro lo confirma
+     * o corrige el usuario en el formulario (sugerido con horasEnFecha, pero editable) en vez
+     * de forzar el valor calculado automaticamente.
+     *
+     * tareaRealizada permite anotar que se hizo en concreto cuando difiere de la tarea nominal
+     * del plan (ej. plan "Recalibracion de Barril y Tornillo" pero lo que se hizo fue un
+     * "Cambio"); si viene vacio, se usa la tarea del plan tal cual. El contador del plan se
+     * reinicia igual en ambos casos porque es el mismo registro el que define horasBase.
      */
-    public void registrarMantenimientoRealizado(PlanMantenimiento plan, LocalDateTime fechaRealizado, String notas) {
-        String lineaMaquina = resolverLineaMaquina(plan.getTag());
-        double horasEnEsaFecha = horometroDiarioRepository.sumHorasHastaFecha(lineaMaquina, fechaRealizado.toLocalDate());
-
+    public void registrarMantenimientoRealizado(PlanMantenimiento plan, LocalDateTime fechaRealizado,
+                                                 String tareaRealizada, double horasAcumuladasEnMomento,
+                                                 String numeroOt, String tecnico, String notas) {
         MantenimientoRealizado registro = new MantenimientoRealizado();
         registro.setPlanMantenimiento(plan);
         registro.setFechaRealizado(fechaRealizado);
-        registro.setHorasAcumuladasEnMomento(horasEnEsaFecha);
+        registro.setHorasAcumuladasEnMomento(horasAcumuladasEnMomento);
         registro.setUsuario(lineaAccessService.usuarioActual());
+        registro.setTareaRealizada(tareaRealizada == null || tareaRealizada.isBlank() ? plan.getTarea() : tareaRealizada);
+        registro.setNumeroOt(numeroOt);
+        registro.setTecnico(tecnico);
         registro.setNotas(notas);
         realizadoRepository.save(registro);
     }

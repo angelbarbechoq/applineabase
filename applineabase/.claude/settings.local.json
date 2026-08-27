@@ -21,7 +21,12 @@
       "Bash(ls -la \"/c/LineaBaseX/data/\" 2>&1)",
       "Bash(powershell -Command \"Get-Process java -ErrorAction SilentlyContinue | Select-Object Id, StartTime, CPU\")",
       "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=11504 or ProcessId=21120\")",
-      "PowerShell(Get-NetTCPConnection -OwningProcess 11504 -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-NetTCPConnection -OwningProcess 11504 -ErrorAction SilentlyContinue)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty State -Unique\")",
+      "Bash(tasklist //FI \"IMAGENAME eq java.exe\")",
+      "Bash(python3 -c ' *)",
+      "Bash(java -Dfile.encoding=UTF-8 -cp '.;__TRACKED_VAR__' CheckPlanes)",
+      "Bash(java -Dfile.encoding=UTF-8 -cp '.;__TRACKED_VAR__' CheckTecnicos)"
     ],
     "defaultMode": "bypassPermissions"
   }

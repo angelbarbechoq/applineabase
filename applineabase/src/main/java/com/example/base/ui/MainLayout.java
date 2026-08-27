@@ -237,7 +237,14 @@ public final class MainLayout extends AppLayout {
             colapsarAlSalirDelMouse(alarmas);
         }
         if (lineaAccessService.esAdmin()) {
-            nav.addItem(new SideNavItem("Mantenimiento Preventivo", "mantenimiento", VaadinIcon.TOOLS.create()));
+            SideNavItem mantenimientoPreventivo = new SideNavItem("Mantenimiento Preventivo");
+            mantenimientoPreventivo.setPrefixComponent(VaadinIcon.TOOLS.create());
+            mantenimientoPreventivo.setExpanded(false);
+            mantenimientoPreventivo.addItem(new SideNavItem("Mantenimiento Barril y Tornillos", "mantenimiento", VaadinIcon.TOOLS.create()));
+            mantenimientoPreventivo.addItem(new SideNavItem("Personal de Mantenimiento", "mantenimiento/personal", VaadinIcon.USERS.create()));
+            nav.addItem(mantenimientoPreventivo);
+            colapsarAlSalirDelMouse(mantenimientoPreventivo);
+
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
             nav.addItem(new SideNavItem("Reparar VIP Mensual", "admin/reparar-vip", VaadinIcon.WRENCH.create()));
 
