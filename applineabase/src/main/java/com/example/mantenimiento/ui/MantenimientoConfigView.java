@@ -13,7 +13,6 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Span;
@@ -62,7 +61,6 @@ public class MantenimientoConfigView extends VerticalLayout {
     private final TextField tareaField = new TextField("Tarea");
     private final NumberField intervaloField = new NumberField("Intervalo (horas)");
     private final NumberField avisoAnticipadoField = new NumberField("Aviso anticipado (horas antes)");
-    private final DateTimePicker fechaUltimoMantenimientoField = new DateTimePicker("Última vez que se hizo esta tarea");
     private final Checkbox habilitadoCheckbox = new Checkbox("Habilitado", true);
     private final Button guardarBtn = new Button("Guardar");
     private final Button eliminarBtn = new Button("Eliminar");
@@ -105,15 +103,11 @@ public class MantenimientoConfigView extends VerticalLayout {
         avisoAnticipadoField.setStep(1);
         avisoAnticipadoField.setMin(0);
 
-        fechaUltimoMantenimientoField.setWidth("260px");
-        fechaUltimoMantenimientoField.setHelperText("Puede ser una fecha pasada, si la tarea ya se hizo y recién ahora se carga el plan");
-        fechaUltimoMantenimientoField.setMax(LocalDateTime.now());
-
         grid.addColumn(e -> e.plan().getTag()).setHeader("TAG").setAutoWidth(true).setSortable(true);
         grid.addColumn(e -> e.plan().getTarea()).setHeader("Tarea").setAutoWidth(true).setSortable(true);
         grid.addColumn(e -> e.plan().getIntervaloHoras()).setHeader("Intervalo (h)").setAutoWidth(true);
         grid.addColumn(this::formatearFecha).setHeader("Última vez realizado").setAutoWidth(true).setSortable(true);
-        grid.addColumn(e -> String.format("%.1f", e.horasTranscurridas())).setHeader("Horas transcurridas").setAutoWidth(true);
+        grid.addColumn(this::formatearHorasTranscurridas).setHeader("Horas transcurridas").setAutoWidth(true);
         grid.addColumn(this::formatearEstadoProximoAviso).setHeader("Próximo aviso").setAutoWidth(true);
         grid.addColumn(e -> e.plan().isHabilitado() ? "Sí" : "No").setHeader("Habilitado").setAutoWidth(true);
         grid.asSingleSelect().addValueChangeListener(e -> cargarEnFormulario(e.getValue() == null ? null : e.getValue().plan()));
@@ -134,7 +128,7 @@ public class MantenimientoConfigView extends VerticalLayout {
         selectorLayout.getStyle().set("flex-wrap", "wrap");
 
         HorizontalLayout formLayout = new HorizontalLayout(
-                tareaField, intervaloField, avisoAnticipadoField, fechaUltimoMantenimientoField, habilitadoCheckbox,
+                tareaField, intervaloField, avisoAnticipadoField, habilitadoCheckbox,
                 guardarBtn, nuevoBtn, eliminarBtn
         );
         formLayout.setAlignItems(Alignment.END);
@@ -197,8 +191,6 @@ public class MantenimientoConfigView extends VerticalLayout {
         tareaField.setEnabled(false);
         intervaloField.setValue(plan.getIntervaloHoras());
         avisoAnticipadoField.setValue(plan.getHorasAvisoAnticipado());
-        fechaUltimoMantenimientoField.setValue(mantenimientoService.obtenerUltimaFechaRealizado(plan).orElse(null));
-        fechaUltimoMantenimientoField.setVisible(true);
         habilitadoCheckbox.setValue(plan.isHabilitado());
         eliminarBtn.setEnabled(true);
     }
@@ -244,8 +236,6 @@ public class MantenimientoConfigView extends VerticalLayout {
         tareaField.setEnabled(true);
         intervaloField.clear();
         avisoAnticipadoField.clear();
-        fechaUltimoMantenimientoField.setValue(LocalDateTime.now());
-        fechaUltimoMantenimientoField.setVisible(true);
         habilitadoCheckbox.setValue(true);
         eliminarBtn.setEnabled(false);
     }
@@ -274,20 +264,14 @@ public class MantenimientoConfigView extends VerticalLayout {
             NotificacionesUtil.mostrarError("El intervalo de horas debe ser mayor a 0");
             return;
         }
-        if (fechaUltimoMantenimientoField.getValue() == null) {
-            NotificacionesUtil.mostrarError("Indica cuándo se hizo esta tarea por última vez");
-            return;
-        }
-
         plan.setIntervaloHoras(intervaloField.getValue());
         plan.setHorasAvisoAnticipado(avisoAnticipadoField.getValue());
         plan.setHabilitado(habilitadoCheckbox.getValue());
 
         if (esNuevo) {
-            mantenimientoService.crearPlan(plan, fechaUltimoMantenimientoField.getValue());
+            mantenimientoService.crearPlan(plan);
         } else {
             mantenimientoService.guardar(plan);
-            mantenimientoService.actualizarFechaUltimoMantenimiento(plan, fechaUltimoMantenimientoField.getValue());
         }
         Notification.show("Plan guardado", 2500, Notification.Position.BOTTOM_END)
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
@@ -311,11 +295,20 @@ public class MantenimientoConfigView extends VerticalLayout {
         grid.setItems(mantenimientoService.listarEstadoPlanes());
     }
 
+    private static final String SIN_REGISTRO = "Sin mantenimiento registrado";
+
     private String formatearFecha(EstadoPlanDTO estado) {
-        return estado.ultimaFechaRealizado() == null ? "—" : estado.ultimaFechaRealizado().format(FORMATO_FECHA);
+        return estado.sinRegistro() ? SIN_REGISTRO : estado.ultimaFechaRealizado().format(FORMATO_FECHA);
+    }
+
+    private String formatearHorasTranscurridas(EstadoPlanDTO estado) {
+        return estado.sinRegistro() ? SIN_REGISTRO : String.format("%.1f", estado.horasTranscurridas());
     }
 
     private String formatearEstadoProximoAviso(EstadoPlanDTO estado) {
+        if (estado.sinRegistro()) {
+            return SIN_REGISTRO;
+        }
         if (estado.vencido()) {
             return "Vencido";
         }

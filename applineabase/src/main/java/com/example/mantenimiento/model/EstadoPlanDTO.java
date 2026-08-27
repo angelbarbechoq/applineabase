@@ -18,4 +18,11 @@ public record EstadoPlanDTO(
     public boolean vencido() {
         return horasRestantes <= 0;
     }
+
+    /** Sin ningún MantenimientoRealizado todavía — el plan se creó pero nadie cargó desde
+     * cuándo contar, así que horasTranscurridas/horasRestantes no son un dato confiable
+     * para mostrar (asumirían 0 horas base). */
+    public boolean sinRegistro() {
+        return ultimaFechaRealizado == null;
+    }
 }

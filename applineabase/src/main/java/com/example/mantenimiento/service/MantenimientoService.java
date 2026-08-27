@@ -98,50 +98,18 @@ public class MantenimientoService {
     }
 
     /**
-     * Crea un plan nuevo y, junto con él, el primer registro de MantenimientoRealizado a partir
-     * de la fecha en que el usuario indica que se hizo la tarea por última vez (puede ser una
-     * fecha pasada — el plan a veces se carga en el sistema después de haber hecho la tarea).
-     * Las horas acumuladas de ese registro se reconstruyen con el histórico del horómetro
-     * (HorometroDiario.sumHorasHastaFecha) tal como estaban al cierre de esa fecha, no con las
-     * horas actuales — así "horas desde el último mantenimiento" se calcula bien desde el día 1.
+     * Crea un plan nuevo, sin ningún registro de MantenimientoRealizado todavía — cuándo se
+     * hizo la tarea por última vez es un evento operativo, se carga aparte (vista de "marcar
+     * mantenimiento realizado", a implementar), no en el formulario de la regla. Hasta que se
+     * cargue ese primer registro, el estado del plan queda como "sin registro" (ver
+     * EstadoPlanDTO.sinRegistro()).
      */
-    public PlanMantenimiento crearPlan(PlanMantenimiento plan, LocalDateTime fechaUltimoMantenimiento) {
-        PlanMantenimiento guardado = planRepository.save(plan);
-
-        String lineaMaquina = resolverLineaMaquina(plan.getTag());
-        double horasEnEsaFecha = horometroDiarioRepository.sumHorasHastaFecha(lineaMaquina, fechaUltimoMantenimiento.toLocalDate());
-
-        MantenimientoRealizado registroInicial = new MantenimientoRealizado();
-        registroInicial.setPlanMantenimiento(guardado);
-        registroInicial.setFechaRealizado(fechaUltimoMantenimiento);
-        registroInicial.setHorasAcumuladasEnMomento(horasEnEsaFecha);
-        registroInicial.setUsuario(lineaAccessService.usuarioActual());
-        registroInicial.setNotas("Registro inicial al crear el plan");
-        realizadoRepository.save(registroInicial);
-
-        return guardado;
+    public PlanMantenimiento crearPlan(PlanMantenimiento plan) {
+        return planRepository.save(plan);
     }
 
     public PlanMantenimiento guardar(PlanMantenimiento plan) {
         return planRepository.save(plan);
-    }
-
-    /** Fecha del MantenimientoRealizado más reciente del plan, para precargar el campo al
-     * editar (así se puede corregir sin tener que ir a "marcar como realizado" de nuevo). */
-    public Optional<LocalDateTime> obtenerUltimaFechaRealizado(PlanMantenimiento plan) {
-        return realizadoRepository.findFirstByPlanMantenimientoOrderByFechaRealizadoDesc(plan)
-                .map(MantenimientoRealizado::getFechaRealizado);
-    }
-
-    /** Corrige la fecha del registro de MantenimientoRealizado más reciente (no crea uno nuevo)
-     * y recalcula sus horas acumuladas para esa fecha, igual que al crear el plan. */
-    public void actualizarFechaUltimoMantenimiento(PlanMantenimiento plan, LocalDateTime nuevaFecha) {
-        MantenimientoRealizado ultimo = realizadoRepository.findFirstByPlanMantenimientoOrderByFechaRealizadoDesc(plan)
-                .orElseThrow(() -> new IllegalStateException("El plan no tiene ningún registro de mantenimiento realizado"));
-        String lineaMaquina = resolverLineaMaquina(plan.getTag());
-        ultimo.setFechaRealizado(nuevaFecha);
-        ultimo.setHorasAcumuladasEnMomento(horometroDiarioRepository.sumHorasHastaFecha(lineaMaquina, nuevaFecha.toLocalDate()));
-        realizadoRepository.save(ultimo);
     }
 
     /** Borra primero el historial de MantenimientoRealizado del plan — sin esto, la FK
