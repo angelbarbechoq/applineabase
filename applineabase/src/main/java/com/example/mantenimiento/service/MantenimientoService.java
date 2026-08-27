@@ -112,6 +112,27 @@ public class MantenimientoService {
         return planRepository.save(plan);
     }
 
+    /**
+     * Registra que la tarea se realizo en una fecha (evento operativo, vista de mantenimiento).
+     * Crea siempre un registro NUEVO en el historial (no edita el anterior) para conservar
+     * trazabilidad de cada vez que se hizo la tarea. Las horas acumuladas de ese registro se
+     * reconstruyen con el historico del horometro (HorometroDiario.sumHorasHastaFecha) tal
+     * como estaban al cierre de esa fecha, no con las horas actuales, ya que la fecha puede
+     * ser pasada (la tarea se hizo antes y recien ahora se carga en el sistema).
+     */
+    public void registrarMantenimientoRealizado(PlanMantenimiento plan, LocalDateTime fechaRealizado, String notas) {
+        String lineaMaquina = resolverLineaMaquina(plan.getTag());
+        double horasEnEsaFecha = horometroDiarioRepository.sumHorasHastaFecha(lineaMaquina, fechaRealizado.toLocalDate());
+
+        MantenimientoRealizado registro = new MantenimientoRealizado();
+        registro.setPlanMantenimiento(plan);
+        registro.setFechaRealizado(fechaRealizado);
+        registro.setHorasAcumuladasEnMomento(horasEnEsaFecha);
+        registro.setUsuario(lineaAccessService.usuarioActual());
+        registro.setNotas(notas);
+        realizadoRepository.save(registro);
+    }
+
     /** Borra primero el historial de MantenimientoRealizado del plan — sin esto, la FK
      * obligatoria hacia PlanMantenimiento rechaza el borrado del plan por integridad
      * referencial en cuanto tiene al menos un registro (siempre tiene uno: el que crearPlan

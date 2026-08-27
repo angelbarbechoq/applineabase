@@ -237,6 +237,7 @@ public final class MainLayout extends AppLayout {
             colapsarAlSalirDelMouse(alarmas);
         }
         if (lineaAccessService.esAdmin()) {
+            nav.addItem(new SideNavItem("Mantenimiento Preventivo", "mantenimiento", VaadinIcon.TOOLS.create()));
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
             nav.addItem(new SideNavItem("Reparar VIP Mensual", "admin/reparar-vip", VaadinIcon.WRENCH.create()));
 

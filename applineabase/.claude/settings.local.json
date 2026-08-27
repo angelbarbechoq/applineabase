@@ -6,7 +6,23 @@
       "Bash(./mvnw.cmd *)",
       "Bash(mvnw.cmd *)",
       "Bash(echo \"EXIT_CODE=$?\")",
-      "Bash(./mvnw.cmd -q -DskipTests compile)"
-    ]
+      "Bash(./mvnw.cmd -q -DskipTests compile)",
+      "Bash(java -version)",
+      "Bash(find ~/.m2/repository/com/h2database -name \"h2-*.jar\" 2>/dev/null)",
+      "Bash(java -cp \"/c/Users/Mantenim-Electrico/.m2/repository/com/h2database/h2/2.4.240/h2-2.4.240.jar\" org.h2.tools.Shell -url \"jdbc:h2:file:C:/LineaBaseX/data/lineabase;AUTO_SERVER=TRUE\" -user sa -password \"\" -sql \"SELECT COLUMN_NAME, TYPE_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PLAN_MANTENIMIENTO'\")",
+      "PowerShell(Get-ChildItem Env: | Where-Object { $_.Name -match \"DB_|SPRING_DATASOURCE\" })",
+      "Bash(java -cp \"/c/Users/Mantenim-Electrico/.m2/repository/com/h2database/h2/2.4.240/h2-2.4.240.jar\" org.h2.tools.Shell -url \"jdbc:h2:file:C:/LineaBaseX/data/lineabase;AUTO_SERVER=TRUE\" -user sa -password \"\" -sql \"SELECT 1\")",
+      "Bash(java -cp \"/c/Users/Mantenim-Electrico/.m2/repository/com/h2database/h2/2.4.240/h2-2.4.240.jar\" org.h2.tools.Shell -url \"jdbc:h2:file:C:/LineaBaseX/data/lineabase;AUTO_SERVER=TRUE\" -user sa -password sa -sql \"SELECT 1\")",
+      "Bash(java -cp \"/c/Users/Mantenim-Electrico/.m2/repository/com/h2database/h2/2.4.240/h2-2.4.240.jar\" org.h2.tools.Shell -url \"jdbc:h2:file:C:/LineaBaseX/data/lineabase\" -user sa -password \"\" -sql \"SELECT 1\")",
+      "PowerShell(& java -cp \"C:\\\\Users\\\\Mantenim-Electrico\\\\.m2\\\\repository\\\\com\\\\h2database\\\\h2\\\\2.4.240\\\\h2-2.4.240.jar\" org.h2.tools.Shell -url \"jdbc:h2:file:C:/LineaBaseX/data/lineabase\" -user sa -password \"\" -sql \"SELECT 1\")",
+      "PowerShell(& java -cp \"C:\\\\Users\\\\Mantenim-Electrico\\\\.m2\\\\repository\\\\com\\\\h2database\\\\h2\\\\2.4.240\\\\h2-2.4.240.jar\" org.h2.tools.Shell -url \"jdbc:h2:file:C:/LineaBaseX/data/lineabase\" -user sa -password \"\" -sql $sql)",
+      "PowerShell(& java -cp \"C:\\\\Users\\\\Mantenim-Electrico\\\\.m2\\\\repository\\\\com\\\\h2database\\\\h2\\\\2.4.240\\\\h2-2.4.240.jar\" org.h2.tools.RunScript -url \"jdbc:h2:file:C:/LineaBaseX/data/lineabase\" -user sa -password \"\" -script \"C:\\\\Users\\\\MANTEN~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Mantenim-Electrico-Documents-MNTTO2020-LineaBaseP1-Productos-BaseDatos-LineaBaseLocal-applineabase\\\\b2db9430-e848-45be-a2f7-76c1758860e3\\\\scratchpad\\\\check_schema.sql\" -showResults)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique\")",
+      "Bash(ls -la \"/c/LineaBaseX/data/\" 2>&1)",
+      "Bash(powershell -Command \"Get-Process java -ErrorAction SilentlyContinue | Select-Object Id, StartTime, CPU\")",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=11504 or ProcessId=21120\")",
+      "PowerShell(Get-NetTCPConnection -OwningProcess 11504 -ErrorAction SilentlyContinue)"
+    ],
+    "defaultMode": "bypassPermissions"
   }
 }

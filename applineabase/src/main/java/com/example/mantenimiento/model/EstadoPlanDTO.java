@@ -25,4 +25,12 @@ public record EstadoPlanDTO(
     public boolean sinRegistro() {
         return ultimaFechaRealizado == null;
     }
+
+    /** Todavía no vencido, pero dentro de la ventana de aviso anticipado configurada en el
+     * plan (horasRestantes <= horasAvisoAnticipado). Si el plan no tiene aviso anticipado
+     * configurado, nunca pasa por este estado intermedio — va directo de OK a Vencido. */
+    public boolean proximoAVencer() {
+        Double aviso = plan.getHorasAvisoAnticipado();
+        return !sinRegistro() && !vencido() && aviso != null && horasRestantes <= aviso;
+    }
 }

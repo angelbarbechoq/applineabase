@@ -29,6 +29,7 @@ import jakarta.annotation.security.RolesAllowed;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -106,7 +107,7 @@ public class MantenimientoConfigView extends VerticalLayout {
         grid.addColumn(e -> e.plan().getTag()).setHeader("TAG").setAutoWidth(true).setSortable(true);
         grid.addColumn(e -> e.plan().getTarea()).setHeader("Tarea").setAutoWidth(true).setSortable(true);
         grid.addColumn(e -> e.plan().getIntervaloHoras()).setHeader("Intervalo (h)").setAutoWidth(true);
-        grid.addColumn(this::formatearFecha).setHeader("Última vez realizado").setAutoWidth(true).setSortable(true);
+        grid.addColumn(this::formatearAvisoAnticipado).setHeader("Aviso anticipado (h)").setAutoWidth(true);
         grid.addColumn(this::formatearHorasTranscurridas).setHeader("Horas transcurridas").setAutoWidth(true);
         grid.addColumn(this::formatearEstadoProximoAviso).setHeader("Próximo aviso").setAutoWidth(true);
         grid.addColumn(e -> e.plan().isHabilitado() ? "Sí" : "No").setHeader("Habilitado").setAutoWidth(true);
@@ -149,7 +150,9 @@ public class MantenimientoConfigView extends VerticalLayout {
         equipoCombo.clear();
         itemCombo.clear();
         Optional<LineaTag> linea = lineaMaquina == null ? Optional.empty() : lineaDelCatalogo(lineaMaquina);
-        equipoCombo.setItems(linea.map(LineaTag::equipos).orElse(List.of()));
+        List<EquipoTag> equipos = new java.util.ArrayList<>(linea.map(LineaTag::equipos).orElse(List.of()));
+        equipos.sort(Comparator.comparing(EquipoTag::etiqueta));
+        equipoCombo.setItems(equipos);
         equipoCombo.setVisible(linea.isPresent());
         itemCombo.setVisible(false);
         actualizarTagResultante();
@@ -157,7 +160,9 @@ public class MantenimientoConfigView extends VerticalLayout {
 
     private void onEquipoCambiado(EquipoTag equipo) {
         itemCombo.clear();
-        itemCombo.setItems(equipo == null ? List.of() : equipo.items());
+        List<ItemTag> items = new java.util.ArrayList<>(equipo == null ? List.of() : equipo.items());
+        items.sort(Comparator.comparing(ItemTag::etiqueta));
+        itemCombo.setItems(items);
         itemCombo.setVisible(equipo != null);
         actualizarTagResultante();
     }
@@ -297,8 +302,9 @@ public class MantenimientoConfigView extends VerticalLayout {
 
     private static final String SIN_REGISTRO = "Sin mantenimiento registrado";
 
-    private String formatearFecha(EstadoPlanDTO estado) {
-        return estado.sinRegistro() ? SIN_REGISTRO : estado.ultimaFechaRealizado().format(FORMATO_FECHA);
+    private String formatearAvisoAnticipado(EstadoPlanDTO estado) {
+        Double aviso = estado.plan().getHorasAvisoAnticipado();
+        return aviso == null ? "—" : String.format("%.1f", aviso);
     }
 
     private String formatearHorasTranscurridas(EstadoPlanDTO estado) {
