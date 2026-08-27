@@ -90,4 +90,12 @@ public class LineaAccessService {
         }
         return principal.getUsuario().getZona();
     }
+
+    public String usuarioActual() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {
+            return null;
+        }
+        return principal.getUsuario().getUsername();
+    }
 }

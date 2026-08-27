@@ -213,44 +213,4 @@ public class ConfigLoaderService {
         }
     }
 
-    /**
-     * TAGs de equipo (nivel 6, ej. EXT-L01-XTR) y de ítem mantenible (nivel 8, ej.
-     * EXT-L01-XTR-BYT) de todas las líneas de Extrusión, aplanados en una sola lista — para
-     * poblar el selector de "a qué TAG le pongo este plan de mantenimiento" sin obligar a
-     * elegir un único nivel de granularidad.
-     */
-    @SuppressWarnings("unchecked")
-    public List<String> listarTodosLosTagsExtrusion() {
-        List<String> tags = new java.util.ArrayList<>();
-        for (Map<String, Object> linea : loadExtrusionTagConfig()) {
-            Object equiposObj = linea.get("equipos");
-            if (!(equiposObj instanceof List)) {
-                continue;
-            }
-            for (Object eqObj : (List<Object>) equiposObj) {
-                if (!(eqObj instanceof Map)) {
-                    continue;
-                }
-                Map<String, Object> equipo = (Map<String, Object>) eqObj;
-                Object tag = equipo.get("tag");
-                if (tag != null) {
-                    tags.add(String.valueOf(tag));
-                }
-                Object itemsObj = equipo.get("items");
-                if (!(itemsObj instanceof List)) {
-                    continue;
-                }
-                for (Object itObj : (List<Object>) itemsObj) {
-                    if (!(itObj instanceof Map)) {
-                        continue;
-                    }
-                    Object tagExtendido = ((Map<String, Object>) itObj).get("tagExtendido");
-                    if (tagExtendido != null) {
-                        tags.add(String.valueOf(tagExtendido));
-                    }
-                }
-            }
-        }
-        return tags.stream().distinct().sorted().collect(Collectors.toList());
-    }
 }
