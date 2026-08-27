@@ -4,6 +4,7 @@ import com.example.base.ui.MainLayout;
 import com.example.base.ui.NotificacionesUtil;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.mantenimiento.model.EquipoTag;
+import com.example.mantenimiento.model.EstadoPlanDTO;
 import com.example.mantenimiento.model.ItemTag;
 import com.example.mantenimiento.model.LineaTag;
 import com.example.mantenimiento.model.PlanMantenimiento;
@@ -28,6 +29,7 @@ import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,10 +48,11 @@ import java.util.Optional;
 public class MantenimientoConfigView extends VerticalLayout {
 
     private static final String SIN_EQUIPO = "(todo el equipo)";
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final MantenimientoService mantenimientoService;
     private final List<LineaTag> catalogo;
-    private final Grid<PlanMantenimiento> grid = new Grid<>(PlanMantenimiento.class, false);
+    private final Grid<EstadoPlanDTO> grid = new Grid<>(EstadoPlanDTO.class, false);
 
     private final Span formTitle = new Span("Selecciona un plan para editarlo, o crea uno nuevo");
     private final ComboBox<String> lineaMaquinaCombo = new ComboBox<>("Línea / Máquina");
@@ -106,11 +109,14 @@ public class MantenimientoConfigView extends VerticalLayout {
         fechaUltimoMantenimientoField.setHelperText("Puede ser una fecha pasada, si la tarea ya se hizo y recién ahora se carga el plan");
         fechaUltimoMantenimientoField.setMax(LocalDateTime.now());
 
-        grid.addColumn(PlanMantenimiento::getTag).setHeader("TAG").setAutoWidth(true).setSortable(true);
-        grid.addColumn(PlanMantenimiento::getTarea).setHeader("Tarea").setAutoWidth(true).setSortable(true);
-        grid.addColumn(PlanMantenimiento::getIntervaloHoras).setHeader("Intervalo (h)").setAutoWidth(true);
-        grid.addColumn(p -> p.isHabilitado() ? "Sí" : "No").setHeader("Habilitado").setAutoWidth(true);
-        grid.asSingleSelect().addValueChangeListener(e -> cargarEnFormulario(e.getValue()));
+        grid.addColumn(e -> e.plan().getTag()).setHeader("TAG").setAutoWidth(true).setSortable(true);
+        grid.addColumn(e -> e.plan().getTarea()).setHeader("Tarea").setAutoWidth(true).setSortable(true);
+        grid.addColumn(e -> e.plan().getIntervaloHoras()).setHeader("Intervalo (h)").setAutoWidth(true);
+        grid.addColumn(this::formatearFecha).setHeader("Última vez realizado").setAutoWidth(true).setSortable(true);
+        grid.addColumn(e -> String.format("%.1f", e.horasTranscurridas())).setHeader("Horas transcurridas").setAutoWidth(true);
+        grid.addColumn(this::formatearEstadoProximoAviso).setHeader("Próximo aviso").setAutoWidth(true);
+        grid.addColumn(e -> e.plan().isHabilitado() ? "Sí" : "No").setHeader("Habilitado").setAutoWidth(true);
+        grid.asSingleSelect().addValueChangeListener(e -> cargarEnFormulario(e.getValue() == null ? null : e.getValue().plan()));
         grid.setSizeFull();
 
         guardarBtn.addClickListener(e -> guardar());
@@ -300,6 +306,20 @@ public class MantenimientoConfigView extends VerticalLayout {
     }
 
     private void refrescarGrid() {
-        grid.setItems(mantenimientoService.listarPlanes());
+        grid.setItems(mantenimientoService.listarEstadoPlanes());
+    }
+
+    private String formatearFecha(EstadoPlanDTO estado) {
+        return estado.ultimaFechaRealizado() == null ? "—" : estado.ultimaFechaRealizado().format(FORMATO_FECHA);
+    }
+
+    private String formatearEstadoProximoAviso(EstadoPlanDTO estado) {
+        if (estado.vencido()) {
+            return "Vencido";
+        }
+        if (estado.proximoAvisoEstimado() == null) {
+            return "Sin uso reciente para estimar";
+        }
+        return estado.proximoAvisoEstimado().format(FORMATO_FECHA) + " (estimado)";
     }
 }
