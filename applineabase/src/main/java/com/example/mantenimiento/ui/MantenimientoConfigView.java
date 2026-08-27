@@ -197,7 +197,8 @@ public class MantenimientoConfigView extends VerticalLayout {
         tareaField.setEnabled(false);
         intervaloField.setValue(plan.getIntervaloHoras());
         avisoAnticipadoField.setValue(plan.getHorasAvisoAnticipado());
-        fechaUltimoMantenimientoField.setVisible(false);
+        fechaUltimoMantenimientoField.setValue(mantenimientoService.obtenerUltimaFechaRealizado(plan).orElse(null));
+        fechaUltimoMantenimientoField.setVisible(true);
         habilitadoCheckbox.setValue(plan.isHabilitado());
         eliminarBtn.setEnabled(true);
     }
@@ -273,7 +274,7 @@ public class MantenimientoConfigView extends VerticalLayout {
             NotificacionesUtil.mostrarError("El intervalo de horas debe ser mayor a 0");
             return;
         }
-        if (esNuevo && fechaUltimoMantenimientoField.getValue() == null) {
+        if (fechaUltimoMantenimientoField.getValue() == null) {
             NotificacionesUtil.mostrarError("Indica cuándo se hizo esta tarea por última vez");
             return;
         }
@@ -286,6 +287,7 @@ public class MantenimientoConfigView extends VerticalLayout {
             mantenimientoService.crearPlan(plan, fechaUltimoMantenimientoField.getValue());
         } else {
             mantenimientoService.guardar(plan);
+            mantenimientoService.actualizarFechaUltimoMantenimiento(plan, fechaUltimoMantenimientoField.getValue());
         }
         Notification.show("Plan guardado", 2500, Notification.Position.BOTTOM_END)
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);

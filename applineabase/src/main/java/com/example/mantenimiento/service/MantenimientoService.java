@@ -126,6 +126,24 @@ public class MantenimientoService {
         return planRepository.save(plan);
     }
 
+    /** Fecha del MantenimientoRealizado más reciente del plan, para precargar el campo al
+     * editar (así se puede corregir sin tener que ir a "marcar como realizado" de nuevo). */
+    public Optional<LocalDateTime> obtenerUltimaFechaRealizado(PlanMantenimiento plan) {
+        return realizadoRepository.findFirstByPlanMantenimientoOrderByFechaRealizadoDesc(plan)
+                .map(MantenimientoRealizado::getFechaRealizado);
+    }
+
+    /** Corrige la fecha del registro de MantenimientoRealizado más reciente (no crea uno nuevo)
+     * y recalcula sus horas acumuladas para esa fecha, igual que al crear el plan. */
+    public void actualizarFechaUltimoMantenimiento(PlanMantenimiento plan, LocalDateTime nuevaFecha) {
+        MantenimientoRealizado ultimo = realizadoRepository.findFirstByPlanMantenimientoOrderByFechaRealizadoDesc(plan)
+                .orElseThrow(() -> new IllegalStateException("El plan no tiene ningún registro de mantenimiento realizado"));
+        String lineaMaquina = resolverLineaMaquina(plan.getTag());
+        ultimo.setFechaRealizado(nuevaFecha);
+        ultimo.setHorasAcumuladasEnMomento(horometroDiarioRepository.sumHorasHastaFecha(lineaMaquina, nuevaFecha.toLocalDate()));
+        realizadoRepository.save(ultimo);
+    }
+
     /** Borra primero el historial de MantenimientoRealizado del plan — sin esto, la FK
      * obligatoria hacia PlanMantenimiento rechaza el borrado del plan por integridad
      * referencial en cuanto tiene al menos un registro (siempre tiene uno: el que crearPlan

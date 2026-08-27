@@ -3,7 +3,8 @@
     "allow": [
       "WebFetch(domain:www.amcharts.com)",
       "Bash(git branch *)",
-      "Bash(./mvnw.cmd -q -DskipTests compile)",
+      "Bash(./mvnw.cmd *)",
+      "Bash(mvnw.cmd *)",
       "Bash(echo \"EXIT_CODE=$?\")"
     ]
   }
