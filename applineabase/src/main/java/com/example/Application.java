@@ -10,6 +10,7 @@ import com.vaadin.flow.component.dependency.StyleSheet;
 import com.vaadin.flow.component.dependency.Uses;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.page.AppShellConfigurator;
+import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.NumberField;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
@@ -32,6 +33,7 @@ import org.springframework.context.annotation.Bean;
 @Uses(ComboBox.class)
 @Uses(NumberField.class)
 @Uses(DateTimePicker.class)
+@Uses(IntegerField.class)
 public class Application implements AppShellConfigurator {
 
     public static void main(String[] args) {
