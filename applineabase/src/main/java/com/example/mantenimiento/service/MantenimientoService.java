@@ -11,9 +11,11 @@ import com.example.mantenimiento.model.ItemTag;
 import com.example.mantenimiento.model.LineaTag;
 import com.example.mantenimiento.model.MantenimientoRealizado;
 import com.example.mantenimiento.model.PlanMantenimiento;
+import com.example.mantenimiento.model.StockBarrilTornillo;
 import com.example.mantenimiento.model.TecnicoMantenimiento;
 import com.example.mantenimiento.repository.MantenimientoRealizadoRepository;
 import com.example.mantenimiento.repository.PlanMantenimientoRepository;
+import com.example.mantenimiento.repository.StockBarrilTornilloRepository;
 import com.example.mantenimiento.repository.TecnicoMantenimientoRepository;
 import com.example.security.LineaAccessService;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,7 @@ public class MantenimientoService {
     private final TecnicoMantenimientoRepository tecnicoRepository;
     private final HorometroBackfillRunner horometroBackfillRunner;
     private final HorometroService horometroService;
+    private final StockBarrilTornilloRepository stockRepository;
 
     public MantenimientoService(PlanMantenimientoRepository planRepository,
                                  MantenimientoRealizadoRepository realizadoRepository,
@@ -45,7 +48,8 @@ public class MantenimientoService {
                                  LineaAccessService lineaAccessService,
                                  TecnicoMantenimientoRepository tecnicoRepository,
                                  HorometroBackfillRunner horometroBackfillRunner,
-                                 HorometroService horometroService) {
+                                 HorometroService horometroService,
+                                 StockBarrilTornilloRepository stockRepository) {
         this.planRepository = planRepository;
         this.realizadoRepository = realizadoRepository;
         this.horometroDiarioRepository = horometroDiarioRepository;
@@ -54,6 +58,19 @@ public class MantenimientoService {
         this.tecnicoRepository = tecnicoRepository;
         this.horometroBackfillRunner = horometroBackfillRunner;
         this.horometroService = horometroService;
+        this.stockRepository = stockRepository;
+    }
+
+    public List<StockBarrilTornillo> listarStockBarrilYTornillo() {
+        return stockRepository.findAllByOrderByModeloAscSistemaRefrigeracionAsc();
+    }
+
+    public void guardarStockBarrilYTornillo(StockBarrilTornillo stock) {
+        stockRepository.save(stock);
+    }
+
+    public void eliminarStockBarrilYTornillo(StockBarrilTornillo stock) {
+        stockRepository.delete(stock);
     }
 
     public List<String> listarTecnicos() {

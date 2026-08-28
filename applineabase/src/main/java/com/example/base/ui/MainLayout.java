@@ -252,7 +252,7 @@ public final class MainLayout extends AppLayout {
             SideNavItem reportes = new SideNavItem("Reportes");
             reportes.setPrefixComponent(VaadinIcon.CHART.create());
             reportes.setExpanded(false);
-            reportes.addItem(new SideNavItem("Estado Barril y Tornillo", "reportes/mantenimiento", VaadinIcon.TOOLS.create()));
+            reportes.addItem(new SideNavItem("Barril y Tornillo", "reportes/mantenimiento", VaadinIcon.TOOLS.create()));
             nav.addItem(reportes);
             colapsarAlSalirDelMouse(reportes);
         }
