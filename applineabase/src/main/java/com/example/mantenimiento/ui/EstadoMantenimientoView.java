@@ -3,6 +3,7 @@ package com.example.mantenimiento.ui;
 import com.example.base.ui.MainLayout;
 import com.example.base.ui.NotificacionesUtil;
 import com.example.mantenimiento.model.EstadoPlanDTO;
+import com.example.mantenimiento.model.MovimientoStock;
 import com.example.mantenimiento.model.StockBarrilTornillo;
 import com.example.mantenimiento.service.MantenimientoService;
 import com.example.security.LineaAccessService;
@@ -27,6 +28,7 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -42,6 +44,7 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
 
     private static final String[] MODELOS_CONOCIDOS = {"LSE-65", "LSE-80", "LSE-92", "LSDP-75", "CM-80", "CM-92"};
     private static final String[] SISTEMAS_REFRIGERACION = {"Agua", "Aceite"};
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private static final String FONDO_VERDE = "#d4edda";
     private static final String TEXTO_VERDE = "#155724";
@@ -65,6 +68,12 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
     private final Button guardarStockBtn = new Button("Guardar");
     private final Button nuevoStockBtn = new Button("Nuevo");
 
+    private final IntegerField ingresoCantidadField = new IntegerField("Cantidad a ingresar");
+    private final TextField ingresoObservacionField = new TextField("Observacion del ingreso");
+    private final Button ingresoBtn = new Button("Registrar Ingreso");
+
+    private final Grid<MovimientoStock> movimientosGrid = new Grid<>(MovimientoStock.class, false);
+
     private StockBarrilTornillo stockEnEdicion;
 
     public EstadoMantenimientoView(MantenimientoService mantenimientoService, LineaAccessService lineaAccessService) {
@@ -81,6 +90,7 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
         tabSheet.setSizeFull();
         tabSheet.add("Estado", crearPanelEstado());
         tabSheet.add("Stock", crearPanelStock());
+        tabSheet.add("Movimientos", crearPanelMovimientos());
 
         add(tabSheet);
         setFlexGrow(1, tabSheet);
@@ -174,6 +184,7 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
             cantidadField.setWidth("110px");
             cantidadField.setMin(0);
             cantidadField.setStepButtonsVisible(true);
+            cantidadField.setHelperText("Solo para un modelo nuevo -- despues se suma con Ingreso");
 
             observacionField.setWidth("320px");
 
@@ -189,7 +200,20 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
             formLayout.setAlignItems(Alignment.END);
             formLayout.getStyle().set("flex-wrap", "wrap");
 
-            panel.add(formLayout);
+            ingresoCantidadField.setWidth("140px");
+            ingresoCantidadField.setMin(1);
+            ingresoObservacionField.setWidth("280px");
+            ingresoBtn.addClickListener(e -> registrarIngreso());
+            ingresoBtn.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
+
+            HorizontalLayout ingresoLayout = new HorizontalLayout(
+                    new Span("Ingreso de stock (modelo seleccionado abajo):"),
+                    ingresoCantidadField, ingresoObservacionField, ingresoBtn
+            );
+            ingresoLayout.setAlignItems(Alignment.END);
+            ingresoLayout.getStyle().set("flex-wrap", "wrap");
+
+            panel.add(formLayout, ingresoLayout);
         }
 
         panel.add(stockGrid);
@@ -218,6 +242,7 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
         modeloField.setValue(stock.getModelo());
         sistemaField.setValue(stock.getSistemaRefrigeracion());
         cantidadField.setValue(stock.getCantidad());
+        cantidadField.setEnabled(false);
         observacionField.setValue(stock.getObservacion() == null ? "" : stock.getObservacion());
     }
 
@@ -227,7 +252,29 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
         modeloField.clear();
         sistemaField.clear();
         cantidadField.clear();
+        cantidadField.setEnabled(true);
         observacionField.clear();
+    }
+
+    /** Suma stock al modelo seleccionado en la grilla (stockEnEdicion) y deja el movimiento en
+     * el historial -- no se edita "Cantidad" a mano para que todo ingreso quede trazado. */
+    private void registrarIngreso() {
+        if (stockEnEdicion == null) {
+            NotificacionesUtil.mostrarError("Selecciona primero un modelo en la grilla de Stock");
+            return;
+        }
+        if (ingresoCantidadField.getValue() == null || ingresoCantidadField.getValue() <= 0) {
+            NotificacionesUtil.mostrarError("Indica cuantas unidades ingresan");
+            return;
+        }
+        mantenimientoService.registrarIngresoStock(stockEnEdicion, ingresoCantidadField.getValue(), ingresoObservacionField.getValue());
+        Notification.show("Ingreso registrado", 2000, Notification.Position.BOTTOM_END)
+                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+        ingresoCantidadField.clear();
+        ingresoObservacionField.clear();
+        limpiarFormularioStock();
+        refrescarStockGrid();
+        refrescarMovimientosGrid();
     }
 
     private void guardarStock() {
@@ -255,5 +302,44 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
     private void refrescarStockGrid() {
         List<StockBarrilTornillo> items = mantenimientoService.listarStockBarrilYTornillo();
         stockGrid.setItems(items);
+    }
+
+    // ================= Movimientos =================
+
+    private VerticalLayout crearPanelMovimientos() {
+        VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
+        panel.setPadding(false);
+
+        movimientosGrid.addColumn(m -> m.getFecha().format(FORMATO_FECHA)).setHeader("Fecha").setAutoWidth(true).setSortable(true);
+        movimientosGrid.addColumn(m -> m.getTipo().name()).setHeader("Tipo").setAutoWidth(true).setSortable(true);
+        movimientosGrid.addColumn(m -> m.getStock() == null ? "-" : etiquetaStockSimple(m.getStock()))
+                .setHeader("Modelo").setAutoWidth(true);
+        movimientosGrid.addColumn(MovimientoStock::getCantidad).setHeader("Cantidad").setAutoWidth(true);
+        movimientosGrid.addColumn(m -> m.getTagEquipo() == null ? "-" : m.getTagEquipo()).setHeader("TAG tarea").setAutoWidth(true);
+        movimientosGrid.addColumn(this::detalleMovimiento).setHeader("Detalle").setAutoWidth(true).setFlexGrow(1);
+        movimientosGrid.setSizeFull();
+
+        panel.add(movimientosGrid);
+        panel.setFlexGrow(1, movimientosGrid);
+
+        refrescarMovimientosGrid();
+        return panel;
+    }
+
+    private String etiquetaStockSimple(StockBarrilTornillo stock) {
+        return stock.getModelo() + " / " + stock.getSistemaRefrigeracion();
+    }
+
+    private String detalleMovimiento(MovimientoStock m) {
+        return switch (m.getTipo()) {
+            case INGRESO -> m.getObservacion() == null ? "-" : m.getObservacion();
+            case EGRESO -> "Consumido por tarea";
+            case DEVOLUCION -> "Motivo: " + m.getMotivo() + " -- Autorizo: " + m.getAutorizadoPor();
+        };
+    }
+
+    private void refrescarMovimientosGrid() {
+        movimientosGrid.setItems(mantenimientoService.listarMovimientosStock());
     }
 }

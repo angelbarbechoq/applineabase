@@ -10,10 +10,13 @@ import com.example.mantenimiento.model.EstadoPlanDTO;
 import com.example.mantenimiento.model.ItemTag;
 import com.example.mantenimiento.model.LineaTag;
 import com.example.mantenimiento.model.MantenimientoRealizado;
+import com.example.mantenimiento.model.MovimientoStock;
 import com.example.mantenimiento.model.PlanMantenimiento;
 import com.example.mantenimiento.model.StockBarrilTornillo;
 import com.example.mantenimiento.model.TecnicoMantenimiento;
+import com.example.mantenimiento.model.TipoMovimientoStock;
 import com.example.mantenimiento.repository.MantenimientoRealizadoRepository;
+import com.example.mantenimiento.repository.MovimientoStockRepository;
 import com.example.mantenimiento.repository.PlanMantenimientoRepository;
 import com.example.mantenimiento.repository.StockBarrilTornilloRepository;
 import com.example.mantenimiento.repository.TecnicoMantenimientoRepository;
@@ -40,6 +43,7 @@ public class MantenimientoService {
     private final HorometroBackfillRunner horometroBackfillRunner;
     private final HorometroService horometroService;
     private final StockBarrilTornilloRepository stockRepository;
+    private final MovimientoStockRepository movimientoStockRepository;
 
     public MantenimientoService(PlanMantenimientoRepository planRepository,
                                  MantenimientoRealizadoRepository realizadoRepository,
@@ -49,7 +53,8 @@ public class MantenimientoService {
                                  TecnicoMantenimientoRepository tecnicoRepository,
                                  HorometroBackfillRunner horometroBackfillRunner,
                                  HorometroService horometroService,
-                                 StockBarrilTornilloRepository stockRepository) {
+                                 StockBarrilTornilloRepository stockRepository,
+                                 MovimientoStockRepository movimientoStockRepository) {
         this.planRepository = planRepository;
         this.realizadoRepository = realizadoRepository;
         this.horometroDiarioRepository = horometroDiarioRepository;
@@ -59,6 +64,7 @@ public class MantenimientoService {
         this.horometroBackfillRunner = horometroBackfillRunner;
         this.horometroService = horometroService;
         this.stockRepository = stockRepository;
+        this.movimientoStockRepository = movimientoStockRepository;
     }
 
     public List<StockBarrilTornillo> listarStockBarrilYTornillo() {
@@ -169,16 +175,6 @@ public class MantenimientoService {
     /** Catalogo de tareas ya usadas (nombre nominal de algun plan, o tarea efectivamente
      * registrada en el historial), para sugerir en el combo de tarea sin dejar de permitir
      * texto libre para una tarea nueva. */
-    public List<String> catalogoTareas() {
-        return java.util.stream.Stream.concat(
-                        planRepository.findAll().stream().map(PlanMantenimiento::getTarea),
-                        realizadoRepository.findAll().stream().map(MantenimientoRealizado::getTareaRealizada))
-                .filter(t -> t != null && !t.isBlank())
-                .distinct()
-                .sorted(String.CASE_INSENSITIVE_ORDER)
-                .toList();
-    }
-
     /** Horas acumuladas del horometro de la linea del plan hasta el momento exacto (fecha y
      * hora) de la tarea, no solo hasta el cierre del dia -- para sugerir el valor de
      * "Horometro" en el formulario (el usuario puede corregirlo a mano si hace falta). */
@@ -225,9 +221,12 @@ public class MantenimientoService {
      * "Cambio"); si viene vacio, se usa la tarea del plan tal cual. El contador del plan se
      * reinicia igual en ambos casos porque es el mismo registro el que define horasBase.
      */
+    public static final String TAREA_CAMBIO = "Cambio";
+
     public void registrarMantenimientoRealizado(PlanMantenimiento plan, LocalDateTime fechaRealizado,
                                                  String tareaRealizada, double horasAcumuladasEnMomento,
-                                                 String numeroOt, String tecnico, String notas) {
+                                                 String numeroOt, String tecnico, String notas,
+                                                 StockBarrilTornillo stockConsumido) {
         MantenimientoRealizado registro = new MantenimientoRealizado();
         registro.setPlanMantenimiento(plan);
         registro.setFechaRealizado(fechaRealizado);
@@ -237,7 +236,75 @@ public class MantenimientoService {
         registro.setNumeroOt(numeroOt);
         registro.setTecnico(tecnico);
         registro.setNotas(notas);
+
+        if (TAREA_CAMBIO.equalsIgnoreCase(registro.getTareaRealizada()) && stockConsumido != null) {
+            registro.setStockConsumido(stockConsumido);
+            registrarMovimientoEgreso(stockConsumido, plan.getTag(), fechaRealizado);
+        }
+
         realizadoRepository.save(registro);
+    }
+
+    /** Descuenta 1 unidad del stock consumido por un "Cambio" y deja el movimiento en el
+     * historial. Se permite que quede en 0 o negativo (ej. al cargar tareas atrasadas de antes
+     * de llevar este control) -- la UI avisa, pero no bloquea el registro de la tarea. */
+    private void registrarMovimientoEgreso(StockBarrilTornillo stock, String tagEquipo, LocalDateTime fechaTarea) {
+        stock.setCantidad(stock.getCantidad() - 1);
+        stockRepository.save(stock);
+
+        MovimientoStock movimiento = new MovimientoStock();
+        movimiento.setStock(stock);
+        movimiento.setTipo(TipoMovimientoStock.EGRESO);
+        movimiento.setCantidad(1);
+        movimiento.setFecha(LocalDateTime.now());
+        movimiento.setTagEquipo(tagEquipo);
+        movimiento.setFechaTarea(fechaTarea);
+        movimientoStockRepository.save(movimiento);
+    }
+
+    /** Ingreso manual de stock (ej. llega un repuesto comprado) -- siempre queda como movimiento,
+     * nunca se pisa el numero de stock directamente. */
+    public void registrarIngresoStock(StockBarrilTornillo stock, int cantidad, String observacion) {
+        stock.setCantidad(stock.getCantidad() + cantidad);
+        stockRepository.save(stock);
+
+        MovimientoStock movimiento = new MovimientoStock();
+        movimiento.setStock(stock);
+        movimiento.setTipo(TipoMovimientoStock.INGRESO);
+        movimiento.setCantidad(cantidad);
+        movimiento.setFecha(LocalDateTime.now());
+        movimiento.setObservacion(observacion);
+        movimientoStockRepository.save(movimiento);
+    }
+
+    /** Borra un registro de tarea ejecutada. Si era un "Cambio" con stock consumido, exige
+     * motivo y quien autoriza el retorno, devuelve 1 unidad al stock y deja el movimiento de
+     * DEVOLUCION en el historial antes de borrar el registro. */
+    public void eliminarMantenimientoRealizado(MantenimientoRealizado registro, String motivo, String autorizadoPor) {
+        StockBarrilTornillo stock = registro.getStockConsumido();
+        if (stock != null) {
+            if (motivo == null || motivo.isBlank() || autorizadoPor == null || autorizadoPor.isBlank()) {
+                throw new IllegalArgumentException("Motivo y quien autoriza son obligatorios para devolver la pieza al stock");
+            }
+            stock.setCantidad(stock.getCantidad() + 1);
+            stockRepository.save(stock);
+
+            MovimientoStock movimiento = new MovimientoStock();
+            movimiento.setStock(stock);
+            movimiento.setTipo(TipoMovimientoStock.DEVOLUCION);
+            movimiento.setCantidad(1);
+            movimiento.setFecha(LocalDateTime.now());
+            movimiento.setTagEquipo(registro.getPlanMantenimiento().getTag());
+            movimiento.setFechaTarea(registro.getFechaRealizado());
+            movimiento.setMotivo(motivo);
+            movimiento.setAutorizadoPor(autorizadoPor);
+            movimientoStockRepository.save(movimiento);
+        }
+        realizadoRepository.delete(registro);
+    }
+
+    public List<MovimientoStock> listarMovimientosStock() {
+        return movimientoStockRepository.findAllByOrderByFechaDesc();
     }
 
     /** Borra primero el historial de MantenimientoRealizado del plan — sin esto, la FK

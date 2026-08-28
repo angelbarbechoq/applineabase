@@ -8,14 +8,18 @@ import com.example.mantenimiento.model.ItemTag;
 import com.example.mantenimiento.model.LineaTag;
 import com.example.mantenimiento.model.MantenimientoRealizado;
 import com.example.mantenimiento.model.PlanMantenimiento;
+import com.example.mantenimiento.model.StockBarrilTornillo;
 import com.example.mantenimiento.service.MantenimientoService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
@@ -48,6 +52,7 @@ import java.util.Optional;
 public class MantenimientoView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final String[] TAREAS_BARRIL_TORNILLO = {"Cambio", "Recalibracion"};
 
     private final MantenimientoService mantenimientoService;
     private final LineaAccessService lineaAccessService;
@@ -62,6 +67,7 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
     private final TextField numeroOtField = new TextField("# OT");
     private final ComboBox<String> tecnicoField = new ComboBox<>("Tecnico");
     private final NumberField horometroField = new NumberField("Horometro");
+    private final ComboBox<StockBarrilTornillo> stockField = new ComboBox<>("Barril/Tornillo instalado");
     private final Button registrarBtn = new Button("Registrar");
 
     public MantenimientoView(MantenimientoService mantenimientoService, ConfigLoaderService configLoaderService,
@@ -85,10 +91,13 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
             return;
         }
 
-        tareaField.setItems(mantenimientoService.catalogoTareas());
-        tareaField.setAllowCustomValue(true);
-        tareaField.addCustomValueSetListener(e -> tareaField.setValue(e.getDetail()));
-        tareaField.setWidth("200px");
+        tareaField.setItems(TAREAS_BARRIL_TORNILLO);
+        tareaField.setWidth("160px");
+        tareaField.addValueChangeListener(e -> actualizarVisibilidadStockField());
+
+        stockField.setItemLabelGenerator(this::etiquetaStock);
+        stockField.setWidth("220px");
+        stockField.setVisible(false);
 
         fechaField.setMax(LocalDateTime.now());
         fechaField.setWidth("200px");
@@ -120,10 +129,11 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
         registrarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         configurarColumnas();
+        grid.addComponentColumn(this::botonEliminarHistorial).setHeader("").setAutoWidth(true);
 
         HorizontalLayout formLayout = new HorizontalLayout(
                 tareaField, fechaField, lineaMaquinaCombo, equipoCombo, itemCombo,
-                numeroOtField, tecnicoField, horometroField, registrarBtn
+                numeroOtField, tecnicoField, horometroField, stockField, registrarBtn
         );
         formLayout.setAlignItems(Alignment.END);
         formLayout.getStyle().set("flex-wrap", "wrap");
@@ -216,13 +226,99 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
             NotificacionesUtil.mostrarError("Indica el horometro (horas totales a la fecha de la tarea)");
             return;
         }
+        boolean esCambio = esTareaCambio();
+        if (esCambio && stockField.getValue() == null) {
+            NotificacionesUtil.mostrarError("Selecciona que barril/tornillo del stock se instalo");
+            return;
+        }
+        StockBarrilTornillo stockConsumido = esCambio ? stockField.getValue() : null;
+
         mantenimientoService.registrarMantenimientoRealizado(
                 plan.get(), fechaField.getValue(), tareaField.getValue(), horometroField.getValue(),
-                numeroOtField.getValue(), tecnicoField.getValue(), null);
-        Notification.show("Tarea registrada", 2500, Notification.Position.BOTTOM_END)
-                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                numeroOtField.getValue(), tecnicoField.getValue(), null, stockConsumido);
+
+        // stockConsumido ya viene con la cantidad descontada aca (misma instancia que actualizo
+        // el servicio), por eso el chequeo de "quedo en 0 o negativo" es DESPUES de guardar.
+        boolean avisarStockBajo = esCambio && stockConsumido.getCantidad() <= 0;
+
+        if (avisarStockBajo) {
+            Notification.show("Tarea registrada -- ojo, el stock de " + etiquetaStock(stockConsumido) + " quedo en 0 o negativo",
+                    4000, Notification.Position.BOTTOM_END).addThemeVariants(NotificationVariant.LUMO_CONTRAST);
+        } else {
+            Notification.show("Tarea registrada", 2500, Notification.Position.BOTTOM_END)
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+        }
         limpiarFormulario();
         refrescarGrid();
+    }
+
+    private boolean esTareaCambio() {
+        return MantenimientoService.TAREA_CAMBIO.equalsIgnoreCase(tareaField.getValue());
+    }
+
+    private void actualizarVisibilidadStockField() {
+        boolean esCambio = esTareaCambio();
+        stockField.setVisible(esCambio);
+        if (esCambio) {
+            stockField.setItems(mantenimientoService.listarStockBarrilYTornillo());
+        } else {
+            stockField.clear();
+        }
+    }
+
+    private String etiquetaStock(StockBarrilTornillo stock) {
+        return stock.getModelo() + " / " + stock.getSistemaRefrigeracion() + " (" + stock.getCantidad() + " disp.)";
+    }
+
+    private Button botonEliminarHistorial(MantenimientoRealizado registro) {
+        Button boton = new Button(VaadinIcon.TRASH.create());
+        boton.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+        boton.addClickListener(e -> abrirDialogoEliminarHistorial(registro));
+        return boton;
+    }
+
+    /** Si la tarea era un "Cambio" con stock consumido, borrar exige motivo y quien autoriza
+     * el retorno de la pieza al stock -- si no, es solo una confirmacion simple. */
+    private void abrirDialogoEliminarHistorial(MantenimientoRealizado registro) {
+        Dialog dialog = new Dialog();
+        if (registro.getStockConsumido() != null) {
+            dialog.setHeaderTitle("Borrar Cambio y devolver pieza al stock");
+            TextField motivoField = new TextField("Motivo del retorno");
+            motivoField.setWidthFull();
+            TextField autorizaField = new TextField("Autorizado por");
+            autorizaField.setWidthFull();
+
+            Button confirmar = new Button("Confirmar", e -> {
+                try {
+                    mantenimientoService.eliminarMantenimientoRealizado(registro, motivoField.getValue(), autorizaField.getValue());
+                } catch (IllegalArgumentException ex) {
+                    NotificacionesUtil.mostrarError(ex.getMessage());
+                    return;
+                }
+                dialog.close();
+                refrescarGrid();
+                actualizarVisibilidadStockField();
+            });
+            confirmar.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
+            Button cancelar = new Button("Cancelar", e -> dialog.close());
+
+            VerticalLayout contenido = new VerticalLayout(motivoField, autorizaField);
+            contenido.setPadding(false);
+            dialog.add(contenido);
+            dialog.getFooter().add(cancelar, confirmar);
+        } else {
+            dialog.setHeaderTitle("Borrar tarea");
+            dialog.add(new Span("Esta accion no se puede deshacer. Confirmas?"));
+            Button confirmar = new Button("Confirmar", e -> {
+                mantenimientoService.eliminarMantenimientoRealizado(registro, null, null);
+                dialog.close();
+                refrescarGrid();
+            });
+            confirmar.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
+            Button cancelar = new Button("Cancelar", e -> dialog.close());
+            dialog.getFooter().add(cancelar, confirmar);
+        }
+        dialog.open();
     }
 
     private void limpiarFormulario() {
@@ -236,6 +332,8 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
         numeroOtField.clear();
         tecnicoField.clear();
         horometroField.clear();
+        stockField.clear();
+        stockField.setVisible(false);
     }
 
     private String formatearHorasTranscurridas(MantenimientoRealizado registro) {

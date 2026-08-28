@@ -53,6 +53,12 @@ public class MantenimientoRealizado {
 
     private String notas;
 
+    /** Barril/tornillo del stock consumido, solo cuando tareaRealizada es "Cambio". Se guarda
+     * para poder devolver la pieza al stock si esta tarea se borra despues (ver
+     * MantenimientoService.eliminarMantenimientoRealizado). */
+    @ManyToOne
+    private StockBarrilTornillo stockConsumido;
+
     public MantenimientoRealizado() {
     }
 
@@ -122,5 +128,13 @@ public class MantenimientoRealizado {
 
     public void setTecnico(String tecnico) {
         this.tecnico = tecnico;
+    }
+
+    public StockBarrilTornillo getStockConsumido() {
+        return stockConsumido;
+    }
+
+    public void setStockConsumido(StockBarrilTornillo stockConsumido) {
+        this.stockConsumido = stockConsumido;
     }
 }
