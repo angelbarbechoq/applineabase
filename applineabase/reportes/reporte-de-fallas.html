@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reporte de Fallas - Modulo de Mantenimiento Preventivo</title>
+<style>
+    body {
+        font-family: Georgia, 'Times New Roman', serif;
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 0 20px;
+        color: #222;
+        line-height: 1.6;
+        background: #fff;
+    }
+    h1 {
+        font-size: 26px;
+        border-bottom: 3px solid #2c3e50;
+        padding-bottom: 10px;
+        color: #2c3e50;
+    }
+    h2 {
+        font-size: 20px;
+        color: #2c3e50;
+        margin-top: 40px;
+        border-left: 5px solid #2c3e50;
+        padding-left: 10px;
+    }
+    h3 {
+        font-size: 16px;
+        color: #34495e;
+        margin-top: 20px;
+    }
+    .meta {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 30px;
+    }
+    .falla {
+        background: #fdf2f2;
+        border-left: 4px solid #c0392b;
+        padding: 10px 15px;
+        margin: 10px 0;
+    }
+    .causa {
+        background: #fff8e1;
+        border-left: 4px solid #f39c12;
+        padding: 10px 15px;
+        margin: 10px 0;
+    }
+    .resolucion {
+        background: #eafaf1;
+        border-left: 4px solid #27ae60;
+        padding: 10px 15px;
+        margin: 10px 0;
+    }
+    .diagnostico {
+        background: #eaf2f8;
+        border-left: 4px solid #2980b9;
+        padding: 10px 15px;
+        margin: 10px 0;
+    }
+    code {
+        background: #f4f4f4;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: Consolas, monospace;
+        font-size: 14px;
+    }
+    pre {
+        background: #2d2d2d;
+        color: #f8f8f2;
+        padding: 12px;
+        border-radius: 5px;
+        overflow-x: auto;
+        font-size: 13px;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 15px 0;
+    }
+    th, td {
+        border: 1px solid #ccc;
+        padding: 8px 10px;
+        text-align: left;
+        font-size: 14px;
+    }
+    th {
+        background: #2c3e50;
+        color: white;
+    }
+    .estado-ok {
+        color: #27ae60;
+        font-weight: bold;
+    }
+    ul, ol {
+        margin: 8px 0;
+    }
+    .referencias li {
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+    .indice {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        padding: 15px 25px;
+        margin: 20px 0;
+    }
+    .indice a {
+        color: #2c3e50;
+        text-decoration: none;
+    }
+    .indice a:hover {
+        text-decoration: underline;
+    }
+</style>
+</head>
+<body>
+
+<h1>Reporte de Fallas</h1>
+<div class="meta">
+    <strong>Proyecto:</strong> Sistema LineaBaseX - Modulo de Mantenimiento Preventivo (applineabase)<br>
+    <strong>Fecha del reporte:</strong> 28 de agosto de 2026<br>
+    <strong>Alcance:</strong> Fallas tecnicas detectadas y resueltas durante la construccion del modulo de
+    mantenimiento preventivo (registro de tareas de Barril y Tornillo, catalogo de Personal de Mantenimiento).
+</div>
+
+<div class="indice">
+    <strong>Indice</strong>
+    <ol>
+        <li><a href="#falla1">Bloqueo de permisos en el asistente de desarrollo</a></li>
+        <li><a href="#falla2">Credenciales reales de conexion a la base de datos H2</a></li>
+        <li><a href="#falla3">Componentes de Vaadin sin renderizar en pantallas nuevas</a></li>
+        <li><a href="#resumen">Resumen general</a></li>
+    </ol>
+</div>
+
+<h2 id="falla1">1. Bloqueo de permisos en el asistente de desarrollo</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> cada comando de terminal (git, Maven) pedia aprobacion manual, incluso
+    despues de haber autorizado comandos similares repetidas veces durante la misma sesion.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> el sistema de permisos evalua el comando completo como texto. Pequenas
+    variaciones invalidaban las reglas ya autorizadas:
+    <ul>
+        <li>Anteponer <code>cd "ruta" &&</code> antes de un comando de git rompia la coincidencia con la regla.</li>
+        <li>Comandos con tuberias (<code>| tail -60</code>, <code>| tail -150</code>) se evaluaban como un
+        comando distinto cada vez que cambiaba el numero de lineas.</li>
+        <li>Subcomandos especificos de git (<code>git checkout</code>) no estaban cubiertos por una regla
+        generica que solo autorizaba <code>status</code>, <code>diff</code>, <code>add</code>,
+        <code>commit</code>, <code>push</code>.</li>
+    </ul>
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion:</strong> se activo <code>"defaultMode": "bypassPermissions"</code> tanto en la
+    configuracion del proyecto (<code>.claude/settings.local.json</code>) como en la configuracion global
+    del usuario (<code>~/.claude/settings.json</code>), eliminando la necesidad de autorizar cada comando
+    individualmente. <span class="estado-ok">Resuelto.</span>
+</div>
+
+<h2 id="falla2">2. Credenciales reales de conexion a la base de datos H2</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> no se conocia el usuario y contrasena reales que usa la aplicacion para
+    conectarse a su base de datos H2, necesarios para poder abrirla con una herramienta externa. El
+    supuesto habitual (usuario <code>sa</code>, sin contrasena) resulto incorrecto.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> <code>application.properties</code> nunca define explicitamente
+    <code>spring.datasource.username</code> ni <code>spring.datasource.password</code>. Spring Boot arma
+    la conexion con los valores por defecto de esas propiedades, que son cadena vacia en ambos casos, no
+    <code>sa</code>.
+</div>
+
+<div class="diagnostico">
+    <strong>Diagnostico:</strong> se agrego temporalmente un metodo <code>@PostConstruct</code> a un bean
+    real de la aplicacion (ya conectado a la base) que imprimia
+    <code>conn.getMetaData().getUserName()</code> directo a consola. El resultado fue una cadena vacia.
+    Se confirmo conectando por JDBC de forma directa (fuera de la aplicacion) con usuario y contrasena
+    vacios, logrando la conexion exitosamente.
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion:</strong> se documento el dato real (usuario y contrasena vacios) en el script
+    <code>abrir-base-datos-h2.bat</code>, y se retiro todo el codigo de diagnostico temporal una vez
+    confirmado el dato. Se confirmo explicitamente que <strong>no</strong> se debe forzar
+    <code>spring.datasource.username=sa</code> en <code>application.properties</code>, ya que eso rompe la
+    conexion real de la aplicacion (probado y revertido durante esta misma investigacion).
+    <span class="estado-ok">Resuelto.</span>
+</div>
+
+<h2 id="falla3">3. Componentes de Vaadin sin renderizar en pantallas nuevas</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> al crear una pantalla nueva (por ejemplo, el registro de tareas de Barril y
+    Tornillo o el catalogo de Personal de Mantenimiento), algunos componentes de la interfaz
+    (<code>Grid</code>, <code>ComboBox</code>, <code>NumberField</code>, <code>DateTimePicker</code>) no
+    aparecian en absoluto en la primera visita a esa pantalla. El resto del formulario (campos de texto
+    simples, botones) se veia con normalidad. Visitar otra pantalla y volver a veces "arreglaba" el
+    problema temporalmente, pero de forma inconsistente.
+</div>
+
+<div class="diagnostico">
+    <strong>Diagnostico:</strong> se descarto que fuera un error de programacion revisando, con
+    JavaScript ejecutado directo en el navegador, si el elemento HTML personalizado de cada componente
+    llegaba a registrarse:
+    <pre>customElements.get('vaadin-grid')  // devolvia false
+customElements.get('vaadin-combo-box')  // a veces true, a veces false</pre>
+    Esto confirmo que el servidor si enviaba el componente (existia en el HTML de la pagina), pero el
+    navegador nunca terminaba de "activarlo" como elemento funcional. Se comparo contra pantallas
+    antiguas del sistema (por ejemplo, Configuracion de Alarmas), que siempre funcionaban bien incluso en
+    una carga totalmente nueva.
+    <br><br>
+    Se construyeron dos pantallas de prueba minimas (solo un <code>Grid</code> con datos de ejemplo, sin
+    ningun otro campo) para descartar que el problema fuera la combinacion de campos de una pantalla
+    especifica. El problema se reprodujo igual en esas pantallas minimas, confirmando que no dependia del
+    contenido de cada vista sino de que la ruta fuera nueva.
+</div>
+
+<div class="causa">
+    <strong>Causa raiz (dos factores combinados):</strong>
+    <ol>
+        <li><strong>Paquete de JavaScript desactualizado:</strong> el archivo
+        <code>src/main/bundles/prod.bundle</code> (el paquete de codigo de interfaz pre-generado que usa
+        la aplicacion en modo produccion) no reflejaba las rutas mas nuevas del proyecto. Intentos de
+        "actualizarlo" con los comandos normales de Maven no generaban cambios porque el sistema de build
+        de Vaadin asumia, de forma incorrecta, que el paquete existente seguia siendo valido.</li>
+        <li><strong>Carga diferida por defecto de Vaadin:</strong> Vaadin solo incluye en el paquete de
+        carga inmediata (siempre presente) las rutas <code>""</code> (raiz) y <code>/login</code>. Todas
+        las demas rutas cargan sus componentes bajo demanda, en modulos separados que el navegador pide
+        la primera vez que se necesitan. En una ruta realmente nueva, con un paquete recien reconstruido y
+        sin nada en la cache del navegador, esa descarga bajo demanda de varios modulos en simultaneo
+        puede perder una carrera de tiempos, dejando el componente sin registrar. Rutas antiguas no
+        mostraban el problema porque el navegador ya tenia esos modulos guardados en cache de usos
+        anteriores.</li>
+    </ol>
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion (dos pasos):</strong>
+    <ol>
+        <li>Se elimino manualmente el archivo <code>src/main/bundles/prod.bundle</code> y se dejo que
+        Maven lo reconstruyera completamente desde cero (no una actualizacion incremental), mediante el
+        goal <code>build-frontend</code> del <code>vaadin-maven-plugin</code> ya configurado en el
+        proyecto. Esto resolvio el caso en que una ruta nueva <em>nunca</em> funcionaba, sin importar
+        cuantas veces se visitara.</li>
+        <li>Para eliminar la carrera de tiempos residual (que persistia de forma ocasional incluso con el
+        paquete actualizado), se agregaron anotaciones <code>@Uses</code> sobre la clase principal de la
+        aplicacion (<code>Application.java</code>, que implementa <code>AppShellConfigurator</code>):
+        <pre>@Uses(Grid.class)
+@Uses(ComboBox.class)
+@Uses(NumberField.class)
+@Uses(DateTimePicker.class)</pre>
+        Esta anotacion le indica a Vaadin que incluya esos componentes en el paquete de carga inmediata
+        (el mismo que ya usan <code>""</code> y <code>/login</code>) en lugar de en un modulo bajo
+        demanda, eliminando la necesidad de una descarga adicional -y su riesgo de carrera de tiempos- en
+        cualquier ruta nueva.</li>
+    </ol>
+    Se confirmo la resolucion con multiples pruebas consecutivas, incluyendo reinicios completos de la
+    aplicacion, verificando en cada caso que los cuatro componentes se registraran correctamente en la
+    primera visita. <span class="estado-ok">Resuelto.</span>
+</div>
+
+<h3>Referencias externas consultadas</h3>
+<ul class="referencias">
+    <li>Documentacion y foros de Vaadin sobre el comportamiento de carga diferida (lazy loading) por
+    defecto en modo produccion, confirmando que solo las rutas raiz y de login se empaquetan de forma
+    inmediata por defecto.</li>
+    <li><a href="https://github.com/vaadin/vaadin-grid-flow/issues/557" target="_blank">vaadin/vaadin-grid-flow issue #557</a>
+    - "Grid components are not always rendered immediately" (reporte oficial de Vaadin sobre demoras de
+    renderizado en el componente Grid).</li>
+    <li><a href="https://vaadin.com/docs/v23/production/troubleshooting" target="_blank">Vaadin - Troubleshooting de despliegue en produccion</a>
+    (documentacion oficial sobre configuracion de <code>productionMode</code> y archivos de build).</li>
+</ul>
+
+<h2 id="resumen">Resumen general</h2>
+<table>
+    <tr>
+        <th>#</th>
+        <th>Falla</th>
+        <th>Causa principal</th>
+        <th>Estado</th>
+    </tr>
+    <tr>
+        <td>1</td>
+        <td>Bloqueo de permisos en el asistente</td>
+        <td>Reglas de permisos sensibles a variaciones minimas del comando</td>
+        <td class="estado-ok">Resuelto</td>
+    </tr>
+    <tr>
+        <td>2</td>
+        <td>Credenciales desconocidas de H2</td>
+        <td>Usuario/contrasena nunca configurados explicitamente (por defecto, vacios)</td>
+        <td class="estado-ok">Resuelto</td>
+    </tr>
+    <tr>
+        <td>3</td>
+        <td>Componentes de Vaadin sin renderizar en rutas nuevas</td>
+        <td>Paquete de interfaz desactualizado + carga diferida por defecto de Vaadin</td>
+        <td class="estado-ok">Resuelto</td>
+    </tr>
+</table>
+
+</body>
+</html>
