@@ -16,6 +16,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.shared.Tooltip;
 import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
@@ -41,6 +42,7 @@ public class UsuariosView extends VerticalLayout {
     private final ComboBox<String> zonaCombo = new ComboBox<>("Zona");
     private final Checkbox habilitadoCheckbox = new Checkbox("Habilitado", true);
     private final Checkbox verMezcladoresCheckbox = new Checkbox("Ver Mezcladores");
+    private final Checkbox verMantenimientoCheckbox = new Checkbox("Ver Mantenimiento");
     private final Span formTitle = new Span("Nuevo usuario");
 
     private Usuario usuarioEnEdicion;
@@ -75,6 +77,11 @@ public class UsuariosView extends VerticalLayout {
         passwordField.setWidth("200px");
         passwordField.setHelperText("Vacío = no cambiar (al editar)");
 
+        configurarTooltip(verMezcladoresCheckbox,
+                "Concede acceso a ver la pestana de Mezcladores en Graficas, sin necesidad de rol ADMIN");
+        configurarTooltip(verMantenimientoCheckbox,
+                "Concede acceso a ver el registro de Mantenimiento Preventivo, sin necesidad de rol ADMIN");
+
         Button guardarBtn = new Button("Guardar", e -> guardar());
         guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
@@ -82,7 +89,8 @@ public class UsuariosView extends VerticalLayout {
         nuevoBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
         HorizontalLayout formLayout = new HorizontalLayout(
-                usernameField, passwordField, rolSelect, zonaCombo, habilitadoCheckbox, verMezcladoresCheckbox, guardarBtn, nuevoBtn
+                usernameField, passwordField, rolSelect, zonaCombo, habilitadoCheckbox,
+                verMezcladoresCheckbox, verMantenimientoCheckbox, guardarBtn, nuevoBtn
         );
         formLayout.setAlignItems(Alignment.END);
         formLayout.getStyle().set("flex-wrap", "wrap");
@@ -96,6 +104,8 @@ public class UsuariosView extends VerticalLayout {
         grid.addColumn(u -> u.isHabilitado() ? "Sí" : "No").setHeader("Habilitado").setAutoWidth(true);
         grid.addColumn(u -> u.getRol() == Usuario.Rol.ADMIN || u.isVerMezcladores() ? "Sí" : "No")
                 .setHeader("Ver Mezcladores").setAutoWidth(true);
+        grid.addColumn(u -> u.getRol() == Usuario.Rol.ADMIN || u.isVerMantenimiento() ? "Sí" : "No")
+                .setHeader("Ver Mantenimiento").setAutoWidth(true);
         grid.addComponentColumn(this::crearAccionesColumna).setHeader("Acciones").setAutoWidth(true);
         grid.setSizeFull();
 
@@ -123,6 +133,7 @@ public class UsuariosView extends VerticalLayout {
         zonaCombo.setEnabled(usuario.getRol() != Usuario.Rol.ADMIN);
         habilitadoCheckbox.setValue(usuario.isHabilitado());
         verMezcladoresCheckbox.setValue(usuario.isVerMezcladores());
+        verMantenimientoCheckbox.setValue(usuario.isVerMantenimiento());
     }
 
     private void limpiarFormulario() {
@@ -136,6 +147,7 @@ public class UsuariosView extends VerticalLayout {
         zonaCombo.setEnabled(true);
         habilitadoCheckbox.setValue(true);
         verMezcladoresCheckbox.setValue(false);
+        verMantenimientoCheckbox.setValue(false);
     }
 
     private void guardar() {
@@ -174,6 +186,7 @@ public class UsuariosView extends VerticalLayout {
         usuario.setZona(rol == Usuario.Rol.ADMIN ? null : zonaCombo.getValue());
         usuario.setHabilitado(habilitadoCheckbox.getValue());
         usuario.setVerMezcladores(verMezcladoresCheckbox.getValue());
+        usuario.setVerMantenimiento(verMantenimientoCheckbox.getValue());
 
         usuarioRepository.save(usuario);
         Notification.show("Usuario guardado", 2500, Notification.Position.BOTTOM_END)
@@ -198,5 +211,14 @@ public class UsuariosView extends VerticalLayout {
 
     private void refrescarGrid() {
         grid.setItems(usuarioRepository.findAll());
+    }
+
+    /** Tooltip breve al pasar el mouse: aparece casi al instante (alcanza con dejar el mouse
+     * un segundo) y se retira solo a los 5s de que el mouse se va, para no estorbar. */
+    private void configurarTooltip(Checkbox checkbox, String texto) {
+        Tooltip.forComponent(checkbox)
+                .withText(texto)
+                .withHoverDelay(200)
+                .withHideDelay(5000);
     }
 }

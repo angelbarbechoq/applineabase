@@ -9,6 +9,7 @@ import com.example.mantenimiento.model.LineaTag;
 import com.example.mantenimiento.model.MantenimientoRealizado;
 import com.example.mantenimiento.model.PlanMantenimiento;
 import com.example.mantenimiento.service.MantenimientoService;
+import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -22,9 +23,11 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import jakarta.annotation.security.RolesAllowed;
+import jakarta.annotation.security.PermitAll;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -41,12 +44,13 @@ import java.util.Optional;
  */
 @PageTitle("Mantenimiento Preventivo | LineaBase")
 @Route(value = "mantenimiento", layout = MainLayout.class)
-@RolesAllowed("ADMIN")
-public class MantenimientoView extends VerticalLayout {
+@PermitAll
+public class MantenimientoView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final MantenimientoService mantenimientoService;
+    private final LineaAccessService lineaAccessService;
     private final List<LineaTag> catalogo;
     private final Grid<MantenimientoRealizado> grid = new Grid<>(MantenimientoRealizado.class, false);
 
@@ -60,8 +64,10 @@ public class MantenimientoView extends VerticalLayout {
     private final NumberField horometroField = new NumberField("Horometro");
     private final Button registrarBtn = new Button("Registrar");
 
-    public MantenimientoView(MantenimientoService mantenimientoService, ConfigLoaderService configLoaderService) {
+    public MantenimientoView(MantenimientoService mantenimientoService, ConfigLoaderService configLoaderService,
+                              LineaAccessService lineaAccessService) {
         this.mantenimientoService = mantenimientoService;
+        this.lineaAccessService = lineaAccessService;
         this.catalogo = mantenimientoService.catalogoLineasExtrusion();
 
         setSizeFull();
@@ -69,6 +75,14 @@ public class MantenimientoView extends VerticalLayout {
         setSpacing(true);
 
         add(new H3("Mantenimiento Preventivo"));
+
+        if (!lineaAccessService.esAdmin()) {
+            configurarColumnas();
+            add(grid);
+            setFlexGrow(1, grid);
+            refrescarGrid();
+            return;
+        }
 
         tareaField.setItems(mantenimientoService.catalogoTareas());
         tareaField.setAllowCustomValue(true);
@@ -104,15 +118,7 @@ public class MantenimientoView extends VerticalLayout {
         registrarBtn.addClickListener(e -> registrar());
         registrarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        grid.addColumn(MantenimientoRealizado::getTareaRealizada).setHeader("Tarea ejecutada").setAutoWidth(true);
-        grid.addColumn(r -> r.getFechaRealizado().format(FORMATO_FECHA)).setHeader("Fecha y hora").setAutoWidth(true);
-        grid.addColumn(r -> r.getPlanMantenimiento().getTag()).setHeader("TAG").setAutoWidth(true);
-        grid.addColumn(MantenimientoRealizado::getNumeroOt).setHeader("# OT").setAutoWidth(true);
-        grid.addColumn(MantenimientoRealizado::getTecnico).setHeader("Tecnico").setAutoWidth(true);
-        grid.addColumn(r -> String.format("%.1f", r.getHorasAcumuladasEnMomento())).setHeader("Horometro").setAutoWidth(true);
-        grid.addColumn(this::formatearHorasTranscurridas).setHeader("Horas transcurridas").setAutoWidth(true);
-        grid.addColumn(this::formatearHorasFaltantes).setHeader("Horas faltantes para la recalibracion").setAutoWidth(true);
-        grid.setSizeFull();
+        configurarColumnas();
 
         HorizontalLayout formLayout = new HorizontalLayout(
                 tareaField, fechaField, lineaMaquinaCombo, equipoCombo, itemCombo,
@@ -126,6 +132,23 @@ public class MantenimientoView extends VerticalLayout {
 
         limpiarFormulario();
         refrescarGrid();
+    }
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        AccesoMantenimiento.verificar(event, lineaAccessService);
+    }
+
+    private void configurarColumnas() {
+        grid.addColumn(MantenimientoRealizado::getTareaRealizada).setHeader("Tarea ejecutada").setAutoWidth(true);
+        grid.addColumn(r -> r.getFechaRealizado().format(FORMATO_FECHA)).setHeader("Fecha y hora").setAutoWidth(true);
+        grid.addColumn(r -> r.getPlanMantenimiento().getTag()).setHeader("TAG").setAutoWidth(true);
+        grid.addColumn(MantenimientoRealizado::getNumeroOt).setHeader("# OT").setAutoWidth(true);
+        grid.addColumn(MantenimientoRealizado::getTecnico).setHeader("Tecnico").setAutoWidth(true);
+        grid.addColumn(r -> String.format("%.1f", r.getHorasAcumuladasEnMomento())).setHeader("Horometro").setAutoWidth(true);
+        grid.addColumn(this::formatearHorasTranscurridas).setHeader("Horas transcurridas").setAutoWidth(true);
+        grid.addColumn(this::formatearHorasFaltantes).setHeader("Horas faltantes para la recalibracion").setAutoWidth(true);
+        grid.setSizeFull();
     }
 
     private Optional<LineaTag> lineaDelCatalogo(String lineaMaquina) {

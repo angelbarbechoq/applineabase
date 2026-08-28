@@ -236,15 +236,20 @@ public final class MainLayout extends AppLayout {
             nav.addItem(alarmas);
             colapsarAlSalirDelMouse(alarmas);
         }
-        if (lineaAccessService.esAdmin()) {
+        if (lineaAccessService.puedeVerMantenimiento()) {
             SideNavItem mantenimientoPreventivo = new SideNavItem("Mantenimiento Preventivo");
             mantenimientoPreventivo.setPrefixComponent(VaadinIcon.TOOLS.create());
             mantenimientoPreventivo.setExpanded(false);
             mantenimientoPreventivo.addItem(new SideNavItem("Mantenimiento Barril y Tornillos", "mantenimiento", VaadinIcon.TOOLS.create()));
-            mantenimientoPreventivo.addItem(new SideNavItem("Personal de Mantenimiento", "mantenimiento/personal", VaadinIcon.USERS.create()));
+            // Personal de Mantenimiento es gestion de datos (alta/edicion/borrado de tecnicos),
+            // no solo consulta -- se mantiene exclusivo ADMIN aunque el resto del modulo ya no lo sea.
+            if (lineaAccessService.esAdmin()) {
+                mantenimientoPreventivo.addItem(new SideNavItem("Personal de Mantenimiento", "mantenimiento/personal", VaadinIcon.USERS.create()));
+            }
             nav.addItem(mantenimientoPreventivo);
             colapsarAlSalirDelMouse(mantenimientoPreventivo);
-
+        }
+        if (lineaAccessService.esAdmin()) {
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));
             nav.addItem(new SideNavItem("Reparar VIP Mensual", "admin/reparar-vip", VaadinIcon.WRENCH.create()));
 

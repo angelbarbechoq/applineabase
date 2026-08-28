@@ -75,6 +75,20 @@ public class LineaAccessService {
         return principal.getUsuario().isVerMezcladores();
     }
 
+    /** Ver el registro de Mantenimiento Preventivo: ADMIN, o el usuario puntual que tenga
+     * marcado "Ver Mantenimiento" (independiente de la zona — ver Usuario.verMantenimiento).
+     * Registrar una tarea nueva sigue siendo exclusivo de ADMIN, esto solo habilita ver. */
+    public boolean puedeVerMantenimiento() {
+        if (esAdmin()) {
+            return true;
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {
+            return false;
+        }
+        return principal.getUsuario().isVerMantenimiento();
+    }
+
     public boolean esAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {

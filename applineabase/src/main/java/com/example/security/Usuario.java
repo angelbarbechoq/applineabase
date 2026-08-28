@@ -46,6 +46,15 @@ public class Usuario {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean verMezcladores = false;
 
+    /**
+     * Acceso al registro de Mantenimiento Preventivo (mismo criterio que verMezcladores):
+     * un usuario puntual, sin necesidad de ser ADMIN ni depender de su zona. Ignorado cuando el
+     * rol es ADMIN, que ya ve todo. Solo habilita VER el historial -- registrar una tarea nueva
+     * sigue siendo exclusivo de ADMIN.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean verMantenimiento = false;
+
     public Usuario() {
     }
 
@@ -99,6 +108,14 @@ public class Usuario {
 
     public void setVerMezcladores(boolean verMezcladores) {
         this.verMezcladores = verMezcladores;
+    }
+
+    public boolean isVerMantenimiento() {
+        return verMantenimiento;
+    }
+
+    public void setVerMantenimiento(boolean verMantenimiento) {
+        this.verMantenimiento = verMantenimiento;
     }
 
     public enum Rol {
