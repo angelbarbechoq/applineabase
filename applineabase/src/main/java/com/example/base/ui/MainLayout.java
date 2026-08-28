@@ -248,6 +248,13 @@ public final class MainLayout extends AppLayout {
             }
             nav.addItem(mantenimientoPreventivo);
             colapsarAlSalirDelMouse(mantenimientoPreventivo);
+
+            SideNavItem reportes = new SideNavItem("Reportes");
+            reportes.setPrefixComponent(VaadinIcon.CHART.create());
+            reportes.setExpanded(false);
+            reportes.addItem(new SideNavItem("Estado Barril y Tornillo", "reportes/mantenimiento", VaadinIcon.TOOLS.create()));
+            nav.addItem(reportes);
+            colapsarAlSalirDelMouse(reportes);
         }
         if (lineaAccessService.esAdmin()) {
             nav.addItem(new SideNavItem("Usuarios", "usuarios", VaadinIcon.USERS.create()));

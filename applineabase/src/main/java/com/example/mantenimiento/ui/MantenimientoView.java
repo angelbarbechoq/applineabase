@@ -4,7 +4,6 @@ import com.example.base.ui.MainLayout;
 import com.example.base.ui.NotificacionesUtil;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.mantenimiento.model.EquipoTag;
-import com.example.mantenimiento.model.EstadoPlanDTO;
 import com.example.mantenimiento.model.ItemTag;
 import com.example.mantenimiento.model.LineaTag;
 import com.example.mantenimiento.model.MantenimientoRealizado;
@@ -17,7 +16,6 @@ import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H3;
-import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
@@ -50,14 +48,11 @@ import java.util.Optional;
 public class MantenimientoView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private static final String COLOR_ADVERTENCIA_FONDO = "#fff3cd";
-    private static final String COLOR_ADVERTENCIA_TEXTO = "#856404";
 
     private final MantenimientoService mantenimientoService;
     private final LineaAccessService lineaAccessService;
     private final List<LineaTag> catalogo;
     private final Grid<MantenimientoRealizado> grid = new Grid<>(MantenimientoRealizado.class, false);
-    private final Grid<EstadoPlanDTO> estadoGrid = new Grid<>(EstadoPlanDTO.class, false);
 
     private final ComboBox<String> tareaField = new ComboBox<>("Tarea ejecutada");
     private final DateTimePicker fechaField = new DateTimePicker("Fecha y hora");
@@ -80,10 +75,6 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
         setSpacing(true);
 
         add(new H3("Mantenimiento Preventivo"));
-
-        configurarEstadoGrid();
-        add(new H3("Estado"), estadoGrid);
-        refrescarEstadoGrid();
 
         if (!lineaAccessService.esAdmin()) {
             add(new H3("Historial"));
@@ -147,50 +138,6 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
         AccesoMantenimiento.verificar(event, lineaAccessService);
-    }
-
-    private void configurarEstadoGrid() {
-        estadoGrid.addColumn(e -> e.plan().getTag()).setHeader("TAG").setAutoWidth(true).setSortable(true);
-        estadoGrid.addColumn(e -> e.plan().getTarea()).setHeader("Tarea").setAutoWidth(true).setSortable(true);
-        estadoGrid.addColumn(this::formatearHorasRestantesEstado).setHeader("Horas restantes").setAutoWidth(true);
-        estadoGrid.addComponentColumn(this::estadoBadge).setHeader("Estado").setAutoWidth(true);
-        estadoGrid.setAllRowsVisible(true);
-        estadoGrid.setWidthFull();
-    }
-
-    private String formatearHorasRestantesEstado(EstadoPlanDTO estado) {
-        return estado.sinRegistro() ? "-" : String.format("%.1f", estado.horasRestantes());
-    }
-
-    private Span estadoBadge(EstadoPlanDTO estado) {
-        if (estado.sinRegistro()) {
-            Span badge = new Span("Sin registro");
-            badge.getElement().getThemeList().add("badge");
-            badge.getElement().getThemeList().add("contrast");
-            return badge;
-        }
-        if (estado.vencido()) {
-            Span badge = new Span("VENCIDO");
-            badge.getElement().getThemeList().add("badge");
-            badge.getElement().getThemeList().add("error");
-            return badge;
-        }
-        if (estado.proximoAVencer()) {
-            Span badge = new Span("PROXIMO A VENCER");
-            badge.getElement().getThemeList().add("badge");
-            badge.getStyle()
-                    .set("background-color", COLOR_ADVERTENCIA_FONDO)
-                    .set("color", COLOR_ADVERTENCIA_TEXTO);
-            return badge;
-        }
-        Span badge = new Span("AL DIA");
-        badge.getElement().getThemeList().add("badge");
-        badge.getElement().getThemeList().add("success");
-        return badge;
-    }
-
-    private void refrescarEstadoGrid() {
-        estadoGrid.setItems(mantenimientoService.listarEstadoPlanes());
     }
 
     private void configurarColumnas() {
@@ -276,7 +223,6 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
         limpiarFormulario();
         refrescarGrid();
-        refrescarEstadoGrid();
     }
 
     private void limpiarFormulario() {
