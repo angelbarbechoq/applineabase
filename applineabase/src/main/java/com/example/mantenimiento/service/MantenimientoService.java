@@ -2,9 +2,9 @@ package com.example.mantenimiento.service;
 
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.horometro.model.HorometroDiario;
-import com.example.horometro.model.HorometroTotal;
 import com.example.horometro.repository.HorometroDiarioRepository;
-import com.example.horometro.repository.HorometroTotalRepository;
+import com.example.horometro.service.HorometroBackfillRunner;
+import com.example.horometro.service.HorometroService;
 import com.example.mantenimiento.model.EquipoTag;
 import com.example.mantenimiento.model.EstadoPlanDTO;
 import com.example.mantenimiento.model.ItemTag;
@@ -32,25 +32,28 @@ public class MantenimientoService {
     private final PlanMantenimientoRepository planRepository;
     private final MantenimientoRealizadoRepository realizadoRepository;
     private final HorometroDiarioRepository horometroDiarioRepository;
-    private final HorometroTotalRepository horometroTotalRepository;
     private final ConfigLoaderService configLoaderService;
     private final LineaAccessService lineaAccessService;
     private final TecnicoMantenimientoRepository tecnicoRepository;
+    private final HorometroBackfillRunner horometroBackfillRunner;
+    private final HorometroService horometroService;
 
     public MantenimientoService(PlanMantenimientoRepository planRepository,
                                  MantenimientoRealizadoRepository realizadoRepository,
                                  HorometroDiarioRepository horometroDiarioRepository,
-                                 HorometroTotalRepository horometroTotalRepository,
                                  ConfigLoaderService configLoaderService,
                                  LineaAccessService lineaAccessService,
-                                 TecnicoMantenimientoRepository tecnicoRepository) {
+                                 TecnicoMantenimientoRepository tecnicoRepository,
+                                 HorometroBackfillRunner horometroBackfillRunner,
+                                 HorometroService horometroService) {
         this.planRepository = planRepository;
         this.realizadoRepository = realizadoRepository;
         this.horometroDiarioRepository = horometroDiarioRepository;
-        this.horometroTotalRepository = horometroTotalRepository;
         this.configLoaderService = configLoaderService;
         this.lineaAccessService = lineaAccessService;
         this.tecnicoRepository = tecnicoRepository;
+        this.horometroBackfillRunner = horometroBackfillRunner;
+        this.horometroService = horometroService;
     }
 
     public List<String> listarTecnicos() {
@@ -103,8 +106,7 @@ public class MantenimientoService {
 
     private EstadoPlanDTO calcularEstado(PlanMantenimiento plan) {
         String lineaMaquina = resolverLineaMaquina(plan.getTag());
-        double horasActuales = horometroTotalRepository.findById(lineaMaquina)
-                .map(HorometroTotal::getHorasAcumuladas).orElse(0.0);
+        double horasActuales = horometroService.obtenerSnapshot(lineaMaquina).horasTotal();
 
         Optional<MantenimientoRealizado> ultimo = realizadoRepository.findFirstByPlanMantenimientoOrderByFechaRealizadoDesc(plan);
         LocalDateTime ultimaFecha = ultimo.map(MantenimientoRealizado::getFechaRealizado).orElse(null);
@@ -160,17 +162,17 @@ public class MantenimientoService {
                 .toList();
     }
 
-    /** Horas acumuladas del horometro de la linea del plan al cierre de una fecha, para
-     * sugerir el valor de "Horometro" en el formulario (el usuario puede corregirlo a mano). */
-    public double horasEnFecha(PlanMantenimiento plan, LocalDate fecha) {
-        return horometroDiarioRepository.sumHorasHastaFecha(resolverLineaMaquina(plan.getTag()), fecha);
+    /** Horas acumuladas del horometro de la linea del plan hasta el momento exacto (fecha y
+     * hora) de la tarea, no solo hasta el cierre del dia -- para sugerir el valor de
+     * "Horometro" en el formulario (el usuario puede corregirlo a mano si hace falta). */
+    public double horasEnFecha(PlanMantenimiento plan, LocalDateTime momento) {
+        return horometroBackfillRunner.horasHastaMomento(resolverLineaMaquina(plan.getTag()), momento);
     }
 
     /** Horas acumuladas actuales (ahora mismo) de la linea del plan, para calcular en vivo
      * "horas transcurridas" y "horas faltantes" de cada fila del historial. */
     public double horasActuales(PlanMantenimiento plan) {
-        return horometroTotalRepository.findById(resolverLineaMaquina(plan.getTag()))
-                .map(HorometroTotal::getHorasAcumuladas).orElse(0.0);
+        return horometroService.obtenerSnapshot(resolverLineaMaquina(plan.getTag())).horasTotal();
     }
 
     /** Historial completo de tareas ya ejecutadas, mas reciente primero, para la grilla de la

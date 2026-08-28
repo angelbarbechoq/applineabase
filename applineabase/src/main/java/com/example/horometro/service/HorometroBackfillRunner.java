@@ -104,6 +104,41 @@ public class HorometroBackfillRunner implements ApplicationRunner {
     }
 
     /**
+     * Horas acumuladas de una línea hasta un momento exacto (fecha y hora), no solo hasta el
+     * cierre del día como {@link HorometroDiarioRepository#sumHorasHastaFecha}. Suma los días ya
+     * cerrados anteriores (exacto, sin releer nada) más el tramo del día puntual hasta esa hora,
+     * releyendo el crudo de potencia de ese único día y aplicando la misma lógica de
+     * confirmación de encendido/apagado que el backfill normal — sin usar muestras posteriores
+     * al momento pedido, igual que lo vería el sistema en vivo en ese instante.
+     * Usado por Mantenimiento Preventivo para sugerir el horómetro real al registrar una tarea
+     * con fecha y hora retroactiva, en vez de aproximar al cierre del día completo.
+     */
+    public double horasHastaMomento(String linea, LocalDateTime momento) {
+        double horasDiasAnteriores = diarioRepository.sumHorasHastaFecha(linea, momento.toLocalDate().minusDays(1));
+
+        Optional<AlarmaConfig> config = configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.DETENCION)
+                .or(() -> configRepository.findByLineaMaquinaAndTipoAlarma(linea, TipoAlarma.CICLO_COMPRESOR));
+        if (config.isEmpty()) {
+            return horasDiasAnteriores;
+        }
+
+        boolean esDetencion = config.get().getTipoAlarma() == TipoAlarma.DETENCION;
+        double umbral = config.get().getUmbralMinimoKw() != null ? config.get().getUmbralMinimoKw() : UMBRAL_MINIMO_KW_DEFAULT;
+        int ventana = esDetencion
+                ? (config.get().getVentanaCiclos() != null ? config.get().getVentanaCiclos() : VENTANA_CICLOS_DEFAULT)
+                : 1;
+
+        LocalDate diaDelMomento = momento.toLocalDate();
+        List<Map<String, Object>> filasDelDia = plcDataQueryService.getHistoricoVIPByRango(linea, diaDelMomento, diaDelMomento);
+        List<Muestra> muestrasHastaElMomento = agruparPorDia(filasDelDia).getOrDefault(diaDelMomento, List.of()).stream()
+                .filter(m -> !m.fecha().isAfter(momento))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+
+        ResultadoDia resultado = calcularHorasEncendidaEnDia(muestrasHastaElMomento, umbral, ventana);
+        return horasDiasAnteriores + resultado.horas();
+    }
+
+    /**
      * Recalcula TODO el histórico de una línea con el umbral/ventana que tenga configurado en
      * este momento, ignorando los días ya calculados — relee todos los datos guardados desde
      * el primer mes disponible, así que cuanto más historial tenga la línea más tarda. Preferir

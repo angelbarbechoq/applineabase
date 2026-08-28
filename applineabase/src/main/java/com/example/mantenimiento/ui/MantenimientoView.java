@@ -170,7 +170,7 @@ public class MantenimientoView extends VerticalLayout {
         }
         Optional<PlanMantenimiento> plan = mantenimientoService.planPorTag(tag.get());
         plan.ifPresent(p -> horometroField.setValue(
-                mantenimientoService.horasEnFecha(p, fechaField.getValue().toLocalDate())));
+                mantenimientoService.horasEnFecha(p, fechaField.getValue())));
     }
 
     private void registrar() {
