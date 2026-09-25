@@ -19,7 +19,7 @@ o cambio importante, actualizar ese archivo** (seccion del modulo, tabla de ruta
 ## Registro de fallas y soluciones (leer y mantener)
 
 Historial de inconvenientes ya diagnosticados y como se resolvieron. Revisarlo antes de
-diagnosticar algo parecido, y **agregar una entrada nueva cada vez que se resuelva una falla**
+diagnosticar algo parecido. **Solo se agrega una entrada nueva cuando el usuario lo indique**, no por cada falla resuelta
 (formato y tabla resumen dentro del archivo). `reportes/reporte-de-fallas.html` es la version para
 leer en el navegador y se regenera desde este archivo cuando el usuario lo pida.
 
