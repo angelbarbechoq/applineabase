@@ -7,6 +7,15 @@
 > un hook** (`~/.claude/hooks/block-dangerous-git.sh`), no solo
 > documentados — no depende de que el modelo se acuerde.
 
+## Contexto del proyecto (leer primero)
+
+El mapa de lo que ya existe (modulos, rutas, permisos, modelo de datos, reglas de negocio
+acordadas, trampas conocidas y checklist para modulos nuevos) esta en el archivo importado
+abajo. Leerlo antes de tocar codigo evita recorrer todo el repositorio. **Al cerrar cada modulo
+o cambio importante, actualizar ese archivo** (seccion del modulo, tabla de rutas y pendientes).
+
+@docs/CONTEXTO-PROYECTO.md
+
 ## CI/CD y empaquetado
 
 El build, los tests y el empaquetado ya están automatizados en
