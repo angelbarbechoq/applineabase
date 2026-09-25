@@ -294,6 +294,8 @@ amarillo `#fff3cd`/`#856404`, rojo `#f8d7da`/`#721c24`, gris `#e2e3e5`/`#383d41`
 - Ejecutable nativo con GraalVM.
 
 **Pendiente / ideas**
+- **Modulo de Mantenimiento Correctivo (MF21 + AMEF):** diseno acordado, sin implementar. Ver
+  `docs/PLAN-MANTENIMIENTO-CORRECTIVO.md`. Falta el AMEF del usuario.
 - Ampliar la lista fija de "Tarea ejecutada" (hoy Cambio y Recalibracion).
 - Mensaje amigable al intentar borrar un modelo de stock con movimientos o tareas asociadas.
 - Los movimientos de stock no se pueden borrar ni corregir desde pantalla (por diseno, es historial).
