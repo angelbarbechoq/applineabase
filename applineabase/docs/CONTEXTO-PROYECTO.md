@@ -11,8 +11,9 @@ codigo, manda el codigo y hay que corregir este archivo.
 
 Ultima actualizacion: 2026-09-25. Las secciones marcadas **[resumen]** son una vista de alto
 nivel que no se reviso a fondo: leer el codigo antes de modificar esa parte.
-`ARCHITECTURE.md` y `README.md` de la raiz estan desactualizados (mencionan `examplefeature`
-y clases que ya no existen); este archivo los reemplaza como referencia.
+Se eliminaron `ARCHITECTURE.md` y `README.md` de la raiz (obsoletos: plantilla de Vaadin y
+clases que ya no existen); este archivo los reemplaza. Los problemas ya resueltos estan en
+`docs/REGISTRO-DE-FALLAS.md`.
 
 ---
 
@@ -56,7 +57,8 @@ navegador.
 | `config\` | `plc-config.json`, `linea-id-config.json`, `mezcladores-config.json`, `extrusion-tag-config.json`. Se siembran desde `src/main/resources` en el primer arranque (`ConfigLoaderService`) y despues se editan a mano ahi, sin recompilar. |
 | `{anio}\{mes}\...` | SQLite de energia: un archivo por mes, una tabla por linea/maquina, PK `fecha` (texto). Ruta armada en `RutaArchivosEnergia` (`BASE_PATH`). Muestreo cada 60 s (`DataAcquisitionTask.CYCLE_INTERVAL`; el comentario del codigo dice 6 s y esta mal). Nunca se purgan. |
 
-`reportes/reporte-de-fallas.html` (en el repo) documenta fallas ya resueltas y como.
+`docs/REGISTRO-DE-FALLAS.md` documenta las fallas ya resueltas (fuente de verdad, se importa en
+`CLAUDE.md`); `reportes/reporte-de-fallas.html` es su version para el navegador.
 
 Trampa: la base H2 es la real. Cualquier prueba en la instancia del usuario deja datos
 reales. Si hace falta limpiar, se hace por JDBC (script en el scratchpad, credenciales vacias).
@@ -297,7 +299,6 @@ amarillo `#fff3cd`/`#856404`, rojo `#f8d7da`/`#721c24`, gris `#e2e3e5`/`#383d41`
 - Los movimientos de stock no se pueden borrar ni corregir desde pantalla (por diseno, es historial).
 - El usuario esta iniciando el CMM: cargara tareas atrasadas de meses anteriores (el calculo exacto
   del horometro se analizo y no es problema de rendimiento).
-- Limpiar `ARCHITECTURE.md` y `README.md` (obsoletos) o reemplazarlos por este archivo.
 - Posible: aviso de stock minimo, mas equipos/planes ademas de Barril y Tornillo, mas reportes
   dentro del menu Reportes.
 

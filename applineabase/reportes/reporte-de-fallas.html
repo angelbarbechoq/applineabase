@@ -121,7 +121,7 @@
 <h1>Reporte de Fallas</h1>
 <div class="meta">
     <strong>Proyecto:</strong> Sistema LineaBaseX - Modulo de Mantenimiento Preventivo (applineabase)<br>
-    <strong>Fecha del reporte:</strong> 28 de agosto de 2026<br>
+    <strong>Fecha del reporte:</strong> 28 de agosto de 2026 (actualizado el 25 de septiembre de 2026; fuente: docs/REGISTRO-DE-FALLAS.md)<br>
     <strong>Alcance:</strong> Fallas tecnicas detectadas y resueltas durante la construccion del modulo de
     mantenimiento preventivo (registro de tareas de Barril y Tornillo, catalogo de Personal de Mantenimiento).
 </div>
@@ -132,6 +132,12 @@
         <li><a href="#falla1">Bloqueo de permisos en el asistente de desarrollo</a></li>
         <li><a href="#falla2">Credenciales reales de conexion a la base de datos H2</a></li>
         <li><a href="#falla3">Componentes de Vaadin sin renderizar en pantallas nuevas</a></li>
+        <li><a href="#falla4">Estados sin color (badges) en las grillas</a></li>
+        <li><a href="#falla5">Campo Cantidad invisible en Stock</a></li>
+        <li><a href="#falla6">Horometro de una tarea con error de unas 8 horas</a></li>
+        <li><a href="#falla7">Confusion de puerto 8080 / 8081 en las pruebas</a></li>
+        <li><a href="#falla8">Login por automatizacion del navegador no ingresa texto</a></li>
+        <li><a href="#falla9">Restaurar un commit viejo deja un arbol inconsistente</a></li>
         <li><a href="#resumen">Resumen general</a></li>
     </ol>
 </div>
@@ -279,6 +285,120 @@ customElements.get('vaadin-combo-box')  // a veces true, a veces false</pre>
     (documentacion oficial sobre configuracion de <code>productionMode</code> y archivos de build).</li>
 </ul>
 
+<h2 id="falla4">4. Estados sin color (badges) en las grillas</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> la columna Estado del reporte de Barril y Tornillo se veia como texto plano,
+    sin el fondo verde, amarillo o rojo esperado.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> el tema del proyecto es <strong>Aura</strong>
+    (<code>@StyleSheet(Aura.STYLESHEET)</code>), no Lumo. Los theme variants de Lumo
+    (<code>"badge"</code>, <code>"success"</code>, <code>"error"</code>) no se pintan bajo Aura.
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion:</strong> cada estado es un <code>Span</code> con estilo inline
+    (<code>background-color</code>, <code>color</code>, <code>padding</code>, <code>border-radius</code>),
+    que se ve igual sin depender del tema. Paleta: verde #d4edda/#155724, amarillo #fff3cd/#856404, rojo
+    #f8d7da/#721c24, gris #e2e3e5/#383d41. <span class="estado-ok">Resuelto.</span>
+</div>
+
+<h2 id="falla5">5. Campo Cantidad invisible en Stock</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> el formulario de Stock de Barril y Tornillo no mostraba el campo Cantidad.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> <code>IntegerField</code> no estaba en la lista de <code>@Uses</code>. Es la
+    misma familia de la falla 3: un componente que carga por demanda en una ruta con bundle recien generado
+    puede no registrarse.
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion:</strong> se agrego <code>@Uses(IntegerField.class)</code> en
+    <code>Application.java</code> y se regenero <code>prod.bundle</code>. Regla preventiva: cada componente
+    Vaadin nuevo en una vista lleva su <code>@Uses</code> y se regenera el bundle en el mismo cambio.
+    <span class="estado-ok">Resuelto.</span>
+</div>
+
+<h2 id="falla6">6. Horometro de una tarea con error de unas 8 horas</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> el horometro sugerido para una tarea registrada a las 09:54 mostraba 3257.0 h;
+    el valor exacto a esa hora era 3249.1 h.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> el metodo anterior sumaba las filas diarias hasta el dia de la tarea
+    <em>inclusive</em>, o sea el dia completo. El error de cada registro es lo que la linea trabajo despues de
+    la hora de la tarea ese mismo dia; <strong>no se acumula</strong> con el tiempo porque los dias anteriores
+    son exactos y cada calculo parte de cero. Ademas, las horas actuales omitian el tramo encendido en curso.
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion:</strong> un metodo nuevo suma exactamente los dias anteriores (una sola consulta
+    agregada) y calcula desde los datos crudos solo el dia de la tarea, cortado en la hora exacta; las horas
+    actuales usan el estado en vivo. Costo fijo por llamada, no crece con la antiguedad de la fecha. Los
+    registros viejos no se recalculan solos: se borran y se vuelven a cargar.
+    <span class="estado-ok">Resuelto.</span>
+</div>
+
+<h2 id="falla7">7. Confusion de puerto 8080 / 8081 en las pruebas</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> el preview del asistente arrancaba en el 8081 mientras el usuario prueba en el 8080.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> el 8080 lo ocupa la propia instancia del usuario (IntelliJ, con la base real). No es
+    un rango reservado por Windows (la consulta de puertos excluidos salio vacia). Dos instancias no pueden
+    compartir puerto.
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion (flujo):</strong> compilar, commit y push a master; el usuario hace pull, recompila y
+    reinicia su instancia en el 8080 y prueba ahi. No se levanta un preview en el 8081 salvo pedido expreso.
+    <span class="estado-ok">Resuelto.</span>
+</div>
+
+<h2 id="falla8">8. Login por automatizacion del navegador no ingresa texto</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> al escribir usuario y clave con el navegador integrado, los campos quedaban
+    vacios y el ingreso fallaba aun con la clave correcta.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> un clic simple no da foco al input interno del componente web de Vaadin.
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion:</strong> usar doble clic para enfocar y verificar por JavaScript el valor de los
+    campos antes de enviar. <span class="estado-ok">Resuelto.</span>
+</div>
+
+<h2 id="falla9">9. Restaurar un commit viejo deja un arbol inconsistente</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> al volver a un commit anterior con <code>git checkout &lt;sha&gt; -- .</code>
+    quedaban archivos que no existian en ese commit.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> ese comando solo restaura archivos presentes en el commit, no borra los agregados
+    despues.
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion:</strong> para reflejar el arbol completo usar <code>git checkout &lt;sha&gt;</code> o
+    crear una rama desde ese commit; para traer un arreglo puntual, <code>git cherry-pick</code>. Guardar
+    antes el trabajo pendiente con <code>git stash push -- &lt;rutas&gt;</code>.
+    <span class="estado-ok">Resuelto.</span>
+</div>
+
 <h2 id="resumen">Resumen general</h2>
 <table>
     <tr>
@@ -304,6 +424,42 @@ customElements.get('vaadin-combo-box')  // a veces true, a veces false</pre>
         <td>Componentes de Vaadin sin renderizar en rutas nuevas</td>
         <td>Paquete de interfaz desactualizado + carga diferida por defecto de Vaadin</td>
         <td class="estado-ok">Resuelto</td>
+    </tr>
+    <tr>
+        <td>4</td>
+        <td>Estados sin color (badges)</td>
+        <td>El tema del proyecto es Aura, no Lumo</td>
+        <td class="estado-ok">Resuelto</td>
+    </tr>
+    <tr>
+        <td>5</td>
+        <td>Campo Cantidad invisible en Stock</td>
+        <td>IntegerField sin @Uses (misma familia que la falla 3)</td>
+        <td class="estado-ok">Resuelto</td>
+    </tr>
+    <tr>
+        <td>6</td>
+        <td>Horometro con error de unas 8 horas</td>
+        <td>El metodo anterior sumaba el dia completo, no hasta la hora</td>
+        <td class="estado-ok">Resuelto</td>
+    </tr>
+    <tr>
+        <td>7</td>
+        <td>Confusion de puerto 8080 / 8081</td>
+        <td>La instancia del usuario ocupa el 8080</td>
+        <td class="estado-ok">Resuelto (flujo)</td>
+    </tr>
+    <tr>
+        <td>8</td>
+        <td>Login por automatizacion sin texto</td>
+        <td>Un clic simple no da foco al input interno</td>
+        <td class="estado-ok">Resuelto</td>
+    </tr>
+    <tr>
+        <td>9</td>
+        <td>Arbol inconsistente al restaurar un commit</td>
+        <td>checkout con -- . no borra archivos nuevos</td>
+        <td class="estado-ok">Resuelto (proceso)</td>
     </tr>
 </table>
 
