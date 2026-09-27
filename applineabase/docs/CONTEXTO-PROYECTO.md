@@ -256,6 +256,11 @@ taxonomia (Mezcla, Casa Fuerza) usan el nombre de la linea como TAG.
 Para estados con color usar `Span` con estilo inline. Paleta usada: verde `#d4edda`/`#155724`,
 amarillo `#fff3cd`/`#856404`, rojo `#f8d7da`/`#721c24`, gris `#e2e3e5`/`#383d41`.
 
+**Regla de datos (pedido explicito del usuario):** los campos que afectan directamente a la
+estadistica y/o KPI **nunca se llenan a mano**: salen de listas cerradas, catalogos o se calculan.
+Texto libre solo para descripciones y comentarios; si falta una opcion, "No previsto" y se agrega
+al catalogo. Fechas y horas con selector y validacion.
+
 **Patrones de UI del proyecto**
 - CRUD de catalogo (solo admin): clic en fila para editar, boton Nuevo/Guardar, tacho por fila con
   `grid.addComponentColumn(...)`, `ComboBox` con `setAllowCustomValue(true)` para catalogos abiertos y

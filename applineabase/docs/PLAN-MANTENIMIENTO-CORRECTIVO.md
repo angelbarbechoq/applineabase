@@ -52,7 +52,8 @@ Tipo, Hora inicio, Hora fin, Trabajo realizado, Realizado por, Recibi conforme.
 3. Categorias del papel **separadas** (ver seccion 5).
 4. Solo el tipo **D (Dano)** entra en la estadistica de modos de falla, MTBF y AMEF. Los demas
    tipos se registran igual (carga de trabajo, tiempo perdido) pero no cuentan como falla del equipo.
-5. Listas cerradas para lo que alimenta calculos/filtros; texto libre para descripciones.
+5. **Regla general del proyecto:** los campos que afectan a la estadistica y/o KPI nunca se
+   llenan a mano; salen de listas, catalogos o se calculan. Texto libre solo para descripciones.
 6. Siempre existe la opcion **"No previsto"** + texto, para fallas que el AMEF no contempla.
    Esos casos se revisan y alimentan el AMEF (AMEF vivo).
 7. Funciones y fallas funcionales cuelgan del **tipo de equipo** (Extrusora, Acampanador...).
