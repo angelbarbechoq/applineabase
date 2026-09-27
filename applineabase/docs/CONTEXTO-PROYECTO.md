@@ -259,7 +259,9 @@ amarillo `#fff3cd`/`#856404`, rojo `#f8d7da`/`#721c24`, gris `#e2e3e5`/`#383d41`
 **Regla de datos (pedido explicito del usuario):** los campos que afectan directamente a la
 estadistica y/o KPI **nunca se llenan a mano**: salen de listas cerradas, catalogos o se calculan.
 Texto libre solo para descripciones y comentarios; si falta una opcion, "No previsto" y se agrega
-al catalogo. Fechas y horas con selector y validacion.
+al catalogo. Fechas y horas con selector y validacion. Lo unico que se escribe a mano es el alta
+en una ventana de catalogo (agregar maquina, item de AMEF, persona...), y lo agregado pasa a ser
+una opcion mas de la lista.
 
 **Patrones de UI del proyecto**
 - CRUD de catalogo (solo admin): clic en fila para editar, boton Nuevo/Guardar, tacho por fila con
@@ -301,6 +303,10 @@ al catalogo. Fechas y horas con selector y validacion.
 **Pendiente / ideas**
 - **Modulo de Mantenimiento Correctivo (MF21 + AMEF):** diseno acordado, sin implementar. Ver
   `docs/PLAN-MANTENIMIENTO-CORRECTIVO.md`. Falta el AMEF del usuario.
+- Campos que hoy violan la regla de datos (corregir sobre la marcha, no ahora): tecnico y
+  linea/maquina en el registro preventivo, linea/maquina en config de planes, horometro editable
+  del preventivo (se dejo asi por las tareas atrasadas del CMM), modelo y refrigeracion del stock,
+  linea en config de alarmas.
 - Ampliar la lista fija de "Tarea ejecutada" (hoy Cambio y Recalibracion).
 - Mensaje amigable al intentar borrar un modelo de stock con movimientos o tareas asociadas.
 - Los movimientos de stock no se pueden borrar ni corregir desde pantalla (por diseno, es historial).
