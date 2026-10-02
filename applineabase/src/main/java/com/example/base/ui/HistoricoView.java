@@ -4,6 +4,7 @@ import com.example.base.model.GraficaModel;
 import com.example.dataacquisition.FactorPotenciaUtil;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.ConfigLoaderService;
+import com.example.dataacquisition.service.ExportacionCsvService;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
@@ -84,6 +85,7 @@ public class HistoricoView extends VerticalLayout {
     private final ConfigLoaderService configLoaderService;
     private final LineaAccessService lineaAccessService;
     private final PLCDataQueryService plcDataQueryService;
+    private final ExportacionCsvService exportacionCsvService;
 
     private ComboBox<String> maquinaCombo;
     private DatePicker desdeDate;
@@ -194,7 +196,8 @@ public class HistoricoView extends VerticalLayout {
     private final Set<String> mezcladoresDisponibles;
 
     public HistoricoView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
-                          PLCDataQueryService plcDataQueryService) {
+                          PLCDataQueryService plcDataQueryService, ExportacionCsvService exportacionCsvService) {
+        this.exportacionCsvService = exportacionCsvService;
         this.configLoaderService = configLoaderService;
         this.lineaAccessService = lineaAccessService;
         this.plcDataQueryService = plcDataQueryService;
@@ -641,6 +644,10 @@ public class HistoricoView extends VerticalLayout {
                 maquinaCombo, desdeDate, hastaDate, variableCombo, ventanaMediaMovilField, consultarBtn, resetZoomBtn);
         if (lineaAccessService.esAdmin()) {
             layout.add(crearLinkDescargaCsv());
+            Button exportarTodoBtn = new Button("Exportar CSV de todas las maquinas",
+                    e -> new ExportacionCsvDialog(exportacionCsvService).open());
+            exportarTodoBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+            layout.add(exportarTodoBtn);
         }
         layout.setAlignItems(FlexComponent.Alignment.END);
         layout.setSpacing(true);
