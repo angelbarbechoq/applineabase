@@ -21,7 +21,6 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,12 +30,14 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
- * Exportación masiva a CSV de las tablas de energía (todas las máquinas) de un rango de meses:
- * un solo CSV por tabla con todo el rango ("{tabla}_{mes}_{año}[_a_{mes}_{año}].csv"),
- * empaquetados en un ZIP que se escribe al vuelo sobre la respuesta HTTP (todas las máquinas
- * de un mes son cientos de MB, no se arma en memoria: cada tabla se lee y escribe mes por mes).
- * Cada CSV junta por fecha las columnas pedidas del archivo mensual normal (kwh) y del VIP
- * (PW, voltajes, corrientes, PF).
+ * Exportación masiva a CSV de las tablas de energía (todas las máquinas) de un rango de meses,
+ * en un ZIP que se escribe al vuelo sobre la respuesta HTTP (todas las máquinas de un mes son
+ * cientos de MB, no se arma en memoria: cada tabla se lee y escribe mes por mes).
+ *
+ * Por cada tabla salen dos CSV, uno por base: "{tabla}_{rango}.csv" con la energía (archivo
+ * mensual normal, kwh) y "{tabla}VIP_{rango}.csv" con voltajes, corrientes, potencia y PF
+ * (archivo mensual VIP). No se juntan en un solo CSV porque las dos bases se graban en ciclos
+ * distintos y sus fechas nunca coinciden al segundo.
  */
 @Service
 public class ExportacionCsvService {
@@ -45,6 +46,9 @@ public class ExportacionCsvService {
 
     private static final DateTimeFormatter FECHA_FORMATTER = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
+    private static final String[] COLUMNAS_NORMAL = {"kwh"};
+    private static final String[] COLUMNAS_VIP = {"VAB", "VAC", "VBC", "IA", "IB", "IC", "PW", "PF"};
+
     /** Encabezado legible (con unidad) de cada columna de la base en el CSV. */
     private static final Map<String, String> ENCABEZADOS = Map.of(
             "kwh", "Energia (kWh)", "PW", "Potencia (kW)",
@@ -52,39 +56,11 @@ public class ExportacionCsvService {
             "IA", "Corriente IA (A)", "IB", "Corriente IB (A)", "IC", "Corriente IC (A)",
             "PF", "PF");
 
-    /** Variables que se pueden elegir en la exportación y de qué archivo/columnas salen. */
-    public enum Variable {
-        ENERGIA("Energia kWh", false, "kwh"),
-        POTENCIA("Potencia kW", true, "PW"),
-        VOLTAJE("Voltaje", true, "VAB", "VAC", "VBC"),
-        CORRIENTE("Corriente", true, "IA", "IB", "IC"),
-        PF("PF", true, "PF");
-
-        private final String etiqueta;
-        private final boolean vip;
-        private final String[] columnas;
-
-        Variable(String etiqueta, boolean vip, String... columnas) {
-            this.etiqueta = etiqueta;
-            this.vip = vip;
-            this.columnas = columnas;
-        }
-
-        public String getEtiqueta() {
-            return etiqueta;
-        }
-    }
-
-    /** Conexiones abiertas a los archivos de un mes (null si ese archivo no existe o no hace falta). */
-    private record MesAbierto(YearMonth mes, Connection normal, Connection vip) {
-    }
-
-    /** Lo que pasó con cada tabla, separado por categoría para "resumen.txt". */
+    /** Lo que pasó con cada archivo, separado por categoría para "resumen.txt". */
     private static final class Resumen {
         final List<String> generados = new ArrayList<>();
         final List<String> enCero = new ArrayList<>();
         final List<String> sinDatos = new ArrayList<>();
-        final List<String> sinVariables = new ArrayList<>();
         final List<String> errores = new ArrayList<>();
 
         String armar(String rango) {
@@ -92,7 +68,6 @@ public class ExportacionCsvService {
             seccion(sb, "Archivos generados con datos", generados);
             seccion(sb, "Archivos generados con todos los valores en cero", enCero);
             seccion(sb, "Sin datos en el rango (no se genero archivo)", sinDatos);
-            seccion(sb, "Sin las variables elegidas (no se genero archivo)", sinVariables);
             seccion(sb, "Meses sin archivo o con error de lectura", errores);
             return sb.toString();
         }
@@ -140,100 +115,92 @@ public class ExportacionCsvService {
     }
 
     /**
-     * Escribe el ZIP completo en out. El detalle por tabla (con datos, en cero, sin datos, sin las
-     * variables pedidas) queda en "resumen.txt" dentro del mismo ZIP, porque la descarga no tiene
-     * otra forma de devolverle un mensaje a la pantalla.
+     * Escribe el ZIP completo en out: los CSV de energía y luego los VIP. El detalle por archivo
+     * (con datos, en cero, sin datos) queda en "resumen.txt" dentro del mismo ZIP, porque la
+     * descarga no tiene otra forma de devolverle un mensaje a la pantalla.
      */
-    public void exportarZip(YearMonth desde, YearMonth hasta, Set<Variable> variables, OutputStream out) throws IOException {
+    public void exportarZip(YearMonth desde, YearMonth hasta, OutputStream out) throws IOException {
         Resumen resumen = new Resumen();
         String sufijo = sufijoRango(desde, hasta);
-        boolean pideNormal = variables.stream().anyMatch(v -> !v.vip);
-        boolean pideVip = variables.stream().anyMatch(v -> v.vip);
-        List<MesAbierto> meses = new ArrayList<>();
-
         try (ZipOutputStream zip = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
-            try {
-                for (YearMonth mes = desde; !mes.isAfter(hasta); mes = mes.plusMonths(1)) {
-                    File normal = new File(RutaArchivosEnergia.construirRutaMensual(mes.getYear(), mes.getMonthValue(), false));
-                    File vip = new File(RutaArchivosEnergia.construirRutaMensual(mes.getYear(), mes.getMonthValue(), true));
-                    Connection connNormal = pideNormal && normal.exists() ? abrir(normal) : null;
-                    Connection connVip = pideVip && vip.exists() ? abrir(vip) : null;
-                    if (connNormal == null && connVip == null) {
-                        resumen.errores.add(etiqueta(mes) + ": sin archivos de datos para las variables elegidas");
-                        continue;
-                    }
-                    meses.add(new MesAbierto(mes, connNormal, connVip));
-                }
-
-                Set<String> tablas = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-                for (MesAbierto m : meses) {
-                    if (m.normal() != null) tablas.addAll(listarTablas(m.normal()));
-                    if (m.vip() != null) tablas.addAll(listarTablas(m.vip()));
-                }
-                for (String tabla : tablas) {
-                    exportarTabla(tabla, meses, variables, sufijo, zip, resumen);
-                }
-            } catch (SQLException e) {
-                logger.error("Error exportando {}: {}", sufijo, e.getMessage());
-                resumen.errores.add("Error leyendo la base: " + e.getMessage());
-            } finally {
-                for (MesAbierto m : meses) {
-                    cerrar(m.normal());
-                    cerrar(m.vip());
-                }
-            }
+            exportarBase(desde, hasta, false, sufijo, zip, resumen);
+            exportarBase(desde, hasta, true, sufijo, zip, resumen);
             zip.putNextEntry(new ZipEntry("resumen.txt"));
             zip.write(resumen.armar(sufijo.replace('_', ' ')).getBytes(StandardCharsets.UTF_8));
             zip.closeEntry();
         }
     }
 
-    /**
-     * Un CSV con todo el rango para una tabla. Las columnas son la unión de las que la tabla tiene
-     * en cualquier mes del rango (un medidor VIP agregado a mitad de rango deja vacías esas
-     * columnas en los meses anteriores). Se lee y escribe mes por mes para no cargar el rango
-     * entero en memoria; como los meses van en orden, el archivo queda ordenado por fecha.
-     */
-    private void exportarTabla(String tabla, List<MesAbierto> meses, Set<Variable> variables, String sufijo,
-                               ZipOutputStream zip, Resumen resumen) throws IOException {
-        String nombreArchivo = tabla + "_" + sufijo + ".csv";
+    /** Todas las tablas de una de las dos bases (normal o VIP) para el rango. */
+    private void exportarBase(YearMonth desde, YearMonth hasta, boolean vip, String sufijo,
+                              ZipOutputStream zip, Resumen resumen) throws IOException {
+        String nombreBase = vip ? "VIP" : "energia";
+        List<Connection> meses = new ArrayList<>();
         try {
-            List<List<String>> columnasNormalPorMes = new ArrayList<>();
-            List<List<String>> columnasVipPorMes = new ArrayList<>();
-            Set<String> presentes = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            for (MesAbierto m : meses) {
-                List<String> cn = m.normal() != null ? columnasPedidas(m.normal(), tabla, variables, false) : List.of();
-                List<String> cv = m.vip() != null ? columnasPedidas(m.vip(), tabla, variables, true) : List.of();
-                columnasNormalPorMes.add(cn);
-                columnasVipPorMes.add(cv);
-                presentes.addAll(cn);
-                presentes.addAll(cv);
+            for (YearMonth mes = desde; !mes.isAfter(hasta); mes = mes.plusMonths(1)) {
+                File archivo = new File(RutaArchivosEnergia.construirRutaMensual(mes.getYear(), mes.getMonthValue(), vip));
+                if (!archivo.exists()) {
+                    resumen.errores.add(etiqueta(mes).replace('_', ' ') + ": no existe el archivo de " + nombreBase);
+                    continue;
+                }
+                meses.add(DriverManager.getConnection("jdbc:sqlite:" + archivo.getAbsolutePath()));
             }
 
-            List<String> columnas = new ArrayList<>();
-            for (Variable variable : Variable.values()) {
-                if (!variables.contains(variable)) continue;
-                for (String columna : variable.columnas) {
-                    if (presentes.contains(columna)) columnas.add(columna);
+            Set<String> tablas = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (Connection conn : meses) {
+                tablas.addAll(listarTablas(conn));
+            }
+            for (String tabla : tablas) {
+                exportarTabla(tabla, meses, vip ? COLUMNAS_VIP : COLUMNAS_NORMAL,
+                        tabla + (vip ? "VIP" : "") + "_" + sufijo + ".csv", zip, resumen);
+            }
+        } catch (SQLException e) {
+            logger.error("Error exportando {} {}: {}", nombreBase, sufijo, e.getMessage());
+            resumen.errores.add("Error leyendo la base de " + nombreBase + ": " + e.getMessage());
+        } finally {
+            for (Connection conn : meses) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    logger.warn("No se pudo cerrar conexion SQLite: {}", e.getMessage());
                 }
             }
-            if (columnas.isEmpty()) {
-                resumen.sinVariables.add(tabla);
-                return;
+        }
+    }
+
+    /**
+     * Un CSV con todo el rango para una tabla. Las columnas son las que la tabla tiene en
+     * cualquier mes del rango (si en algún mes le falta una, esa celda queda vacía). Se lee y
+     * escribe mes por mes; como los meses van en orden, el archivo queda ordenado por fecha.
+     */
+    private void exportarTabla(String tabla, List<Connection> meses, String[] columnasBase, String nombreArchivo,
+                               ZipOutputStream zip, Resumen resumen) throws IOException {
+        try {
+            List<Set<String>> existentesPorMes = new ArrayList<>();
+            Set<String> presentes = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (Connection conn : meses) {
+                Set<String> existentes = columnasExistentes(conn, tabla);
+                existentesPorMes.add(existentes);
+                presentes.addAll(existentes);
             }
-            Map<String, Integer> indices = new HashMap<>();
-            for (int i = 0; i < columnas.size(); i++) {
-                indices.put(columnas.get(i), i);
+            List<String> columnas = new ArrayList<>();
+            for (String columna : columnasBase) {
+                if (presentes.contains(columna)) columnas.add(columna);
+            }
+            if (columnas.isEmpty()) {
+                resumen.sinDatos.add(nombreArchivo);
+                return;
             }
 
             // No se cierra el writer: cerraría el ZipOutputStream entero, solo se vacía.
             Writer w = null;
             boolean algunValorDistintoDeCero = false;
             for (int i = 0; i < meses.size(); i++) {
-                MesAbierto m = meses.get(i);
-                TreeMap<LocalDateTime, Double[]> filas = new TreeMap<>();
-                leer(m.normal(), tabla, columnasNormalPorMes.get(i), indices, columnas.size(), filas);
-                leer(m.vip(), tabla, columnasVipPorMes.get(i), indices, columnas.size(), filas);
+                List<String> columnasMes = new ArrayList<>();
+                for (String columna : columnas) {
+                    if (existentesPorMes.get(i).contains(columna)) columnasMes.add(columna);
+                }
+                TreeMap<LocalDateTime, Double[]> filas = leer(meses.get(i), tabla, columnas, columnasMes);
                 if (filas.isEmpty()) continue;
                 if (w == null) {
                     zip.putNextEntry(new ZipEntry(nombreArchivo));
@@ -245,28 +212,15 @@ public class ExportacionCsvService {
             }
 
             if (w == null) {
-                resumen.sinDatos.add(tabla);
+                resumen.sinDatos.add(nombreArchivo);
                 return;
             }
             w.flush();
             zip.closeEntry();
             (algunValorDistintoDeCero ? resumen.generados : resumen.enCero).add(nombreArchivo);
         } catch (SQLException e) {
-            logger.error("Error exportando tabla {}: {}", tabla, e.getMessage());
-            resumen.errores.add(tabla + ": error leyendo la base (" + e.getMessage() + ")");
-        }
-    }
-
-    private static Connection abrir(File archivo) throws SQLException {
-        return DriverManager.getConnection("jdbc:sqlite:" + archivo.getAbsolutePath());
-    }
-
-    private static void cerrar(Connection conn) {
-        if (conn == null) return;
-        try {
-            conn.close();
-        } catch (SQLException e) {
-            logger.warn("No se pudo cerrar conexion SQLite: {}", e.getMessage());
+            logger.error("Error exportando {}: {}", nombreArchivo, e.getMessage());
+            resumen.errores.add(nombreArchivo + ": error leyendo la base (" + e.getMessage() + ")");
         }
     }
 
@@ -284,8 +238,8 @@ public class ExportacionCsvService {
         return tablas;
     }
 
-    /** Columnas de las variables pedidas (del archivo normal o VIP según vip) que la tabla tiene en ese archivo. */
-    private static List<String> columnasPedidas(Connection conn, String tabla, Set<Variable> variables, boolean vip) throws SQLException {
+    /** Columnas que la tabla tiene en ese archivo (vacío si la tabla no existe en ese mes). */
+    private static Set<String> columnasExistentes(Connection conn, String tabla) throws SQLException {
         Set<String> existentes = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery("PRAGMA table_info(" + tabla + ")")) {
@@ -293,28 +247,21 @@ public class ExportacionCsvService {
                 existentes.add(rs.getString("name"));
             }
         }
-        List<String> columnas = new ArrayList<>();
-        if (existentes.isEmpty()) {
-            return columnas;
-        }
-        for (Variable variable : Variable.values()) {
-            if (variable.vip == vip && variables.contains(variable)) {
-                for (String columna : variable.columnas) {
-                    if (existentes.contains(columna)) {
-                        columnas.add(columna);
-                    }
-                }
-            }
-        }
-        return columnas;
+        return existentes;
     }
 
-    private static void leer(Connection conn, String tabla, List<String> columnas, Map<String, Integer> indices,
-                             int total, Map<LocalDateTime, Double[]> filas) throws SQLException {
-        if (conn == null || columnas.isEmpty()) {
-            return;
+    /** Filas de un mes, ordenadas por fecha; cada arreglo sigue el orden de columnas (null = sin dato). */
+    private static TreeMap<LocalDateTime, Double[]> leer(Connection conn, String tabla, List<String> columnas,
+                                                         List<String> columnasMes) throws SQLException {
+        TreeMap<LocalDateTime, Double[]> filas = new TreeMap<>();
+        if (columnasMes.isEmpty()) {
+            return filas;
         }
-        String sql = "SELECT fecha, " + String.join(", ", columnas) + " FROM " + tabla;
+        int[] indices = new int[columnasMes.size()];
+        for (int i = 0; i < columnasMes.size(); i++) {
+            indices[i] = columnas.indexOf(columnasMes.get(i));
+        }
+        String sql = "SELECT fecha, " + String.join(", ", columnasMes) + " FROM " + tabla;
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
@@ -324,13 +271,15 @@ public class ExportacionCsvService {
                 } catch (DateTimeParseException | NullPointerException e) {
                     continue;
                 }
-                Double[] valores = filas.computeIfAbsent(fecha, f -> new Double[total]);
-                for (int i = 0; i < columnas.size(); i++) {
+                Double[] valores = new Double[columnas.size()];
+                for (int i = 0; i < indices.length; i++) {
                     double valor = rs.getDouble(i + 2);
-                    valores[indices.get(columnas.get(i))] = rs.wasNull() ? null : valor;
+                    valores[indices[i]] = rs.wasNull() ? null : valor;
                 }
+                filas.put(fecha, valores);
             }
         }
+        return filas;
     }
 
     /** true si ningún valor de ninguna columna es distinto de 0 (medidor que grabó solo ceros). */
