@@ -103,7 +103,7 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 |---|---|---|
 | `login` | `LoginView` | anonimo |
 | `grafica` | `ChartsView` | todos; pestanas segun zona/permisos (kWh, Temperatura, PF general, Mezcladores) |
-| `historico` | `HistoricoView` | todos; boton "Exportar CSV de todas las maquinas" solo ADMIN (`ExportacionCsvDialog` + `ExportacionCsvService`: ZIP con un CSV por tabla y mes, `tabla_mes_anio.csv`, columnas segun variables elegidas) |
+| `historico` | `HistoricoView` | todos; boton "Exportar CSV de todas las maquinas" solo ADMIN (`ExportacionCsvDialog` + `ExportacionCsvService`: ZIP con un CSV por tabla con todo el rango de meses, `tabla_mes_anio[_a_mes_anio].csv`, columnas segun variables elegidas; `resumen.txt` separa con datos / en cero / sin datos / sin variables) |
 | `query` | `DataQueryView` | todos |
 | `horometro` | `HorometroView` | todos (acciones extra solo ADMIN) |
 | `alarmas` | `AlarmasHistorialView` (Alarmas Activas) | gate `puedeVerAlarmas()` |

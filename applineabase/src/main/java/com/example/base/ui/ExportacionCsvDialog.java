@@ -22,7 +22,7 @@ import java.util.Set;
 
 /**
  * Exportación masiva (solo ADMIN, se abre desde HistoricoView): todas las tablas de energía de
- * los meses elegidos, un CSV por tabla y mes, dentro de un ZIP. Es una descarga normal del
+ * los meses elegidos, un CSV por tabla con todo el rango, dentro de un ZIP. Es una descarga normal del
  * navegador, así que funciona desde cualquier PC y el navegador pregunta dónde guardarlo.
  */
 class ExportacionCsvDialog extends Dialog {
@@ -59,7 +59,8 @@ class ExportacionCsvDialog extends Dialog {
             variables.add(check);
         }
 
-        Span ayuda = new Span("Se descarga un ZIP con un CSV por maquina y por mes (nombre: tabla_mes_anio.csv). "
+        Span ayuda = new Span("Se descarga un ZIP con un CSV por maquina con todo el rango elegido "
+                + "(nombre: tabla_mes_anio.csv, o tabla_mesdesde_anio_a_meshasta_anio.csv si son varios meses). "
                 + "El navegador pregunta donde guardarlo si tiene activada la opcion de preguntar la ubicacion de descarga. "
                 + "Puede tardar varios minutos si se eligen muchos meses.");
         ayuda.getStyle().set("font-size", "12px").set("color", "var(--vaadin-text-color-secondary, #666)");
@@ -104,14 +105,10 @@ class ExportacionCsvDialog extends Dialog {
             return;
         }
 
-        String nombreZip = "energia_" + etiqueta(desde) + (desde.equals(hasta) ? "" : "_a_" + etiqueta(hasta)) + ".zip";
+        String nombreZip = "energia_" + ExportacionCsvService.sufijoRango(desde, hasta) + ".zip";
         StreamResource recurso = new StreamResource(nombreZip,
                 (out, session) -> exportacionCsvService.exportarZip(desde, hasta, elegidas, out));
         recurso.setContentType("application/zip");
         descargarLink.setHref(recurso);
-    }
-
-    private static String etiqueta(YearMonth ym) {
-        return RutaArchivosEnergia.getNombreMes(ym.getMonthValue()) + "_" + ym.getYear();
     }
 }
