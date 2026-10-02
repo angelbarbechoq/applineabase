@@ -4,7 +4,9 @@ import com.vaadin.flow.theme.aura.Aura;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dependency.StyleSheet;
 import com.vaadin.flow.component.dependency.Uses;
@@ -34,6 +36,8 @@ import org.springframework.context.annotation.Bean;
 @Uses(NumberField.class)
 @Uses(DateTimePicker.class)
 @Uses(IntegerField.class)
+@Uses(Dialog.class)
+@Uses(Checkbox.class)
 public class Application implements AppShellConfigurator {
 
     public static void main(String[] args) {
