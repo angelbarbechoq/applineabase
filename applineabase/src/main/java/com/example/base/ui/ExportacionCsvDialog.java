@@ -42,8 +42,8 @@ class ExportacionCsvDialog extends Dialog {
             combo.addValueChangeListener(e -> actualizarDescarga());
         }
 
-        Span ayuda = new Span("Se descarga un ZIP con dos CSV por maquina con todo el rango elegido: "
-                + "tabla_mes_anio.csv (energia kWh) y tablaVIP_mes_anio.csv (voltaje, corriente, potencia y PF). "
+        Span ayuda = new Span("Se descarga un ZIP con dos carpetas y un CSV por maquina con todo el rango elegido: "
+                + "Energia (tabla_mes_anio.csv, kWh) y Voltaje-Corriente-Potencia-PF (tablaVIP_mes_anio.csv). "
                 + "El archivo resumen.txt indica que maquinas tienen datos, cuales estan en cero y cuales no tienen datos. "
                 + "Puede tardar varios minutos si se eligen muchos meses.");
         ayuda.getStyle().set("font-size", "12px").set("color", "var(--vaadin-text-color-secondary, #666)");

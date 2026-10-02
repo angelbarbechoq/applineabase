@@ -151,8 +151,10 @@ public class ExportacionCsvService {
                 tablas.addAll(listarTablas(conn));
             }
             for (String tabla : tablas) {
+                // Carpeta dentro del ZIP según la base: al descomprimir quedan separados.
+                String carpeta = vip ? "Voltaje-Corriente-Potencia-PF/" : "Energia/";
                 exportarTabla(tabla, meses, vip ? COLUMNAS_VIP : COLUMNAS_NORMAL,
-                        tabla + (vip ? "VIP" : "") + "_" + sufijo + ".csv", zip, resumen);
+                        carpeta + tabla + (vip ? "VIP" : "") + "_" + sufijo + ".csv", zip, resumen);
             }
         } catch (SQLException e) {
             logger.error("Error exportando {} {}: {}", nombreBase, sufijo, e.getMessage());
