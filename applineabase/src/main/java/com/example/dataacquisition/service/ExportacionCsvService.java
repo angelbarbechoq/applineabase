@@ -16,6 +16,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -110,18 +111,29 @@ public class ExportacionCsvService {
         return etiqueta(desde) + (desde.equals(hasta) ? "" : "_a_" + etiqueta(hasta));
     }
 
+    /** "01-09-2026" o "01-09-2026_a_15-09-2026": sufijo de los CSV y del ZIP al exportar por fechas. */
+    public static String sufijoFechas(LocalDate desde, LocalDate hasta) {
+        DateTimeFormatter f = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+        return f.format(desde) + (desde.equals(hasta) ? "" : "_a_" + f.format(hasta));
+    }
+
     private static String etiqueta(YearMonth ym) {
         return RutaArchivosEnergia.getNombreMes(ym.getMonthValue()) + "_" + ym.getYear();
     }
 
-    /**
-     * Escribe el ZIP completo en out: los CSV de energía y luego los VIP. El detalle por archivo
-     * (con datos, en cero, sin datos) queda en "resumen.txt" dentro del mismo ZIP, porque la
-     * descarga no tiene otra forma de devolverle un mensaje a la pantalla.
-     */
+    /** Exportación por meses completos: del primer día de desde al último de hasta. */
     public void exportarZip(YearMonth desde, YearMonth hasta, OutputStream out) throws IOException {
+        exportarZip(desde.atDay(1), hasta.atEndOfMonth(), sufijoRango(desde, hasta), out);
+    }
+
+    /**
+     * Escribe el ZIP completo en out: los CSV de energía y luego los VIP, solo con las filas cuya
+     * fecha está entre desde y hasta (ambos incluidos). El detalle por archivo (con datos, en
+     * cero, sin datos) queda en "resumen.txt" dentro del mismo ZIP, porque la descarga no tiene
+     * otra forma de devolverle un mensaje a la pantalla.
+     */
+    public void exportarZip(LocalDate desde, LocalDate hasta, String sufijo, OutputStream out) throws IOException {
         Resumen resumen = new Resumen();
-        String sufijo = sufijoRango(desde, hasta);
         try (ZipOutputStream zip = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
             exportarBase(desde, hasta, false, sufijo, zip, resumen);
             exportarBase(desde, hasta, true, sufijo, zip, resumen);
@@ -132,18 +144,20 @@ public class ExportacionCsvService {
     }
 
     /** Todas las tablas de una de las dos bases (normal o VIP) para el rango. */
-    private void exportarBase(YearMonth desde, YearMonth hasta, boolean vip, String sufijo,
+    private void exportarBase(LocalDate desde, LocalDate hasta, boolean vip, String sufijo,
                               ZipOutputStream zip, Resumen resumen) throws IOException {
         String nombreBase = vip ? "VIP" : "energia";
         List<Connection> meses = new ArrayList<>();
+        List<YearMonth> mesesYm = new ArrayList<>();
         try {
-            for (YearMonth mes = desde; !mes.isAfter(hasta); mes = mes.plusMonths(1)) {
+            for (YearMonth mes = YearMonth.from(desde); !mes.isAfter(YearMonth.from(hasta)); mes = mes.plusMonths(1)) {
                 File archivo = new File(RutaArchivosEnergia.construirRutaMensual(mes.getYear(), mes.getMonthValue(), vip));
                 if (!archivo.exists()) {
                     resumen.errores.add(etiqueta(mes).replace('_', ' ') + ": no existe el archivo de " + nombreBase);
                     continue;
                 }
                 meses.add(DriverManager.getConnection("jdbc:sqlite:" + archivo.getAbsolutePath()));
+                mesesYm.add(mes);
             }
 
             Set<String> tablas = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
@@ -153,8 +167,8 @@ public class ExportacionCsvService {
             for (String tabla : tablas) {
                 // Carpeta dentro del ZIP según la base: al descomprimir quedan separados.
                 String carpeta = vip ? "Voltaje-Corriente-Potencia-PF/" : "Energia/";
-                exportarTabla(tabla, meses, vip ? COLUMNAS_VIP : COLUMNAS_NORMAL,
-                        carpeta + tabla + (vip ? "VIP" : "") + "_" + sufijo + ".csv", zip, resumen);
+                exportarTabla(tabla, meses, mesesYm, vip ? COLUMNAS_VIP : COLUMNAS_NORMAL,
+                        carpeta + tabla + (vip ? "VIP" : "") + "_" + sufijo + ".csv", desde, hasta, zip, resumen);
             }
         } catch (SQLException e) {
             logger.error("Error exportando {} {}: {}", nombreBase, sufijo, e.getMessage());
@@ -173,10 +187,13 @@ public class ExportacionCsvService {
     /**
      * Un CSV con todo el rango para una tabla. Las columnas son las que la tabla tiene en
      * cualquier mes del rango (si en algún mes le falta una, esa celda queda vacía). Se lee y
-     * escribe mes por mes; como los meses van en orden, el archivo queda ordenado por fecha.
+     * escribe mes por mes. Un archivo mensual puede traer horas del mes siguiente (ej. el VIP de
+     * septiembre siguió grabando la madrugada del 1 de octubre, que también está en el de
+     * octubre): esas filas se pasan al mes siguiente y se mezclan con las suyas antes de
+     * escribir, para que el CSV quede siempre ordenado por fecha.
      */
-    private void exportarTabla(String tabla, List<Connection> meses, String[] columnasBase, String nombreArchivo,
-                               ZipOutputStream zip, Resumen resumen) throws IOException {
+    private void exportarTabla(String tabla, List<Connection> meses, List<YearMonth> mesesYm, String[] columnasBase, String nombreArchivo,
+                               LocalDate desde, LocalDate hasta, ZipOutputStream zip, Resumen resumen) throws IOException {
         try {
             List<Set<String>> existentesPorMes = new ArrayList<>();
             Set<String> presentes = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
@@ -197,12 +214,21 @@ public class ExportacionCsvService {
             // No se cierra el writer: cerraría el ZipOutputStream entero, solo se vacía.
             Writer w = null;
             boolean algunValorDistintoDeCero = false;
+            TreeMap<LocalDateTime, Double[]> pendientes = new TreeMap<>();
             for (int i = 0; i < meses.size(); i++) {
                 List<String> columnasMes = new ArrayList<>();
                 for (String columna : columnas) {
                     if (existentesPorMes.get(i).contains(columna)) columnasMes.add(columna);
                 }
-                TreeMap<LocalDateTime, Double[]> filas = leer(meses.get(i), tabla, columnas, columnasMes);
+                TreeMap<LocalDateTime, Double[]> filas = leer(meses.get(i), tabla, columnas, columnasMes, desde, hasta);
+                pendientes.forEach(filas::putIfAbsent);
+                pendientes.clear();
+                if (i < meses.size() - 1) {
+                    Map<LocalDateTime, Double[]> posteriores =
+                            filas.tailMap(mesesYm.get(i).plusMonths(1).atDay(1).atStartOfDay());
+                    pendientes.putAll(posteriores);
+                    posteriores.clear();
+                }
                 if (filas.isEmpty()) continue;
                 if (w == null) {
                     zip.putNextEntry(new ZipEntry(nombreArchivo));
@@ -252,9 +278,12 @@ public class ExportacionCsvService {
         return existentes;
     }
 
-    /** Filas de un mes, ordenadas por fecha; cada arreglo sigue el orden de columnas (null = sin dato). */
+    /**
+     * Filas de un mes con fecha entre desde y hasta (incluidos), ordenadas por fecha; cada arreglo
+     * sigue el orden de columnas (null = sin dato).
+     */
     private static TreeMap<LocalDateTime, Double[]> leer(Connection conn, String tabla, List<String> columnas,
-                                                         List<String> columnasMes) throws SQLException {
+                                                         List<String> columnasMes, LocalDate desde, LocalDate hasta) throws SQLException {
         TreeMap<LocalDateTime, Double[]> filas = new TreeMap<>();
         if (columnasMes.isEmpty()) {
             return filas;
@@ -271,6 +300,10 @@ public class ExportacionCsvService {
                 try {
                     fecha = LocalDateTime.parse(rs.getString(1), FECHA_FORMATTER);
                 } catch (DateTimeParseException | NullPointerException e) {
+                    continue;
+                }
+                LocalDate dia = fecha.toLocalDate();
+                if (dia.isBefore(desde) || dia.isAfter(hasta)) {
                     continue;
                 }
                 Double[] valores = new Double[columnas.size()];
