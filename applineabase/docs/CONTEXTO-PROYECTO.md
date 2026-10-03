@@ -302,6 +302,9 @@ una opcion mas de la lista.
 - Ejecutable nativo con GraalVM.
 
 **Pendiente / ideas**
+- **Calidad de Energia + migracion de PLC a pasarelas PAS600L:** plan acordado, se avanza un medidor
+  a la vez cuando el usuario avise. Ver `docs/PLAN-CALIDAD-ENERGIA.md` (incluye el PF del PM5110
+  guardado sin decodificar y los registros a confirmar).
 - **Modulo de Mantenimiento Correctivo (MF21 + AMEF):** diseno acordado, sin implementar. Ver
   `docs/PLAN-MANTENIMIENTO-CORRECTIVO.md`. Falta el AMEF del usuario.
 - Campos que hoy violan la regla de datos (corregir sobre la marcha, no ahora): tecnico y
