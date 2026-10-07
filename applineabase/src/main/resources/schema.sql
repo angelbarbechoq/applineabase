@@ -13,3 +13,10 @@ ALTER TABLE alarma_evento ALTER COLUMN tipo_alarma VARCHAR(40);
 -- Columna agregada junto con DISPOSITIVO_NO_DISPONIBLE; en instalaciones nuevas ya la crea
 -- Hibernate, IF NOT EXISTS la deja sin efecto ahi.
 ALTER TABLE alarma_evento ADD COLUMN IF NOT EXISTS urgente BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Catalogo de modelos de medidor: parametro/tipo_dato/orden_palabras se crearon como ENUM nativo
+-- de H2 (2026-10-07) y no aceptarian valores nuevos (ej. INT32_M10K, KWH_RETORNO). Mismo arreglo
+-- que tipo_alarma; no-op en instalaciones nuevas (columnDefinition en RegistroModelo).
+ALTER TABLE registro_modelo_medidor ALTER COLUMN parametro VARCHAR(40);
+ALTER TABLE registro_modelo_medidor ALTER COLUMN tipo_dato VARCHAR(40);
+ALTER TABLE registro_modelo_medidor ALTER COLUMN orden_palabras VARCHAR(40);

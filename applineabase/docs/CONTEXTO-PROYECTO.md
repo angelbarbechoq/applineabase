@@ -74,7 +74,7 @@ reales. Si hace falta limpiar, se hace por JDBC (script en el scratchpad, creden
 | `alarmas` | Alarmas por umbral | ver seccion 7 |
 | `mezcladores` | Temperatura de mezcladores (DTB48) | ver seccion 8 |
 | `mantenimiento` | Mantenimiento preventivo y stock | ver seccion 9 |
-| `medidores` | Catalogo de modelos de medidor y lector generico | `ModeloMedidor`/`RegistroModelo` (H2), `ParametroMedidor` (lista cerrada, 9 basicos + 26 de calidad), `ModeloMedidorService`, `DefinicionModelo` (copia inmutable por ciclo), `LectorMedidorService` (lectura en bloques, decodificacion, PF 4Q), `ModeloMedidorSeeder`, `ModelosMedidorView`. Detalle en `docs/PLAN-CALIDAD-ENERGIA.md` (fase B) |
+| `medidores` | Catalogo de modelos de medidor y lector generico | `ModeloMedidor`/`RegistroModelo` (H2), `ParametroMedidor` (lista cerrada, 9 basicos + 27 de calidad, incluye KWH_RETORNO = columna KWhR), `ModeloMedidorService`, `DefinicionModelo` (copia inmutable por ciclo), `LectorMedidorService` (lectura en bloques, decodificacion, PF 4Q), `ModeloMedidorSeeder`, `ModelosMedidorView`. Detalle en `docs/PLAN-CALIDAD-ENERGIA.md` (fase B) |
 | `security` | Usuarios, roles, permisos | `Usuario`, `UsuarioRepository`, `UsuarioPrincipal`, `SecurityConfig`, `LineaAccessService`, `DataSeeder` (crea el admin inicial), `AdminSessionTimeoutFilter` |
 | `tools` | Reparaciones puntuales | `ReparacionVipView`, `MergeVipMensualTool` |
 | `config` | `JacksonConfiguration` | |

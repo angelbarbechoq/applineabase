@@ -9,7 +9,11 @@ public enum TipoDato {
     INT32("Int32 (entero con signo)", 2),
     UINT32("UInt32 (entero sin signo)", 2),
     INT64("Int64 (entero con signo)", 4),
-    UINT64("UInt64 (entero sin signo)", 4);
+    UINT64("UInt64 (entero sin signo)", 4),
+    /** Medidores ION: valor = alto x 10000 + bajo, las dos palabras con signo. */
+    INT32_M10K("Int32 Modulo-10000 (ION, con signo)", 2),
+    /** Medidores ION: valor = alto x 10000 + bajo, sin signo. */
+    UINT32_M10K("UInt32 Modulo-10000 (ION, sin signo)", 2);
 
     private final String etiqueta;
     private final int registros;

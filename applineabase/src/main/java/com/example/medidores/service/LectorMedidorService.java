@@ -200,6 +200,8 @@ public class LectorMedidorService {
             case UINT32 -> bits & 0xFFFFFFFFL;
             case INT64 -> bits;
             case UINT64 -> bits >= 0 ? bits : (double) (bits >>> 1) * 2.0 + (bits & 1);
+            case INT32_M10K -> (short) (bits >>> 16) * 10000.0 + (short) (bits & 0xFFFF);
+            case UINT32_M10K -> ((bits >>> 16) & 0xFFFF) * 10000.0 + (bits & 0xFFFF);
         };
         return valor * r.escala();
     }

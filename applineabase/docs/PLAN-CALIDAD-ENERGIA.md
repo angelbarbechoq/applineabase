@@ -69,7 +69,22 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
       queda sin agrupar hasta reiniciar. Se borro `PASModbusRegistry`. El PF se guarda como lo
       entrega el medidor (igual que por PLC); el decodificado 4Q va al mostrarlo (fase E).
       Pendiente de datos: registros de ION8600 y PAC1020 (hoy por PLC con escalas propias).
-- [ ] B4. Definir KWhR (que es, que registro) y llenarlo desde la pasarela. Inconveniente 6.
+- [x] B4. KWhR = **"KWh Retorno"** (bloque de direcciones del PLC, captura del usuario 2026-10-07).
+      Parametro `KWH_RETORNO` en el catalogo; la pasarela lo guarda en la columna KWhR si el modelo
+      lo tiene (si no, 0 como antes; su falla no invalida el medidor). Falta el registro de retorno
+      de PM5110 y PM710 (no suponer). (2026-10-07)
+- [x] B5. ION8600 y PAC1020 cargados (2026-10-07). ION8600: manual "Modbus Protocol and Register
+      Map for ION Devices" 70022-0124-00 (mapa por defecto, 26 parametros) cruzado con ION_ADD del
+      PLC. PAC1020: PAC_ADD del PLC (10 parametros, Float32). Unidades iguales al historico (kW en
+      W, PF del ION en %). Se agregaron tipos Int32/UInt32 Modulo-10000 (formato ION) y las columnas
+      enum del catalogo pasaron a varchar (schema.sql) para aceptar valores nuevos.
+      Hallazgos para la migracion (fase C/D, decide el usuario):
+      - El PLC lee del ION las tensiones **fase-neutro** (40166-40170, ~12.700 V en red de 22 kV) y
+        las guarda en VAB/VAC/VBC. El catalogo tiene VAB/VBC/VCA = fase-fase (40178-40182, ~22 kV) y
+        VAN/VBN/VCN = fase-neutro. Al pasar KWhPlanta1 a pasarela, el historico cambiaria de escala.
+      - Orden de columnas: el PLC guarda la 2a tension (B-C) en la columna VAC y la 3a (C-A) en VBC
+        (PAC_ADD); la pasarela guarda VCA en VAC y VBC en VBC. Al migrar un medidor del PLC a
+        pasarela, VAC y VBC quedarian cruzadas respecto de su historico. Definir antes de D1.
 
 **Fase C - Preparar la migracion**
 - [ ] C1. Ordenar `linea-id-config.json`: BarCompHP duplicado, serie repetida Linea02/CabezalXTR2,

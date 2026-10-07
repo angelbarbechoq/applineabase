@@ -264,11 +264,21 @@ public class PASReaderService {
             return "el modelo " + nombreModelo + " no tiene cargados los registros basicos " + modelo.faltantesBasicos();
         }
 
-        LectorMedidorService.Lectura lectura = lectorMedidorService.leer(conexion, unitId, modelo, PARAMETROS_BASICOS);
-        if (!lectura.errores().isEmpty()) {
-            return "parametros sin lectura " + lectura.errores();
+        // Básicos obligatorios + energía de retorno (columna KWhR) si el modelo la tiene.
+        List<ParametroMedidor> aLeer = new ArrayList<>(PARAMETROS_BASICOS);
+        boolean conRetorno = modelo.registros().containsKey(ParametroMedidor.KWH_RETORNO);
+        if (conRetorno) {
+            aLeer.add(ParametroMedidor.KWH_RETORNO);
+        }
+        LectorMedidorService.Lectura lectura = lectorMedidorService.leer(conexion, unitId, modelo, aLeer);
+        Map<ParametroMedidor, String> erroresBasicos = new EnumMap<>(lectura.errores());
+        erroresBasicos.remove(ParametroMedidor.KWH_RETORNO);
+        if (!erroresBasicos.isEmpty()) {
+            return "parametros sin lectura " + erroresBasicos;
         }
         Map<ParametroMedidor, Double> v = lectura.valores();
+        Double retorno = v.get(ParametroMedidor.KWH_RETORNO);
+        gateway.setKWhRx(index, retorno == null ? BigDecimal.ZERO : decimal(retorno));
 
         // Se guardan en el orden de los PLC: VAB, VAC (= VCA del medidor), VBC.
         gateway.setKWhActx(index, decimal(v.get(ParametroMedidor.KWH)));
@@ -324,10 +334,11 @@ public class PASReaderService {
 
             // Save VIP data (Voltage, Current, Power, PF)
             if (vab != null && vac != null && vbc != null && ia != null && ib != null && ic != null && kw != null && pf != null) {
-                Object[] dataDiarioVIP = {timestamp, vab, vac, vbc, ia, ib, ic, kw, pf, BigDecimal.ZERO};  // Last 0 is placeholder
+                BigDecimal kwhR = gateway.getKWhRx(i);  // 0 si el modelo no tiene energía de retorno
+                Object[] dataDiarioVIP = {timestamp, vab, vac, vbc, ia, ib, ic, kw, pf, kwhR};
                 databaseInitializationService.guardarDatoBatch(dataDiarioVIP, nombreTabla, "DAILY_VIP");
 
-                Object[] dataMensualVIP = {timestamp, vab, vac, vbc, ia, ib, ic, kw, pf, BigDecimal.ZERO};
+                Object[] dataMensualVIP = {timestamp, vab, vac, vbc, ia, ib, ic, kw, pf, kwhR};
                 databaseInitializationService.guardarDatoBatch(dataMensualVIP, nombreTabla, "MONTHLY_VIP");
 
                 logger.debug("Saved VIP data for {}: VAB={}, VAC={}, VBC={}, IA={}, IB={}, IC={}, KW={}, PF={}",

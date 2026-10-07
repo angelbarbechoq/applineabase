@@ -29,8 +29,9 @@ public class RegistroModelo {
     @JoinColumn(name = "modelo_id")
     private ModeloMedidor modelo;
 
+    // varchar y no ENUM nativo de H2: un ENUM no acepta valores nuevos con ddl-auto=update (ver schema.sql).
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(40)")
     private ParametroMedidor parametro;
 
     /** Registro como figura en el manual (ver {@link ModeloMedidor#isNumeracionManual()}). */
@@ -38,11 +39,11 @@ public class RegistroModelo {
     private int registro;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(40)")
     private TipoDato tipoDato = TipoDato.FLOAT32;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(40)")
     private OrdenPalabras ordenPalabras = OrdenPalabras.NORMAL;
 
     /** Multiplicador aplicado al valor crudo (ej. 0.001 para pasar Wh a kWh). */

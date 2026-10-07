@@ -32,6 +32,8 @@ public enum ParametroMedidor {
     FRECUENCIA("Frecuencia", "Hz", false),
     KVARH("Energia reactiva", "kVARh", false),
     KVAH("Energia aparente", "kVAh", false),
+    /** Columna KWhR de las tablas VIP ("KWh Retorno" en el PLC). */
+    KWH_RETORNO("Energia activa de retorno (KWhR)", "kWh", false),
     DESBALANCE_I("Desbalance de corriente (peor fase)", "%", false),
     DESBALANCE_V("Desbalance de tension L-L (peor fase)", "%", false),
     THD_IA("THD corriente A", "%", false),

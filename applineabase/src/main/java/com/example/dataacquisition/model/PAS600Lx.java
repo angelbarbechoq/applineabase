@@ -33,6 +33,16 @@ public class PAS600Lx {
     private ArrayList<BigDecimal> IC = new ArrayList<>();       // Current phase C
     private ArrayList<BigDecimal> KW = new ArrayList<>();       // Active power
     private ArrayList<BigDecimal> PF = new ArrayList<>();       // Power factor
+    private ArrayList<BigDecimal> KWhR = new ArrayList<>();     // Energía de retorno (columna KWhR), 0 si el modelo no la tiene
+
+    public BigDecimal getKWhRx(int index) {
+        return index >= 0 && index < KWhR.size() ? KWhR.get(index) : BigDecimal.ZERO;
+    }
+
+    public void setKWhRx(int index, BigDecimal value) {
+        ensureCapacity(KWhR, index);
+        KWhR.set(index, value);
+    }
 
     public PAS600Lx(String gatewayIP, String gatewayNombre) {
         this.gatewayIP = gatewayIP;
