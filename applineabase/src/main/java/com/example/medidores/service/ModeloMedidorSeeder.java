@@ -21,7 +21,9 @@ import org.springframework.stereotype.Component;
  * hasta que el usuario los confirme.
  */
 @Component
-@Order(10)
+// Antes que todo (es instantaneo): el recalculo del horometro (@Order(2)) tarda minutos y
+// mientras tanto la pantalla de modelos y la lectura de pasarelas verian el catalogo incompleto.
+@Order(0)
 public class ModeloMedidorSeeder implements CommandLineRunner {
 
     private final ModeloMedidorRepository repository;
