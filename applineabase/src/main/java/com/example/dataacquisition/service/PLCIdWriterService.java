@@ -1,6 +1,5 @@
 package com.example.dataacquisition.service;
 
-import de.re.easymodbus.modbusclient.ModbusClient;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,22 +75,13 @@ public class PLCIdWriterService {
             return "sin respuesta a ping";
         }
 
-        ModbusClient modbusClient = new ModbusClient();
-        modbusClient.setipAddress(ip);
-        try {
-            modbusClient.Connect();
-            modbusClient.WriteMultipleRegisters(OFFSET_IDS, payload);
+        try (ModbusTcpConexion conexion = new ModbusTcpConexion(ip, PLCDataAcquisitionService.TIMEOUT_MS)) {
+            conexion.escribirHolding(PLCDataAcquisitionService.UNIT_ID_PLC, OFFSET_IDS, payload);
             logger.info("IDs escritos en PLC {} ({}), offset {}: {} líneas", nombre, ip, OFFSET_IDS, lineasDelPLC.size());
             return "OK (" + lineasDelPLC.size() + " IDs)";
         } catch (Exception e) {
             logger.error("Error escribiendo IDs en PLC {} ({}): {}", nombre, ip, e.getMessage());
             return "error: " + e.getMessage();
-        } finally {
-            try {
-                modbusClient.Disconnect();
-            } catch (Exception e) {
-                logger.warn("Error desconectando de PLC {}: {}", nombre, e.getMessage());
-            }
         }
     }
 }

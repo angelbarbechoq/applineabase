@@ -1,33 +1,38 @@
 package com.example.dataacquisition.service;
 
+import com.ghgande.j2mod.modbus.ModbusException;
+import com.ghgande.j2mod.modbus.ModbusSlaveException;
+import com.ghgande.j2mod.modbus.facade.ModbusTCPMaster;
+import com.ghgande.j2mod.modbus.procimg.InputRegister;
+import com.ghgande.j2mod.modbus.procimg.Register;
+import com.ghgande.j2mod.modbus.procimg.SimpleRegister;
+
 import java.io.Closeable;
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 
 /**
- * Cliente Modbus TCP mínimo (solo función 03, Read Holding Registers) para leer medidores a
- * través de pasarelas (PAS600L, Link150).
+ * Único punto de acceso Modbus TCP de la app (PLC, pasarelas PAS600L/Link150, mezcladores), sobre
+ * la librería j2mod. Antes se usaba EasyModbus, que nunca detectaba las respuestas de excepción
+ * Modbus (comparaba un byte con signo contra 131): cuando la pasarela contestaba "el medidor no
+ * respondió" (0x0B), EasyModbus devolvía registros en cero como si fueran datos válidos.
  *
- * Reemplaza a EasyModbus en {@link PASReaderService} porque EasyModbus compara el código de
- * función de la respuesta (byte con signo) contra 131, así que nunca detecta una respuesta de
- * excepción Modbus: cuando la pasarela contesta "el medidor no respondió" (excepción 0x0A/0x0B),
- * EasyModbus devuelve registros armados con basura/ceros como si fueran datos válidos.
+ * Separa los dos tipos de falla, porque se manejan distinto:
+ * - {@link ExcepcionModbus}: el equipo/pasarela contestó con un código de excepción. La conexión
+ *   sigue sirviendo para el próximo Unit ID.
+ * - {@link IOException}: no hubo respuesta válida (tiempo vencido, conexión cortada, respuesta de
+ *   otra transacción). La conexión se descarta y se reconecta en el próximo pedido, para que una
+ *   respuesta tardía no se confunda con la del pedido siguiente.
  *
- * Una conexión por pasarela por ciclo; el Unit ID va en cada pedido. Si un pedido vence por
- * tiempo, la conexión queda descartada (una respuesta tardía se mezclaría con el pedido siguiente)
- * y el llamador debe reconectar.
+ * No es thread-safe: una instancia por hilo (una por pasarela/PLC por ciclo).
  */
 final class ModbusTcpConexion implements Closeable {
 
-    /** La pasarela contestó con una excepción Modbus (medidor sin respuesta, dirección inválida...). */
+    /** El equipo contestó con una excepción Modbus (código estándar 0x01-0x0B). */
     static final class ExcepcionModbus extends Exception {
         private final int codigo;
 
         ExcepcionModbus(int codigo) {
-            super("excepción Modbus 0x" + Integer.toHexString(codigo).toUpperCase() + " (" + descripcion(codigo) + ")");
+            super("excepción Modbus 0x" + String.format("%02X", codigo) + " (" + descripcion(codigo) + ")");
             this.codigo = codigo;
         }
 
@@ -35,115 +40,119 @@ final class ModbusTcpConexion implements Closeable {
             return codigo;
         }
 
-        private static String descripcion(int codigo) {
+        static String descripcion(int codigo) {
             return switch (codigo) {
                 case 0x01 -> "función no soportada";
                 case 0x02 -> "dirección de registro inválida";
-                case 0x03 -> "cantidad inválida";
+                case 0x03 -> "valor o cantidad inválida";
                 case 0x04 -> "falla del dispositivo";
+                case 0x05 -> "pedido aceptado, en proceso";
+                case 0x06 -> "dispositivo ocupado";
+                case 0x08 -> "error de paridad de memoria";
                 case 0x0A -> "pasarela sin ruta al dispositivo";
-                case 0x0B -> "el medidor no respondió a la pasarela";
-                default -> "código desconocido";
+                case 0x0B -> "el dispositivo no respondió a la pasarela";
+                default -> "código no estándar";
             };
         }
     }
 
-    private static final int PUERTO = 502;
+    static final int PUERTO_MODBUS = 502;
+    /** Sin reintentos dentro de un mismo ciclo: el próximo ciclo ya es el reintento. Con los 5 que
+     * trae j2mod por defecto, un equipo caído multiplicaría por 6 su espera. */
+    private static final int REINTENTOS = 0;
 
     private final String ip;
+    private final int puerto;
     private final int timeoutMs;
-    private Socket socket;
-    private DataInputStream entrada;
-    private OutputStream salida;
-    private int transaccion = 0;
+    private ModbusTCPMaster master;
 
     ModbusTcpConexion(String ip, int timeoutMs) {
+        this(ip, PUERTO_MODBUS, timeoutMs);
+    }
+
+    ModbusTcpConexion(String ip, int puerto, int timeoutMs) {
         this.ip = ip;
+        this.puerto = puerto;
         this.timeoutMs = timeoutMs;
+    }
+
+    String getIp() {
+        return ip;
     }
 
     void conectar() throws IOException {
         close();
-        Socket s = new Socket();
-        s.connect(new InetSocketAddress(ip, PUERTO), timeoutMs);
-        s.setSoTimeout(timeoutMs);
-        s.setTcpNoDelay(true);
-        socket = s;
-        entrada = new DataInputStream(s.getInputStream());
-        salida = s.getOutputStream();
+        ModbusTCPMaster m = new ModbusTCPMaster(ip, puerto, timeoutMs, false);
+        m.setRetries(REINTENTOS);
+        m.setCheckingValidity(true);
+        try {
+            m.connect();
+        } catch (Exception e) {
+            m.disconnect();
+            throw new IOException("no se pudo conectar a " + ip + ":" + puerto + ": " + e.getMessage(), e);
+        }
+        master = m;
     }
 
     boolean estaConectada() {
-        return socket != null && socket.isConnected() && !socket.isClosed();
+        return master != null && master.isConnected();
     }
 
-    /**
-     * Lee {@code cantidad} holding registers desde {@code direccion} (base 0, como en el cable).
-     *
-     * @throws ExcepcionModbus si la pasarela/medidor contestó con excepción (la conexión sigue útil)
-     * @throws IOException si venció el tiempo o se cortó la conexión (hay que reconectar)
-     */
+    /** Función 03. {@code direccion} base 0 (como viaja en el cable). Valores 0-65535. */
     int[] leerHolding(int unitId, int direccion, int cantidad) throws IOException, ExcepcionModbus {
+        return valores(ejecutar(() -> master.readMultipleRegisters(unitId, direccion, cantidad)), cantidad);
+    }
+
+    /** Función 04. {@code direccion} base 0. Valores 0-65535. */
+    int[] leerInput(int unitId, int direccion, int cantidad) throws IOException, ExcepcionModbus {
+        return valores(ejecutar(() -> master.readInputRegisters(unitId, direccion, cantidad)), cantidad);
+    }
+
+    /** Función 16. {@code direccion} base 0. */
+    void escribirHolding(int unitId, int direccion, int[] valores) throws IOException, ExcepcionModbus {
+        Register[] registros = new Register[valores.length];
+        for (int i = 0; i < valores.length; i++) {
+            registros[i] = new SimpleRegister(valores[i] & 0xFFFF);
+        }
+        ejecutar(() -> master.writeMultipleRegisters(unitId, direccion, registros));
+    }
+
+    @FunctionalInterface
+    private interface Pedido<T> {
+        T ejecutar() throws ModbusException;
+    }
+
+    private <T> T ejecutar(Pedido<T> pedido) throws IOException, ExcepcionModbus {
         if (!estaConectada()) {
-            throw new IOException("conexión cerrada");
+            conectar();
         }
-        int tid = (++transaccion) & 0xFFFF;
-        byte[] pedido = {
-                (byte) (tid >> 8), (byte) tid,
-                0, 0,          // protocolo Modbus
-                0, 6,          // largo: unit + función + dirección + cantidad
-                (byte) unitId,
-                0x03,
-                (byte) (direccion >> 8), (byte) direccion,
-                (byte) (cantidad >> 8), (byte) cantidad
-        };
         try {
-            salida.write(pedido);
-            salida.flush();
-
-            byte[] cabecera = new byte[7];
-            entrada.readFully(cabecera);
-            int tidRespuesta = ((cabecera[0] & 0xFF) << 8) | (cabecera[1] & 0xFF);
-            int largo = ((cabecera[4] & 0xFF) << 8) | (cabecera[5] & 0xFF);
-            if (largo < 2 || largo > 260) {
-                throw new IOException("largo de respuesta inválido: " + largo);
-            }
-            byte[] pdu = new byte[largo - 1];
-            entrada.readFully(pdu);
-            if (tidRespuesta != tid) {
-                throw new IOException("respuesta de otro pedido (transacción " + tidRespuesta + ", esperada " + tid + ")");
-            }
-
-            int funcion = pdu[0] & 0xFF;
-            if ((funcion & 0x80) != 0) {
-                throw new ExcepcionModbus(pdu.length > 1 ? pdu[1] & 0xFF : 0);
-            }
-            int bytes = pdu[1] & 0xFF;
-            if (funcion != 0x03 || bytes != cantidad * 2 || pdu.length < 2 + bytes) {
-                throw new IOException("respuesta mal formada (función " + funcion + ", " + bytes + " bytes)");
-            }
-            int[] registros = new int[cantidad];
-            for (int i = 0; i < cantidad; i++) {
-                registros[i] = ((pdu[2 + i * 2] & 0xFF) << 8) | (pdu[3 + i * 2] & 0xFF);
-            }
-            return registros;
-        } catch (IOException e) {
-            close(); // una respuesta tardía no debe confundirse con la del pedido siguiente
-            throw e;
+            return pedido.ejecutar();
+        } catch (ModbusSlaveException e) {
+            throw new ExcepcionModbus(e.getType());
+        } catch (ModbusException e) {
+            close(); // sin respuesta válida: no reusar este socket
+            throw new IOException(e.getMessage(), e);
         }
+    }
+
+    private static int[] valores(InputRegister[] registros, int esperados) throws IOException {
+        if (registros == null || registros.length != esperados) {
+            throw new IOException("respuesta con " + (registros == null ? 0 : registros.length)
+                    + " registros, se esperaban " + esperados);
+        }
+        int[] valores = new int[registros.length];
+        for (int i = 0; i < registros.length; i++) {
+            valores[i] = registros[i].getValue();
+        }
+        return valores;
     }
 
     @Override
     public void close() {
-        if (socket != null) {
-            try {
-                socket.close();
-            } catch (IOException ignored) {
-                // ya no sirve; nada que hacer
-            }
+        if (master != null) {
+            master.disconnect();
+            master = null;
         }
-        socket = null;
-        entrada = null;
-        salida = null;
     }
 }

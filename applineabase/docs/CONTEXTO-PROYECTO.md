@@ -35,7 +35,8 @@ navegador.
   25.1.3 con tema **Aura** (no Lumo), Hibernate 7 / Spring Data JPA.
 - H2 en archivo para usuarios, alarmas, horometro y mantenimiento. SQLite para datos crudos
   de energia. amCharts5 en el frontend (ver `GraficaModel`). Cliente Modbus:
-  `lib/EasyModbusJavaClient.jar`.
+  j2mod (Maven), siempre a traves de `ModbusTcpConexion` (excepcion del equipo vs sin respuesta).
+  EasyModbus se elimino: no detectaba excepciones Modbus y las devolvia como ceros.
 - `vaadin.productionMode=true`: el frontend sale de `src/main/bundles/prod.bundle`, que **esta
   versionado en git** (ver seccion 10).
 - `spring.jpa.hibernate.ddl-auto=update`: tablas y columnas nuevas se crean solas al arrancar.

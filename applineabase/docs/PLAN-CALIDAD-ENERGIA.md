@@ -28,18 +28,26 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
       inventar horas de marcha ni consumo). Inconveniente 1. (2026-10-07)
       Causa real de los ceros: EasyModbus no detecta respuestas de excepcion Modbus (compara un
       byte con signo contra 131), asi que "el medidor no respondio a la pasarela" (0x0B) llegaba
-      como registros en cero. El lector de pasarelas ahora usa `ModbusTcpConexion` (cliente
-      propio, solo funcion 03, valida transaccion y excepciones).
+      como registros en cero. Resuelto con j2mod (ver A4), que si informa el codigo
+      de excepcion del equipo.
 - [x] A2. Una conexion por pasarela por ciclo (no una por medidor) y tiempo de espera de 3 s por
-      pedido; si un pedido vence se reconecta antes del medidor siguiente. Inconveniente 5. (2026-10-07)
-- [ ] A4. (Opcional) Pasar tambien mezcladores, PLC y escritura de IDs a `ModbusTcpConexion` y
-      quitar EasyModbus del proyecto. Mismo defecto: hoy una excepcion del equipo se lee como ceros.
-- [ ] A3. **Pasarelas en paralelo:** cada pasarela se lee en su propio hilo (son equipos y buses
+      pedido, sin reintentos dentro del ciclo; si un pedido vence se reconecta antes del medidor
+      siguiente, y con 2 vencimientos seguidos la pasarela se da por caida en ese ciclo (no espera
+      el timeout de cada medidor restante). Inconveniente 5. (2026-10-07)
+- [x] A3. **Pasarelas en paralelo** (2026-10-07): cada pasarela se lee en su propio hilo virtual,
+      escala a N pasarelas sin configurar nada; tope de 45 s para la fase de red; todas las
+      pasarelas del ciclo con la misma marca de tiempo; el log muestra por pasarela leidos/total
+      y ms. Detalle: (son equipos y buses
       RS-485 independientes). Dentro de una misma pasarela los medidores siguen uno tras otro (el
       bus atiende de a un pedido, en paralelo no se gana). Las lecturas se juntan en memoria y se
       guardan en SQLite al final, en un solo hilo, porque la escritura por lotes de
       `DatabaseInitializationService` no admite dos hilos a la vez. Mostrar en el log el tiempo
       por pasarela. Inconveniente 5.
+- [x] A4. EasyModbus reemplazado por **j2mod 3.4.0** (Maven Central, mantenida: todas las funciones
+      Modbus, codigos de excepcion, validacion de transaccion, TCP/RTU/RTU sobre TCP/UDP) en
+      pasarelas, mezcladores, PLC y escritura de IDs. `ModbusTcpConexion` es el unico punto de
+      acceso: separa "el equipo contesto con excepcion" (la conexion sigue) de "sin respuesta"
+      (reconecta). Se borraron los jar de `lib/`. (2026-10-07)
 
 **Fase B - Catalogo de modelos (necesita los registros del usuario)**
 - [ ] B1. Catalogo de modelos de medidor (H2, pantalla admin en Configuracion): lista cerrada de
@@ -76,6 +84,7 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
 - **Pasarela** (`PASReaderService` + `PASModbusRegistry`): la app es el maestro; por cada medidor
   abre una conexion TCP con Unit ID = campo `id`, y hace 5 lecturas (KWh, V, I, KW, PF). Solo
   conoce PM5110 y PM710. Las pasarelas se leen una tras otra, y los medidores tambien.
+  (Estado al 2026-10-07 antes de la fase A; ver A1-A4 para como quedo.)
 - GA752 (PM5110) ya se lee por GteWay01: los registros basicos del PM5110 por pasarela estan
   probados con datos reales.
 

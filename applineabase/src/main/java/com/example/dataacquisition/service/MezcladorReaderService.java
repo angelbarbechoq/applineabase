@@ -2,8 +2,6 @@ package com.example.dataacquisition.service;
 
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.event.SensorDataUpdateEvent;
-import de.re.easymodbus.exceptions.ModbusException;
-import de.re.easymodbus.modbusclient.ModbusClient;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -44,6 +42,8 @@ public class MezcladorReaderService {
      * para que caiga en el real. Se suma acá, en un solo lugar, en vez de tener que recordarlo
      * cada vez que se agregue un registro nuevo del DTB48. */
     private static final int REGISTRO_PV = REGISTRO_PV_MANUAL;
+
+    private static final int TIMEOUT_MS = 3000;
 
     private final ConfigLoaderService configLoaderService;
     private final DatabaseInitializationService databaseInitializationService;
@@ -128,48 +128,32 @@ public class MezcladorReaderService {
      * próximo sin cortar la conexión entera. Sin acceso a SQLite acá — solo lectura Modbus. */
     private List<LecturaCanal> leerGateway(String gatewayIP, List<Map<String, Object>> mezcladoresDelGateway) {
         List<LecturaCanal> lecturas = new ArrayList<>();
-        ModbusClient modbusClient = new ModbusClient();
-        modbusClient.setipAddress(gatewayIP);
-        modbusClient.setConnectionTimeout(5000);
-
-        try {
-            modbusClient.Connect();
+        try (ModbusTcpConexion conexion = new ModbusTcpConexion(gatewayIP, TIMEOUT_MS)) {
             for (Map<String, Object> mezclador : mezcladoresDelGateway) {
                 String nombre = String.valueOf(mezclador.get("nombre"));
-                leerCanal(modbusClient, nombre, "Calentamiento", ((Number) mezclador.get("idCalentamiento")).intValue())
+                leerCanal(conexion, nombre, "Calentamiento", ((Number) mezclador.get("idCalentamiento")).intValue())
                         .ifPresent(lecturas::add);
-                leerCanal(modbusClient, nombre, "Enfriamiento", ((Number) mezclador.get("idEnfriamiento")).intValue())
+                leerCanal(conexion, nombre, "Enfriamiento", ((Number) mezclador.get("idEnfriamiento")).intValue())
                         .ifPresent(lecturas::add);
-            }
-        } catch (IOException e) {
-            logger.warn("Error conectando a gateway {}: {}", gatewayIP, e.getMessage());
-        } finally {
-            try {
-                modbusClient.Disconnect();
-            } catch (IOException e) {
-                logger.debug("Error desconectando de {}: {}", gatewayIP, e.getMessage());
             }
         }
         return lecturas;
     }
 
-    private java.util.Optional<LecturaCanal> leerCanal(ModbusClient modbusClient, String nombreMezclador, String canal, int unitId) {
+    /** Si el canal falla (excepción del DTB48 o sin respuesta) no se guarda nada ese ciclo. */
+    private java.util.Optional<LecturaCanal> leerCanal(ModbusTcpConexion conexion, String nombreMezclador, String canal, int unitId) {
         String nombreTabla = ConfigLoaderService.nombreTablaCanalMezclador(nombreMezclador, canal);
-        modbusClient.setUnitIdentifier((byte) unitId);
 
         try {
             // REGISTRO_PV y REGISTRO_SV son contiguos (1000h/1001h): un solo read de 2 registros.
-            int[] registros = modbusClient.ReadHoldingRegisters(REGISTRO_PV, 2);
-            if (registros == null || registros.length < 2) {
-                return java.util.Optional.empty();
-            }
+            int[] registros = conexion.leerHolding(unitId, REGISTRO_PV, 2);
             // DTB48: PV/SV con 1 decimal (ajustar el divisor si el punto decimal configurado en
             // el controlador es distinto). Cast a short para reinterpretar el registro como
             // complemento a 2 con signo (temperaturas bajo cero).
             double pv = ((short) registros[0]) / 10.0;
             double sv = ((short) registros[1]) / 10.0;
             return java.util.Optional.of(new LecturaCanal(nombreTabla, pv, sv));
-        } catch (IOException | ModbusException e) {
+        } catch (IOException | ModbusTcpConexion.ExcepcionModbus e) {
             logger.warn("Error leyendo {} (Unit ID {}): {}", nombreTabla, unitId, e.getMessage());
             return java.util.Optional.empty();
         }

@@ -5,7 +5,6 @@ import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.event.DispositivoConectividadEvent;
 import com.example.dataacquisition.event.SensorDataUpdateEvent;
 import com.example.dataacquisition.model.PLCS7200x;
-import de.re.easymodbus.modbusclient.ModbusClient;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -15,11 +14,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import jakarta.annotation.PreDestroy;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
 /**
@@ -46,9 +43,11 @@ public class PLCDataAcquisitionService {
     private final DatabaseInitializationService databaseInitializationService;
     private final KWhDifferenceService kwhDifferenceService;
     private final PLCDataQueryService plcDataQueryService;
-    private final Map<String, BigDecimal> lastKWhValues = new HashMap<>();
-    private final Map<String, ModbusClient> activeConnections = new ConcurrentHashMap<>();
     private final PASGatewayConfigService gatewayConfigService;
+
+    /** Unit ID con que se habla al servidor Modbus del PLC (el mismo que usaba EasyModbus por defecto). */
+    static final int UNIT_ID_PLC = 1;
+    static final int TIMEOUT_MS = 3000;
 
     public PLCDataAcquisitionService(ConfigLoaderService configLoaderService, ApplicationEventPublisher eventPublisher,
                                     DatabaseInitializationService databaseInitializationService, KWhDifferenceService kwhDifferenceService,
@@ -102,22 +101,6 @@ public class PLCDataAcquisitionService {
 
         logger.info("=== COMPLETED PLC READ CYCLE ===");
     }
-    private ModbusClient getConnectedClient(String ipAddress) {
-        ModbusClient client = activeConnections.get(ipAddress);
-        if (client == null || !client.isConnected()) {
-            try {
-                client = new ModbusClient();
-                client.setipAddress(ipAddress);
-                client.Connect();
-                activeConnections.put(ipAddress, client);
-                logger.info("Conexión persistente establecida con PLC en {}", ipAddress);
-            } catch (Exception e) {
-                logger.error("Error conectando a PLC {}: {}", ipAddress, e.getMessage());
-                return null;
-            }
-        }
-        return client;
-    }
     /**
      * Read data from a single PLC
      * - Filter lines for this PLC
@@ -127,8 +110,7 @@ public class PLCDataAcquisitionService {
     private void readSinglePLC(PLCS7200x plc) {
         String plcName = plc.getNombre();
         String plcIP = plc.getPlcIPx();
-        ModbusClient modbusClientPLC = new ModbusClient();
-        modbusClientPLC.setipAddress(plc.getPlcIPx());
+        ModbusTcpConexion modbusClientPLC = new ModbusTcpConexion(plcIP, TIMEOUT_MS);
         int nDispositivos = 20;//numero total de dispositivos que soporta el PLC
 
         logger.info("Reading PLC: {} ({})", plcName, plcIP);
@@ -153,14 +135,14 @@ public class PLCDataAcquisitionService {
         int[][] registrosPLC = new int[numeroValores][];
 
         try {
-            modbusClientPLC.Connect();
+            modbusClientPLC.conectar();
             logger.debug("Connected to PLC {} at {}", plcName, plcIP);
 
             // Arrays to store BigDecimal data
             BigDecimal[][] datosConvertidosBD = new BigDecimal[numeroValores][];
 
             for (int lineIndex = 0; lineIndex < numeroValores; lineIndex++) {
-                registrosPLC[lineIndex] = modbusClientPLC.ReadHoldingRegisters(nDispositivos * 2 * lineIndex, lineasDelPLC.size() * 2);
+                registrosPLC[lineIndex] = modbusClientPLC.leerHolding(UNIT_ID_PLC, nDispositivos * 2 * lineIndex, lineasDelPLC.size() * 2);
                 datosConvertidosBD[lineIndex] = returnByteToBigDecimal(registrosPLC[lineIndex]);
             }
             //String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
@@ -168,9 +150,9 @@ public class PLCDataAcquisitionService {
             int[] parametros=null;
             if(plc.getPlcIPx().equals("192.168.0.3"))
             {
-                parametros = modbusClientPLC.ReadHoldingRegisters(422,tablas.size()); //readRegister(IpPLC, 422, tablas.size());
+                parametros = modbusClientPLC.leerHolding(UNIT_ID_PLC, 422, tablas.size()); //readRegister(IpPLC, 422, tablas.size());
             }
-            modbusClientPLC.Disconnect();
+            modbusClientPLC.close();
             // Unpack converted data into named variables
             BigDecimal[] KWh = datosConvertidosBD[0];
             BigDecimal[] VAB = datosConvertidosBD[1];
@@ -286,12 +268,7 @@ public class PLCDataAcquisitionService {
             logger.error("Failed to read PLC {} at {}: {}", plcName, plcIP, e.getMessage());
             publicarConectividad(lineasDelPLC, false, "error de conexión Modbus");
         } finally {
-            try {
-                modbusClientPLC.Disconnect();
-                logger.debug("Disconnected from PLC {}", plcName);
-            } catch (Exception e) {
-                logger.warn("Error disconnecting from PLC {}: {}", plcName, e.getMessage());
-            }
+            modbusClientPLC.close();
             databaseInitializationService.endBatch();
         }
     }

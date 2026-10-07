@@ -14,6 +14,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Service for reading data from Schneider PAS600L meters via Modbus TCP/IP.
@@ -34,6 +41,10 @@ public class PASReaderService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
     /** Espera máxima por pedido Modbus: un medidor caído no frena más que esto a los demás. */
     private static final int TIMEOUT_MS = 3000;
+    /** Vencimientos seguidos (sin ninguna respuesta) para dar por caída la pasarela en este ciclo. */
+    private static final int MAX_FALLAS_RED_SEGUIDAS = 2;
+    /** Tope de la fase de red de todas las pasarelas juntas, dentro del ciclo de 60 s. */
+    private static final long LIMITE_CICLO_MS = 45_000;
 
     private final ArrayList<PAS600Lx> gatewayDevices;
     private final List<Map<String, Object>> lineaIdConfigCache;
@@ -81,8 +92,19 @@ public class PASReaderService {
         logger.info("Total gateway devices initialized: {}", gatewayDevices.size());
     }
 
+    /** Resultado de leer una pasarela en un ciclo: qué medidores se leyeron y el motivo de cada falla. */
+    private record ResultadoPasarela(PAS600Lx gateway, List<Map<String, Object>> lineas, boolean[] leidos,
+                                     String[] motivos, long ms) {
+    }
+
     /**
-     * Main read cycle: iterate over all gateways and read data
+     * Ciclo de lectura de todas las pasarelas.
+     *
+     * Fase 1 (red, en paralelo): cada pasarela se lee en su propio hilo virtual, porque son
+     * equipos y buses RS-485 independientes; dentro de una pasarela los medidores van uno tras
+     * otro (su bus atiende de a un pedido). El ciclo dura lo que la pasarela más lenta, no la suma.
+     * Fase 2 (un solo hilo): eventos de conectividad y guardado en SQLite, porque la escritura por
+     * lotes de DatabaseInitializationService no admite dos hilos a la vez.
      */
     public void readPAS600L() {
         if (gatewayDevices.isEmpty()) {
@@ -90,84 +112,116 @@ public class PASReaderService {
             return;
         }
 
-        logger.info("=== STARTING PAS600L READ CYCLE ===");
-
-        for (PAS600Lx gateway : gatewayDevices) {
-            try {
-                readSingleGateway(gateway);
-            } catch (Exception e) {
-                logger.error("Error reading gateway {}: {}", gateway.getNombrex(), e.getMessage(), e);
-            }
-        }
-
-        logger.info("=== COMPLETED PAS600L READ CYCLE ===");
-    }
-
-    /**
-     * Read data from a single gateway
-     * - Filter lines for this gateway
-     * - Connect via Modbus
-     * - Read each meter (Unit ID) and store in device arrays
-     * - Persist to SQLite
-     */
-    private void readSingleGateway(PAS600Lx gateway) {
-        String gatewayName = gateway.getNombrex();
-        String gatewayIP = gateway.getGatewayIP();
-
-        logger.info("Reading gateway: {} ({})", gatewayName, gatewayIP);
-
-        // Get lines configured for this gateway
-        List<Map<String, Object>> lineasDelGateway = gatewayConfigService.getLineasForGateway(gatewayName, lineaIdConfigCache);
-        logger.debug("Gateway {} has {} lines", gatewayName, lineasDelGateway.size());
-
-        if (lineasDelGateway.isEmpty()) {
-            logger.warn("No lines configured for gateway {}", gatewayName);
-            return;
-        }
-
-        // Check connectivity via ping
-        if (!ModbusUtil.isIPAvailable(gatewayIP)) {
-            logger.warn("IP {} not available for gateway {}", gatewayIP, gatewayName);
-            publicarConectividad(lineasDelGateway, false, "sin respuesta a ping");
-            return;
-        }
-
+        long inicio = System.currentTimeMillis();
+        // Misma marca de tiempo para todas las pasarelas del ciclo (filas alineadas entre máquinas).
         String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
-        boolean[] leidos = new boolean[lineasDelGateway.size()];
 
-        // Una sola conexión por pasarela por ciclo; el Unit ID va en cada pedido.
-        try (ModbusTcpConexion conexion = new ModbusTcpConexion(gatewayIP, TIMEOUT_MS)) {
-            for (int i = 0; i < lineasDelGateway.size(); i++) {
-                Map<String, Object> linea = lineasDelGateway.get(i);
-                String nombreLinea = (String) linea.get("lineaMaquina");
-                String motivoFalla = null;
-                try {
-                    if (!conexion.estaConectada()) {
-                        conexion.conectar();
-                    }
-                    leidos[i] = readSingleMeter(conexion, gateway, linea, i);
-                    if (!leidos[i]) {
-                        motivoFalla = "modelo de medidor sin registros configurados";
-                    }
-                } catch (ModbusTcpConexion.ExcepcionModbus e) {
-                    motivoFalla = e.getMessage();
-                } catch (IOException e) {
-                    motivoFalla = "error de conexión Modbus: " + e.getMessage();
-                }
-                if (motivoFalla != null) {
-                    // Sin dato este ciclo: no se guarda nada (queda el hueco), ni ceros ni el valor anterior.
-                    logger.warn("Medidor {} (Unit ID {}) en {} sin lectura: {}", nombreLinea, linea.get("id"), gatewayName, motivoFalla);
-                }
-                eventPublisher.publishEvent(new DispositivoConectividadEvent(this, nombreLinea, leidos[i], motivoFalla, LocalDateTime.now()));
+        List<Callable<ResultadoPasarela>> tareas = new ArrayList<>();
+        for (PAS600Lx gateway : gatewayDevices) {
+            List<Map<String, Object>> lineas = gatewayConfigService.getLineasForGateway(gateway.getNombrex(), lineaIdConfigCache);
+            if (lineas.isEmpty()) {
+                logger.debug("Pasarela {} sin medidores de energía asignados", gateway.getNombrex());
+                continue;
             }
+            tareas.add(() -> leerPasarela(gateway, lineas));
+        }
+        if (tareas.isEmpty()) {
+            return;
         }
 
+        List<ResultadoPasarela> resultados = new ArrayList<>();
+        try (ExecutorService hilos = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Future<ResultadoPasarela>> futuros = hilos.invokeAll(tareas, LIMITE_CICLO_MS, TimeUnit.MILLISECONDS);
+            for (int t = 0; t < futuros.size(); t++) {
+                Future<ResultadoPasarela> futuro = futuros.get(t);
+                try {
+                    resultados.add(futuro.get());
+                } catch (CancellationException e) {
+                    logger.error("Lectura de pasarelas cortada a los {} ms; una pasarela no terminó a tiempo", LIMITE_CICLO_MS);
+                } catch (ExecutionException e) {
+                    logger.error("Error leyendo una pasarela: {}", e.getCause().getMessage(), e.getCause());
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.warn("Lectura de pasarelas interrumpida");
+            return;
+        }
+
+        LocalDateTime ahora = LocalDateTime.now();
         databaseInitializationService.beginBatch();
         try {
-            persistGatewayData(gateway, lineasDelGateway, leidos, timestamp);
+            for (ResultadoPasarela r : resultados) {
+                for (int i = 0; i < r.lineas().size(); i++) {
+                    String nombreLinea = (String) r.lineas().get(i).get("lineaMaquina");
+                    eventPublisher.publishEvent(new DispositivoConectividadEvent(this, nombreLinea, r.leidos()[i], r.motivos()[i], ahora));
+                }
+                persistGatewayData(r.gateway(), r.lineas(), r.leidos(), timestamp);
+            }
         } finally {
             databaseInitializationService.endBatch();
         }
+        publicarDatosActuales(resultados);
+
+        StringBuilder detalle = new StringBuilder();
+        for (ResultadoPasarela r : resultados) {
+            int ok = 0;
+            for (boolean b : r.leidos()) {
+                if (b) ok++;
+            }
+            detalle.append(String.format(" | %s: %d/%d en %d ms", r.gateway().getNombrex(), ok, r.lineas().size(), r.ms()));
+        }
+        logger.info("Pasarelas leídas en {} ms{}", System.currentTimeMillis() - inicio, detalle);
+    }
+
+    /**
+     * Lee todos los medidores de una pasarela con una sola conexión (el Unit ID va en cada pedido).
+     * Corre en un hilo propio: no toca SQLite ni publica eventos. Si un medidor falla queda sin
+     * dato este ciclo (hueco), ni ceros ni el valor anterior. Si la pasarela misma deja de
+     * contestar ({@link #MAX_FALLAS_RED_SEGUIDAS} vencimientos seguidos), se abandona por este
+     * ciclo en vez de esperar el timeout de cada medidor restante.
+     */
+    private ResultadoPasarela leerPasarela(PAS600Lx gateway, List<Map<String, Object>> lineas) {
+        long inicio = System.currentTimeMillis();
+        String gatewayName = gateway.getNombrex();
+        String gatewayIP = gateway.getGatewayIP();
+        boolean[] leidos = new boolean[lineas.size()];
+        String[] motivos = new String[lineas.size()];
+
+        if (!ModbusUtil.isIPAvailable(gatewayIP)) {
+            logger.warn("Pasarela {} ({}) sin respuesta a ping", gatewayName, gatewayIP);
+            java.util.Arrays.fill(motivos, "pasarela sin respuesta a ping");
+            return new ResultadoPasarela(gateway, lineas, leidos, motivos, System.currentTimeMillis() - inicio);
+        }
+
+        int fallasRedSeguidas = 0;
+        try (ModbusTcpConexion conexion = new ModbusTcpConexion(gatewayIP, TIMEOUT_MS)) {
+            for (int i = 0; i < lineas.size(); i++) {
+                Map<String, Object> linea = lineas.get(i);
+                if (fallasRedSeguidas >= MAX_FALLAS_RED_SEGUIDAS) {
+                    motivos[i] = "pasarela sin respuesta Modbus este ciclo";
+                    continue;
+                }
+                try {
+                    leidos[i] = readSingleMeter(conexion, gateway, linea, i);
+                    if (!leidos[i]) {
+                        motivos[i] = "modelo de medidor sin registros configurados";
+                    }
+                    fallasRedSeguidas = 0;
+                } catch (ModbusTcpConexion.ExcepcionModbus e) {
+                    motivos[i] = e.getMessage(); // la pasarela contestó: la red está bien
+                    fallasRedSeguidas = 0;
+                } catch (IOException e) {
+                    motivos[i] = "error de comunicación Modbus: " + e.getMessage();
+                    fallasRedSeguidas++;
+                }
+                if (motivos[i] != null) {
+                    logger.warn("Medidor {} (Unit ID {}) en {} sin lectura: {}",
+                            linea.get("lineaMaquina"), linea.get("id"), gatewayName, motivos[i]);
+                }
+            }
+        }
+        return new ResultadoPasarela(gateway, lineas, leidos, motivos, System.currentTimeMillis() - inicio);
     }
 
     /**
@@ -258,29 +312,29 @@ public class PASReaderService {
 
                 logger.debug("Saved VIP data for {}: VAB={}, VAC={}, VBC={}, IA={}, IB={}, IC={}, KW={}, PF={}",
                     nombreTabla, vab, vac, vbc, ia, ib, ic, kw, pf);
-
-                // Publish updated data
-                try {
-                    Map<String, Object> datosVIP = plcDataQueryService.getLatestVIPDataByMaquina(nombreTabla);
-                    Map<String, Object> datosKWh = plcDataQueryService.getLatestKWhDataByMaquina(nombreTabla);
-
-                    if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
-                        kwhDifferenceService.publicarDatosActuales(nombreTabla, datosVIP, datosKWh);
-                    }
-                } catch (Exception e) {
-                    logger.warn("Error publishing data for {}: {}", nombreTabla, e.getMessage());
-                }
             }
         }
     }
 
-    /** Reporta a AlarmaEvaluatorService (regla DISPOSITIVO_NO_DISPONIBLE) que ninguna línea de
-     * este gateway pudo leerse este ciclo (ping fallido antes de intentar conectar por Modbus). */
-    private void publicarConectividad(List<Map<String, Object>> lineas, boolean conectado, String motivo) {
-        LocalDateTime ahora = LocalDateTime.now();
-        for (Map<String, Object> linea : lineas) {
-            String nombreLinea = (String) linea.get("lineaMaquina");
-            eventPublisher.publishEvent(new DispositivoConectividadEvent(this, nombreLinea, conectado, motivo, ahora));
+    /** Publica a la UI (tarjetas en vivo, SSE) los últimos datos de cada medidor leído, ya con el
+     * lote guardado, igual que el lector de PLC. */
+    private void publicarDatosActuales(List<ResultadoPasarela> resultados) {
+        for (ResultadoPasarela r : resultados) {
+            for (int i = 0; i < r.lineas().size(); i++) {
+                if (!r.leidos()[i]) {
+                    continue;
+                }
+                String nombreTabla = (String) r.lineas().get(i).get("lineaMaquina");
+                try {
+                    Map<String, Object> datosVIP = plcDataQueryService.getLatestVIPDataByMaquina(nombreTabla);
+                    Map<String, Object> datosKWh = plcDataQueryService.getLatestKWhDataByMaquina(nombreTabla);
+                    if (!datosVIP.containsKey("error") && !datosKWh.containsKey("error")) {
+                        kwhDifferenceService.publicarDatosActuales(nombreTabla, datosVIP, datosKWh);
+                    }
+                } catch (Exception e) {
+                    logger.warn("Error publicando datos de {}: {}", nombreTabla, e.getMessage());
+                }
+            }
         }
     }
 }

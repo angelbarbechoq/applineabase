@@ -77,12 +77,18 @@
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.46.1.0</version>
         </dependency>
+        <!-- Modbus (TCP, RTU, RTU sobre TCP, UDP; todas las funciones y códigos de excepción).
+             Se excluye su binding de log: la app ya usa Logback vía Spring Boot. -->
         <dependency>
-            <groupId>de.re-create</groupId>
-            <artifactId>easymodbus-client</artifactId>
-            <version>1.0</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/lib/EasyModbusJavaClient.jar</systemPath>
+            <groupId>com.ghgande</groupId>
+            <artifactId>j2mod</artifactId>
+            <version>3.4.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-reload4j</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
