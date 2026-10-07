@@ -50,13 +50,25 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
       (reconecta). Se borraron los jar de `lib/`. (2026-10-07)
 
 **Fase B - Catalogo de modelos (necesita los registros del usuario)**
-- [ ] B1. Catalogo de modelos de medidor (H2, pantalla admin en Configuracion): lista cerrada de
-      parametros; por modelo, registro + tipo de dato + escala + codificacion (PF 4Q). Basicos
-      obligatorios, de calidad pueden ser "No disponible". Semilla PM5110 y PM710 confirmados.
-- [ ] B2. Boton "Probar lectura" (pasarela, Unit ID, modelo) para comparar con la pantalla del medidor.
-- [ ] B3. Lector de pasarelas usando el catalogo: lectura en bloques (~3 pedidos por medidor) y
-      escalas por modelo (reemplaza `PASModbusRegistry` y los casos especiales por nombre).
-      Inconvenientes 7 y 8.
+- [x] B1. Catalogo de modelos de medidor (2026-10-07): Configuracion > Modelos de medidor
+      (`configuracion/medidores`, ADMIN). Lista cerrada de 35 parametros (9 basicos obligatorios,
+      26 de calidad que pueden quedar "No disponible"); por parametro: registro como en el manual,
+      tipo de dato (Float32, Int16, UInt16, Int32, UInt32, Int64, UInt64), orden de palabras,
+      escala y PF 4 cuadrantes; por modelo: funcion 03/04 y numeracion base 1/0. Alta, edicion,
+      duplicado y baja (bloqueada si una linea lo usa). El campo "Medidor" de Configuracion de
+      hardware pasa a ser lista cerrada del catalogo. Semilla: PM5110 y PM710 con los 9 basicos
+      (confirmados con datos reales: GA752, OrientadoraL2 y HornoL3 por GteWay01); ION8600 y
+      PAC1020 creados vacios (faltan sus registros). Los cambios rigen en el ciclo siguiente, sin
+      recompilar ni reiniciar.
+- [x] B2. Pestana "Probar lectura" (2026-10-07): medidor ya configurado o pasarela + Unit ID, con el
+      modelo elegido; muestra cada valor (y el PF decodificado si es 4Q) y el error por parametro,
+      sin guardar.
+- [x] B3. Lector de pasarelas usando el catalogo (2026-10-07): `LectorMedidorService` agrupa
+      registros cercanos (hueco <= 40, bloque <= 100): PM710 en 1 pedido, PM5110 en 2 (antes 5). Si
+      un bloque cae en registros inexistentes (0x02/0x03) lee ese bloque por parametro y el modelo
+      queda sin agrupar hasta reiniciar. Se borro `PASModbusRegistry`. El PF se guarda como lo
+      entrega el medidor (igual que por PLC); el decodificado 4Q va al mostrarlo (fase E).
+      Pendiente de datos: registros de ION8600 y PAC1020 (hoy por PLC con escalas propias).
 - [ ] B4. Definir KWhR (que es, que registro) y llenarlo desde la pasarela. Inconveniente 6.
 
 **Fase C - Preparar la migracion**
@@ -147,12 +159,15 @@ Direccion como en el manual (la app resta 1). Float32 salvo indicacion.
 | THD I A, B, C | 21300, 21302, 21304 |
 | THD V AB, BC, CA / AN, BN, CN | 21322, 21324, 21326 / 21330, 21332, 21334 |
 
-PM710 (en uso hoy): kWh 1000, I 1034, V 1054, kW 1006, PF 1012. Falta el resto.
+PM710 (confirmado 2026-10-07 con datos reales, Float32, palabra alta primero): kWh 1000,
+kW 1006, PF 1012, IA/IB/IC 1034/1036/1038, VAB/VBC/VCA 1054/1056/1058. Falta lo de calidad.
 
 ## Datos pendientes del usuario
+(Todo esto se puede cargar desde Configuracion > Modelos de medidor, sin recompilar.)
 1. Registros del PM710 para los parametros de calidad.
-2. Confirmacion de los registros del PM5110.
-3. ION8600 (KWhPlanta1) y PAC1020 (TDGeneradorSA): registros si pasan a pasarela.
+2. Confirmacion de los registros de calidad del PM5110 (los basicos ya estan confirmados).
+3. ION8600 (KWhPlanta1) y PAC1020 (TDGeneradorSA): registros, tipo de dato y escala de los 9
+   basicos (por PLC hoy: KWhPlanta1 con enteros, I/10 y PF/100; TDGeneradorSA con kWh/1000).
    Sensores del PLC 192.168.0.3 (TemperaturaAmbiente, TemperaturaAgua, PsiAireP1, PsiAgua,
    BarCompHP): si ese PLC se queda o como se leeran.
 4. Pasarelas: cantidad, IP, medidores por pasarela, si se conservan las direcciones (102, 103...),

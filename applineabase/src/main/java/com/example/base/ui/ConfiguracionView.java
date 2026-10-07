@@ -2,6 +2,7 @@ package com.example.base.ui;
 
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCIdWriterService;
+import com.example.medidores.service.ModeloMedidorService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.CheckboxGroup;
@@ -48,6 +49,7 @@ public class ConfiguracionView extends VerticalLayout {
 
     private final ConfigLoaderService configLoaderService;
     private final PLCIdWriterService plcIdWriterService;
+    private final ModeloMedidorService modeloMedidorService;
 
     private List<Map<String, Object>> lineas;
     private List<Map<String, Object>> plcs;
@@ -57,7 +59,9 @@ public class ConfiguracionView extends VerticalLayout {
     private final Grid<Map<String, Object>> plcsGrid = new Grid<>();
     private final Grid<Map<String, Object>> gatewaysGrid = new Grid<>();
 
-    public ConfiguracionView(ConfigLoaderService configLoaderService, PLCIdWriterService plcIdWriterService) {
+    public ConfiguracionView(ConfigLoaderService configLoaderService, PLCIdWriterService plcIdWriterService,
+                             ModeloMedidorService modeloMedidorService) {
+        this.modeloMedidorService = modeloMedidorService;
         this.configLoaderService = configLoaderService;
         this.plcIdWriterService = plcIdWriterService;
         setSizeFull();
@@ -144,7 +148,10 @@ public class ConfiguracionView extends VerticalLayout {
         IntegerField idField = new IntegerField("ID");
         idField.setStepButtonsVisible(false);
         TextField nombreField = new TextField("Línea/Máquina");
-        TextField medidorField = new TextField("Medidor");
+        // Lista cerrada: el modelo decide qué registros se leen (Configuracion > Modelos de medidor).
+        ComboBox<String> medidorField = new ComboBox<>("Medidor");
+        medidorField.setItems(modeloMedidorService.listarNombres());
+        medidorField.setHelperText("Modelos de Configuracion > Modelos de medidor");
         ComboBox<String> plcField = new ComboBox<>("PLC");
         plcField.setItems(Stream.concat(
                 plcs.stream().map(p -> String.valueOf(p.get("nombre"))),
@@ -171,7 +178,16 @@ public class ConfiguracionView extends VerticalLayout {
         if (lineaEnEdicion != null) {
             idField.setValue(((Number) lineaEnEdicion.get("id")).intValue());
             nombreField.setValue(String.valueOf(lineaEnEdicion.getOrDefault("lineaMaquina", "")));
-            medidorField.setValue(String.valueOf(lineaEnEdicion.getOrDefault("modeloMedidor", "")));
+            String modeloActual = (String) lineaEnEdicion.get("modeloMedidor");
+            if (modeloActual != null && !modeloActual.isBlank()) {
+                if (!modeloMedidorService.listarNombres().contains(modeloActual)) {
+                    // Valor viejo que no está en el catálogo: se muestra para no perderlo al editar.
+                    List<String> conActual = new java.util.ArrayList<>(modeloMedidorService.listarNombres());
+                    conActual.add(modeloActual);
+                    medidorField.setItems(conActual);
+                }
+                medidorField.setValue(modeloActual);
+            }
             plcField.setValue((String) lineaEnEdicion.get("nombrePLC"));
             serialField.setValue(String.valueOf(lineaEnEdicion.getOrDefault("numeroSerie", "")));
             zonaField.setValue((String) lineaEnEdicion.get("zona"));

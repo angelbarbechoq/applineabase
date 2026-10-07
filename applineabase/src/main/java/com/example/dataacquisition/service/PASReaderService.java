@@ -3,7 +3,10 @@ package com.example.dataacquisition.service;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.event.DispositivoConectividadEvent;
 import com.example.dataacquisition.model.PAS600Lx;
-import com.example.dataacquisition.model.PASModbusRegistry;
+import com.example.medidores.model.ParametroMedidor;
+import com.example.medidores.service.DefinicionModelo;
+import com.example.medidores.service.LectorMedidorService;
+import com.example.medidores.service.ModeloMedidorService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -53,13 +56,23 @@ public class PASReaderService {
     private final KWhDifferenceService kwhDifferenceService;
     private final PLCDataQueryService plcDataQueryService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ModeloMedidorService modeloMedidorService;
+    private final LectorMedidorService lectorMedidorService;
+
+    /** Parámetros que se guardan hoy por cada medidor (kWh y VIP). */
+    private static final List<ParametroMedidor> PARAMETROS_BASICOS = Arrays.stream(ParametroMedidor.values())
+            .filter(ParametroMedidor::isBasico).toList();
 
     public PASReaderService(PASGatewayConfigService gatewayConfigService,
                             ConfigLoaderService configLoaderService,
                             DatabaseInitializationService databaseInitializationService,
                             KWhDifferenceService kwhDifferenceService,
                             PLCDataQueryService plcDataQueryService,
-                            ApplicationEventPublisher eventPublisher) {
+                            ApplicationEventPublisher eventPublisher,
+                            ModeloMedidorService modeloMedidorService,
+                            LectorMedidorService lectorMedidorService) {
+        this.modeloMedidorService = modeloMedidorService;
+        this.lectorMedidorService = lectorMedidorService;
         this.gatewayConfigService = gatewayConfigService;
         this.databaseInitializationService = databaseInitializationService;
         this.kwhDifferenceService = kwhDifferenceService;
@@ -112,6 +125,13 @@ public class PASReaderService {
             return;
         }
 
+        // Catálogo de modelos leído en cada ciclo: un cambio en la pantalla rige desde el ciclo siguiente.
+        Map<String, DefinicionModelo> modelos = modeloMedidorService.definiciones();
+        if (modelos.isEmpty()) {
+            logger.warn("Catalogo de modelos de medidor vacio (todavia no se cargo); se saltea la lectura de pasarelas");
+            return;
+        }
+
         long inicio = System.currentTimeMillis();
         // Misma marca de tiempo para todas las pasarelas del ciclo (filas alineadas entre máquinas).
         String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
@@ -123,7 +143,7 @@ public class PASReaderService {
                 logger.debug("Pasarela {} sin medidores de energía asignados", gateway.getNombrex());
                 continue;
             }
-            tareas.add(() -> leerPasarela(gateway, lineas));
+            tareas.add(() -> leerPasarela(gateway, lineas, modelos));
         }
         if (tareas.isEmpty()) {
             return;
@@ -181,7 +201,8 @@ public class PASReaderService {
      * contestar ({@link #MAX_FALLAS_RED_SEGUIDAS} vencimientos seguidos), se abandona por este
      * ciclo en vez de esperar el timeout de cada medidor restante.
      */
-    private ResultadoPasarela leerPasarela(PAS600Lx gateway, List<Map<String, Object>> lineas) {
+    private ResultadoPasarela leerPasarela(PAS600Lx gateway, List<Map<String, Object>> lineas,
+                                           Map<String, DefinicionModelo> modelos) {
         long inicio = System.currentTimeMillis();
         String gatewayName = gateway.getNombrex();
         String gatewayIP = gateway.getGatewayIP();
@@ -203,16 +224,14 @@ public class PASReaderService {
                     continue;
                 }
                 try {
-                    leidos[i] = readSingleMeter(conexion, gateway, linea, i);
-                    if (!leidos[i]) {
-                        motivos[i] = "modelo de medidor sin registros configurados";
-                    }
+                    motivos[i] = readSingleMeter(conexion, gateway, linea, i, modelos);
+                    leidos[i] = motivos[i] == null;
                     fallasRedSeguidas = 0;
                 } catch (ModbusTcpConexion.ExcepcionModbus e) {
                     motivos[i] = e.getMessage(); // la pasarela contestó: la red está bien
                     fallasRedSeguidas = 0;
                 } catch (IOException e) {
-                    motivos[i] = "error de comunicación Modbus: " + e.getMessage();
+                    motivos[i] = "error de comunicacion Modbus: " + e.getMessage();
                     fallasRedSeguidas++;
                 }
                 if (motivos[i] != null) {
@@ -225,51 +244,52 @@ public class PASReaderService {
     }
 
     /**
-     * Lee KWh, tensiones, corrientes, kW y PF de un medidor. Los valores se cargan en el gateway
-     * solo si las cinco lecturas salieron bien; si una falla, el medidor queda sin dato este ciclo.
+     * Lee los parámetros básicos (kWh, tensiones, corrientes, kW, PF) de un medidor según su
+     * modelo del catálogo. Los valores se cargan en el gateway solo si salieron todos; si falta
+     * uno, el medidor queda sin dato este ciclo.
      *
-     * @return false si el modelo no tiene registros configurados
+     * @return null si se leyó, o el motivo por el que no se pudo
      */
-    private boolean readSingleMeter(ModbusTcpConexion conexion, PAS600Lx gateway, Map<String, Object> linea, int index)
+    private String readSingleMeter(ModbusTcpConexion conexion, PAS600Lx gateway, Map<String, Object> linea, int index,
+                                   Map<String, DefinicionModelo> modelos)
             throws IOException, ModbusTcpConexion.ExcepcionModbus {
         int unitId = ((Number) linea.get("id")).intValue();
-        String modelo = (String) linea.get("modeloMedidor");
+        String nombreModelo = String.valueOf(linea.get("modeloMedidor"));
 
-        int[] regKWh = leer(conexion, unitId, modelo, "KWh");
-        int[] regV = leer(conexion, unitId, modelo, "V");
-        int[] regI = leer(conexion, unitId, modelo, "I");
-        int[] regKW = leer(conexion, unitId, modelo, "KW");
-        int[] regPF = leer(conexion, unitId, modelo, "PF");
-        if (regKWh == null || regV == null || regI == null || regKW == null || regPF == null) {
-            return false;
+        DefinicionModelo modelo = modelos.get(nombreModelo.toUpperCase());
+        if (modelo == null) {
+            return "el modelo " + nombreModelo + " no existe en Configuracion > Modelos de medidor";
+        }
+        if (!modelo.completo()) {
+            return "el modelo " + nombreModelo + " no tiene cargados los registros basicos " + modelo.faltantesBasicos();
         }
 
-        // Tensiones del medidor: [VAB, VBC, VCA]; se guardan en el orden de los PLC (VAB, VAC, VBC).
-        gateway.setKWhActx(index, flotante(regKWh, 0));
-        gateway.setVABx(index, flotante(regV, 0));
-        gateway.setVBCx(index, flotante(regV, 2));
-        gateway.setVACx(index, flotante(regV, 4));
-        gateway.setIAx(index, flotante(regI, 0));
-        gateway.setIBx(index, flotante(regI, 2));
-        gateway.setICx(index, flotante(regI, 4));
-        gateway.setKWx(index, flotante(regKW, 0));
-        gateway.setPFx(index, flotante(regPF, 0));
-
-        logger.debug("Medidor {} (Unit ID {}) leído", linea.get("lineaMaquina"), unitId);
-        return true;
-    }
-
-    private int[] leer(ModbusTcpConexion conexion, int unitId, String modelo, String variable)
-            throws IOException, ModbusTcpConexion.ExcepcionModbus {
-        int[] info = PASModbusRegistry.getRegisterInfo(modelo, variable);
-        if (info == null) {
-            return null;
+        LectorMedidorService.Lectura lectura = lectorMedidorService.leer(conexion, unitId, modelo, PARAMETROS_BASICOS);
+        if (!lectura.errores().isEmpty()) {
+            return "parametros sin lectura " + lectura.errores();
         }
-        return conexion.leerHolding(unitId, info[0], info[1]);
+        Map<ParametroMedidor, Double> v = lectura.valores();
+
+        // Se guardan en el orden de los PLC: VAB, VAC (= VCA del medidor), VBC.
+        gateway.setKWhActx(index, decimal(v.get(ParametroMedidor.KWH)));
+        gateway.setVABx(index, decimal(v.get(ParametroMedidor.VAB)));
+        gateway.setVBCx(index, decimal(v.get(ParametroMedidor.VBC)));
+        gateway.setVACx(index, decimal(v.get(ParametroMedidor.VCA)));
+        gateway.setIAx(index, decimal(v.get(ParametroMedidor.IA)));
+        gateway.setIBx(index, decimal(v.get(ParametroMedidor.IB)));
+        gateway.setICx(index, decimal(v.get(ParametroMedidor.IC)));
+        gateway.setKWx(index, decimal(v.get(ParametroMedidor.KW_TOTAL)));
+        // PF tal como lo entrega el medidor (igual que por PLC); el decodificado 4 cuadrantes se
+        // aplica al mostrarlo (ver docs/PLAN-CALIDAD-ENERGIA.md).
+        gateway.setPFx(index, decimal(v.get(ParametroMedidor.PF_TOTAL)));
+
+        logger.debug("Medidor {} (Unit ID {}, {}) leido", linea.get("lineaMaquina"), unitId, nombreModelo);
+        return null;
     }
 
-    private static BigDecimal flotante(int[] registros, int desde) {
-        return ModbusUtil.registroIntToBigDecimal(new int[]{registros[desde], registros[desde + 1]});
+    /** Mismo formato que se guardaba antes (expansión exacta del valor binario). */
+    private static BigDecimal decimal(double valor) {
+        return new BigDecimal(valor);
     }
 
     /**

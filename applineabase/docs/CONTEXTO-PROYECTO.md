@@ -9,7 +9,7 @@ carga solo al abrir una sesion.
 seccion correspondiente (y la seccion 12 de pendientes). Si algo de aqui contradice el
 codigo, manda el codigo y hay que corregir este archivo.
 
-Ultima actualizacion: 2026-09-25. Las secciones marcadas **[resumen]** son una vista de alto
+Ultima actualizacion: 2026-10-07. Las secciones marcadas **[resumen]** son una vista de alto
 nivel que no se reviso a fondo: leer el codigo antes de modificar esa parte.
 Se eliminaron `ARCHITECTURE.md` y `README.md` de la raiz (obsoletos: plantilla de Vaadin y
 clases que ya no existen); este archivo los reemplaza. Los problemas ya resueltos estan en
@@ -69,11 +69,12 @@ reales. Si hace falta limpiar, se hace por JDBC (script en el scratchpad, creden
 | Paquete | Para que sirve | Clases clave |
 |---|---|---|
 | `base/ui`, `base/model` | Layout y vistas transversales | `MainLayout` (menu lateral y permisos), `LoginView`, `ChartsView`, `HistoricoView`, `DataQueryView`, `ConfiguracionView` (hardware), `UsuariosView`, `NotificacionesUtil`, `CsvUtil`, `PanelGraficoUtil`, `TarjetasEstadoActual`, `GraficaModel` (JS de amCharts5) |
-| `dataacquisition` | Adquisicion de datos **[resumen]** | `DataAcquisitionTask` (scheduler), `PLCReaderService` (S7-200), `PASReaderService` (PAS600L), `MezcladorReaderService` (DTB48), `PLCDataAcquisitionService`, `PLCDataQueryService` (lee SQLite), `ConfigLoaderService` (JSON externos), `RutaArchivosEnergia`, `MaquinasVirtuales` (`TemperaturaAgua`, `TemperaturaAmbiente`, `KWhPlanta1`), eventos (`SensorDataUpdateEvent`, `MaquinaEstadoCambioEvent`, ...), controladores SSE (`/api/plc/stream/...`) |
+| `dataacquisition` | Adquisicion de datos **[resumen]** | `DataAcquisitionTask` (scheduler), `PLCReaderService` (S7-200), `PASReaderService` (pasarelas en paralelo, un hilo virtual por pasarela, registros segun el catalogo de `medidores`; si un medidor falla queda hueco, nunca 0), `ModbusTcpConexion` (unico acceso Modbus, j2mod), `MezcladorReaderService` (DTB48), `PLCDataAcquisitionService`, `PLCDataQueryService` (lee SQLite), `ConfigLoaderService` (JSON externos), `RutaArchivosEnergia`, `MaquinasVirtuales` (`TemperaturaAgua`, `TemperaturaAmbiente`, `KWhPlanta1`), eventos (`SensorDataUpdateEvent`, `MaquinaEstadoCambioEvent`, ...), controladores SSE (`/api/plc/stream/...`) |
 | `horometro` | Horas de funcionamiento | ver seccion 6 |
 | `alarmas` | Alarmas por umbral | ver seccion 7 |
 | `mezcladores` | Temperatura de mezcladores (DTB48) | ver seccion 8 |
 | `mantenimiento` | Mantenimiento preventivo y stock | ver seccion 9 |
+| `medidores` | Catalogo de modelos de medidor y lector generico | `ModeloMedidor`/`RegistroModelo` (H2), `ParametroMedidor` (lista cerrada, 9 basicos + 26 de calidad), `ModeloMedidorService`, `DefinicionModelo` (copia inmutable por ciclo), `LectorMedidorService` (lectura en bloques, decodificacion, PF 4Q), `ModeloMedidorSeeder`, `ModelosMedidorView`. Detalle en `docs/PLAN-CALIDAD-ENERGIA.md` (fase B) |
 | `security` | Usuarios, roles, permisos | `Usuario`, `UsuarioRepository`, `UsuarioPrincipal`, `SecurityConfig`, `LineaAccessService`, `DataSeeder` (crea el admin inicial), `AdminSessionTimeoutFilter` |
 | `tools` | Reparaciones puntuales | `ReparacionVipView`, `MergeVipMensualTool` |
 | `config` | `JacksonConfiguration` | |
@@ -111,6 +112,7 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `alarmas/historial` | `AlarmasHistorialCompletoView` | ADMIN |
 | `alarmas/config` | `AlarmasConfigView` | ADMIN |
 | `configuracion` | `ConfiguracionView` (hardware) | ADMIN |
+| `configuracion/medidores` | `ModelosMedidorView` (catalogo de modelos + Probar lectura) | ADMIN |
 | `mezcladores/config` | `MezcladoresConfigView` | gate `puedeVerMezcladores()` |
 | `mantenimiento` | `MantenimientoView` | gate `puedeVerMantenimiento()`; el formulario solo lo ve ADMIN |
 | `mantenimiento/personal` | `PersonalMantenimientoView` | ADMIN |
@@ -123,7 +125,7 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 Datos, Horometro, Alarmas (Alarmas Activas; Historial solo admin), Mantenimiento Preventivo
 (Mantenimiento Barril y Tornillos; Personal de Mantenimiento solo admin), Reportes (Barril y
 Tornillo), y solo admin: Usuarios, Reparar VIP Mensual, Configuracion (alarmas, hardware,
-Mezcladores, Mantenimiento). Los padres usan `colapsarAlSalirDelMouse(...)`. "Mantenimiento
+Modelos de medidor, Mezcladores, Mantenimiento). Los padres usan `colapsarAlSalirDelMouse(...)`. "Mantenimiento
 Preventivo" y "Reportes" comparten el bloque `if (puedeVerMantenimiento())`. `MainLayout` tambien
 tiene un poll que muestra avisos de alarmas en el navegador (solo `puedeVerAlarmas()`).
 
@@ -303,9 +305,10 @@ una opcion mas de la lista.
 - Ejecutable nativo con GraalVM.
 
 **Pendiente / ideas**
-- **Calidad de Energia + migracion de PLC a pasarelas PAS600L:** plan acordado, se avanza un medidor
-  a la vez cuando el usuario avise. Ver `docs/PLAN-CALIDAD-ENERGIA.md` (incluye el PF del PM5110
-  guardado sin decodificar y los registros a confirmar).
+- **Calidad de Energia + migracion de PLC a pasarelas PAS600L:** en curso como checklist en
+  `docs/PLAN-CALIDAD-ENERGIA.md` (fases A y B hechas el 2026-10-07; faltan registros de ION8600,
+  PAC1020 y los de calidad, que el usuario carga desde la pantalla; luego C, D, E). Incluye el PF
+  del PM5110 guardado sin decodificar.
 - **Modulo de Mantenimiento Correctivo (MF21 + AMEF):** diseno acordado, sin implementar. Ver
   `docs/PLAN-MANTENIMIENTO-CORRECTIVO.md`. Falta el AMEF del usuario.
 - Campos que hoy violan la regla de datos (corregir sobre la marcha, no ahora): tecnico y

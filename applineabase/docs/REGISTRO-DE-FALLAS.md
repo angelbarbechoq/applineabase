@@ -11,7 +11,7 @@ Se importa desde `CLAUDE.md`, asi que se carga solo en cada sesion.
 - Este archivo es la fuente de verdad. `reportes/reporte-de-fallas.html` es la version para leer en
   el navegador; se regenera desde aqui cuando el usuario lo pida (ultima vez: 2026-09-25).
 
-Ultima actualizacion: 2026-09-25.
+Ultima actualizacion: 2026-10-07.
 
 ## Resumen
 
@@ -26,6 +26,7 @@ Ultima actualizacion: 2026-09-25.
 | F-07 | Confusion de puerto 8080 / 8081 en las pruebas | Instancia del usuario ocupa el 8080 | Resuelto (flujo) |
 | F-08 | Login por automatizacion del navegador no ingresa texto | Un clic simple no da foco al input interno | Resuelto |
 | F-09 | Restaurar un commit viejo deja un arbol inconsistente | `git checkout <sha> -- .` no borra archivos nuevos | Resuelto (proceso) |
+| F-10 | Datos en cero en medidores leidos por pasarela | EasyModbus no detecta excepciones Modbus + el lector guardaba la fila igual | Resuelto (cambio de libreria a j2mod) |
 
 ---
 
@@ -133,6 +134,36 @@ Ultima actualizacion: 2026-09-25.
   antes el trabajo sin commitear con `git stash push -- <rutas>`.
 - **Prevencion:** los borrados de rama no fusionada (`git branch -D`) y el force-push estan bloqueados
   por hook; requieren confirmacion explicita del usuario.
+
+## F-10 Datos en cero en medidores leidos por pasarela (motivo del cambio de libreria Modbus)
+- **Sintoma:** en las tablas VIP de los medidores leidos por GteWay01 (GA752, OrientadoraL2, HornoL3)
+  aparecian filas sueltas con un valor en 0 y el resto normal (ej. HornoL3: VAB = 0 con 6.98 kW).
+  El 2026-10-07 hubo 16 filas asi entre 00:00 y 12:59 (unas 1 cada 45 min entre los tres). Con
+  kW = 0 el horometro cuenta la maquina como parada y la advertencia de Detencion puede dispararse.
+- **Como reconocerlo:** filas aisladas de 1 minuto con `VAB = 0` o `PW = 0` o `IA = 0` mientras los
+  demas campos de la misma fila son normales. Consulta por JDBC sobre `ddmesVIP` (SQLite):
+  `SELECT count(*) FROM "<maquina>" WHERE VAB=0 OR PW=0 OR IA=0`.
+- **Causa (dos factores):**
+  1. **EasyModbus** (`lib/EasyModbusJavaClient.jar`) nunca detecta una respuesta de excepcion
+     Modbus: compara el byte de funcion de la respuesta (con signo; 0x83 = -125) contra 131, que
+     nunca coincide (se vio desensamblando `ModbusClient.ReadHoldingRegisters` con `javap -c`).
+     Cuando el medidor no le contesta a la pasarela por RS-485, la pasarela responde la excepcion
+     0x0B y EasyModbus la devuelve como registros armados con ceros, como si fuera un dato valido.
+     Cada medidor se leia en 5 pedidos (kWh, V, I, kW, PF): fallaba uno y ese grupo salia en 0.
+  2. `PASReaderService` ponia en cero los valores antes de leer y guardaba la fila VIP aunque la
+     lectura hubiera fallado.
+- **Resolucion (2026-10-07):** se reemplazo EasyModbus por **j2mod 3.4.0** (Maven Central) en
+  pasarelas, mezcladores, PLC y escritura de IDs, siempre a traves de `ModbusTcpConexion`, que
+  separa "el equipo contesto con excepcion" (la conexion sigue) de "sin respuesta" (reconecta). Si
+  falla cualquier parametro basico del medidor no se guarda la fila: queda el hueco de ese minuto
+  (decidido con el usuario: ni 0 ni repetir el valor anterior, para no inventar horas de marcha ni
+  consumo; el kWh se recupera solo con la lectura siguiente). Se borraron los jar de `lib/`.
+  Commits 53d45af y 72d58dd.
+- **Prevencion:** no usar librerias Modbus que no informen el codigo de excepcion. Ante una falla de
+  lectura, hueco y motivo en el log ("Medidor X ... sin lectura: excepcion Modbus 0x0B ..."), nunca
+  0. **Verificacion pendiente:** contar filas con ceros desde 2026-10-07 12:59 (deben ser 0 y en su
+  lugar aparecer minutos faltantes).
+- **Referencias:** `docs/PLAN-CALIDAD-ENERGIA.md` (fase A).
 
 ---
 

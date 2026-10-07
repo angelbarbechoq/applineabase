@@ -265,6 +265,7 @@ public final class MainLayout extends AppLayout {
             configuracion.setExpanded(false);
             configuracion.addItem(new SideNavItem("Configuración de alarmas", "alarmas/config", VaadinIcon.BELL.create()));
             configuracion.addItem(new SideNavItem("Configuración de hardware", "configuracion", VaadinIcon.SERVER.create()));
+            configuracion.addItem(new SideNavItem("Modelos de medidor", "configuracion/medidores", VaadinIcon.DASHBOARD.create()));
             configuracion.addItem(new SideNavItem("Configuración Mezcladores", "mezcladores/config", VaadinIcon.FIRE.create()));
             configuracion.addItem(new SideNavItem("Configuración Mantenimiento", "mantenimiento/config", VaadinIcon.TOOLS.create()));
             nav.addItem(configuracion);
