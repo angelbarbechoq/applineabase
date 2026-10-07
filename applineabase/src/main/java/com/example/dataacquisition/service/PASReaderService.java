@@ -4,8 +4,6 @@ import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.event.DispositivoConectividadEvent;
 import com.example.dataacquisition.model.PAS600Lx;
 import com.example.dataacquisition.model.PASModbusRegistry;
-import de.re.easymodbus.exceptions.ModbusException;
-import de.re.easymodbus.modbusclient.ModbusClient;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -34,6 +32,8 @@ public class PASReaderService {
 
     private static final Logger logger = LoggerFactory.getLogger(PASReaderService.class);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
+    /** Espera máxima por pedido Modbus: un medidor caído no frena más que esto a los demás. */
+    private static final int TIMEOUT_MS = 3000;
 
     private final ArrayList<PAS600Lx> gatewayDevices;
     private final List<Map<String, Object>> lineaIdConfigCache;
@@ -133,181 +133,99 @@ public class PASReaderService {
         }
 
         String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
-        databaseInitializationService.beginBatch();
+        boolean[] leidos = new boolean[lineasDelGateway.size()];
 
-        try {
-            // Clear previous data for this gateway's meters
-            for (Map<String, Object> linea : lineasDelGateway) {
-                int lineIndex = lineasDelGateway.indexOf(linea);
-                gateway.setKWhActx(lineIndex, BigDecimal.ZERO);
-                gateway.setVABx(lineIndex, BigDecimal.ZERO);
-                gateway.setVACx(lineIndex, BigDecimal.ZERO);
-                gateway.setVBCx(lineIndex, BigDecimal.ZERO);
-                gateway.setIAx(lineIndex, BigDecimal.ZERO);
-                gateway.setIBx(lineIndex, BigDecimal.ZERO);
-                gateway.setICx(lineIndex, BigDecimal.ZERO);
-                gateway.setKWx(lineIndex, BigDecimal.ZERO);
-                gateway.setPFx(lineIndex, BigDecimal.ZERO);
-            }
-
-            // Read each meter
+        // Una sola conexión por pasarela por ciclo; el Unit ID va en cada pedido.
+        try (ModbusTcpConexion conexion = new ModbusTcpConexion(gatewayIP, TIMEOUT_MS)) {
             for (int i = 0; i < lineasDelGateway.size(); i++) {
+                Map<String, Object> linea = lineasDelGateway.get(i);
+                String nombreLinea = (String) linea.get("lineaMaquina");
+                String motivoFalla = null;
                 try {
-                    readSingleMeter(gateway, lineasDelGateway.get(i), i, gatewayIP);
-                } catch (Exception e) {
-                    logger.error("Error reading meter {} on gateway {}: {}", i, gatewayName, e.getMessage());
+                    if (!conexion.estaConectada()) {
+                        conexion.conectar();
+                    }
+                    leidos[i] = readSingleMeter(conexion, gateway, linea, i);
+                    if (!leidos[i]) {
+                        motivoFalla = "modelo de medidor sin registros configurados";
+                    }
+                } catch (ModbusTcpConexion.ExcepcionModbus e) {
+                    motivoFalla = e.getMessage();
+                } catch (IOException e) {
+                    motivoFalla = "error de conexión Modbus: " + e.getMessage();
                 }
+                if (motivoFalla != null) {
+                    // Sin dato este ciclo: no se guarda nada (queda el hueco), ni ceros ni el valor anterior.
+                    logger.warn("Medidor {} (Unit ID {}) en {} sin lectura: {}", nombreLinea, linea.get("id"), gatewayName, motivoFalla);
+                }
+                eventPublisher.publishEvent(new DispositivoConectividadEvent(this, nombreLinea, leidos[i], motivoFalla, LocalDateTime.now()));
             }
+        }
 
-            // Persist data to SQLite
-            persistGatewayData(gateway, lineasDelGateway, timestamp);
-
+        databaseInitializationService.beginBatch();
+        try {
+            persistGatewayData(gateway, lineasDelGateway, leidos, timestamp);
         } finally {
             databaseInitializationService.endBatch();
         }
     }
 
     /**
-     * Read data from a single meter via Modbus
+     * Lee KWh, tensiones, corrientes, kW y PF de un medidor. Los valores se cargan en el gateway
+     * solo si las cinco lecturas salieron bien; si una falla, el medidor queda sin dato este ciclo.
      *
-     * @param gateway Gateway device
-     * @param linea Line configuration entry
-     * @param index Index within this gateway's meter array
-     * @param gatewayIP Gateway IP address
+     * @return false si el modelo no tiene registros configurados
      */
-    private void readSingleMeter(PAS600Lx gateway, Map<String, Object> linea, int index, String gatewayIP) {
-        Integer deviceId = ((Number) linea.get("id")).intValue();  // Unit ID
+    private boolean readSingleMeter(ModbusTcpConexion conexion, PAS600Lx gateway, Map<String, Object> linea, int index)
+            throws IOException, ModbusTcpConexion.ExcepcionModbus {
+        int unitId = ((Number) linea.get("id")).intValue();
         String modelo = (String) linea.get("modeloMedidor");
 
-        logger.debug("Reading meter {} (Unit ID {}) model {}", linea.get("lineaMaquina"), deviceId, modelo);
-
-        ModbusClient modbusClient = new ModbusClient();
-        modbusClient.setipAddress(gatewayIP);
-        modbusClient.setUnitIdentifier(deviceId.byteValue());
-        modbusClient.setConnectionTimeout(5000);
-
-        try {
-            modbusClient.Connect();
-
-            // Read KWh
-            readAndStoreKWh(modbusClient, gateway, modelo, index);
-
-            // Read Voltage, Current, Power, Power Factor
-            readAndStoreVoltages(modbusClient, gateway, modelo, index);
-            readAndStoreCurrents(modbusClient, gateway, modelo, index);
-            readAndStorePower(modbusClient, gateway, modelo, index);
-            readAndStorePowerFactor(modbusClient, gateway, modelo, index);
-
-            logger.debug("Successfully read meter {} (Unit ID {})", linea.get("lineaMaquina"), deviceId);
-            eventPublisher.publishEvent(new DispositivoConectividadEvent(this, (String) linea.get("lineaMaquina"), true, null, LocalDateTime.now()));
-
-        } catch (IOException | ModbusException e) {
-            logger.warn("Failed to read meter {} (Unit ID {}): {}", linea.get("lineaMaquina"), deviceId, e.getMessage());
-            // Do NOT update arrays on failure - keep last valid value
-            eventPublisher.publishEvent(new DispositivoConectividadEvent(this, (String) linea.get("lineaMaquina"), false, "error de conexión Modbus", LocalDateTime.now()));
-        } finally {
-            try {
-                modbusClient.Disconnect();
-            } catch (IOException e) {
-                logger.debug("Error disconnecting from gateway {}: {}", gatewayIP, e.getMessage());
-            }
+        int[] regKWh = leer(conexion, unitId, modelo, "KWh");
+        int[] regV = leer(conexion, unitId, modelo, "V");
+        int[] regI = leer(conexion, unitId, modelo, "I");
+        int[] regKW = leer(conexion, unitId, modelo, "KW");
+        int[] regPF = leer(conexion, unitId, modelo, "PF");
+        if (regKWh == null || regV == null || regI == null || regKW == null || regPF == null) {
+            return false;
         }
+
+        // Tensiones del medidor: [VAB, VBC, VCA]; se guardan en el orden de los PLC (VAB, VAC, VBC).
+        gateway.setKWhActx(index, flotante(regKWh, 0));
+        gateway.setVABx(index, flotante(regV, 0));
+        gateway.setVBCx(index, flotante(regV, 2));
+        gateway.setVACx(index, flotante(regV, 4));
+        gateway.setIAx(index, flotante(regI, 0));
+        gateway.setIBx(index, flotante(regI, 2));
+        gateway.setICx(index, flotante(regI, 4));
+        gateway.setKWx(index, flotante(regKW, 0));
+        gateway.setPFx(index, flotante(regPF, 0));
+
+        logger.debug("Medidor {} (Unit ID {}) leído", linea.get("lineaMaquina"), unitId);
+        return true;
+    }
+
+    private int[] leer(ModbusTcpConexion conexion, int unitId, String modelo, String variable)
+            throws IOException, ModbusTcpConexion.ExcepcionModbus {
+        int[] info = PASModbusRegistry.getRegisterInfo(modelo, variable);
+        if (info == null) {
+            return null;
+        }
+        return conexion.leerHolding(unitId, info[0], info[1]);
+    }
+
+    private static BigDecimal flotante(int[] registros, int desde) {
+        return ModbusUtil.registroIntToBigDecimal(new int[]{registros[desde], registros[desde + 1]});
     }
 
     /**
-     * Read KWh (Energy) from meter
+     * Persist gateway data to SQLite (batch mode). Solo los medidores leídos en este ciclo.
      */
-    private void readAndStoreKWh(ModbusClient client, PAS600Lx gateway, String modelo, int index)
-            throws IOException, ModbusException {
-        int[] registerInfo = PASModbusRegistry.getRegisterInfo(modelo, "KWh");
-        if (registerInfo == null) return;
-
-        int[] kwhRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
-        if (kwhRegisters != null) {
-            BigDecimal kwh = ModbusUtil.registroIntToBigDecimal(kwhRegisters);
-            if (kwh != null && !kwh.equals(BigDecimal.ZERO)) {
-                gateway.setKWhActx(index, kwh);
-            }
-        }
-    }
-
-    /**
-     * Read Voltages (VAB, VBC, VAC) and reorganize to PLCs order (VAB, VAC, VBC)
-     */
-    private void readAndStoreVoltages(ModbusClient client, PAS600Lx gateway, String modelo, int index)
-            throws IOException, ModbusException {
-        int[] registerInfo = PASModbusRegistry.getRegisterInfo(modelo, "V");
-        if (registerInfo == null) return;
-
-        int[] voltageRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
-        if (voltageRegisters != null && voltageRegisters.length >= 6) {
-            // PAS600L returns: [VAB_hi, VAB_lo, VBC_hi, VBC_lo, VAC_hi, VAC_lo]
-            BigDecimal vab = ModbusUtil.registroIntToBigDecimal(new int[]{voltageRegisters[0], voltageRegisters[1]});
-            BigDecimal vbc = ModbusUtil.registroIntToBigDecimal(new int[]{voltageRegisters[2], voltageRegisters[3]});
-            BigDecimal vac = ModbusUtil.registroIntToBigDecimal(new int[]{voltageRegisters[4], voltageRegisters[5]});
-
-            if (vab != null) gateway.setVABx(index, vab);
-            if (vac != null) gateway.setVACx(index, vac);  // Reorganize to PLC order
-            if (vbc != null) gateway.setVBCx(index, vbc);
-        }
-    }
-
-    /**
-     * Read Currents (IA, IB, IC)
-     */
-    private void readAndStoreCurrents(ModbusClient client, PAS600Lx gateway, String modelo, int index)
-            throws IOException, ModbusException {
-        int[] registerInfo = PASModbusRegistry.getRegisterInfo(modelo, "I");
-        if (registerInfo == null) return;
-
-        int[] currentRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
-        if (currentRegisters != null && currentRegisters.length >= 6) {
-            // Returns: [IA_hi, IA_lo, IB_hi, IB_lo, IC_hi, IC_lo]
-            BigDecimal ia = ModbusUtil.registroIntToBigDecimal(new int[]{currentRegisters[0], currentRegisters[1]});
-            BigDecimal ib = ModbusUtil.registroIntToBigDecimal(new int[]{currentRegisters[2], currentRegisters[3]});
-            BigDecimal ic = ModbusUtil.registroIntToBigDecimal(new int[]{currentRegisters[4], currentRegisters[5]});
-
-            if (ia != null) gateway.setIAx(index, ia);
-            if (ib != null) gateway.setIBx(index, ib);
-            if (ic != null) gateway.setICx(index, ic);
-        }
-    }
-
-    /**
-     * Read Power (KW)
-     */
-    private void readAndStorePower(ModbusClient client, PAS600Lx gateway, String modelo, int index)
-            throws IOException, ModbusException {
-        int[] registerInfo = PASModbusRegistry.getRegisterInfo(modelo, "KW");
-        if (registerInfo == null) return;
-
-        int[] powerRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
-        if (powerRegisters != null && powerRegisters.length >= 2) {
-            BigDecimal kw = ModbusUtil.registroIntToBigDecimal(new int[]{powerRegisters[0], powerRegisters[1]});
-            if (kw != null) gateway.setKWx(index, kw);
-        }
-    }
-
-    /**
-     * Read Power Factor (PF)
-     */
-    private void readAndStorePowerFactor(ModbusClient client, PAS600Lx gateway, String modelo, int index)
-            throws IOException, ModbusException {
-        int[] registerInfo = PASModbusRegistry.getRegisterInfo(modelo, "PF");
-        if (registerInfo == null) return;
-
-        int[] pfRegisters = client.ReadHoldingRegisters(registerInfo[0], registerInfo[1]);
-        if (pfRegisters != null && pfRegisters.length >= 2) {
-            BigDecimal pf = ModbusUtil.registroIntToBigDecimal(new int[]{pfRegisters[0], pfRegisters[1]});
-            if (pf != null) gateway.setPFx(index, pf);
-        }
-    }
-
-    /**
-     * Persist gateway data to SQLite (batch mode)
-     */
-    private void persistGatewayData(PAS600Lx gateway, List<Map<String, Object>> lineasDelGateway, String timestamp) {
+    private void persistGatewayData(PAS600Lx gateway, List<Map<String, Object>> lineasDelGateway, boolean[] leidos, String timestamp) {
         for (int i = 0; i < lineasDelGateway.size(); i++) {
+            if (!leidos[i]) {
+                continue;
+            }
             Map<String, Object> linea = lineasDelGateway.get(i);
             String nombreTabla = (String) linea.get("lineaMaquina");
 

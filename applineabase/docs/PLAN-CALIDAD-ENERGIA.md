@@ -23,10 +23,17 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
 ## Checklist (se marca [x] al cerrar cada punto)
 
 **Fase A - Lector de pasarelas confiable (no depende de datos del usuario)**
-- [ ] A1. No guardar ceros cuando un medidor no responde (ni en VIP ni en kWh); se registra la falla
-      y se deja el hueco. Inconveniente 1.
-- [ ] A2. Una conexion por pasarela por ciclo (no una por medidor) y tiempo de espera corto por
-      pedido, para que un medidor caido no frene a los demas. Inconveniente 5.
+- [x] A1. No guardar ceros cuando un medidor no responde (ni en VIP ni en kWh); se registra la falla
+      y se deja el hueco (decidido con el usuario: hueco, no repetir el valor anterior, para no
+      inventar horas de marcha ni consumo). Inconveniente 1. (2026-10-07)
+      Causa real de los ceros: EasyModbus no detecta respuestas de excepcion Modbus (compara un
+      byte con signo contra 131), asi que "el medidor no respondio a la pasarela" (0x0B) llegaba
+      como registros en cero. El lector de pasarelas ahora usa `ModbusTcpConexion` (cliente
+      propio, solo funcion 03, valida transaccion y excepciones).
+- [x] A2. Una conexion por pasarela por ciclo (no una por medidor) y tiempo de espera de 3 s por
+      pedido; si un pedido vence se reconecta antes del medidor siguiente. Inconveniente 5. (2026-10-07)
+- [ ] A4. (Opcional) Pasar tambien mezcladores, PLC y escritura de IDs a `ModbusTcpConexion` y
+      quitar EasyModbus del proyecto. Mismo defecto: hoy una excepcion del equipo se lee como ceros.
 - [ ] A3. **Pasarelas en paralelo:** cada pasarela se lee en su propio hilo (son equipos y buses
       RS-485 independientes). Dentro de una misma pasarela los medidores siguen uno tras otro (el
       bus atiende de a un pedido, en paralelo no se gana). Las lecturas se juntan en memoria y se
