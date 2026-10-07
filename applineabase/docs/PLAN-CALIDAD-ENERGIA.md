@@ -1,7 +1,7 @@
 # Plan: modulo de Calidad de Energia y migracion de PLC a pasarelas PAS600L
 
-Estado: **plan acordado, sin implementar** (2026-10-03). Se avanza paso a paso, cuando el usuario
-lo indique. No tocar el lector actual de PLC ni de pasarelas hasta que el usuario lo pida.
+Estado: **plan acordado, en curso** (2026-10-07). Se avanza punto por punto del checklist y se
+marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas hasta que el usuario lo pida.
 
 ## Restricciones del usuario
 - Migracion **un medidor a la vez**, empezando por uno de poco impacto. El usuario avisa cuando seguir.
@@ -20,19 +20,44 @@ lo indique. No tocar el lector actual de PLC ni de pasarelas hasta que el usuari
 - Tableros de ~460-480 V (falta la tension nominal exacta por tablero).
 - Linea02 y CabezalXTR2 tienen el mismo numero de serie (540060660837) en `linea-id-config.json`.
 
-## Pasos
-1. **Catalogo de modelos de medidor** (H2, pantalla admin en Configuracion): lista cerrada de
-   parametros; por modelo, registro + tipo de dato + escala + codificacion (PF 4Q) por parametro;
-   basicos obligatorios, de calidad pueden ser "No disponible". Boton "Probar lectura" (pasarela,
-   Unit ID, modelo) para comparar con la pantalla del medidor. Semilla PM5110 y PM710 con registros
-   confirmados por el usuario.
-2. **Lector de pasarelas** usando el catalogo: lectura en bloques (~3 por medidor), pasarelas en
-   paralelo, PF decodificado, sin guardar ceros ante falla. Lo basico se sigue guardando igual
-   (kWh y VIP); lo de calidad en una tabla nueva por maquina en un archivo mensual aparte.
-3. **Migracion por medidor**: cambiar solo `nombrePLC` del medidor en `linea-id-config.json` a la
-   pasarela. PLC y pasarela conviven durante la transicion.
-4. **Modulo Calidad de Energia** (pantallas y KPI, luego resumen diario precalculado y alarmas de
-   desbalance y tension fuera de rango).
+## Checklist (se marca [x] al cerrar cada punto)
+
+**Fase A - Lector de pasarelas confiable (no depende de datos del usuario)**
+- [ ] A1. No guardar ceros cuando un medidor no responde (ni en VIP ni en kWh); se registra la falla
+      y se deja el hueco. Inconveniente 1.
+- [ ] A2. Una conexion por pasarela por ciclo (no una por medidor) y tiempo de espera corto por
+      pedido, para que un medidor caido no frene a los demas. Inconveniente 5.
+- [ ] A3. **Pasarelas en paralelo:** cada pasarela se lee en su propio hilo (son equipos y buses
+      RS-485 independientes). Dentro de una misma pasarela los medidores siguen uno tras otro (el
+      bus atiende de a un pedido, en paralelo no se gana). Las lecturas se juntan en memoria y se
+      guardan en SQLite al final, en un solo hilo, porque la escritura por lotes de
+      `DatabaseInitializationService` no admite dos hilos a la vez. Mostrar en el log el tiempo
+      por pasarela. Inconveniente 5.
+
+**Fase B - Catalogo de modelos (necesita los registros del usuario)**
+- [ ] B1. Catalogo de modelos de medidor (H2, pantalla admin en Configuracion): lista cerrada de
+      parametros; por modelo, registro + tipo de dato + escala + codificacion (PF 4Q). Basicos
+      obligatorios, de calidad pueden ser "No disponible". Semilla PM5110 y PM710 confirmados.
+- [ ] B2. Boton "Probar lectura" (pasarela, Unit ID, modelo) para comparar con la pantalla del medidor.
+- [ ] B3. Lector de pasarelas usando el catalogo: lectura en bloques (~3 pedidos por medidor) y
+      escalas por modelo (reemplaza `PASModbusRegistry` y los casos especiales por nombre).
+      Inconvenientes 7 y 8.
+- [ ] B4. Definir KWhR (que es, que registro) y llenarlo desde la pasarela. Inconveniente 6.
+
+**Fase C - Preparar la migracion**
+- [ ] C1. Ordenar `linea-id-config.json`: BarCompHP duplicado, serie repetida Linea02/CabezalXTR2,
+      lineas en PLC5. Inconveniente 9.
+- [ ] C2. Confirmar con el usuario como se sincroniza la lista de IDs con NetBeans. Inconvenientes 2 y 3.
+- [ ] C3. Datos de pasarelas: cantidad, IP, medidores por pasarela, velocidad RS-485. Inconveniente 4.
+
+**Fase D - Migracion, un medidor a la vez (el usuario avisa cuando seguir)**
+- [ ] D1. Primer medidor de poco impacto, con la secuencia de abajo.
+- [ ] D2... uno por medidor, se agrega una linea al migrar cada uno.
+
+**Fase E - Modulo Calidad de Energia**
+- [ ] E1. Tabla de calidad por maquina en un archivo mensual aparte (lo basico sigue igual).
+- [ ] E2. Pantallas y KPI.
+- [ ] E3. Resumen diario precalculado y alarmas de desbalance y tension fuera de rango.
 
 ## Como se lee hoy (revisado 2026-10-07)
 - **PLC** (`PLCDataAcquisitionService`): el PLC es el maestro RS-485 y sondea los medidores cuyos
