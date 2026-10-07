@@ -178,8 +178,13 @@ Direccion como en el manual (la app resta 1). Float32 salvo indicacion.
 | THD I A, B, C | 21300, 21302, 21304 |
 | THD V AB, BC, CA / AN, BN, CN | 21322, 21324, 21326 / 21330, 21332, 21334 |
 
-PM710 (confirmado 2026-10-07 con datos reales, Float32, palabra alta primero): kWh 1000,
-kW 1006, PF 1012, IA/IB/IC 1034/1036/1038, VAB/VBC/VCA 1054/1056/1058. Falta lo de calidad.
+PM710 (confirmado 2026-10-07 con datos reales y con el manual 63230-501-209A1, Float32): kWh
+1000, kW 1006, PF 1012 (absoluto, sin 4Q), IA/IB/IC 1034/1036/1038, VAB/VBC/VCA 1054/1056/1058.
+Calidad (sembrada): kVAh 1002, kVARh 1004, kVA 1008, kVAR 1010, Hz 1020, IN 1040, VAN/VBN/VCN
+1060-1064, kW A/B/C 1066-1070, THD I A/B/C 1084-1088, THD V A-N/B-N/C-N 1092-1096, THD V
+A-B/B-C/C-A 1098-1102. No tiene PF por fase, desbalances ni energia de retorno.
+ION8600: el mapa por defecto solo expone THD **maximos** (40266-40271), no instantaneos; para
+tener THD instantaneo hay que configurarlo en los modulos Modbus Slave del medidor (ION Setup).
 
 ## Datos pendientes del usuario
 (Todo esto se puede cargar desde Configuracion > Modelos de medidor, sin recompilar.)

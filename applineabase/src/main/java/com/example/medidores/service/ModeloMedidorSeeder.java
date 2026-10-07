@@ -60,6 +60,14 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
             agregar(pm710, ParametroMedidor.VCA, 1058);
             repository.save(pm710);
         }
+        // Parámetros de calidad del PM710: se agregan una sola vez, si el modelo todavía no tiene
+        // ninguno (no pisa lo que el usuario haya cargado o marcado No disponible después).
+        repository.findByNombreIgnoreCase("PM710")
+                .filter(m -> m.getRegistros().stream().allMatch(r -> r.getParametro().isBasico()))
+                .ifPresent(m -> {
+                    sembrarCalidadPm710(m);
+                    repository.save(m);
+                });
         // ION8600 y PAC1020 se crearon vacíos en una versión anterior: se completan solo si siguen sin registros.
         ModeloMedidor ion = repository.findByNombreIgnoreCase("ION8600")
                 .orElseGet(() -> new ModeloMedidor("ION8600", null));
@@ -73,6 +81,36 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
             sembrarPac1020(pac);
             repository.save(pac);
         }
+    }
+
+    /**
+     * PM710: "Power Meter 710, Appendix B - Register List" (63230-501-209A1, 07/2008, firmware
+     * 2.020), registros Float32 de la tabla B-2. El PM710 no ofrece PF por fase, desbalances ni
+     * energía de retorno (sus energías son absolutas): quedan No disponible. Su PF es absoluto
+     * (0-1), sin codificación de 4 cuadrantes.
+     */
+    private static void sembrarCalidadPm710(ModeloMedidor m) {
+        agregar(m, ParametroMedidor.KVAH, 1002);
+        agregar(m, ParametroMedidor.KVARH, 1004);
+        agregar(m, ParametroMedidor.KVA_TOTAL, 1008);
+        agregar(m, ParametroMedidor.KVAR_TOTAL, 1010);
+        agregar(m, ParametroMedidor.FRECUENCIA, 1020);
+        agregar(m, ParametroMedidor.IN, 1040);
+        agregar(m, ParametroMedidor.VAN, 1060);
+        agregar(m, ParametroMedidor.VBN, 1062);
+        agregar(m, ParametroMedidor.VCN, 1064);
+        agregar(m, ParametroMedidor.KW_A, 1066);
+        agregar(m, ParametroMedidor.KW_B, 1068);
+        agregar(m, ParametroMedidor.KW_C, 1070);
+        agregar(m, ParametroMedidor.THD_IA, 1084);
+        agregar(m, ParametroMedidor.THD_IB, 1086);
+        agregar(m, ParametroMedidor.THD_IC, 1088);
+        agregar(m, ParametroMedidor.THD_VAN, 1092);
+        agregar(m, ParametroMedidor.THD_VBN, 1094);
+        agregar(m, ParametroMedidor.THD_VCN, 1096);
+        agregar(m, ParametroMedidor.THD_VAB, 1098);
+        agregar(m, ParametroMedidor.THD_VBC, 1100);
+        agregar(m, ParametroMedidor.THD_VCA, 1102);
     }
 
     /**
