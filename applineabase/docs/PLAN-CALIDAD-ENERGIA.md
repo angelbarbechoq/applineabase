@@ -161,7 +161,9 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
    ese PLC con sus valores de siempre.
 6. Plan de vuelta atras: restaurar el JSON y los IDs del PLC y recablear.
 
-## Parametros y registros PM5110 (de memoria, A CONFIRMAR por el usuario)
+## Parametros y registros PM5110 (CONFIRMADO 2026-10-07 con "PM51xx_PM53xx_PMC Register List v2011_v2021 R01", sembrado en el catalogo)
+Ademas: energia de retorno (columna KWhR) = 2702 "Active Energy Received", Float32. PF A/B/C/total
+en formato 4Q_FP_PF. Desbalances "Worst": corriente 3018, tension L-L 3044.
 Direccion como en el manual (la app resta 1). Float32 salvo indicacion.
 
 | Parametro | Registro |
@@ -188,8 +190,8 @@ tener THD instantaneo hay que configurarlo en los modulos Modbus Slave del medid
 
 ## Datos pendientes del usuario
 (Todo esto se puede cargar desde Configuracion > Modelos de medidor, sin recompilar.)
-1. Registros del PM710 para los parametros de calidad.
-2. Confirmacion de los registros de calidad del PM5110 (los basicos ya estan confirmados).
+1. ~~Registros de calidad del PM710~~ (hecho 2026-10-07).
+2. ~~Registros de calidad del PM5110~~ (hecho 2026-10-07). PAC1020: falta su manual para los de calidad.
 3. ION8600 (KWhPlanta1) y PAC1020 (TDGeneradorSA): registros, tipo de dato y escala de los 9
    basicos (por PLC hoy: KWhPlanta1 con enteros, I/10 y PF/100; TDGeneradorSA con kWh/1000).
    Sensores del PLC 192.168.0.3 (TemperaturaAmbiente, TemperaturaAgua, PsiAireP1, PsiAgua,

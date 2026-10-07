@@ -60,6 +60,12 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
             agregar(pm710, ParametroMedidor.VCA, 1058);
             repository.save(pm710);
         }
+        repository.findByNombreIgnoreCase("PM5110")
+                .filter(m -> m.getRegistros().stream().allMatch(r -> r.getParametro().isBasico()))
+                .ifPresent(m -> {
+                    sembrarCalidadPm5110(m);
+                    repository.save(m);
+                });
         // Parámetros de calidad del PM710: se agregan una sola vez, si el modelo todavía no tiene
         // ninguno (no pisa lo que el usuario haya cargado o marcado No disponible después).
         repository.findByNombreIgnoreCase("PM710")
@@ -81,6 +87,41 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
             sembrarPac1020(pac);
             repository.save(pac);
         }
+    }
+
+    /**
+     * PM5110: "PM51xx_PM53xx_PMC Register List v2011_v2021 R01" (hoja Register List, columna
+     * PM5110_11 = Y), todos Float32. Los PF por fase vienen en 4 cuadrantes (4Q_FP_PF) como el total.
+     * Energía de retorno = 2702 "Active Energy Received (Out of Load)". Desbalances: "Worst".
+     */
+    private static void sembrarCalidadPm5110(ModeloMedidor m) {
+        agregar(m, ParametroMedidor.KWH_RETORNO, 2702);
+        agregar(m, ParametroMedidor.KVARH, 2708);
+        agregar(m, ParametroMedidor.KVAH, 2716);
+        agregar(m, ParametroMedidor.IN, 3006);
+        agregar(m, ParametroMedidor.DESBALANCE_I, 3018);
+        agregar(m, ParametroMedidor.VAN, 3028);
+        agregar(m, ParametroMedidor.VBN, 3030);
+        agregar(m, ParametroMedidor.VCN, 3032);
+        agregar(m, ParametroMedidor.DESBALANCE_V, 3044);
+        agregar(m, ParametroMedidor.KW_A, 3054);
+        agregar(m, ParametroMedidor.KW_B, 3056);
+        agregar(m, ParametroMedidor.KW_C, 3058);
+        agregar(m, ParametroMedidor.KVAR_TOTAL, 3068);
+        agregar(m, ParametroMedidor.KVA_TOTAL, 3076);
+        agregar(m, ParametroMedidor.PF_A, 3078).setPf4Cuadrantes(true);
+        agregar(m, ParametroMedidor.PF_B, 3080).setPf4Cuadrantes(true);
+        agregar(m, ParametroMedidor.PF_C, 3082).setPf4Cuadrantes(true);
+        agregar(m, ParametroMedidor.FRECUENCIA, 3110);
+        agregar(m, ParametroMedidor.THD_IA, 21300);
+        agregar(m, ParametroMedidor.THD_IB, 21302);
+        agregar(m, ParametroMedidor.THD_IC, 21304);
+        agregar(m, ParametroMedidor.THD_VAB, 21322);
+        agregar(m, ParametroMedidor.THD_VBC, 21324);
+        agregar(m, ParametroMedidor.THD_VCA, 21326);
+        agregar(m, ParametroMedidor.THD_VAN, 21330);
+        agregar(m, ParametroMedidor.THD_VBN, 21332);
+        agregar(m, ParametroMedidor.THD_VCN, 21334);
     }
 
     /**
