@@ -145,6 +145,7 @@
         <li><a href="#falla8">Login por automatizacion del navegador no ingresa texto</a></li>
         <li><a href="#falla9">Restaurar un commit viejo deja un arbol inconsistente</a></li>
         <li><a href="#falla10">Datos en cero en medidores leidos por pasarela (cambio de libreria Modbus)</a></li>
+        <li><a href="#falla11">PF general con valores de 559 en lugar de -95</a></li>
         <li><a href="#resumen">Resumen general</a></li>
     </ol>
 </div>
@@ -444,6 +445,45 @@ customElements.get('vaadin-combo-box')  // a veces true, a veces false</pre>
     Verificacion pendiente: contar las filas con ceros desde el 7 de octubre a las 12:59 (deben ser 0).
 </div>
 
+<h2 id="falla11">11. PF general con valores de 559 en lugar de -95</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> desde el 7 de octubre a las 12:55 el PF general (pestana "PF general" de
+    Tiempo Real, medidor de planta KWhPlanta1 leido por el PLC3) mostraba valores entre 558 y 562.
+    Hasta las 12:53 estaba entre -94 y -97, que es lo normal.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> efecto secundario del cambio de libreria de la falla 10. El PLC entrega ese
+    PF como un numero entero con signo multiplicado por 100 (por ejemplo -9611 = -96.11). La libreria
+    anterior lo entregaba con signo; la nueva (j2mod) lo entrega sin signo, y -9611 llegaba como
+    55925, o sea 559.25. La relacion entre el valor malo y el bueno es exacta:
+    malo = (65536 + bueno x 100) / 100.
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion:</strong>
+    <ol>
+        <li><strong>Lectura:</strong> se corrigio la conversion para leer ese valor con signo, y se
+            aplico lo mismo a los sensores de temperatura y presion del PLC3. Despues del reinicio,
+            la lectura sale bien desde las 16:46:53 (-95.33, -95.78, -96.18...).</li>
+        <li><strong>Datos ya guardados:</strong> con autorizacion del usuario se corrigieron las 232
+            filas afectadas (12:55:52 a 16:46:20) en el archivo del dia y en el del mes, con la
+            formula PF correcto = (PF guardado x 100 - 65536) / 100. Ejemplo: 559.25 pasa a -96.11.
+            Antes se hizo una copia de los dos archivos en
+            <code>C:\LineaBaseX\backup\2026-10-07-pf-general\</code>. El PF del dia quedo entre
+            -97.93 y -89.88, con promedio -95.72, igual que en la manana.</li>
+    </ol>
+    No hubo alarmas falsas de PF bajo: el valor malo se interpretaba como un PF alto.
+    <span class="estado-ok">Resuelto.</span>
+</div>
+
+<div class="prevencion">
+    <strong>Prevencion:</strong> con la libreria nueva, todo valor de 16 bits que pueda ser negativo
+    se convierte con signo en el codigo. En la pantalla de Modelos de medidor esto se elige con el
+    tipo de dato: Int16 (con signo) o UInt16 (sin signo).
+</div>
+
 <h2 id="resumen">Resumen general</h2>
 <table>
     <tr>
@@ -511,6 +551,12 @@ customElements.get('vaadin-combo-box')  // a veces true, a veces false</pre>
         <td>Datos en cero en medidores por pasarela</td>
         <td>EasyModbus no detecta errores Modbus y el lector guardaba la fila igual</td>
         <td class="estado-ok">Resuelto (cambio a j2mod)</td>
+    </tr>
+    <tr>
+        <td>11</td>
+        <td>PF general en 559 en lugar de -95</td>
+        <td>La libreria nueva entrega los registros sin signo; ese PF del PLC tiene signo</td>
+        <td class="estado-ok">Resuelto (lectura y datos corregidos)</td>
     </tr>
 </table>
 

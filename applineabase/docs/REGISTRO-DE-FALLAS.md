@@ -27,6 +27,7 @@ Ultima actualizacion: 2026-10-07.
 | F-08 | Login por automatizacion del navegador no ingresa texto | Un clic simple no da foco al input interno | Resuelto |
 | F-09 | Restaurar un commit viejo deja un arbol inconsistente | `git checkout <sha> -- .` no borra archivos nuevos | Resuelto (proceso) |
 | F-10 | Datos en cero en medidores leidos por pasarela | EasyModbus no detecta excepciones Modbus + el lector guardaba la fila igual | Resuelto (cambio de libreria a j2mod) |
+| F-11 | PF general en 559 en lugar de -95 | j2mod entrega registros sin signo; el PF del PLC es int16 con signo | Resuelto (codigo y datos corregidos) |
 
 ---
 
@@ -167,13 +168,29 @@ Ultima actualizacion: 2026-10-07.
   lectura, hueco y motivo en el log ("Medidor X ... sin lectura: excepcion Modbus 0x0B ..."), nunca
   0. **Verificacion pendiente:** contar filas con ceros desde 2026-10-07 12:59 (deben ser 0 y en su
   lugar aparecer minutos faltantes).
-- **Regresion del cambio (2026-10-07):** EasyModbus entregaba los registros **con signo** (int16) y
-  j2mod **sin signo** (0-65535). El PF general (KWhPlanta1 por PLC3, entero/100) paso de -95.51 a
-  559.85 desde las 12:55:52 (= (65536 - 9551) / 100). Se corrigio con `(short)` en el PF de
-  KWhPlanta1 y en los sensores del registro 422 de PLC3. Regla: todo registro de 16 bits leido
-  "tal cual" (sin `& 0xFFFF` ni armado de 32 bits) debe pasar por `(short)` si puede ser negativo.
-  Los registros de 32 bits (`(hi << 16) | (lo & 0xFFFF)`) no cambian.
-- **Referencias:** `docs/PLAN-CALIDAD-ENERGIA.md` (fase A).
+- **Referencias:** `docs/PLAN-CALIDAD-ENERGIA.md` (fase A). El cambio de libreria trajo una
+  regresion en el PF general: ver F-11.
+
+## F-11 PF general con valores de 559 en lugar de -95 (regresion del cambio a j2mod)
+- **Sintoma:** desde el 2026-10-07 12:55:52 el PF general (pestana "PF general" de Tiempo Real,
+  maquina KWhPlanta1, ION8600 leido por PLC3) mostraba valores entre 558 y 562; hasta las 12:53:38
+  estaba entre -94 y -97.
+- **Como reconocerlo:** `SELECT fecha, PF FROM KWhPlanta1` en `ddmesVIP` con `PF > 500`. El valor
+  malo y el bueno estan relacionados exacto: malo = (65536 + bueno x 100) / 100.
+- **Causa:** el PLC entrega el PF de KWhPlanta1 como un entero de 16 bits **con signo** x100
+  (-9611 = -96.11). EasyModbus devolvia los registros con signo; **j2mod los devuelve sin signo**
+  (0-65535), asi que -9611 llegaba como 55925 = 559.25. El lector de PLC usaba ese registro "tal
+  cual" (sin conversion). Empezo al reiniciar con el commit 72d58dd.
+- **Resolucion:** `(short)` sobre ese registro en `PLCDataAcquisitionService` y, por las dudas, en
+  los sensores del registro 422 de PLC3 (temperaturas y presiones, hoy siempre positivas). Commit
+  284bc47; lectura verificada correcta desde las 16:46:53. **Datos corregidos** (con permiso del
+  usuario): 232 filas de KWhPlanta1 (12:55:52 a 16:46:20) en `07octubreVIP` y en `octubreVIP` con
+  `PF = (ROUND(PF*100) - 65536) / 100`. Copia previa en `C:\LineaBaseX\backup\2026-10-07-pf-general\`.
+  Las alarmas de PF bajo no se dispararon de mas (el valor malo se normalizaba a 5.59).
+- **Prevencion:** con j2mod todo registro de 16 bits que pueda ser negativo y se use "tal cual"
+  (sin `& 0xFFFF` ni armado de 32 bits) debe pasar por `(short)`. Los de 32 bits armados como
+  `(hi << 16) | (lo & 0xFFFF)` y los Float32 no cambian. En el catalogo de modelos esto se elige con
+  el tipo de dato (Int16 con signo / UInt16 sin signo).
 
 ---
 
