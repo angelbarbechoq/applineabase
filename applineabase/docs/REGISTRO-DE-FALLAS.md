@@ -166,8 +166,10 @@ Ultima actualizacion: 2026-10-07.
   Commits 53d45af y 72d58dd.
 - **Prevencion:** no usar librerias Modbus que no informen el codigo de excepcion. Ante una falla de
   lectura, hueco y motivo en el log ("Medidor X ... sin lectura: excepcion Modbus 0x0B ..."), nunca
-  0. **Verificacion pendiente:** contar filas con ceros desde 2026-10-07 12:59 (deben ser 0 y en su
-  lugar aparecer minutos faltantes).
+  0. **Verificado 2026-10-07:** de 12:55:52 a 16:53:53, 238 filas por medidor (GA752,
+  OrientadoraL2, HornoL3) y 0 con ceros (antes, unas 5 esperables en ese lapso). Ademas se
+  compararon las 496 columnas de todas las maquinas antes/despues del cambio de libreria: la unica
+  anomalia fue el PF general (F-11).
 - **Referencias:** `docs/PLAN-CALIDAD-ENERGIA.md` (fase A). El cambio de libreria trajo una
   regresion en el PF general: ver F-11.
 
