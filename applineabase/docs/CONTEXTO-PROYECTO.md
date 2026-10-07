@@ -249,7 +249,8 @@ taxonomia (Mezcla, Casa Fuerza) usan el nombre de la linea como TAG.
   registrarse como custom element (queda invisible). Se comprueba con
   `customElements.get('vaadin-grid')` en el navegador.
 - Solucion permanente: `@Uses(X.class)` en `Application.java` para cada componente no basico
-  (hoy: `Grid`, `ComboBox`, `NumberField`, `DateTimePicker`, `IntegerField`, `Dialog`, `Checkbox`;
+  (hoy: `Grid`, `ComboBox`, `NumberField`, `DateTimePicker`, `IntegerField`, `Dialog`, `Checkbox`,
+  `FormLayout`, `TabSheet`;
   `Dialog` se agrego al abrir un dialogo desde `HistoricoView`, que fallaba con "reading 'overlay'"), y **borrar
   `src/main/bundles/prod.bundle` y regenerarlo** con `./mvnw.cmd -q -DskipTests compile`
   (el build incremental cree que el bundle viejo sirve). El bundle se commitea.

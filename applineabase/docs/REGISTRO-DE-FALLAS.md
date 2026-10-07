@@ -72,7 +72,11 @@ Ultima actualizacion: 2026-10-07.
   varias pruebas consecutivas incluyendo reinicios completos.
 - **Prevencion:** cada vez que un modulo use un componente Vaadin que ninguna vista usaba antes,
   agregar su `@Uses` y regenerar el bundle **en el mismo cambio**. El bundle se commitea. Lista actual
-  de `@Uses`: `Grid`, `ComboBox`, `NumberField`, `DateTimePicker`, `IntegerField`.
+  de `@Uses`: `Grid`, `ComboBox`, `NumberField`, `DateTimePicker`, `IntegerField`, `Dialog`,
+  `Checkbox`, `FormLayout`, `TabSheet`. Volvio a pasar el 2026-10-07 con la ruta nueva
+  `configuracion/medidores` (los dialogos dejaban sus campos al final de la pagina): se regenero el
+  bundle. Ojo al regenerarlo en una copia limpia del repo: `compile` solo no alcanza (el bundle sale
+  sin componentes porque todavia no hay clases); usar `process-classes`.
 - **Referencias:** vaadin/vaadin-grid-flow issue #557; documentacion de Vaadin sobre troubleshooting
   en produccion (`productionMode`).
 
