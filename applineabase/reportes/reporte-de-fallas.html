@@ -100,6 +100,10 @@
         color: #27ae60;
         font-weight: bold;
     }
+    .estado-pend {
+        color: #b9770e;
+        font-weight: bold;
+    }
     ul, ol {
         margin: 8px 0;
     }
@@ -146,6 +150,7 @@
         <li><a href="#falla9">Restaurar un commit viejo deja un arbol inconsistente</a></li>
         <li><a href="#falla10">Datos en cero en medidores leidos por pasarela (cambio de libreria Modbus)</a></li>
         <li><a href="#falla11">PF general con valores de 559 en lugar de -95</a></li>
+        <li><a href="#falla12">Potencia del generador (TDGeneradorSA) guardada a un tercio</a></li>
         <li><a href="#resumen">Resumen general</a></li>
     </ol>
 </div>
@@ -487,6 +492,36 @@ customElements.get('vaadin-combo-box')  // a veces true, a veces false</pre>
     tipo de dato: Int16 (con signo) o UInt16 (sin signo).
 </div>
 
+<h2 id="falla12">12. Potencia del generador (TDGeneradorSA) guardada a un tercio</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> la potencia guardada del tablero del generador es mucho menor que la que
+    corresponde a su energia. El 7 de octubre entrego 867,7 kWh en 17,9 horas, o sea unos 48,5 kW de
+    promedio, pero la potencia guardada promedia 16,5 kW: justo un tercio.
+</div>
+
+<div class="causa">
+    <strong>Causa:</strong> en el bloque de direcciones del PLC para el PAC1020 (<code>PAC_ADD</code>), la
+    posicion "KW" apunta a la direccion 40020. Segun el manual del Siemens SENTRON PAC1020, esa direccion
+    es la potencia activa de <strong>una sola fase (L1)</strong>; la potencia total esta en la 40042.
+    Ademas, la posicion "KWh Retorno" (42806) es en realidad la <strong>energia reactiva</strong>.
+    Se encontro al cotejar el bloque del PLC con el manual, al cargar el medidor en el catalogo.
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion:</strong> en el catalogo de modelos de la aplicacion, el PAC1020 quedo cargado con
+    el mapa completo del manual y la potencia total correcta: cuando se lea por pasarela, la potencia
+    sera la correcta. <strong>Falta</strong> corregir en el programa del PLC (TIA Portal) la posicion
+    <code>PAC_ADD[7]</code> de 40020 a 40042, mientras el medidor se siga leyendo por el PLC. El historico
+    anterior queda con la potencia de una fase; no se puede reconstruir exacto.
+    <span class="estado-pend">Pendiente (PLC).</span>
+</div>
+
+<div class="prevencion">
+    <strong>Prevencion:</strong> al cargar cada medidor en el catalogo, cotejar cada direccion de los
+    bloques del PLC con el manual del fabricante.
+</div>
+
 <h2 id="resumen">Resumen general</h2>
 <table>
     <tr>
@@ -560,6 +595,12 @@ customElements.get('vaadin-combo-box')  // a veces true, a veces false</pre>
         <td>PF general en 559 en lugar de -95</td>
         <td>La libreria nueva entrega los registros sin signo; ese PF del PLC tiene signo</td>
         <td class="estado-ok">Resuelto (lectura y datos corregidos)</td>
+    </tr>
+    <tr>
+        <td>12</td>
+        <td>Potencia del generador a un tercio</td>
+        <td>El PLC lee la potencia de una fase (40020) y no la total (40042)</td>
+        <td class="estado-pend">Pendiente (corregir el PLC)</td>
     </tr>
 </table>
 

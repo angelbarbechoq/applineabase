@@ -1,6 +1,7 @@
 package com.example.medidores.service;
 
 import com.example.medidores.model.ModeloMedidor;
+import com.example.medidores.model.OrdenPalabras;
 import com.example.medidores.model.ParametroMedidor;
 import com.example.medidores.model.RegistroModelo;
 import com.example.medidores.model.TensionesHistorico;
@@ -83,7 +84,8 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
         }
         ModeloMedidor pac = repository.findByNombreIgnoreCase("PAC1020")
                 .orElseGet(() -> new ModeloMedidor("PAC1020", null));
-        if (pac.getRegistros().isEmpty()) {
+        // También se corrige la semilla anterior (direcciones del PLC, KW = fase L1), si nadie la editó.
+        if (pac.getRegistros().isEmpty() || esSemillaViejaPac1020(pac)) {
             sembrarPac1020(pac);
             repository.save(pac);
         }
@@ -197,33 +199,76 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
     }
 
     /**
-     * PAC1020 (TDGeneradorSA): direcciones del bloque PAC_ADD del PLC (captura del usuario,
-     * 2026-10-07), Float32. Escalas como el historico por PLC: kWh llega en Wh (-> 0.001), kW en
-     * W y kWh de retorno en Wh (escala 1, sin conversion en el PLC).
+     * PAC1020 (TDGeneradorSA): "SENTRON PAC1020 Manual", tabla A-3 "Available measured variables"
+     * (FC 0x03/0x04, todos float). Siemens numera por **offset** (base 0, como viaja en el cable):
+     * el modelo usa numeración del manual = false y los registros son esos offsets.
+     *
+     * Cruce con PAC_ADD del PLC (2026-10-07):
+     * - "KW" del PLC (40020 = offset 19) es la potencia activa de la FASE L1, no la total (offset
+     *   41). Confirmado con datos: 867.7 kWh en 17.9 h = 48.5 kW medios, contra 16.5 kW guardados.
+     *   Aquí KW_TOTAL = 41 (correcto); el historico por PLC tiene solo L1 hasta que se corrija PAC_ADD.
+     * - "KWh Retorno" del PLC (PAC_ADD 42806 = offset 2805) es la ENERGÍA REACTIVA
+     *   (varh). Se mantiene en KWH_RETORNO con escala 1 para que la columna KWhR siga igual que su
+     *   historico; KVARH (mismo offset, en kvarh) es el dato correcto para Calidad de Energía.
+     * Unidades de potencia en W/var/VA, como el historico (escala 1). Sin THD ni desbalances.
      */
     private static void sembrarPac1020(ModeloMedidor m) {
-        m.setDescripcion("Siemens SENTRON PAC1020 (TDGeneradorSA). Registros del PLC; unidades como el historico (kW en W)");
-        agregar(m, ParametroMedidor.KWH, 2804, TipoDato.FLOAT32, 0.001);
-        agregar(m, ParametroMedidor.KWH_RETORNO, 2806, TipoDato.FLOAT32, 1);
-        agregar(m, ParametroMedidor.VAB, 8, TipoDato.FLOAT32, 1);
-        agregar(m, ParametroMedidor.VBC, 10, TipoDato.FLOAT32, 1);
-        agregar(m, ParametroMedidor.VCA, 12, TipoDato.FLOAT32, 1);
-        agregar(m, ParametroMedidor.IA, 14, TipoDato.FLOAT32, 1);
-        agregar(m, ParametroMedidor.IB, 16, TipoDato.FLOAT32, 1);
-        agregar(m, ParametroMedidor.IC, 18, TipoDato.FLOAT32, 1);
-        agregar(m, ParametroMedidor.KW_TOTAL, 20, TipoDato.FLOAT32, 1);
-        agregar(m, ParametroMedidor.PF_TOTAL, 46, TipoDato.FLOAT32, 1);
+        m.setDescripcion("Siemens SENTRON PAC1020 (TDGeneradorSA). Offsets del manual (base 0); kW en W como el historico");
+        m.setNumeracionManual(false);
+        m.setTensionesHistorico(TensionesHistorico.FASE_FASE);
+        agregar(m, ParametroMedidor.KWH, 2803, TipoDato.FLOAT32, 0.001);
+        agregar(m, ParametroMedidor.KVARH, 2805, TipoDato.FLOAT32, 0.001);
+        agregar(m, ParametroMedidor.KWH_RETORNO, 2805, TipoDato.FLOAT32, 1);
+        agregar(m, ParametroMedidor.VAN, 1);
+        agregar(m, ParametroMedidor.VBN, 3);
+        agregar(m, ParametroMedidor.VCN, 5);
+        agregar(m, ParametroMedidor.VAB, 7);
+        agregar(m, ParametroMedidor.VBC, 9);
+        agregar(m, ParametroMedidor.VCA, 11);
+        agregar(m, ParametroMedidor.IA, 13);
+        agregar(m, ParametroMedidor.IB, 15);
+        agregar(m, ParametroMedidor.IC, 17);
+        agregar(m, ParametroMedidor.KW_A, 19);
+        agregar(m, ParametroMedidor.KW_B, 21);
+        agregar(m, ParametroMedidor.KW_C, 23);
+        agregar(m, ParametroMedidor.PF_A, 31);
+        agregar(m, ParametroMedidor.PF_B, 33);
+        agregar(m, ParametroMedidor.PF_C, 35);
+        agregar(m, ParametroMedidor.IN, 37);
+        agregar(m, ParametroMedidor.FRECUENCIA, 39);
+        agregar(m, ParametroMedidor.KW_TOTAL, 41);
+        agregar(m, ParametroMedidor.KVAR_TOTAL, 43);
+        agregar(m, ParametroMedidor.PF_TOTAL, 45);
+        agregar(m, ParametroMedidor.KVA_TOTAL, 4115);
+    }
+
+    /** Semilla anterior del PAC1020 (direcciones del PLC en base 1, con KW = 20 = fase L1). */
+    private static boolean esSemillaViejaPac1020(ModeloMedidor m) {
+        RegistroModelo kw = m.registroDe(ParametroMedidor.KW_TOTAL);
+        return m.isNumeracionManual() && kw != null && kw.getRegistro() == 20;
     }
 
     private static RegistroModelo agregar(ModeloMedidor modelo, ParametroMedidor parametro, int registroManual) {
         return agregar(modelo, parametro, registroManual, TipoDato.FLOAT32, 1);
     }
 
+    /**
+     * Carga o corrige un parámetro. Si ya existe se actualiza la misma fila (no se borra y se
+     * vuelve a insertar: Hibernate inserta antes de borrar y chocaría con la clave única
+     * modelo+parámetro).
+     */
     private static RegistroModelo agregar(ModeloMedidor modelo, ParametroMedidor parametro, int registroManual,
                                           TipoDato tipo, double escala) {
-        RegistroModelo r = new RegistroModelo(parametro, registroManual, tipo);
+        RegistroModelo r = modelo.registroDe(parametro);
+        if (r == null) {
+            r = new RegistroModelo(parametro, registroManual, tipo);
+            modelo.ponerRegistro(r);
+        }
+        r.setRegistro(registroManual);
+        r.setTipoDato(tipo);
+        r.setOrdenPalabras(OrdenPalabras.NORMAL);
         r.setEscala(escala);
-        modelo.ponerRegistro(r);
+        r.setPf4Cuadrantes(false);
         return r;
     }
 }

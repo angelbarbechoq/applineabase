@@ -28,6 +28,7 @@ Ultima actualizacion: 2026-10-07.
 | F-09 | Restaurar un commit viejo deja un arbol inconsistente | `git checkout <sha> -- .` no borra archivos nuevos | Resuelto (proceso) |
 | F-10 | Datos en cero en medidores leidos por pasarela | EasyModbus no detecta excepciones Modbus + el lector guardaba la fila igual | Resuelto (cambio de libreria a j2mod) |
 | F-11 | PF general en 559 en lugar de -95 | j2mod entrega registros sin signo; el PF del PLC es int16 con signo | Resuelto (codigo y datos corregidos) |
+| F-12 | Potencia de TDGeneradorSA guardada a un tercio | El PLC lee la potencia de la fase L1 (offset 19), no la total (41) | Pendiente: corregir PAC_ADD en el PLC |
 
 ---
 
@@ -193,6 +194,25 @@ Ultima actualizacion: 2026-10-07.
   (sin `& 0xFFFF` ni armado de 32 bits) debe pasar por `(short)`. Los de 32 bits armados como
   `(hi << 16) | (lo & 0xFFFF)` y los Float32 no cambian. En el catalogo de modelos esto se elige con
   el tipo de dato (Int16 con signo / UInt16 sin signo).
+
+
+## F-12 Potencia de TDGeneradorSA guardada a un tercio (direccion equivocada en el PLC)
+- **Sintoma:** la potencia (PW) de TDGeneradorSA es mucho menor que la que corresponde a su energia.
+  El 2026-10-07: 867.7 kWh en 17.9 h = 48.5 kW medios, contra 16.5 kW guardados de promedio
+  (un tercio). Con V = 448 V, I = 66 A y PF = 0.95, la potencia trifasica da unos 48 kW.
+- **Como reconocerlo:** comparar el aumento de kWh en un periodo con el promedio de PW del mismo
+  periodo (kWh / horas debe dar el PW medio en kW; PW se guarda en W).
+- **Causa:** en el bloque `PAC_ADD` del PLC, la posicion "KW" apunta a 40020 = offset 19, que en el
+  manual del SENTRON PAC1020 (tabla A-3) es la **potencia activa de la fase L1**. La potencia total
+  ("collective active power") es el offset 41 = 40042. Ademas "KWh Retorno" (42806 = offset 2805)
+  es la **energia reactiva** (varh), no energia de retorno.
+- **Resolucion:** en el catalogo de modelos el PAC1020 quedo con el mapa completo del manual
+  (offsets base 0) y KW total = 41: al migrar a pasarela se guarda la potencia correcta. **Falta**
+  corregir `PAC_ADD[7]` de 40020 a 40042 en el programa del PLC (TIA Portal) mientras siga leyendose
+  por PLC; lo hace el usuario. El historico anterior queda con la potencia de L1 (no se puede
+  reconstruir exacto).
+- **Prevencion:** cotejar cada direccion de los bloques `*_ADD` del PLC con el manual del medidor al
+  cargarlo en el catalogo (asi se encontro este y la diferencia de tensiones del ION8600).
 
 ---
 
