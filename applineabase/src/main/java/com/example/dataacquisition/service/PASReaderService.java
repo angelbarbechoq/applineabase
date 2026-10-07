@@ -59,10 +59,6 @@ public class PASReaderService {
     private final ModeloMedidorService modeloMedidorService;
     private final LectorMedidorService lectorMedidorService;
 
-    /** Parámetros que se guardan hoy por cada medidor (kWh y VIP). */
-    private static final List<ParametroMedidor> PARAMETROS_BASICOS = Arrays.stream(ParametroMedidor.values())
-            .filter(ParametroMedidor::isBasico).toList();
-
     public PASReaderService(PASGatewayConfigService gatewayConfigService,
                             ConfigLoaderService configLoaderService,
                             DatabaseInitializationService databaseInitializationService,
@@ -264,8 +260,9 @@ public class PASReaderService {
             return "el modelo " + nombreModelo + " no tiene cargados los registros basicos " + modelo.faltantesBasicos();
         }
 
-        // Básicos obligatorios + energía de retorno (columna KWhR) si el modelo la tiene.
-        List<ParametroMedidor> aLeer = new ArrayList<>(PARAMETROS_BASICOS);
+        // Requeridos del modelo (incluye las tensiones elegidas para el historico) + energía de
+        // retorno (columna KWhR) si el modelo la tiene.
+        List<ParametroMedidor> aLeer = new ArrayList<>(modelo.requeridos());
         boolean conRetorno = modelo.registros().containsKey(ParametroMedidor.KWH_RETORNO);
         if (conRetorno) {
             aLeer.add(ParametroMedidor.KWH_RETORNO);
@@ -280,11 +277,14 @@ public class PASReaderService {
         Double retorno = v.get(ParametroMedidor.KWH_RETORNO);
         gateway.setKWhRx(index, retorno == null ? BigDecimal.ZERO : decimal(retorno));
 
-        // Se guardan en el orden de los PLC: VAB, VAC (= VCA del medidor), VBC.
+        // Columnas de tensión posicionales, con la convención del PLC (PAC_ADD/ION_ADD): 1a tensión
+        // en VAB, 2a en VAC, 3a en VBC. Fase-fase: A-B, B-C, C-A. Fase-neutro (ION8600): A-N, B-N, C-N.
+        // Hasta el 2026-10-07 la pasarela guardaba C-A en VAC y B-C en VBC (cruzado respecto del PLC).
+        List<ParametroMedidor> tensiones = modelo.tensiones().getParametros();
         gateway.setKWhActx(index, decimal(v.get(ParametroMedidor.KWH)));
-        gateway.setVABx(index, decimal(v.get(ParametroMedidor.VAB)));
-        gateway.setVBCx(index, decimal(v.get(ParametroMedidor.VBC)));
-        gateway.setVACx(index, decimal(v.get(ParametroMedidor.VCA)));
+        gateway.setVABx(index, decimal(v.get(tensiones.get(0))));
+        gateway.setVACx(index, decimal(v.get(tensiones.get(1))));
+        gateway.setVBCx(index, decimal(v.get(tensiones.get(2))));
         gateway.setIAx(index, decimal(v.get(ParametroMedidor.IA)));
         gateway.setIBx(index, decimal(v.get(ParametroMedidor.IB)));
         gateway.setICx(index, decimal(v.get(ParametroMedidor.IC)));

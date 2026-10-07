@@ -77,6 +77,7 @@ public class ModeloMedidorService {
         ModeloMedidor copia = new ModeloMedidor(nombreNuevo.trim(), descripcion);
         copia.setNumeracionManual(origen.isNumeracionManual());
         copia.setFuncionLectura(origen.getFuncionLectura());
+        copia.setTensionesHistorico(origen.getTensionesHistorico());
         for (RegistroModelo r : origen.getRegistros()) {
             copia.ponerRegistro(r.copia());
         }

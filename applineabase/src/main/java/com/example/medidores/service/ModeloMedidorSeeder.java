@@ -3,6 +3,7 @@ package com.example.medidores.service;
 import com.example.medidores.model.ModeloMedidor;
 import com.example.medidores.model.ParametroMedidor;
 import com.example.medidores.model.RegistroModelo;
+import com.example.medidores.model.TensionesHistorico;
 import com.example.medidores.model.TipoDato;
 import com.example.medidores.repository.ModeloMedidorRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -83,6 +84,8 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
      */
     private static void sembrarIon8600(ModeloMedidor m) {
         m.setDescripcion("Schneider ION8600 (KWhPlanta1). Mapa por defecto del manual; unidades como el historico (W, PF en %)");
+        // El historico por PLC guarda Vln a/b/c (40166-40170): se mantiene al pasar a pasarela.
+        m.setTensionesHistorico(TensionesHistorico.FASE_NEUTRO);
         agregar(m, ParametroMedidor.KWH, 230, TipoDato.INT32, 1);
         agregar(m, ParametroMedidor.KWH_RETORNO, 232, TipoDato.INT32, 1);
         agregar(m, ParametroMedidor.KVARH, 234, TipoDato.INT32, 1);

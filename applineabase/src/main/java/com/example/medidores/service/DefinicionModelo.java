@@ -5,9 +5,10 @@ import com.example.medidores.model.ModeloMedidor;
 import com.example.medidores.model.OrdenPalabras;
 import com.example.medidores.model.ParametroMedidor;
 import com.example.medidores.model.RegistroModelo;
+import com.example.medidores.model.TensionesHistorico;
 import com.example.medidores.model.TipoDato;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
@@ -18,7 +19,8 @@ import java.util.Map;
  * numeración del cable (base 0). Se arma al inicio de cada ciclo y se comparte entre los hilos
  * de las pasarelas sin tocar JPA.
  */
-public record DefinicionModelo(String nombre, FuncionLectura funcion, Map<ParametroMedidor, Registro> registros) {
+public record DefinicionModelo(String nombre, FuncionLectura funcion, TensionesHistorico tensiones,
+                               Map<ParametroMedidor, Registro> registros) {
 
     /** Un parámetro listo para pedir: dirección base 0, tipo, orden de palabras, escala y PF 4Q. */
     public record Registro(ParametroMedidor parametro, int registroManual, int direccion, TipoDato tipoDato,
@@ -40,15 +42,27 @@ public record DefinicionModelo(String nombre, FuncionLectura funcion, Map<Parame
             mapa.put(r.getParametro(), new Registro(r.getParametro(), r.getRegistro(), r.getRegistro() - resta,
                     r.getTipoDato(), r.getOrdenPalabras(), r.getEscala(), r.isPf4Cuadrantes()));
         }
-        return new DefinicionModelo(modelo.getNombre(), modelo.getFuncionLectura(), Collections.unmodifiableMap(mapa));
+        return new DefinicionModelo(modelo.getNombre(), modelo.getFuncionLectura(), modelo.getTensionesHistorico(),
+                Collections.unmodifiableMap(mapa));
     }
 
-    /** Parámetros básicos que el modelo todavía no tiene cargados (vacío = puede leerse). */
+    /**
+     * Lo que se guarda en el historico (kWh y VIP): kWh, las tres tensiones elegidas para el
+     * historico (fase-fase o fase-neutro, en el orden de las columnas VAB, VAC, VBC), corrientes,
+     * kW y PF. Todos obligatorios para leer el medidor por pasarela.
+     */
+    public List<ParametroMedidor> requeridos() {
+        List<ParametroMedidor> lista = new ArrayList<>();
+        lista.add(ParametroMedidor.KWH);
+        lista.addAll(tensiones.getParametros());
+        lista.addAll(List.of(ParametroMedidor.IA, ParametroMedidor.IB, ParametroMedidor.IC,
+                ParametroMedidor.KW_TOTAL, ParametroMedidor.PF_TOTAL));
+        return lista;
+    }
+
+    /** Parámetros requeridos que el modelo todavía no tiene cargados (vacío = puede leerse). */
     public List<ParametroMedidor> faltantesBasicos() {
-        return Arrays.stream(ParametroMedidor.values())
-                .filter(ParametroMedidor::isBasico)
-                .filter(p -> !registros.containsKey(p))
-                .toList();
+        return requeridos().stream().filter(p -> !registros.containsKey(p)).toList();
     }
 
     public boolean completo() {

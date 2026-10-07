@@ -78,13 +78,17 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
       PLC. PAC1020: PAC_ADD del PLC (10 parametros, Float32). Unidades iguales al historico (kW en
       W, PF del ION en %). Se agregaron tipos Int32/UInt32 Modulo-10000 (formato ION) y las columnas
       enum del catalogo pasaron a varchar (schema.sql) para aceptar valores nuevos.
-      Hallazgos para la migracion (fase C/D, decide el usuario):
-      - El PLC lee del ION las tensiones **fase-neutro** (40166-40170, ~12.700 V en red de 22 kV) y
-        las guarda en VAB/VAC/VBC. El catalogo tiene VAB/VBC/VCA = fase-fase (40178-40182, ~22 kV) y
-        VAN/VBN/VCN = fase-neutro. Al pasar KWhPlanta1 a pasarela, el historico cambiaria de escala.
-      - Orden de columnas: el PLC guarda la 2a tension (B-C) en la columna VAC y la 3a (C-A) en VBC
-        (PAC_ADD); la pasarela guarda VCA en VAC y VBC en VBC. Al migrar un medidor del PLC a
-        pasarela, VAC y VBC quedarian cruzadas respecto de su historico. Definir antes de D1.
+- [x] B6. Continuidad del historico al migrar (2026-10-07, decidido: manda el historico del PLC):
+      - Cada modelo elige que tensiones van al historico: fase-fase o **fase-neutro**. ION8600 =
+        fase-neutro (el PLC guarda Vln a/b/c, 40166-40170, ~12.700 V en red de 22 kV); las
+        fase-fase (40178-40182) quedan para Calidad de Energia. Los basicos obligatorios dependen de
+        esa eleccion.
+      - Columnas de tension **posicionales con la convencion del PLC**: 1a tension en VAB, 2a (B-C o
+        B-N) en VAC, 3a (C-A o C-N) en VBC (evidencia: PAC_ADD y ION_ADD). La pasarela guardaba C-A
+        en VAC y B-C en VBC; desde este cambio guarda como el PLC.
+      - Pendiente de confirmar con captura de PM_ADD (bloque del PLC para los PM5110) y, con permiso,
+        cruzar VAC/VBC en el historico de GA752, OrientadoraL2 y HornoL3 (277 archivos VIP, 2,6 M
+        filas, con copia previa).
 
 **Fase C - Preparar la migracion**
 - [ ] C1. Ordenar `linea-id-config.json`: BarCompHP duplicado, serie repetida Linea02/CabezalXTR2,

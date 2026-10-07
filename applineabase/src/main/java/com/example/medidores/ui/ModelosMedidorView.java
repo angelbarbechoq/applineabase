@@ -9,6 +9,7 @@ import com.example.medidores.model.ModeloMedidor;
 import com.example.medidores.model.OrdenPalabras;
 import com.example.medidores.model.ParametroMedidor;
 import com.example.medidores.model.RegistroModelo;
+import com.example.medidores.model.TensionesHistorico;
 import com.example.medidores.model.TipoDato;
 import com.example.medidores.service.DefinicionModelo;
 import com.example.medidores.service.LectorMedidorService;
@@ -159,7 +160,7 @@ public class ModelosMedidorView extends VerticalLayout {
     // ================= Pestana Registros =================
 
     private VerticalLayout crearPanelRegistros() {
-        registrosGrid.addColumn(p -> p.isBasico() ? "Basico" : "Calidad").setHeader("Grupo").setAutoWidth(true);
+        registrosGrid.addColumn(p -> esRequerido(p) ? "Basico" : "Calidad").setHeader("Grupo").setAutoWidth(true);
         registrosGrid.addColumn(ParametroMedidor::getEtiqueta).setHeader("Parametro").setAutoWidth(true);
         registrosGrid.addColumn(ParametroMedidor::getUnidad).setHeader("Unidad").setAutoWidth(true);
         registrosGrid.addComponentColumn(this::celdaRegistro).setHeader("Registro").setAutoWidth(true);
@@ -186,7 +187,7 @@ public class ModelosMedidorView extends VerticalLayout {
         Span s = new Span();
         if (r != null) {
             s.setText(String.valueOf(r.getRegistro()));
-        } else if (p.isBasico()) {
+        } else if (esRequerido(p)) {
             badge(s, "Falta", "#f8d7da", "#721c24");
         } else {
             badge(s, "No disponible", "#e2e3e5", "#383d41");
@@ -194,7 +195,12 @@ public class ModelosMedidorView extends VerticalLayout {
         return s;
     }
 
-    private String texto(ParametroMedidor p, java.util.function.Function<RegistroModelo, String> campo) {
+    /** Obligatorio para leer por pasarela en el modelo elegido (depende de las tensiones del historico). */
+    private boolean esRequerido(ParametroMedidor p) {
+        return modelo == null ? p.isBasico() : DefinicionModelo.de(modelo).requeridos().contains(p);
+    }
+
+    private String texto(ParametroMedidor p,java.util.function.Function<RegistroModelo, String> campo) {
         RegistroModelo r = modelo == null ? null : modelo.registroDe(p);
         return r == null ? "" : campo.apply(r);
     }
@@ -257,7 +263,7 @@ public class ModelosMedidorView extends VerticalLayout {
 
         if (actual != null) {
             Button noDisponible = new Button("Marcar No disponible", e -> {
-                if (parametro.isBasico() && !service.lineasQueLoUsan(modelo.getNombre()).isEmpty()) {
+                if (esRequerido(parametro) && !service.lineasQueLoUsan(modelo.getNombre()).isEmpty()) {
                     NotificacionesUtil.mostrarError("Es un parametro basico y hay lineas con este modelo: dejarian de leerse");
                     return;
                 }
@@ -290,17 +296,26 @@ public class ModelosMedidorView extends VerticalLayout {
                 .withHoverDelay(200)
                 .withHideDelay(5000);
 
+        ComboBox<TensionesHistorico> tensionesField = new ComboBox<>("Tensiones que se guardan en el historico");
+        tensionesField.setItems(TensionesHistorico.values());
+        tensionesField.setItemLabelGenerator(TensionesHistorico::getEtiqueta);
+        tensionesField.setHelperText("Columnas VAB, VAC y VBC, en ese orden. Debe coincidir con lo que guardaba el PLC "
+                + "para no cambiar el historico (ION8600: fase-neutro).");
+
         if (enEdicion != null) {
             nombreField.setValue(enEdicion.getNombre());
             descripcionField.setValue(enEdicion.getDescripcion() == null ? "" : enEdicion.getDescripcion());
             funcionField.setValue(enEdicion.getFuncionLectura());
             manualField.setValue(enEdicion.isNumeracionManual());
+            tensionesField.setValue(enEdicion.getTensionesHistorico());
         } else {
             funcionField.setValue(FuncionLectura.HOLDING);
             manualField.setValue(true);
+            tensionesField.setValue(TensionesHistorico.FASE_FASE);
         }
 
-        FormLayout form = new FormLayout(nombreField, funcionField, descripcionField, manualField);
+        FormLayout form = new FormLayout(nombreField, funcionField, descripcionField, tensionesField, manualField);
+        form.setColspan(tensionesField, 2);
         form.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1), new FormLayout.ResponsiveStep("320px", 2));
         form.setColspan(descripcionField, 2);
         form.setColspan(manualField, 2);
@@ -313,6 +328,7 @@ public class ModelosMedidorView extends VerticalLayout {
             m.setDescripcion(descripcionField.getValue());
             m.setFuncionLectura(funcionField.getValue() == null ? FuncionLectura.HOLDING : funcionField.getValue());
             m.setNumeracionManual(Boolean.TRUE.equals(manualField.getValue()));
+            m.setTensionesHistorico(tensionesField.getValue() == null ? TensionesHistorico.FASE_FASE : tensionesField.getValue());
             ejecutar(() -> service.guardarModelo(m), "Modelo guardado", dialog);
         });
         guardar.addThemeVariants(ButtonVariant.LUMO_PRIMARY);

@@ -43,6 +43,10 @@ public class ModeloMedidor {
     @Column(columnDefinition = "varchar(20) default 'HOLDING'")
     private FuncionLectura funcionLectura = FuncionLectura.HOLDING;
 
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(20) default 'FASE_FASE'")
+    private TensionesHistorico tensionesHistorico = TensionesHistorico.FASE_FASE;
+
     @OneToMany(mappedBy = "modelo", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<RegistroModelo> registros = new ArrayList<>();
 
@@ -88,6 +92,14 @@ public class ModeloMedidor {
 
     public void setFuncionLectura(FuncionLectura funcionLectura) {
         this.funcionLectura = funcionLectura;
+    }
+
+    public TensionesHistorico getTensionesHistorico() {
+        return tensionesHistorico == null ? TensionesHistorico.FASE_FASE : tensionesHistorico;
+    }
+
+    public void setTensionesHistorico(TensionesHistorico tensionesHistorico) {
+        this.tensionesHistorico = tensionesHistorico;
     }
 
     public List<RegistroModelo> getRegistros() {
