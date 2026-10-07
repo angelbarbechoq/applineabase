@@ -10,7 +10,9 @@ import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dependency.StyleSheet;
 import com.vaadin.flow.component.dependency.Uses;
+import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.page.AppShellConfigurator;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.NumberField;
@@ -38,6 +40,8 @@ import org.springframework.context.annotation.Bean;
 @Uses(IntegerField.class)
 @Uses(Dialog.class)
 @Uses(Checkbox.class)
+@Uses(FormLayout.class)
+@Uses(TabSheet.class)
 public class Application implements AppShellConfigurator {
 
     public static void main(String[] args) {

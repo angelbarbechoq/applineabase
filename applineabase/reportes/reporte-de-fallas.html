@@ -54,6 +54,12 @@
         padding: 10px 15px;
         margin: 10px 0;
     }
+    .prevencion {
+        background: #eef4fb;
+        border-left: 4px solid #2c6fb7;
+        padding: 10px 15px;
+        margin: 10px 0;
+    }
     .diagnostico {
         background: #eaf2f8;
         border-left: 4px solid #2980b9;
@@ -121,7 +127,7 @@
 <h1>Reporte de Fallas</h1>
 <div class="meta">
     <strong>Proyecto:</strong> Sistema LineaBaseX - Modulo de Mantenimiento Preventivo (applineabase)<br>
-    <strong>Fecha del reporte:</strong> 28 de agosto de 2026 (actualizado el 25 de septiembre de 2026; fuente: docs/REGISTRO-DE-FALLAS.md)<br>
+    <strong>Fecha del reporte:</strong> 28 de agosto de 2026 (actualizado el 7 de octubre de 2026; fuente: docs/REGISTRO-DE-FALLAS.md)<br>
     <strong>Alcance:</strong> Fallas tecnicas detectadas y resueltas durante la construccion del modulo de
     mantenimiento preventivo (registro de tareas de Barril y Tornillo, catalogo de Personal de Mantenimiento).
 </div>
@@ -138,6 +144,7 @@
         <li><a href="#falla7">Confusion de puerto 8080 / 8081 en las pruebas</a></li>
         <li><a href="#falla8">Login por automatizacion del navegador no ingresa texto</a></li>
         <li><a href="#falla9">Restaurar un commit viejo deja un arbol inconsistente</a></li>
+        <li><a href="#falla10">Datos en cero en medidores leidos por pasarela (cambio de libreria Modbus)</a></li>
         <li><a href="#resumen">Resumen general</a></li>
     </ol>
 </div>
@@ -399,6 +406,44 @@ customElements.get('vaadin-combo-box')  // a veces true, a veces false</pre>
     <span class="estado-ok">Resuelto.</span>
 </div>
 
+<h2 id="falla10">10. Datos en cero en medidores leidos por pasarela (cambio de libreria Modbus)</h2>
+
+<div class="falla">
+    <strong>Sintoma:</strong> en los medidores leidos por la pasarela GteWay01 (GA752, OrientadoraL2 y
+    HornoL3) aparecian filas sueltas de un minuto con un valor en 0 y el resto normal (por ejemplo,
+    HornoL3 con voltaje 0 y 6.98 kW). El 7 de octubre hubo 16 filas asi entre las 00:00 y las 12:59.
+    Con la potencia en 0 el horometro cuenta la maquina como parada y la advertencia de Detencion
+    puede dispararse.
+</div>
+
+<div class="causa">
+    <strong>Causa (dos factores):</strong>
+    <ol>
+        <li>La libreria Modbus que se usaba (EasyModbus) nunca reconoce una respuesta de error del
+            equipo: compara un byte con signo contra 131 y la comparacion nunca coincide. Cuando el
+            medidor no le contesta a la pasarela, la pasarela responde el error 0x0B y EasyModbus lo
+            entregaba como si fueran datos en cero. Cada medidor se leia en 5 pedidos (kWh, voltajes,
+            corrientes, kW y PF): si fallaba uno, ese grupo salia en 0.</li>
+        <li>El lector de pasarelas ponia los valores en cero antes de leer y guardaba la fila aunque
+            la lectura hubiera fallado.</li>
+    </ol>
+</div>
+
+<div class="resolucion">
+    <strong>Resolucion (7 de octubre de 2026):</strong> se reemplazo EasyModbus por <code>j2mod 3.4.0</code>,
+    una libreria mantenida que informa los codigos de error del equipo, y se usa en pasarelas,
+    mezcladores, PLC y escritura de IDs. Si falla cualquier valor basico de un medidor, esa fila no se
+    guarda: queda el hueco de ese minuto. Se decidio con el usuario no guardar 0 ni repetir el valor
+    anterior, para no inventar horas de marcha ni consumo; el kWh se recupera solo con la lectura
+    siguiente. <span class="estado-ok">Resuelto.</span>
+</div>
+
+<div class="prevencion">
+    <strong>Prevencion:</strong> no usar librerias Modbus que no informen el codigo de error. Ante una
+    falla de lectura se deja el hueco y el motivo en el registro de la aplicacion, nunca un 0.
+    Verificacion pendiente: contar las filas con ceros desde el 7 de octubre a las 12:59 (deben ser 0).
+</div>
+
 <h2 id="resumen">Resumen general</h2>
 <table>
     <tr>
@@ -460,6 +505,12 @@ customElements.get('vaadin-combo-box')  // a veces true, a veces false</pre>
         <td>Arbol inconsistente al restaurar un commit</td>
         <td>checkout con -- . no borra archivos nuevos</td>
         <td class="estado-ok">Resuelto (proceso)</td>
+    </tr>
+    <tr>
+        <td>10</td>
+        <td>Datos en cero en medidores por pasarela</td>
+        <td>EasyModbus no detecta errores Modbus y el lector guardaba la fila igual</td>
+        <td class="estado-ok">Resuelto (cambio a j2mod)</td>
     </tr>
 </table>
 

@@ -9,7 +9,7 @@ Se importa desde `CLAUDE.md`, asi que se carga solo en cada sesion.
 - Al resolver una falla nueva, agregar una entrada `F-NN` con el formato de abajo y una fila en la
   tabla resumen. Mantenerlo corto: sintoma, como reconocerlo, causa, resolucion, prevencion.
 - Este archivo es la fuente de verdad. `reportes/reporte-de-fallas.html` es la version para leer en
-  el navegador; se regenera desde aqui cuando el usuario lo pida (ultima vez: 2026-09-25).
+  el navegador; se regenera desde aqui cuando el usuario lo pida (ultima vez: 2026-10-07).
 
 Ultima actualizacion: 2026-10-07.
 
