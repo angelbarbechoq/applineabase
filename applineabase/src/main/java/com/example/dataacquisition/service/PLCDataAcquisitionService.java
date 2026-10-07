@@ -182,8 +182,8 @@ public class PLCDataAcquisitionService {
                         String nombreTablax = tablas.get(i);
                         // Calculamos el valor ajustado antes de decidir el guardado
                         double valor = nombreTablax.contains("Temperatura")
-                                ? finalParametros[i] / 10.0
-                                : (double) finalParametros[i];
+                                ? (short) finalParametros[i] / 10.0   // con signo, como entregaba EasyModbus
+                                : (double) (short) finalParametros[i];
 
                         Object[] dataDiario = {timestamp, valor};
                         databaseInitializationService.guardarDatoBatch(dataDiario, nombreTablax, "DAILY");
@@ -216,7 +216,9 @@ public class PLCDataAcquisitionService {
                     IC[ixy] = BigDecimal.valueOf((float) bits / (float) 10.0);
                     bits = ((registrosPLC[7][ixy * 2] & 0xFFFF) << 16) | (registrosPLC[7][ixy * 2 + 1] & 0xFFFF);
                     PW[ixy] = BigDecimal.valueOf((float) bits);
-                    bits = ((registrosPLC[8][ixy * 2]));
+                    // Entero de 16 bits CON signo (PF negativo, ej. -9551 = -95.51). j2mod entrega
+                    // los registros sin signo (0-65535); EasyModbus los entregaba con signo.
+                    bits = (short) registrosPLC[8][ixy * 2];
                     PF[ixy] = BigDecimal.valueOf((float) bits / (float) 100.0);
                     bits = ((registrosPLC[9][ixy * 2] & 0xFFFF) << 16) | (registrosPLC[9][ixy * 2 + 1] & 0xFFFF);
                     KWhR[ixy] = BigDecimal.valueOf((float) bits);

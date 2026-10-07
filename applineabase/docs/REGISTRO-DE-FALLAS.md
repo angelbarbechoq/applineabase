@@ -167,6 +167,12 @@ Ultima actualizacion: 2026-10-07.
   lectura, hueco y motivo en el log ("Medidor X ... sin lectura: excepcion Modbus 0x0B ..."), nunca
   0. **Verificacion pendiente:** contar filas con ceros desde 2026-10-07 12:59 (deben ser 0 y en su
   lugar aparecer minutos faltantes).
+- **Regresion del cambio (2026-10-07):** EasyModbus entregaba los registros **con signo** (int16) y
+  j2mod **sin signo** (0-65535). El PF general (KWhPlanta1 por PLC3, entero/100) paso de -95.51 a
+  559.85 desde las 12:55:52 (= (65536 - 9551) / 100). Se corrigio con `(short)` en el PF de
+  KWhPlanta1 y en los sensores del registro 422 de PLC3. Regla: todo registro de 16 bits leido
+  "tal cual" (sin `& 0xFFFF` ni armado de 32 bits) debe pasar por `(short)` si puede ser negativo.
+  Los registros de 32 bits (`(hi << 16) | (lo & 0xFFFF)`) no cambian.
 - **Referencias:** `docs/PLAN-CALIDAD-ENERGIA.md` (fase A).
 
 ---
