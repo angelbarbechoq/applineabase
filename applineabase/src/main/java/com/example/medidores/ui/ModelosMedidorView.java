@@ -299,17 +299,17 @@ public class ModelosMedidorView extends VerticalLayout {
         ComboBox<TensionesHistorico> tensionesField = new ComboBox<>("Tensiones que se guardan en el historico");
         tensionesField.setItems(TensionesHistorico.values());
         tensionesField.setItemLabelGenerator(TensionesHistorico::getEtiqueta);
-        tensionesField.setHelperText("Columnas VAB, VAC y VBC, en ese orden. Debe coincidir con lo que guardaba el PLC "
-                + "para no cambiar el historico (ION8600: fase-neutro).");
+        tensionesField.setHelperText("Columnas VAB, VBC y VAC del historico. Como dicen los manuales: fase-fase. "
+                + "Fase-neutro solo para un caso especial.");
 
         Checkbox potenciaWField = new Checkbox("Historico VIP: potencia en W (como lo guardaba el PLC)");
         Checkbox pfPorcentajeField = new Checkbox("Historico VIP: PF en % (como lo guardaba el PLC)");
         Tooltip.forComponent(potenciaWField)
-                .withText("El catalogo siempre se carga en kW y PF de -1 a 1. Marcar solo si el historico de "
-                        + "las maquinas con este modelo esta en W (ION8600, PAC1020), para no cambiarlo al migrar.")
+                .withText("El catalogo siempre se carga en kW y PF de -1 a 1, y asi se guarda el historico. Caso especial: "
+                        + "marcar solo si hace falta guardar la potencia en W. Ningun modelo lo usa.")
                 .withHoverDelay(200).withHideDelay(5000);
         Tooltip.forComponent(pfPorcentajeField)
-                .withText("Marcar solo si el historico de las maquinas con este modelo guarda el PF en % (ION8600).")
+                .withText("Caso especial: guardar el PF del historico en %. Ningun modelo lo usa.")
                 .withHoverDelay(200).withHideDelay(5000);
 
         if (enEdicion != null) {

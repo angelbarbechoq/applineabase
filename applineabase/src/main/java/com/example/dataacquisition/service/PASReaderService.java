@@ -299,14 +299,15 @@ public class PASReaderService {
         Double retorno = v.get(ParametroMedidor.KWH_RETORNO);
         gateway.setKWhRx(index, retorno == null ? BigDecimal.ZERO : decimal(retorno));
 
-        // Columnas de tensión posicionales, con la convención del PLC (PAC_ADD/ION_ADD): 1a tensión
-        // en VAB, 2a en VAC, 3a en VBC. Fase-fase: A-B, B-C, C-A. Fase-neutro (ION8600): A-N, B-N, C-N.
-        // Hasta el 2026-10-07 la pasarela guardaba C-A en VAC y B-C en VBC (cruzado respecto del PLC).
-        List<ParametroMedidor> tensiones = modelo.tensiones().getParametros();
+        // Columnas de tensión según su nombre, como dicen los manuales (decidido con el usuario el
+        // 2026-10-08: la migración guarda lo correcto, no los errores del PLC): VAB = A-B,
+        // VAC = A-C (= C-A), VBC = B-C. El PLC guarda B-C en VAC y C-A en VBC (PAC_ADD/ION_ADD):
+        // al migrar un medidor del PLC esas dos columnas pasan a tener su significado correcto.
+        List<ParametroMedidor> tensiones = modelo.tensiones().getParametros(); // [A-B, B-C, C-A] o [A-N, B-N, C-N]
         gateway.setKWhActx(index, decimal(v.get(ParametroMedidor.KWH)));
         gateway.setVABx(index, decimal(v.get(tensiones.get(0))));
-        gateway.setVACx(index, decimal(v.get(tensiones.get(1))));
-        gateway.setVBCx(index, decimal(v.get(tensiones.get(2))));
+        gateway.setVBCx(index, decimal(v.get(tensiones.get(1))));
+        gateway.setVACx(index, decimal(v.get(tensiones.get(2))));
         gateway.setIAx(index, decimal(v.get(ParametroMedidor.IA)));
         gateway.setIBx(index, decimal(v.get(ParametroMedidor.IB)));
         gateway.setICx(index, decimal(v.get(ParametroMedidor.IC)));
@@ -314,9 +315,13 @@ public class PASReaderService {
         // (ION8600/PAC1020 por PLC: W; ION8600: PF en %).
         double kw = v.get(ParametroMedidor.KW_TOTAL);
         gateway.setKWx(index, decimal(modelo.historicoPotenciaEnW() ? kw * 1000.0 : kw));
-        // PF tal como lo entrega el medidor (igual que por PLC, sin decodificar 4 cuadrantes); el
-        // archivo de calidad guarda el valor real decodificado.
+        // PF real (-1..1): el de 4 cuadrantes (PM5xxx) se decodifica, como indica su manual. El
+        // histórico por PLC lo tiene codificado; FactorPotenciaUtil interpreta ambos al mostrarlo.
         double pf = v.get(ParametroMedidor.PF_TOTAL);
+        DefinicionModelo.Registro regPf = modelo.registros().get(ParametroMedidor.PF_TOTAL);
+        if (regPf != null && regPf.pf4Cuadrantes()) {
+            pf = LectorMedidorService.decodificarPf4Cuadrantes(pf);
+        }
         gateway.setPFx(index, decimal(modelo.historicoPfEnPorcentaje() ? pf * 100.0 : pf));
 
         logger.debug("Medidor {} (Unit ID {}, {}) leido", linea.get("lineaMaquina"), unitId, nombreModelo);

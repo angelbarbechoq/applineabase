@@ -3,9 +3,9 @@ package com.example.medidores.model;
 import java.util.List;
 
 /**
- * Qué tensiones del medidor se guardan en las tres columnas de tensión del historico VIP
- * (VAB, VAC, VBC). Las columnas son posicionales, con la convención del PLC: 1a tensión en VAB,
- * 2a en VAC, 3a en VBC (PAC_ADD del PLC: A-B, B-C, C-A; ION_ADD: V1, V2, V3).
+ * Qué tensiones del medidor se guardan en las tres columnas de tensión del historico VIP. Por
+ * defecto (y lo que dicen los manuales) fase-fase: VAB = A-B, VBC = B-C, VAC = A-C. Fase-neutro
+ * queda como opción para un caso especial; ningún modelo la usa desde 2026-10-08.
  */
 public enum TensionesHistorico {
 

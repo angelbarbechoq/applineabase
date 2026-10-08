@@ -78,7 +78,22 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
       PLC. PAC1020: PAC_ADD del PLC (10 parametros, Float32). Unidades iguales al historico (kW en
       W, PF del ION en %). Se agregaron tipos Int32/UInt32 Modulo-10000 (formato ION) y las columnas
       enum del catalogo pasaron a varchar (schema.sql) para aceptar valores nuevos.
-- [x] B6. Continuidad del historico al migrar (2026-10-07, decidido: manda el historico del PLC):
+- [x] B7. **Revision 2026-10-08 (decidido con el usuario): la migracion guarda lo correcto segun
+      los manuales, no los errores del PLC.** Reemplaza a B6:
+      - VIP por pasarela: VAB = A-B, VAC = A-C (C-A), VBC = B-C (por nombre de columna). El PLC
+        guarda B-C en VAC y C-A en VBC: al migrar un medidor del PLC esas columnas pasan a su
+        significado correcto desde esa fecha. El historico de GA752/OrientadoraL2/HornoL3 ya estaba
+        bien por nombre; solo quedaron cruzadas las filas del 2026-10-07 17:21 al reinicio con este
+        cambio (corregir con permiso).
+      - ION8600: VIP con tensiones fase-fase (40178-40182), kW y PF -1..1 (el PLC: Vln, W y %).
+        PAC1020: kW; KWhR vacio (0) porque no mide energia de retorno (2805 es reactiva).
+      - PF en VIP por pasarela: valor real (4Q decodificado). `FactorPotenciaUtil` interpreta los
+        tres formatos del historico: 0-1, 4Q (1-2 -> 2 - v) y % (> 2 -> /100). Antes dividia por
+        100 todo valor > 1: los PM5110 por PLC en zona capacitiva (ej. Linea03 1.055) salian con PF
+        0.01 en graficos y en la alarma de PF bajo.
+      - Las marcas "historico en W / PF en %" y "tensiones fase-neutro" quedan como opcion para un
+        caso especial; ningun modelo las usa.
+- [x] B6. (Reemplazado por B7) Continuidad del historico al migrar (2026-10-07, decidido: manda el historico del PLC):
       - Cada modelo elige que tensiones van al historico: fase-fase o **fase-neutro**. ION8600 =
         fase-neutro (el PLC guarda Vln a/b/c, 40166-40170, ~12.700 V en red de 22 kV); las
         fase-fase (40178-40182) quedan para Calidad de Energia. Los basicos obligatorios dependen de

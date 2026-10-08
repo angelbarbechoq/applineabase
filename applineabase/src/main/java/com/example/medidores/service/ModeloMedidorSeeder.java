@@ -78,14 +78,14 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
         // ION8600 y PAC1020 se crearon vacíos en una versión anterior: se completan solo si siguen sin registros.
         ModeloMedidor ion = repository.findByNombreIgnoreCase("ION8600")
                 .orElseGet(() -> new ModeloMedidor("ION8600", null));
-        if (ion.getRegistros().isEmpty() || enUnidadesViejas(ion)) {
+        if (ion.getRegistros().isEmpty() || enUnidadesViejas(ion) || copiaConvencionPlc(ion)) {
             sembrarIon8600(ion);
             repository.save(ion);
         }
         ModeloMedidor pac = repository.findByNombreIgnoreCase("PAC1020")
                 .orElseGet(() -> new ModeloMedidor("PAC1020", null));
         // También se corrige la semilla anterior (direcciones del PLC, KW = fase L1), si nadie la editó.
-        if (pac.getRegistros().isEmpty() || esSemillaViejaPac1020(pac) || enUnidadesViejas(pac)) {
+        if (pac.getRegistros().isEmpty() || esSemillaViejaPac1020(pac) || enUnidadesViejas(pac) || copiaConvencionPlc(pac)) {
             sembrarPac1020(pac);
             repository.save(pac);
         }
@@ -166,12 +166,12 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
      * maximos ("mx"), no instantaneos: quedan No disponible.
      */
     private static void sembrarIon8600(ModeloMedidor m) {
-        m.setDescripcion("Schneider ION8600 (KWhPlanta1). Mapa por defecto del manual. Catalogo en kW y PF 0-1; historico VIP en W y PF en % como el PLC");
-        // El historico por PLC guarda Vln a/b/c (40166-40170): se mantiene al pasar a pasarela.
-        m.setTensionesHistorico(TensionesHistorico.FASE_NEUTRO);
-        // Catálogo en kW y PF -1..1; el histórico VIP por PLC está en W y PF en %: se convierte al guardarlo.
-        m.setHistoricoPotenciaEnW(true);
-        m.setHistoricoPfEnPorcentaje(true);
+        m.setDescripcion("Schneider ION8600 (KWhPlanta1). Mapa por defecto del manual; kW y PF -1..1 como los demas medidores");
+        // Como dice el manual y como los demás medidores: VIP con tensiones fase-fase, kW y PF -1..1
+        // (el PLC guardaba Vln, W y PF en %; decidido con el usuario el 2026-10-08).
+        m.setTensionesHistorico(TensionesHistorico.FASE_FASE);
+        m.setHistoricoPotenciaEnW(false);
+        m.setHistoricoPfEnPorcentaje(false);
         agregar(m, ParametroMedidor.KWH, 230, TipoDato.INT32, 1);
         agregar(m, ParametroMedidor.KWH_RETORNO, 232, TipoDato.INT32, 1);
         agregar(m, ParametroMedidor.KVARH, 234, TipoDato.INT32, 1);
@@ -216,13 +216,13 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
      * Catálogo en kW/kVAR/kVA (el medidor entrega W, escala 0.001); el histórico VIP en W (marca). Sin THD ni desbalances.
      */
     private static void sembrarPac1020(ModeloMedidor m) {
-        m.setDescripcion("Siemens SENTRON PAC1020 (TDGeneradorSA). Offsets del manual (base 0). Catalogo en kW; historico VIP en W como el PLC");
+        m.setDescripcion("Siemens SENTRON PAC1020 (TDGeneradorSA). Offsets del manual (base 0); kW como los demas medidores. Sin energia de retorno");
         m.setNumeracionManual(false);
-        m.setHistoricoPotenciaEnW(true); // el PLC guarda la potencia en W
+        m.setHistoricoPotenciaEnW(false); // VIP en kW como los demás (manual), no en W como el PLC
         m.setTensionesHistorico(TensionesHistorico.FASE_FASE);
         agregar(m, ParametroMedidor.KWH, 2803, TipoDato.FLOAT32, 0.001);
         agregar(m, ParametroMedidor.KVARH, 2805, TipoDato.FLOAT32, 0.001);
-        agregar(m, ParametroMedidor.KWH_RETORNO, 2805, TipoDato.FLOAT32, 1);
+        m.quitarRegistro(ParametroMedidor.KWH_RETORNO); // el PAC1020 no mide energía de retorno (2805 es reactiva)
         agregar(m, ParametroMedidor.VAN, 1);
         agregar(m, ParametroMedidor.VBN, 3);
         agregar(m, ParametroMedidor.VCN, 5);
@@ -253,6 +253,19 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
     private static boolean enUnidadesViejas(ModeloMedidor m) {
         RegistroModelo kw = m.registroDe(ParametroMedidor.KW_TOTAL);
         return kw != null && kw.getEscala() == 1.0 && !m.isHistoricoPotenciaEnW();
+    }
+
+    /**
+     * Semilla del 2026-10-07 que copiaba la convención del PLC (VIP en W, PF en %, tensiones
+     * fase-neutro en el ION8600, KWhR = reactiva en el PAC1020). Desde el 2026-10-08 se carga como
+     * dicen los manuales. Se reconoce por la combinación que solo ponía esa semilla (así una marca
+     * puesta a mano después no se pisa en cada arranque).
+     */
+    private static boolean copiaConvencionPlc(ModeloMedidor m) {
+        RegistroModelo retorno = m.registroDe(ParametroMedidor.KWH_RETORNO);
+        boolean pacConReactivaComoRetorno = retorno != null && retorno.getRegistro() == 2805;
+        return m.isHistoricoPotenciaEnW()
+                && (m.getTensionesHistorico() == TensionesHistorico.FASE_NEUTRO || pacConReactivaComoRetorno);
     }
 
     /** Semilla anterior del PAC1020 (direcciones del PLC en base 1, con KW = 20 = fase L1). */
