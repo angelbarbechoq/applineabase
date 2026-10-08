@@ -236,5 +236,11 @@ en el PAC1020 era reactiva), orden de columnas (se guarda segun manual, no hace 
 6. `linea-id-config.json` (C1): BarCompHP en PLC1 y PLC3, serie repetida Linea02/CabezalXTR2, lineas
    en PLC5.
 7. NetBeans (C2): como se sincroniza su lista de IDs del PLC con esta app.
-8. InteliGen 200 (192.168.0.254): activar el servidor Modbus TCP (puerto 502 hoy cerrado; abiertos
+8. InteliGen 200 (192.168.0.254, generador Gen Power, junto a TR2). Modbus TCP ACTIVO desde 2026-10-08
+   (Unit ID 1, 690 registros en 41001-41391, 43001-43723, 44205, 44215; SOLO LECTURA, funcion 03).
+   Confirmado contra TR2: 41052/41053/41054 = tensiones fase-fase de red (444/443/444 V vs TR2
+   444-447 V); 41048 = 600 (probable frecuencia x10). 32768 = no disponible. Sin InteliConfig: se
+   identifican los demas comparando `docs/ig200/foto-generador-parado.csv` con una foto igual con
+   el generador en marcha + fotos de la pantalla del controlador que manda el usuario.
+   (Antes: puerto 502 cerrado; abiertos
    23 y 80) y exportar la lista de registros desde InteliConfig ("Generate Cfg Image" > Modbus).
