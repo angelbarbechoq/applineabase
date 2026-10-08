@@ -147,7 +147,10 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
 **Fase G - Generador Gen Power (InteliGen 200), mantenimiento basado en condicion**
 Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REGISTROS.md`
 (solo lectura, funcion 03, Unit ID 1, 192.168.0.254).
-- [ ] G1. Guardado segun estado del generador:
+- [x] G1. Guardado segun estado del generador (2026-10-08, `com.example.generador`: `GeneradorReaderService`
+      en el ciclo de 1 min, `GeneradorAlmacen`; config en `C:ineabasexnfiggenerador-config.json`;
+      lecturas en `{mes}generador`, arranques en `c:ineabasexgeneradorrranques`; solo los 17
+      valores confirmados, 4 pedidos de lectura funcion 03; nunca escribe):
       - En marcha (RPM > 0): todo cada minuto (tensiones, frecuencia, corrientes, kW, PF, RPM,
         aceite, refrigerante, bateria).
       - Parado: cada 15 min solo lo que dice si esta listo para arrancar: tension de bateria,

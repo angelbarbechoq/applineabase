@@ -1,5 +1,6 @@
 package com.example.dataacquisition.service;
 
+import com.example.generador.service.GeneradorReaderService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
@@ -35,11 +36,14 @@ public class DataAcquisitionTask {
     private final PASReaderService pasReaderService;
     private final MezcladorReaderService mezcladorReaderService;
     private final DatabaseInitializationService databaseInitializationService;
+    private final GeneradorReaderService generadorReaderService;
 
     public DataAcquisitionTask(PLCDataAcquisitionService plcDataAcquisitionService,
                                PASReaderService pasReaderService,
                                MezcladorReaderService mezcladorReaderService,
-                               DatabaseInitializationService databaseInitializationService) {
+                               DatabaseInitializationService databaseInitializationService,
+                               GeneradorReaderService generadorReaderService) {
+        this.generadorReaderService = generadorReaderService;
         this.plcDataAcquisitionService = plcDataAcquisitionService;
         this.pasReaderService = pasReaderService;
         this.mezcladorReaderService = mezcladorReaderService;
@@ -86,9 +90,18 @@ public class DataAcquisitionTask {
                     mezcladorReaderService.readMezcladores();
                     long msMezcladores = System.currentTimeMillis() - t0;
 
+                    // Generadores (ComAp InteliGen 200), SOLO LECTURA; un error no corta el ciclo.
+                    t0 = System.currentTimeMillis();
+                    try {
+                        generadorReaderService.leerGeneradores();
+                    } catch (Exception e) {
+                        logger.error("Error leyendo generadores", e);
+                    }
+                    long msGenerador = System.currentTimeMillis() - t0;
+
                     long msTotal = System.currentTimeMillis() - inicioCiclo;
-                    logger.info(">>> END READING CYCLE - PLC: {} ms | PAS600L: {} ms | Mezcladores: {} ms | Total: {} ms <<<",
-                            msPLC, msPAS, msMezcladores, msTotal);
+                    logger.info(">>> END READING CYCLE - PLC: {} ms | PAS600L: {} ms | Mezcladores: {} ms | Generador: {} ms | Total: {} ms <<<",
+                            msPLC, msPAS, msMezcladores, msGenerador, msTotal);
                 } finally {
                     cicloEnCurso.set(false);
                 }

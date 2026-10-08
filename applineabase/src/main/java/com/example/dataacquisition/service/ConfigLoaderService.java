@@ -36,6 +36,8 @@ public class ConfigLoaderService {
     private static final String LINEA_CONFIG_FILE = "linea-id-config.json";
     private static final String MEZCLADORES_CONFIG_FILE = "mezcladores-config.json";
     private static final String EXTRUSION_TAG_CONFIG_FILE = "extrusion-tag-config.json";
+    /** Archivo propio: plc-config.json lo reescribe ConfiguracionView solo con plcs y gateways. */
+    private static final String GENERADOR_CONFIG_FILE = "generador-config.json";
 
     private final ObjectMapper objectMapper;
 
@@ -52,6 +54,14 @@ public class ConfigLoaderService {
         sembrarSiNoExiste(LINEA_CONFIG_FILE);
         sembrarSiNoExiste(MEZCLADORES_CONFIG_FILE);
         sembrarSiNoExiste(EXTRUSION_TAG_CONFIG_FILE);
+        sembrarSiNoExiste(GENERADOR_CONFIG_FILE);
+    }
+
+    /** Generadores con controlador por Modbus TCP (solo lectura): nombre, modelo, ipAddress, unitId. */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> loadGeneradoresConfig() {
+        Object generadores = leerArchivo(GENERADOR_CONFIG_FILE).get("generadores");
+        return generadores != null ? (List<Map<String, Object>>) generadores : List.of();
     }
 
     private void sembrarSiNoExiste(String nombreArchivo) {
