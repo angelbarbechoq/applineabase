@@ -47,6 +47,17 @@ public class ModeloMedidor {
     @Column(columnDefinition = "varchar(20) default 'FASE_FASE'")
     private TensionesHistorico tensionesHistorico = TensionesHistorico.FASE_FASE;
 
+    /**
+     * El catálogo siempre entrega unidades estándar (kW, PF -1..1). Estas dos marcas solo
+     * convierten al guardar en el histórico VIP, para que un medidor que pasa del PLC a pasarela
+     * siga guardando como lo hacía el PLC (ION8600: W y PF en %; PAC1020: W).
+     */
+    @Column(columnDefinition = "boolean default false")
+    private boolean historicoPotenciaEnW;
+
+    @Column(columnDefinition = "boolean default false")
+    private boolean historicoPfEnPorcentaje;
+
     @OneToMany(mappedBy = "modelo", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<RegistroModelo> registros = new ArrayList<>();
 
@@ -100,6 +111,22 @@ public class ModeloMedidor {
 
     public void setTensionesHistorico(TensionesHistorico tensionesHistorico) {
         this.tensionesHistorico = tensionesHistorico;
+    }
+
+    public boolean isHistoricoPotenciaEnW() {
+        return historicoPotenciaEnW;
+    }
+
+    public void setHistoricoPotenciaEnW(boolean historicoPotenciaEnW) {
+        this.historicoPotenciaEnW = historicoPotenciaEnW;
+    }
+
+    public boolean isHistoricoPfEnPorcentaje() {
+        return historicoPfEnPorcentaje;
+    }
+
+    public void setHistoricoPfEnPorcentaje(boolean historicoPfEnPorcentaje) {
+        this.historicoPfEnPorcentaje = historicoPfEnPorcentaje;
     }
 
     public List<RegistroModelo> getRegistros() {

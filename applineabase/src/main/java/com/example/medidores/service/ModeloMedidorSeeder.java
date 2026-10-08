@@ -78,14 +78,14 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
         // ION8600 y PAC1020 se crearon vacíos en una versión anterior: se completan solo si siguen sin registros.
         ModeloMedidor ion = repository.findByNombreIgnoreCase("ION8600")
                 .orElseGet(() -> new ModeloMedidor("ION8600", null));
-        if (ion.getRegistros().isEmpty()) {
+        if (ion.getRegistros().isEmpty() || enUnidadesViejas(ion)) {
             sembrarIon8600(ion);
             repository.save(ion);
         }
         ModeloMedidor pac = repository.findByNombreIgnoreCase("PAC1020")
                 .orElseGet(() -> new ModeloMedidor("PAC1020", null));
         // También se corrige la semilla anterior (direcciones del PLC, KW = fase L1), si nadie la editó.
-        if (pac.getRegistros().isEmpty() || esSemillaViejaPac1020(pac)) {
+        if (pac.getRegistros().isEmpty() || esSemillaViejaPac1020(pac) || enUnidadesViejas(pac)) {
             sembrarPac1020(pac);
             repository.save(pac);
         }
@@ -159,16 +159,19 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
     /**
      * ION8600 (KWhPlanta1): mapa por defecto del manual "Modbus Protocol and Register Map for ION
      * Devices" (70022-0124-00, 04/2009), cruzado con las direcciones que usa el PLC (ION_ADD) y
-     * con los datos guardados. Escalas para guardar en las mismas unidades que el historico por
-     * PLC: kW/kVAR/kVA en W/VAR/VA (escala 1; el medidor entrega x1000), PF en % (x100 -> 0.01),
+     * con los datos guardados. Catálogo en unidades estándar: kW/kVAR/kVA (el medidor entrega W x1000 ->
+     * escala 0.001), PF -1..1 (entero x100 en % -> 0.0001); el histórico VIP se guarda en W y PF en % (marcas),
      * corrientes, frecuencia y desbalance x10 (-> 0.1). Las tensiones 40166-40170 que lee el PLC
      * son FASE-NEUTRO (Vln); las fase-fase estan en 40178-40182. Los THD del mapa por defecto son
      * maximos ("mx"), no instantaneos: quedan No disponible.
      */
     private static void sembrarIon8600(ModeloMedidor m) {
-        m.setDescripcion("Schneider ION8600 (KWhPlanta1). Mapa por defecto del manual; unidades como el historico (W, PF en %)");
+        m.setDescripcion("Schneider ION8600 (KWhPlanta1). Mapa por defecto del manual. Catalogo en kW y PF 0-1; historico VIP en W y PF en % como el PLC");
         // El historico por PLC guarda Vln a/b/c (40166-40170): se mantiene al pasar a pasarela.
         m.setTensionesHistorico(TensionesHistorico.FASE_NEUTRO);
+        // Catálogo en kW y PF -1..1; el histórico VIP por PLC está en W y PF en %: se convierte al guardarlo.
+        m.setHistoricoPotenciaEnW(true);
+        m.setHistoricoPfEnPorcentaje(true);
         agregar(m, ParametroMedidor.KWH, 230, TipoDato.INT32, 1);
         agregar(m, ParametroMedidor.KWH_RETORNO, 232, TipoDato.INT32, 1);
         agregar(m, ParametroMedidor.KVARH, 234, TipoDato.INT32, 1);
@@ -186,16 +189,16 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
         agregar(m, ParametroMedidor.FRECUENCIA, 159, TipoDato.UINT16, 0.1);
         agregar(m, ParametroMedidor.DESBALANCE_V, 163, TipoDato.UINT16, 0.1);
         agregar(m, ParametroMedidor.DESBALANCE_I, 164, TipoDato.UINT16, 0.1);
-        agregar(m, ParametroMedidor.KW_A, 198, TipoDato.INT32, 1);
-        agregar(m, ParametroMedidor.KW_B, 200, TipoDato.INT32, 1);
-        agregar(m, ParametroMedidor.KW_C, 202, TipoDato.INT32, 1);
-        agregar(m, ParametroMedidor.KW_TOTAL, 204, TipoDato.INT32, 1);
-        agregar(m, ParametroMedidor.KVAR_TOTAL, 214, TipoDato.INT32, 1);
-        agregar(m, ParametroMedidor.KVA_TOTAL, 224, TipoDato.INT32, 1);
-        agregar(m, ParametroMedidor.PF_A, 262, TipoDato.INT16, 0.01);
-        agregar(m, ParametroMedidor.PF_B, 263, TipoDato.INT16, 0.01);
-        agregar(m, ParametroMedidor.PF_C, 264, TipoDato.INT16, 0.01);
-        agregar(m, ParametroMedidor.PF_TOTAL, 265, TipoDato.INT16, 0.01);
+        agregar(m, ParametroMedidor.KW_A, 198, TipoDato.INT32, 0.001);
+        agregar(m, ParametroMedidor.KW_B, 200, TipoDato.INT32, 0.001);
+        agregar(m, ParametroMedidor.KW_C, 202, TipoDato.INT32, 0.001);
+        agregar(m, ParametroMedidor.KW_TOTAL, 204, TipoDato.INT32, 0.001);
+        agregar(m, ParametroMedidor.KVAR_TOTAL, 214, TipoDato.INT32, 0.001);
+        agregar(m, ParametroMedidor.KVA_TOTAL, 224, TipoDato.INT32, 0.001);
+        agregar(m, ParametroMedidor.PF_A, 262, TipoDato.INT16, 0.0001);
+        agregar(m, ParametroMedidor.PF_B, 263, TipoDato.INT16, 0.0001);
+        agregar(m, ParametroMedidor.PF_C, 264, TipoDato.INT16, 0.0001);
+        agregar(m, ParametroMedidor.PF_TOTAL, 265, TipoDato.INT16, 0.0001);
     }
 
     /**
@@ -210,11 +213,12 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
      * - "KWh Retorno" del PLC (PAC_ADD 42806 = offset 2805) es la ENERGÍA REACTIVA
      *   (varh). Se mantiene en KWH_RETORNO con escala 1 para que la columna KWhR siga igual que su
      *   historico; KVARH (mismo offset, en kvarh) es el dato correcto para Calidad de Energía.
-     * Unidades de potencia en W/var/VA, como el historico (escala 1). Sin THD ni desbalances.
+     * Catálogo en kW/kVAR/kVA (el medidor entrega W, escala 0.001); el histórico VIP en W (marca). Sin THD ni desbalances.
      */
     private static void sembrarPac1020(ModeloMedidor m) {
-        m.setDescripcion("Siemens SENTRON PAC1020 (TDGeneradorSA). Offsets del manual (base 0); kW en W como el historico");
+        m.setDescripcion("Siemens SENTRON PAC1020 (TDGeneradorSA). Offsets del manual (base 0). Catalogo en kW; historico VIP en W como el PLC");
         m.setNumeracionManual(false);
+        m.setHistoricoPotenciaEnW(true); // el PLC guarda la potencia en W
         m.setTensionesHistorico(TensionesHistorico.FASE_FASE);
         agregar(m, ParametroMedidor.KWH, 2803, TipoDato.FLOAT32, 0.001);
         agregar(m, ParametroMedidor.KVARH, 2805, TipoDato.FLOAT32, 0.001);
@@ -228,18 +232,27 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
         agregar(m, ParametroMedidor.IA, 13);
         agregar(m, ParametroMedidor.IB, 15);
         agregar(m, ParametroMedidor.IC, 17);
-        agregar(m, ParametroMedidor.KW_A, 19);
-        agregar(m, ParametroMedidor.KW_B, 21);
-        agregar(m, ParametroMedidor.KW_C, 23);
+        agregar(m, ParametroMedidor.KW_A, 19, TipoDato.FLOAT32, 0.001);
+        agregar(m, ParametroMedidor.KW_B, 21, TipoDato.FLOAT32, 0.001);
+        agregar(m, ParametroMedidor.KW_C, 23, TipoDato.FLOAT32, 0.001);
         agregar(m, ParametroMedidor.PF_A, 31);
         agregar(m, ParametroMedidor.PF_B, 33);
         agregar(m, ParametroMedidor.PF_C, 35);
         agregar(m, ParametroMedidor.IN, 37);
         agregar(m, ParametroMedidor.FRECUENCIA, 39);
-        agregar(m, ParametroMedidor.KW_TOTAL, 41);
-        agregar(m, ParametroMedidor.KVAR_TOTAL, 43);
+        agregar(m, ParametroMedidor.KW_TOTAL, 41, TipoDato.FLOAT32, 0.001);
+        agregar(m, ParametroMedidor.KVAR_TOTAL, 43, TipoDato.FLOAT32, 0.001);
         agregar(m, ParametroMedidor.PF_TOTAL, 45);
-        agregar(m, ParametroMedidor.KVA_TOTAL, 4115);
+        agregar(m, ParametroMedidor.KVA_TOTAL, 4115, TipoDato.FLOAT32, 0.001);
+    }
+
+    /**
+     * Semilla anterior de ION8600/PAC1020 con potencias en W en el propio catálogo (escala 1).
+     * Desde E1 el catálogo va en kW y la conversión a W la hace la marca de histórico.
+     */
+    private static boolean enUnidadesViejas(ModeloMedidor m) {
+        RegistroModelo kw = m.registroDe(ParametroMedidor.KW_TOTAL);
+        return kw != null && kw.getEscala() == 1.0 && !m.isHistoricoPotenciaEnW();
     }
 
     /** Semilla anterior del PAC1020 (direcciones del PLC en base 1, con KW = 20 = fase L1). */

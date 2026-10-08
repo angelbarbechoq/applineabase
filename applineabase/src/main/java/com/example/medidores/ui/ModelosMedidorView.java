@@ -302,7 +302,19 @@ public class ModelosMedidorView extends VerticalLayout {
         tensionesField.setHelperText("Columnas VAB, VAC y VBC, en ese orden. Debe coincidir con lo que guardaba el PLC "
                 + "para no cambiar el historico (ION8600: fase-neutro).");
 
+        Checkbox potenciaWField = new Checkbox("Historico VIP: potencia en W (como lo guardaba el PLC)");
+        Checkbox pfPorcentajeField = new Checkbox("Historico VIP: PF en % (como lo guardaba el PLC)");
+        Tooltip.forComponent(potenciaWField)
+                .withText("El catalogo siempre se carga en kW y PF de -1 a 1. Marcar solo si el historico de "
+                        + "las maquinas con este modelo esta en W (ION8600, PAC1020), para no cambiarlo al migrar.")
+                .withHoverDelay(200).withHideDelay(5000);
+        Tooltip.forComponent(pfPorcentajeField)
+                .withText("Marcar solo si el historico de las maquinas con este modelo guarda el PF en % (ION8600).")
+                .withHoverDelay(200).withHideDelay(5000);
+
         if (enEdicion != null) {
+            potenciaWField.setValue(enEdicion.isHistoricoPotenciaEnW());
+            pfPorcentajeField.setValue(enEdicion.isHistoricoPfEnPorcentaje());
             nombreField.setValue(enEdicion.getNombre());
             descripcionField.setValue(enEdicion.getDescripcion() == null ? "" : enEdicion.getDescripcion());
             funcionField.setValue(enEdicion.getFuncionLectura());
@@ -314,8 +326,11 @@ public class ModelosMedidorView extends VerticalLayout {
             tensionesField.setValue(TensionesHistorico.FASE_FASE);
         }
 
-        FormLayout form = new FormLayout(nombreField, funcionField, descripcionField, tensionesField, manualField);
+        FormLayout form = new FormLayout(nombreField, funcionField, descripcionField, tensionesField, manualField,
+                potenciaWField, pfPorcentajeField);
         form.setColspan(tensionesField, 2);
+        form.setColspan(potenciaWField, 2);
+        form.setColspan(pfPorcentajeField, 2);
         form.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1), new FormLayout.ResponsiveStep("320px", 2));
         form.setColspan(descripcionField, 2);
         form.setColspan(manualField, 2);
@@ -329,6 +344,8 @@ public class ModelosMedidorView extends VerticalLayout {
             m.setFuncionLectura(funcionField.getValue() == null ? FuncionLectura.HOLDING : funcionField.getValue());
             m.setNumeracionManual(Boolean.TRUE.equals(manualField.getValue()));
             m.setTensionesHistorico(tensionesField.getValue() == null ? TensionesHistorico.FASE_FASE : tensionesField.getValue());
+            m.setHistoricoPotenciaEnW(Boolean.TRUE.equals(potenciaWField.getValue()));
+            m.setHistoricoPfEnPorcentaje(Boolean.TRUE.equals(pfPorcentajeField.getValue()));
             ejecutar(() -> service.guardarModelo(m), "Modelo guardado", dialog);
         });
         guardar.addThemeVariants(ButtonVariant.LUMO_PRIMARY);

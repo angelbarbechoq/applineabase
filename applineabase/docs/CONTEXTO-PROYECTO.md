@@ -56,7 +56,7 @@ navegador.
 |---|---|
 | `data\lineabase` | Base H2: `jdbc:h2:file:C:/LineaBaseX/data/lineabase;AUTO_SERVER=TRUE`, usuario y clave **vacios**. `AUTO_SERVER` permite abrirla por JDBC (jar `h2-2.4.240` en `~/.m2`) con la app corriendo. |
 | `config\` | `plc-config.json`, `linea-id-config.json`, `mezcladores-config.json`, `extrusion-tag-config.json`. Se siembran desde `src/main/resources` en el primer arranque (`ConfigLoaderService`) y despues se editan a mano ahi, sin recompilar. |
-| `{anio}\{mes}\...` | SQLite de energia: un archivo por mes, una tabla por linea/maquina, PK `fecha` (texto). Ruta armada en `RutaArchivosEnergia` (`BASE_PATH`). Muestreo cada 60 s (`DataAcquisitionTask.CYCLE_INTERVAL`; el comentario del codigo dice 6 s y esta mal). Nunca se purgan. |
+| `{anio}\{mes}\...` | SQLite de energia: un archivo por mes, una tabla por linea/maquina, PK `fecha` (texto). Ruta armada en `RutaArchivosEnergia` (`BASE_PATH`). Ademas `{mes}Calidad` (solo mensual, medidores por pasarela, ver `com.example.calidad`). Muestreo cada 60 s (`DataAcquisitionTask.CYCLE_INTERVAL`; el comentario del codigo dice 6 s y esta mal). Nunca se purgan. |
 
 `docs/REGISTRO-DE-FALLAS.md` documenta las fallas ya resueltas (fuente de verdad, se importa en
 `CLAUDE.md`); `reportes/reporte-de-fallas.html` es su version para el navegador.
@@ -74,6 +74,7 @@ reales. Si hace falta limpiar, se hace por JDBC (script en el scratchpad, creden
 | `alarmas` | Alarmas por umbral | ver seccion 7 |
 | `mezcladores` | Temperatura de mezcladores (DTB48) | ver seccion 8 |
 | `mantenimiento` | Mantenimiento preventivo y stock | ver seccion 9 |
+| `calidad` | Calidad de energia (fase E del plan) | `CalidadEnergiaAlmacen` (archivo SQLite mensual `{mes}Calidad`, una tabla por maquina, columnas nulables), `CalculoCalidad` (PF 4Q decodificado, desbalance calculado si el medidor no lo da), `LecturaCalidad`. Lo llena `PASReaderService` (solo medidores por pasarela) |
 | `medidores` | Catalogo de modelos de medidor y lector generico | `ModeloMedidor`/`RegistroModelo` (H2), `ParametroMedidor` (lista cerrada, 9 basicos + 27 de calidad, incluye KWH_RETORNO = columna KWhR), `ModeloMedidorService`, `DefinicionModelo` (copia inmutable por ciclo), `LectorMedidorService` (lectura en bloques, decodificacion, PF 4Q), `ModeloMedidorSeeder`, `ModelosMedidorView`. Detalle en `docs/PLAN-CALIDAD-ENERGIA.md` (fase B) |
 | `security` | Usuarios, roles, permisos | `Usuario`, `UsuarioRepository`, `UsuarioPrincipal`, `SecurityConfig`, `LineaAccessService`, `DataSeeder` (crea el admin inicial), `AdminSessionTimeoutFilter` |
 | `tools` | Reparaciones puntuales | `ReparacionVipView`, `MergeVipMensualTool` |

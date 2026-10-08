@@ -20,6 +20,7 @@ import java.util.Map;
  * de las pasarelas sin tocar JPA.
  */
 public record DefinicionModelo(String nombre, FuncionLectura funcion, TensionesHistorico tensiones,
+                               boolean historicoPotenciaEnW, boolean historicoPfEnPorcentaje,
                                Map<ParametroMedidor, Registro> registros) {
 
     /** Un parámetro listo para pedir: dirección base 0, tipo, orden de palabras, escala y PF 4Q. */
@@ -43,6 +44,7 @@ public record DefinicionModelo(String nombre, FuncionLectura funcion, TensionesH
                     r.getTipoDato(), r.getOrdenPalabras(), r.getEscala(), r.isPf4Cuadrantes()));
         }
         return new DefinicionModelo(modelo.getNombre(), modelo.getFuncionLectura(), modelo.getTensionesHistorico(),
+                modelo.isHistoricoPotenciaEnW(), modelo.isHistoricoPfEnPorcentaje(),
                 Collections.unmodifiableMap(mapa));
     }
 

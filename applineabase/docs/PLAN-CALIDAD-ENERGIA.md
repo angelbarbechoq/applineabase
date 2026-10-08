@@ -101,7 +101,18 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
 - [ ] D2... uno por medidor, se agrega una linea al migrar cada uno.
 
 **Fase E - Modulo Calidad de Energia**
-- [ ] E1. Tabla de calidad por maquina en un archivo mensual aparte (lo basico sigue igual).
+- [x] E1. Archivo de calidad (2026-10-08): `C:\LineaBaseX\{anio}\{mes}\{mes}Calidad` (SQLite), solo
+      mensual, una tabla por maquina, una fila por minuto con la misma marca de tiempo que el VIP.
+      Columnas: los 34 parametros del catalogo salvo las energias, en unidades estandar (kW, kVAR,
+      kVA, PF real -1..1 ya decodificado de 4Q, %), nulables (vacio = el modelo no lo tiene o fallo,
+      nunca 0), + `DESBALANCE_I_CALCULADO` / `DESBALANCE_V_CALCULADO` (1 = calculado por la app:
+      "peor fase" como el PM5110, vacio si la maquina esta parada). Se lee en los mismos pedidos
+      agrupados que el VIP. Decisiones con el usuario: cada minuto completo (~640 MB/mes con ~45
+      medidores, 245 GB libres), resumenes de norma (10 min, maximos, % en limites) al leer, archivo
+      aparte para no tocar lo que lee NetBeans. THD no calculable sin el medidor (ION8600 sin THD
+      instantaneo en su mapa por defecto; PAC1020 no mide THD).
+      Catalogo en unidades estandar para todos; marcas por modelo "historico VIP en W" y "PF en %"
+      (ION8600 ambas, PAC1020 W) para que el VIP siga igual que por PLC.
 - [ ] E2. Pantallas y KPI.
 - [ ] E3. Resumen diario precalculado y alarmas de desbalance y tension fuera de rango.
 

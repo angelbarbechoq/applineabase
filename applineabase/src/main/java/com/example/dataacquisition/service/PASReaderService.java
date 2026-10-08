@@ -3,6 +3,9 @@ package com.example.dataacquisition.service;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.event.DispositivoConectividadEvent;
 import com.example.dataacquisition.model.PAS600Lx;
+import com.example.calidad.model.LecturaCalidad;
+import com.example.calidad.service.CalculoCalidad;
+import com.example.calidad.service.CalidadEnergiaAlmacen;
 import com.example.medidores.model.ParametroMedidor;
 import com.example.medidores.service.DefinicionModelo;
 import com.example.medidores.service.LectorMedidorService;
@@ -15,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -58,6 +62,7 @@ public class PASReaderService {
     private final ApplicationEventPublisher eventPublisher;
     private final ModeloMedidorService modeloMedidorService;
     private final LectorMedidorService lectorMedidorService;
+    private final CalidadEnergiaAlmacen calidadEnergiaAlmacen;
 
     public PASReaderService(PASGatewayConfigService gatewayConfigService,
                             ConfigLoaderService configLoaderService,
@@ -66,7 +71,9 @@ public class PASReaderService {
                             PLCDataQueryService plcDataQueryService,
                             ApplicationEventPublisher eventPublisher,
                             ModeloMedidorService modeloMedidorService,
-                            LectorMedidorService lectorMedidorService) {
+                            LectorMedidorService lectorMedidorService,
+                            CalidadEnergiaAlmacen calidadEnergiaAlmacen) {
+        this.calidadEnergiaAlmacen = calidadEnergiaAlmacen;
         this.modeloMedidorService = modeloMedidorService;
         this.lectorMedidorService = lectorMedidorService;
         this.gatewayConfigService = gatewayConfigService;
@@ -103,7 +110,7 @@ public class PASReaderService {
 
     /** Resultado de leer una pasarela en un ciclo: qué medidores se leyeron y el motivo de cada falla. */
     private record ResultadoPasarela(PAS600Lx gateway, List<Map<String, Object>> lineas, boolean[] leidos,
-                                     String[] motivos, long ms) {
+                                     String[] motivos, LecturaCalidad[] calidad, long ms) {
     }
 
     /**
@@ -130,7 +137,8 @@ public class PASReaderService {
 
         long inicio = System.currentTimeMillis();
         // Misma marca de tiempo para todas las pasarelas del ciclo (filas alineadas entre máquinas).
-        String timestamp = LocalDateTime.now().format(DATE_FORMATTER);
+        LocalDateTime momento = LocalDateTime.now();
+        String timestamp = momento.format(DATE_FORMATTER);
 
         List<Callable<ResultadoPasarela>> tareas = new ArrayList<>();
         for (PAS600Lx gateway : gatewayDevices) {
@@ -177,6 +185,18 @@ public class PASReaderService {
         } finally {
             databaseInitializationService.endBatch();
         }
+
+        // Calidad de energía (archivo mensual aparte), después del kWh/VIP: un error acá no los afecta.
+        Map<String, LecturaCalidad> calidad = new LinkedHashMap<>();
+        for (ResultadoPasarela r : resultados) {
+            for (int i = 0; i < r.lineas().size(); i++) {
+                if (r.leidos()[i] && r.calidad()[i] != null) {
+                    calidad.put((String) r.lineas().get(i).get("lineaMaquina"), r.calidad()[i]);
+                }
+            }
+        }
+        calidadEnergiaAlmacen.guardar(YearMonth.from(momento), timestamp, calidad);
+
         publicarDatosActuales(resultados);
 
         StringBuilder detalle = new StringBuilder();
@@ -204,11 +224,12 @@ public class PASReaderService {
         String gatewayIP = gateway.getGatewayIP();
         boolean[] leidos = new boolean[lineas.size()];
         String[] motivos = new String[lineas.size()];
+        LecturaCalidad[] calidad = new LecturaCalidad[lineas.size()];
 
         if (!ModbusUtil.isIPAvailable(gatewayIP)) {
             logger.warn("Pasarela {} ({}) sin respuesta a ping", gatewayName, gatewayIP);
             java.util.Arrays.fill(motivos, "pasarela sin respuesta a ping");
-            return new ResultadoPasarela(gateway, lineas, leidos, motivos, System.currentTimeMillis() - inicio);
+            return new ResultadoPasarela(gateway, lineas, leidos, motivos, calidad, System.currentTimeMillis() - inicio);
         }
 
         int fallasRedSeguidas = 0;
@@ -220,7 +241,7 @@ public class PASReaderService {
                     continue;
                 }
                 try {
-                    motivos[i] = readSingleMeter(conexion, gateway, linea, i, modelos);
+                    motivos[i] = readSingleMeter(conexion, gateway, linea, i, modelos, calidad);
                     leidos[i] = motivos[i] == null;
                     fallasRedSeguidas = 0;
                 } catch (ModbusTcpConexion.ExcepcionModbus e) {
@@ -236,7 +257,7 @@ public class PASReaderService {
                 }
             }
         }
-        return new ResultadoPasarela(gateway, lineas, leidos, motivos, System.currentTimeMillis() - inicio);
+        return new ResultadoPasarela(gateway, lineas, leidos, motivos, calidad, System.currentTimeMillis() - inicio);
     }
 
     /**
@@ -247,7 +268,7 @@ public class PASReaderService {
      * @return null si se leyó, o el motivo por el que no se pudo
      */
     private String readSingleMeter(ModbusTcpConexion conexion, PAS600Lx gateway, Map<String, Object> linea, int index,
-                                   Map<String, DefinicionModelo> modelos)
+                                   Map<String, DefinicionModelo> modelos, LecturaCalidad[] calidad)
             throws IOException, ModbusTcpConexion.ExcepcionModbus {
         int unitId = ((Number) linea.get("id")).intValue();
         String nombreModelo = String.valueOf(linea.get("modeloMedidor"));
@@ -260,19 +281,20 @@ public class PASReaderService {
             return "el modelo " + nombreModelo + " no tiene cargados los registros basicos " + modelo.faltantesBasicos();
         }
 
-        // Requeridos del modelo (incluye las tensiones elegidas para el historico) + energía de
-        // retorno (columna KWhR) si el modelo la tiene.
-        List<ParametroMedidor> aLeer = new ArrayList<>(modelo.requeridos());
-        boolean conRetorno = modelo.registros().containsKey(ParametroMedidor.KWH_RETORNO);
-        if (conRetorno) {
-            aLeer.add(ParametroMedidor.KWH_RETORNO);
+        // Todo lo que el modelo tiene, en los mismos pedidos agrupados: los requeridos para kWh/VIP
+        // y el resto para el archivo de calidad (y KWhR). Solo un requerido faltante invalida la lectura.
+        LectorMedidorService.Lectura lectura = lectorMedidorService.leer(conexion, unitId, modelo,
+                modelo.registros().keySet());
+        Map<ParametroMedidor, String> erroresBasicos = new EnumMap<>(ParametroMedidor.class);
+        for (ParametroMedidor p : modelo.requeridos()) {
+            if (lectura.errores().containsKey(p)) {
+                erroresBasicos.put(p, lectura.errores().get(p));
+            }
         }
-        LectorMedidorService.Lectura lectura = lectorMedidorService.leer(conexion, unitId, modelo, aLeer);
-        Map<ParametroMedidor, String> erroresBasicos = new EnumMap<>(lectura.errores());
-        erroresBasicos.remove(ParametroMedidor.KWH_RETORNO);
         if (!erroresBasicos.isEmpty()) {
             return "parametros sin lectura " + erroresBasicos;
         }
+        calidad[index] = CalculoCalidad.construir(modelo, lectura.valores());
         Map<ParametroMedidor, Double> v = lectura.valores();
         Double retorno = v.get(ParametroMedidor.KWH_RETORNO);
         gateway.setKWhRx(index, retorno == null ? BigDecimal.ZERO : decimal(retorno));
@@ -288,10 +310,14 @@ public class PASReaderService {
         gateway.setIAx(index, decimal(v.get(ParametroMedidor.IA)));
         gateway.setIBx(index, decimal(v.get(ParametroMedidor.IB)));
         gateway.setICx(index, decimal(v.get(ParametroMedidor.IC)));
-        gateway.setKWx(index, decimal(v.get(ParametroMedidor.KW_TOTAL)));
-        // PF tal como lo entrega el medidor (igual que por PLC); el decodificado 4 cuadrantes se
-        // aplica al mostrarlo (ver docs/PLAN-CALIDAD-ENERGIA.md).
-        gateway.setPFx(index, decimal(v.get(ParametroMedidor.PF_TOTAL)));
+        // El catálogo entrega kW y PF -1..1; el VIP se guarda en las unidades de su histórico
+        // (ION8600/PAC1020 por PLC: W; ION8600: PF en %).
+        double kw = v.get(ParametroMedidor.KW_TOTAL);
+        gateway.setKWx(index, decimal(modelo.historicoPotenciaEnW() ? kw * 1000.0 : kw));
+        // PF tal como lo entrega el medidor (igual que por PLC, sin decodificar 4 cuadrantes); el
+        // archivo de calidad guarda el valor real decodificado.
+        double pf = v.get(ParametroMedidor.PF_TOTAL);
+        gateway.setPFx(index, decimal(modelo.historicoPfEnPorcentaje() ? pf * 100.0 : pf));
 
         logger.debug("Medidor {} (Unit ID {}, {}) leido", linea.get("lineaMaquina"), unitId, nombreModelo);
         return null;
