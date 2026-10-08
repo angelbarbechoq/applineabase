@@ -30,9 +30,21 @@ Los valores de 32 bits hay que pedirlos enteros (2 registros juntos): pedir la m
 | 41239-41240 | 1238-1239 | Horas de marcha | UInt32 | 0.1 | h | 11322 = 1.132,2 h |
 | 41241 | 1240 | Cantidad de arranques | UInt16 | 1 | - | 708 = 708 (12:32); 710 a las 12:46 (arranques de prueba del tecnico, confirmado por el usuario) |
 
-## Pendientes (confirmar con el generador CON CARGA: GCB cerrado)
-- Corrientes, kW, kVAr y PF del generador: hoy 0 (sin carga). Candidatos: 41015-41017 (16 bits,
-  0/0/0) y los valores de 32 bits en 41060-41075 (8 valores, todos 0).
+## Confirmados por calculo con carga (2026-10-08 13:13, `foto-generador-carga.csv`); falta pantalla
+| Registro | Base 0 | Dato | Tipo | Escala | Unidad | Evidencia |
+|---|---|---|---|---|---|---|
+| 41020 | 1019 | Generador kW total | Int16 | 1 | kW | 604 = 200+209+195 |
+| 41021-41023 | 1020-1022 | Generador kW L1, L2, L3 | Int16 | 1 | kW | 200/209/195 |
+| 41024 | 1023 | Generador kVAr total | Int16 | 1 | kVAr | 202 = 61+72+69 |
+| 41025-41027 | 1024-1026 | Generador kVAr L1, L2, L3 | Int16 | 1 | kVAr | 61/72/69 |
+| 41028 | 1027 | Generador kVA total | UInt16 | 1 | kVA | 639 = 210+222+207 |
+| 41029-41031 | 1028-1030 | Generador kVA L1, L2, L3 | UInt16 | 1 | kVA | 210/222/207 |
+| 41032 | 1031 | Generador PF total | Int16 | 0.01 | - | 95 = 604/639 = 0,945 |
+| 41033-41035 | 1032-1034 | Generador PF L1, L2, L3 | Int16 | 0.01 | - | 95/94/94 |
+| 41043-41045 | 1042-1044 | Generador corriente L1, L2, L3 | UInt16 | 1 | A | 753/800/746 (en vacio 0) |
+Con carga: RPM 1800, 60,0 Hz, V L-L 458/456/458, kWh +2 en el momento de la foto.
+
+## Pendientes
 - 41047 (base 0 1046): cambia mucho entre lecturas (980, 64399, 65423...); quiza angulo de
   sincronismo. 41055-41057: cambian con la carga de la red (1022-1250 / 777-921 / 207-267) pero
   no coinciden con corrientes ni potencia de TR2. 41058 = 96-97 (¿PF de red x100?). 41082 = -104.
