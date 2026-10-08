@@ -242,5 +242,8 @@ en el PAC1020 era reactiva), orden de columnas (se guarda segun manual, no hace 
    444-447 V); 41048 = 600 (probable frecuencia x10). 32768 = no disponible. Sin InteliConfig: se
    identifican los demas comparando `docs/ig200/foto-generador-parado.csv` con una foto igual con
    el generador en marcha + fotos de la pantalla del controlador que manda el usuario.
+   2026-10-08: 13 registros confirmados (RPM, frecuencias, tensiones red/generador, bateria, aceite,
+   refrigerante, kWh, kVArh, horas) en `docs/ig200/MAPA-REGISTROS.md`. Faltan corrientes/kW/PF del
+   generador: confirmar cuando tome carga.
    (Antes: puerto 502 cerrado; abiertos
    23 y 80) y exportar la lista de registros desde InteliConfig ("Generate Cfg Image" > Modbus).
