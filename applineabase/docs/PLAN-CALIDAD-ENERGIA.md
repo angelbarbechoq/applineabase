@@ -159,12 +159,16 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       - Un registro por arranque: inicio, fin, duracion, kWh generados, carga maxima, prueba o corte
         de red (contadores del controlador: horas 41239, kWh 41231, arranques 41241).
       - No se guardan las tensiones de red del controlador (ya las mide TR2 por el PLC).
-- [ ] G2. Pantalla del generador: estado actual, historial de arranques, tendencia de bateria y
+- [x] G2. (2026-10-08) Pantalla `generador` (menu "Generador", alcance como alarmas): Estado actual en vivo cada
+      15 s (Red TR2 / Generador / Motor con semaforo; motor con limites provisorios de 24 V), Arranques
+      (con carga maxima) y Tendencias (bateria, refrigerante, aceite, kW, corrientes, tension, Hz, RPM).
+      Texto original: Pantalla del generador: estado actual, historial de arranques, tendencia de bateria y
       refrigerante.
 - [ ] G3. Alarmas del generador (con E3): bateria baja/en descenso, refrigerante frio con el
       generador parado (precalentador), arranque fallido, controlador sin comunicacion, aceite y
       temperatura fuera de rango en marcha.
-- [ ] G4. Confirmar corrientes, kW, kVAr y PF del generador cuando tome carga (hoy 0, sin carga).
+- [x] G4. (2026-10-08) Corrientes, kW (total y por fase), kVAr, kVA y PF confirmados con carga contra TR2 y
+      el contador; se guardan desde entonces (columnas agregadas solas a la tabla del mes).
 
 ## Como se lee hoy (revisado 2026-10-07)
 - **PLC** (`PLCDataAcquisitionService`): el PLC es el maestro RS-485 y sondea los medidores cuyos

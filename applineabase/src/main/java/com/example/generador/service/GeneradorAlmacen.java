@@ -34,6 +34,41 @@ public class GeneradorAlmacen {
     private static final Logger logger = LoggerFactory.getLogger(GeneradorAlmacen.class);
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
+    static final String[] COLUMNAS_CARGA = {"kw", "kw_l1", "kw_l2", "kw_l3", "kvar", "kva", "pf", "i_l1", "i_l2", "i_l3"};
+    /** Columnas de valores en el orden en que se insertan (después de fecha y estado). */
+    static final String[] COLUMNAS_VALOR = {"rpm", "frecuencia", "v_l1n", "v_l2n", "v_l3n", "v_l1l2", "v_l2l3", "v_l3l1",
+            "bateria", "presion_aceite", "temp_refrigerante", "kwh", "kvarh", "horas_marcha", "arranques",
+            "kw", "kw_l1", "kw_l2", "kw_l3", "kvar", "kva", "pf", "i_l1", "i_l2", "i_l3"};
+
+    private static void agregarColumnasSiFaltan(Connection c, String tabla, String[] columnas) throws SQLException {
+        java.util.Set<String> existentes = new java.util.HashSet<>();
+        try (ResultSet rs = c.getMetaData().getColumns(null, null, tabla, null)) {
+            while (rs.next()) existentes.add(rs.getString("COLUMN_NAME").toLowerCase());
+        }
+        try (Statement st = c.createStatement()) {
+            for (String col : columnas) {
+                if (!existentes.contains(col)) {
+                    st.executeUpdate("ALTER TABLE \"" + tabla + "\" ADD COLUMN " + col + " REAL");
+                }
+            }
+        }
+    }
+
+    /** Carga máxima del arranque en curso (se actualiza en cada lectura en marcha). */
+    public void actualizarKwMax(String generador, Double kw) {
+        if (kw == null) {
+            return;
+        }
+        try (Connection c = abrirArranques(generador);
+             PreparedStatement ps = c.prepareStatement("UPDATE \"" + generador + "\" SET kw_max = max(coalesce(kw_max, 0), ?) "
+                     + "WHERE fin IS NULL")) {
+            ps.setDouble(1, kw);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            logger.error("Error actualizando carga maxima de {}: {}", generador, e.getMessage());
+        }
+    }
+
     public static String rutaLecturas(YearMonth mes) {
         return RutaArchivosEnergia.construirCarpetaMes(mes.getYear(), mes.getMonthValue())
                 + "\\" + RutaArchivosEnergia.getNombreMes(mes.getMonthValue()) + "Generador";
@@ -57,13 +92,22 @@ public class GeneradorAlmacen {
                         + "estado TEXT, rpm REAL, frecuencia REAL, v_l1n REAL, v_l2n REAL, v_l3n REAL, "
                         + "v_l1l2 REAL, v_l2l3 REAL, v_l3l1 REAL, bateria REAL, presion_aceite REAL, "
                         + "temp_refrigerante REAL, kwh INTEGER, kvarh INTEGER, horas_marcha REAL, arranques INTEGER)");
+                // Columnas de carga agregadas el 2026-10-08 (confirmadas con carga contra TR2).
+                agregarColumnasSiFaltan(c, generador, COLUMNAS_CARGA);
+            }
+            StringBuilder cols = new StringBuilder("fecha, estado");
+            StringBuilder marcas = new StringBuilder("?, ?");
+            for (String col : COLUMNAS_VALOR) {
+                cols.append(", ").append(col);
+                marcas.append(", ?");
             }
             try (PreparedStatement ps = c.prepareStatement("INSERT OR REPLACE INTO \"" + generador
-                    + "\" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
+                    + "\" (" + cols + ") VALUES (" + marcas + ")")) {
                 ps.setString(1, l.fecha().format(FECHA));
                 ps.setString(2, l.enMarcha() ? "MARCHA" : "PARADO");
                 Object[] v = {l.rpm(), l.frecuencia(), l.vL1N(), l.vL2N(), l.vL3N(), l.vL1L2(), l.vL2L3(), l.vL3L1(),
-                        l.bateria(), l.presionAceite(), l.tempRefrigerante(), l.kwh(), l.kvarh(), l.horasMarcha(), l.arranques()};
+                        l.bateria(), l.presionAceite(), l.tempRefrigerante(), l.kwh(), l.kvarh(), l.horasMarcha(), l.arranques(),
+                        l.kw(), l.kwL1(), l.kwL2(), l.kwL3(), l.kvar(), l.kva(), l.pf(), l.iL1(), l.iL2(), l.iL3()};
                 for (int i = 0; i < v.length; i++) {
                     if (v[i] == null) ps.setNull(i + 3, Types.REAL);
                     else ps.setObject(i + 3, v[i]);
@@ -150,8 +194,9 @@ public class GeneradorAlmacen {
             st.executeUpdate("CREATE TABLE IF NOT EXISTS \"" + generador + "\" (id INTEGER PRIMARY KEY AUTOINCREMENT, "
                     + "inicio TEXT NOT NULL, fin TEXT, duracion_min REAL, kwh_inicio INTEGER, kwh_fin INTEGER, "
                     + "kwh_generados INTEGER, horas_inicio REAL, horas_fin REAL, arranques_contador INTEGER, "
-                    + "inicio_estimado INTEGER)");
+                    + "inicio_estimado INTEGER, kw_max REAL)");
         }
+        agregarColumnasSiFaltan(c, generador, new String[]{"kw_max"});
         return c;
     }
 

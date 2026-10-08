@@ -4,6 +4,7 @@
     "modelo" : "InteliGen200",
     "ipAddress" : "192.168.0.254",
     "unitId" : 1,
+    "redAsociada" : "Trafo2",
     "descripcion" : "Generador Gen Power, controlador ComAp InteliGen 200 (junto a TR2). Solo lectura."
   } ]
 }

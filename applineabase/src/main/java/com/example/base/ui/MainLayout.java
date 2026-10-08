@@ -237,6 +237,7 @@ public final class MainLayout extends AppLayout {
             colapsarAlSalirDelMouse(alarmas);
             // Calidad de Energia: mismo alcance que alarmas (ADMIN y zona Mantenimiento).
             nav.addItem(new SideNavItem("Calidad de Energia", "calidad", VaadinIcon.FLASH.create()));
+            nav.addItem(new SideNavItem("Generador", "generador", VaadinIcon.COGS.create()));
         }
         if (lineaAccessService.puedeVerMantenimiento()) {
             SideNavItem mantenimientoPreventivo = new SideNavItem("Mantenimiento Preventivo");

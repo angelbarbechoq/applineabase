@@ -65,17 +65,26 @@ public class GeneradorReaderService {
     }
 
     /** 4 pedidos de lectura (función 03). Direcciones base 0 = registro 4xxxx - 40001. */
-    static LecturaGenerador leer(String ip, int unitId) throws IOException, ModbusTcpConexion.ExcepcionModbus {
+    public static LecturaGenerador leer(String ip, int unitId) throws IOException, ModbusTcpConexion.ExcepcionModbus {
         try (ModbusTcpConexion c = new ModbusTcpConexion(ip, TIMEOUT_MS)) {
             int[] rpm = c.leerHolding(unitId, 1000, 1);    // 41001 RPM
-            int[] gen = c.leerHolding(unitId, 1035, 7);    // 41036 frec x10, 41037-39 V L-N, 41040-42 V L-L
+            // 41020..41054 (base 0 1019..1053): kW tot/L1-3, kVAr tot/L1-3, kVA tot/L1-3, PF tot/L1-3,
+            // frec gen, V L-N, V L-L, corrientes L1-3, (41046-47 sin uso), frec red, red V L-N, red V L-L.
+            int[] e = c.leerHolding(unitId, 1019, 35);
             int[] mot = c.leerHolding(unitId, 1083, 4);    // 41084 bateria x10, 41085 ?, 41086 aceite x10, 41087 refrigerante
             int[] cont = c.leerHolding(unitId, 1230, 12);  // 41231 kWh, 41233 kVArh, 41235/37 red, 41239 horas x10, 41241 arranques
             return new LecturaGenerador(LocalDateTime.now().withNano(0),
                     u16(rpm[0], 1),
-                    u16(gen[0], 10),
-                    u16(gen[1], 1), u16(gen[2], 1), u16(gen[3], 1),
-                    u16(gen[4], 1), u16(gen[5], 1), u16(gen[6], 1),
+                    u16(e[16], 10),                                    // 41036 frecuencia generador
+                    u16(e[17], 1), u16(e[18], 1), u16(e[19], 1),       // 41037-39 V L-N
+                    u16(e[20], 1), u16(e[21], 1), u16(e[22], 1),       // 41040-42 V L-L
+                    u16(e[23], 1), u16(e[24], 1), u16(e[25], 1),       // 41043-45 corrientes
+                    s16(e[0]), s16(e[1]), s16(e[2]), s16(e[3]),        // 41020-23 kW total y por fase
+                    s16(e[4]),                                         // 41024 kVAr total
+                    u16(e[8], 1),                                      // 41028 kVA total
+                    e[12] == NO_DISPONIBLE ? null : (short) e[12] / 100.0, // 41032 PF total
+                    u16(e[28], 10),                                    // 41048 frecuencia red
+                    u16(e[32], 1), u16(e[33], 1), u16(e[34], 1),       // 41052-54 red V L-L
                     u16(mot[0], 10),
                     u16(mot[2], 10),
                     s16(mot[3]),
@@ -107,6 +116,7 @@ public class GeneradorReaderService {
 
         if (enMarcha) {
             almacen.guardarLectura(nombre, l);
+            almacen.actualizarKwMax(nombre, l.kw());
             return;
         }
         LocalDateTime ultimo = ultimoGuardadoParado.get(nombre);

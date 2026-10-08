@@ -30,7 +30,9 @@ Los valores de 32 bits hay que pedirlos enteros (2 registros juntos): pedir la m
 | 41239-41240 | 1238-1239 | Horas de marcha | UInt32 | 0.1 | h | 11322 = 1.132,2 h |
 | 41241 | 1240 | Cantidad de arranques | UInt16 | 1 | - | 708 = 708 (12:32); 710 a las 12:46 (arranques de prueba del tecnico, confirmado por el usuario) |
 
-## Confirmados por calculo con carga (2026-10-08 13:13, `foto-generador-carga.csv`); falta pantalla
+## Confirmados con carga (2026-10-08, `foto-generador-carga.csv`): por suma de fases, contra TR2 (cuando el
+## generador toma ~610 kW, TR2 baja de ~850 a ~215 kW; corrientes igual) y contra el contador (13:14-13:53:
+## +389 kWh con ~600 kW durante 39 min = 390 kWh)
 | Registro | Base 0 | Dato | Tipo | Escala | Unidad | Evidencia |
 |---|---|---|---|---|---|---|
 | 41020 | 1019 | Generador kW total | Int16 | 1 | kW | 604 = 200+209+195 |

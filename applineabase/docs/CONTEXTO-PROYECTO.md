@@ -74,7 +74,7 @@ reales. Si hace falta limpiar, se hace por JDBC (script en el scratchpad, creden
 | `alarmas` | Alarmas por umbral | ver seccion 7 |
 | `mezcladores` | Temperatura de mezcladores (DTB48) | ver seccion 8 |
 | `mantenimiento` | Mantenimiento preventivo y stock | ver seccion 9 |
-| `generador` | Generador con controlador ComAp InteliGen 200 (fase G, solo lectura) | `GeneradorReaderService` (lee en el ciclo de 1 min: marcha = cada minuto, parado = cada 15 min, abre/cierra arranques), `GeneradorAlmacen` (`{mes}Generador` y `C:/LineaBaseX/generador/arranques`), `LecturaGenerador`. Config `generador-config.json`. Mapa en `docs/ig200/MAPA-REGISTROS.md` |
+| `generador` | Generador con controlador ComAp InteliGen 200 (fase G, solo lectura) | `GeneradorView` (ruta `generador`, gate `puedeVerAlarmas()`), `GeneradorService` (en vivo, red TR2, arranques, tendencias), `GeneradorReaderService` (lee en el ciclo de 1 min: marcha = cada minuto, parado = cada 15 min, abre/cierra arranques), `GeneradorAlmacen` (`{mes}Generador` y `C:/LineaBaseX/generador/arranques`), `LecturaGenerador`. Config `generador-config.json`. Mapa en `docs/ig200/MAPA-REGISTROS.md` |
 | `calidad` | calidad de energia (fase e del plan) | `CalidadEnergiaView` (ruta `calidad`), `CalidadEnergiaService` (lectura, bloques de 10 min, cumplimiento, limites), `ConfiguracionCalidad` y `TensionNominal` (H2), `Indicador`, `CalidadEnergiaAlmacen` (archivo SQLite mensual `{mes}Calidad`, una tabla por maquina, columnas nulables), `CalculoCalidad` (PF 4Q decodificado, desbalance calculado si el medidor no lo da), `LecturaCalidad`. Lo llena `PASReaderService` (solo medidores por pasarela) |
 | `medidores` | Catalogo de modelos de medidor y lector generico | `ModeloMedidor`/`RegistroModelo` (H2), `ParametroMedidor` (lista cerrada, 9 basicos + 27 de calidad, incluye KWH_RETORNO = columna KWhR), `ModeloMedidorService`, `DefinicionModelo` (copia inmutable por ciclo), `LectorMedidorService` (lectura en bloques, decodificacion, PF 4Q), `ModeloMedidorSeeder`, `ModelosMedidorView`. Detalle en `docs/PLAN-CALIDAD-ENERGIA.md` (fase B) |
 | `security` | Usuarios, roles, permisos | `Usuario`, `UsuarioRepository`, `UsuarioPrincipal`, `SecurityConfig`, `LineaAccessService`, `DataSeeder` (crea el admin inicial), `AdminSessionTimeoutFilter` |
@@ -116,6 +116,7 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `configuracion` | `ConfiguracionView` (hardware) | ADMIN |
 | `configuracion/medidores` | `ModelosMedidorView` (catalogo de modelos + Probar lectura) | ADMIN |
 | `calidad` | `CalidadEnergiaView` (Estado actual, Historico, Cumplimiento; Limites solo ADMIN) | gate `puedeVerAlarmas()` |
+| `generador` | `GeneradorView` (Estado actual en vivo, Arranques, Tendencias; solo lectura del controlador) | gate `puedeVerAlarmas()` |
 | `mezcladores/config` | `MezcladoresConfigView` | gate `puedeVerMezcladores()` |
 | `mantenimiento` | `MantenimientoView` | gate `puedeVerMantenimiento()`; el formulario solo lo ve ADMIN |
 | `mantenimiento/personal` | `PersonalMantenimientoView` | ADMIN |
