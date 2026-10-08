@@ -74,7 +74,7 @@ reales. Si hace falta limpiar, se hace por JDBC (script en el scratchpad, creden
 | `alarmas` | Alarmas por umbral | ver seccion 7 |
 | `mezcladores` | Temperatura de mezcladores (DTB48) | ver seccion 8 |
 | `mantenimiento` | Mantenimiento preventivo y stock | ver seccion 9 |
-| `calidad` | Calidad de energia (fase E del plan) | `CalidadEnergiaAlmacen` (archivo SQLite mensual `{mes}Calidad`, una tabla por maquina, columnas nulables), `CalculoCalidad` (PF 4Q decodificado, desbalance calculado si el medidor no lo da), `LecturaCalidad`. Lo llena `PASReaderService` (solo medidores por pasarela) |
+| `calidad` | Calidad de energia (fase E del plan) | `CalidadEnergiaView` (ruta `calidad`), `CalidadEnergiaService` (lectura, bloques de 10 min, cumplimiento, limites), `ConfiguracionCalidad` y `TensionNominal` (H2), `Indicador`, `CalidadEnergiaAlmacen` (archivo SQLite mensual `{mes}Calidad`, una tabla por maquina, columnas nulables), `CalculoCalidad` (PF 4Q decodificado, desbalance calculado si el medidor no lo da), `LecturaCalidad`. Lo llena `PASReaderService` (solo medidores por pasarela) |
 | `medidores` | Catalogo de modelos de medidor y lector generico | `ModeloMedidor`/`RegistroModelo` (H2), `ParametroMedidor` (lista cerrada, 9 basicos + 27 de calidad, incluye KWH_RETORNO = columna KWhR), `ModeloMedidorService`, `DefinicionModelo` (copia inmutable por ciclo), `LectorMedidorService` (lectura en bloques, decodificacion, PF 4Q), `ModeloMedidorSeeder`, `ModelosMedidorView`. Detalle en `docs/PLAN-CALIDAD-ENERGIA.md` (fase B) |
 | `security` | Usuarios, roles, permisos | `Usuario`, `UsuarioRepository`, `UsuarioPrincipal`, `SecurityConfig`, `LineaAccessService`, `DataSeeder` (crea el admin inicial), `AdminSessionTimeoutFilter` |
 | `tools` | Reparaciones puntuales | `ReparacionVipView`, `MergeVipMensualTool` |
@@ -114,6 +114,7 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `alarmas/config` | `AlarmasConfigView` | ADMIN |
 | `configuracion` | `ConfiguracionView` (hardware) | ADMIN |
 | `configuracion/medidores` | `ModelosMedidorView` (catalogo de modelos + Probar lectura) | ADMIN |
+| `calidad` | `CalidadEnergiaView` (Estado actual, Historico, Cumplimiento; Limites solo ADMIN) | gate `puedeVerAlarmas()` |
 | `mezcladores/config` | `MezcladoresConfigView` | gate `puedeVerMezcladores()` |
 | `mantenimiento` | `MantenimientoView` | gate `puedeVerMantenimiento()`; el formulario solo lo ve ADMIN |
 | `mantenimiento/personal` | `PersonalMantenimientoView` | ADMIN |
@@ -123,7 +124,7 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `admin/reparar-vip` | `ReparacionVipView` | ADMIN |
 
 **Menu lateral (`MainLayout.createSideNav()`):** Graficas (Tiempo Real, Historico), Consulta de
-Datos, Horometro, Alarmas (Alarmas Activas; Historial solo admin), Mantenimiento Preventivo
+Datos, Horometro, Alarmas (Alarmas Activas; Historial solo admin), Calidad de Energia (mismo alcance que alarmas), Mantenimiento Preventivo
 (Mantenimiento Barril y Tornillos; Personal de Mantenimiento solo admin), Reportes (Barril y
 Tornillo), y solo admin: Usuarios, Reparar VIP Mensual, Configuracion (alarmas, hardware,
 Modelos de medidor, Mezcladores, Mantenimiento). Los padres usan `colapsarAlSalirDelMouse(...)`. "Mantenimiento

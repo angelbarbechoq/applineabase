@@ -128,7 +128,16 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
       instantaneo en su mapa por defecto; PAC1020 no mide THD).
       Catalogo en unidades estandar para todos; marcas por modelo "historico VIP en W" y "PF en %"
       (ION8600 ambas, PAC1020 W) para que el VIP siga igual que por PLC.
-- [ ] E2. Pantallas y KPI.
+- [x] E2. Pantalla **Calidad de Energia** (2026-10-08, ruta `calidad`, menu propio, alcance como
+      alarmas: ADMIN y zona Mantenimiento). Pestanas: **Estado actual** (ultimo minuto por maquina,
+      7 indicadores con color y limite al pasar el mouse; * = desbalance calculado), **Historico**
+      (maquina + indicador + rango hasta 2 meses: promedios de 10 min por fase y linea del limite),
+      **Cumplimiento** (por mes: % de bloques de 10 min dentro del limite y peor bloque) y **Limites**
+      (ADMIN: limites editables en H2 y tension nominal fase-fase por maquina; 460 V por defecto).
+      Indicadores: THD tension (max de fases; limite 8 % hasta 1 kV, 5 % de 1 a 69 kV), THD
+      corriente (20 %), desbalance tension (2 %) y corriente (10 %), tension (+/-5 aviso, +/-10 fuera),
+      frecuencia (+/-1 %), PF (>= 0.92). Aviso = 80 % del limite. Defaults propuestos por normas; el
+      usuario no los confirmo todavia (se editan en Limites).
 - [ ] E3. Resumen diario precalculado y alarmas de desbalance y tension fuera de rango.
 
 ## Como se lee hoy (revisado 2026-10-07)
