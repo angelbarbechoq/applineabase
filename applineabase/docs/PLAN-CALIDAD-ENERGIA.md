@@ -223,16 +223,18 @@ A-B/B-C/C-A 1098-1102. No tiene PF por fase, desbalances ni energia de retorno.
 ION8600: el mapa por defecto solo expone THD **maximos** (40266-40271), no instantaneos; para
 tener THD instantaneo hay que configurarlo en los modulos Modbus Slave del medidor (ION Setup).
 
-## Datos pendientes del usuario
-(Todo esto se puede cargar desde Configuracion > Modelos de medidor, sin recompilar.)
-1. ~~Registros de calidad del PM710~~ (hecho 2026-10-07).
-2. ~~Registros de calidad del PM5110~~ (hecho 2026-10-07). PAC1020: falta su manual para los de calidad.
-3. ION8600 (KWhPlanta1) y PAC1020 (TDGeneradorSA): registros, tipo de dato y escala de los 9
-   basicos (por PLC hoy: KWhPlanta1 con enteros, I/10 y PF/100; TDGeneradorSA con kWh/1000).
-   Sensores del PLC 192.168.0.3 (TemperaturaAmbiente, TemperaturaAgua, PsiAireP1, PsiAgua,
-   BarCompHP): si ese PLC se queda o como se leeran.
-4. Pasarelas: cantidad, IP, medidores por pasarela, si se conservan las direcciones (102, 103...),
-   velocidad RS-485.
-5. Tension nominal por tablero, kVA de transformadores y que cuelga de cada uno, corriente nominal
-   por maquina, tarifa (umbral de FP, horario de punta, demanda contratada). Que es `KWhR`.
-6. Numero de serie repetido Linea02 / CabezalXTR2.
+## Datos pendientes del usuario (actualizado 2026-10-08)
+Resueltos: registros de PM5110, PM710, ION8600 y PAC1020 (manuales), KWhR (= energia de retorno;
+en el PAC1020 era reactiva), orden de columnas (se guarda segun manual, no hace falta PM_ADD).
+1. PLC: cambiar `PAC_ADD[7]` de 40020 a 40042 (F-12, potencia del generador a un tercio).
+2. ION8600: THD instantaneo (programarlo en ION Setup) o dejarlo vacio.
+3. Calidad: confirmar limites propuestos y cargar la tension nominal real por tablero (pestana
+   Limites). Tarifa: umbral de PF, horario de punta, demanda contratada.
+4. Sensores del PLC 192.168.0.3 (TemperaturaAmbiente, TemperaturaAgua, PsiAireP1, PsiAgua,
+   BarCompHP): como se leeran si ese PLC se retira.
+5. Pasarelas (C3): cantidad, IP, medidores por pasarela, direcciones (102, 103...), velocidad RS-485.
+6. `linea-id-config.json` (C1): BarCompHP en PLC1 y PLC3, serie repetida Linea02/CabezalXTR2, lineas
+   en PLC5.
+7. NetBeans (C2): como se sincroniza su lista de IDs del PLC con esta app.
+8. InteliGen 200 (192.168.0.254): activar el servidor Modbus TCP (puerto 502 hoy cerrado; abiertos
+   23 y 80) y exportar la lista de registros desde InteliConfig ("Generate Cfg Image" > Modbus).
