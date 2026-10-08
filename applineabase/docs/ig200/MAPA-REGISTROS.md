@@ -28,7 +28,7 @@ Los valores de 32 bits hay que pedirlos enteros (2 registros juntos): pedir la m
 | 41235-41236 | 1234-1235 | Red (Mains) kWh | UInt32 | 1 | kWh | 38580072 (pantalla Statistics); sube ~580 kW, coherente con la red |
 | 41237-41238 | 1236-1237 | Red (Mains) kVArh | UInt32 | 1 | kVArh | 9857303 (pantalla) vs 9857326 leido minutos despues |
 | 41239-41240 | 1238-1239 | Horas de marcha | UInt32 | 0.1 | h | 11322 = 1.132,2 h |
-| 41241 | 1240 | Cantidad de arranques | UInt16 | 1 | - | 708 = 708 (12:32); 710 a las 12:46 |
+| 41241 | 1240 | Cantidad de arranques | UInt16 | 1 | - | 708 = 708 (12:32); 710 a las 12:46 (arranques de prueba del tecnico, confirmado por el usuario) |
 
 ## Pendientes (confirmar con el generador CON CARGA: GCB cerrado)
 - Corrientes, kW, kVAr y PF del generador: hoy 0 (sin carga). Candidatos: 41015-41017 (16 bits,
