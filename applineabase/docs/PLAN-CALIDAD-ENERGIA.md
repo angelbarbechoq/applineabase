@@ -139,6 +139,29 @@ marca [x] al cerrar cada uno. No tocar el lector actual de PLC ni de pasarelas h
       frecuencia (+/-1 %), PF (>= 0.92). Aviso = 80 % del limite. Defaults propuestos por normas; el
       usuario no los confirmo todavia (se editan en Limites).
 - [ ] E3. Resumen diario precalculado y alarmas de desbalance y tension fuera de rango.
+      (2026-10-08: se hara en una sesion aparte, junto con la fase G. Propuesta ya presentada: alarmas
+      de tension fuera de rango y frecuencia (urgentes), desbalances y THD (informativas), evaluadas
+      sobre promedios de 10 min con los mismos limites de la pestana Limites. El "resumen diario
+      precalculado" se descarta: los calculos al leer son instantaneos.)
+
+**Fase G - Generador Gen Power (InteliGen 200), mantenimiento basado en condicion**
+Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REGISTROS.md`
+(solo lectura, funcion 03, Unit ID 1, 192.168.0.254).
+- [ ] G1. Guardado segun estado del generador:
+      - En marcha (RPM > 0): todo cada minuto (tensiones, frecuencia, corrientes, kW, PF, RPM,
+        aceite, refrigerante, bateria).
+      - Parado: cada 15 min solo lo que dice si esta listo para arrancar: tension de bateria,
+        temperatura de refrigerante (precalentador), modo OFF/MAN/AUTO, alarmas y si el controlador
+        responde.
+      - Un registro por arranque: inicio, fin, duracion, kWh generados, carga maxima, prueba o corte
+        de red (contadores del controlador: horas 41239, kWh 41231, arranques 41241).
+      - No se guardan las tensiones de red del controlador (ya las mide TR2 por el PLC).
+- [ ] G2. Pantalla del generador: estado actual, historial de arranques, tendencia de bateria y
+      refrigerante.
+- [ ] G3. Alarmas del generador (con E3): bateria baja/en descenso, refrigerante frio con el
+      generador parado (precalentador), arranque fallido, controlador sin comunicacion, aceite y
+      temperatura fuera de rango en marcha.
+- [ ] G4. Confirmar corrientes, kW, kVAr y PF del generador cuando tome carga (hoy 0, sin carga).
 
 ## Como se lee hoy (revisado 2026-10-07)
 - **PLC** (`PLCDataAcquisitionService`): el PLC es el maestro RS-485 y sondea los medidores cuyos

@@ -312,6 +312,9 @@ una opcion mas de la lista.
   `docs/PLAN-CALIDAD-ENERGIA.md` (fases A y B hechas el 2026-10-07; faltan registros de ION8600,
   PAC1020 y los de calidad, que el usuario carga desde la pantalla; luego C, D, E). Incluye el PF
   del PM5110 guardado sin decodificar.
+- **Generador Gen Power (InteliGen 200):** fase G de `docs/PLAN-CALIDAD-ENERGIA.md` (guardar segun estado,
+  historial de arranques, alarmas de condicion: bateria, precalentador, arranque fallido). Mapa de
+  registros confirmado en `docs/ig200/MAPA-REGISTROS.md`; solo lectura.
 - **Modulo de Mantenimiento Correctivo (MF21 + AMEF):** diseno acordado, sin implementar. Ver
   `docs/PLAN-MANTENIMIENTO-CORRECTIVO.md`. Falta el AMEF del usuario.
 - Campos que hoy violan la regla de datos (corregir sobre la marcha, no ahora): tecnico y
