@@ -6,5 +6,12 @@
     "unitId" : 1,
     "redAsociada" : "Trafo2",
     "descripcion" : "Generador Gen Power, controlador ComAp InteliGen 200 (junto a TR2). Solo lectura."
+  }, {
+    "nombre" : "Caterpillar",
+    "modelo" : "InteliGen500",
+    "ipAddress" : "192.168.0.201",
+    "unitId" : 1,
+    "redAsociada" : "Trafo1",
+    "descripcion" : "Generador Caterpillar, controlador ComAp InteliGen 500 (junto a TR1). Solo lectura."
   } ]
 }

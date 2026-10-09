@@ -237,7 +237,13 @@ public final class MainLayout extends AppLayout {
             colapsarAlSalirDelMouse(alarmas);
             // Calidad de Energia: mismo alcance que alarmas (ADMIN y zona Mantenimiento).
             nav.addItem(new SideNavItem("Calidad de Energia", "calidad", VaadinIcon.FLASH.create()));
-            nav.addItem(new SideNavItem("Generador", "generador", VaadinIcon.COGS.create()));
+            SideNavItem grupoElectrogeno = new SideNavItem("Grupo Electrogeno");
+            grupoElectrogeno.setPrefixComponent(VaadinIcon.COGS.create());
+            grupoElectrogeno.setExpanded(false);
+            grupoElectrogeno.addItem(new SideNavItem("Generadores", "generador", VaadinIcon.COG.create()));
+            grupoElectrogeno.addItem(new SideNavItem("Analisis", "generador/analisis", VaadinIcon.BAR_CHART.create()));
+            nav.addItem(grupoElectrogeno);
+            colapsarAlSalirDelMouse(grupoElectrogeno);
         }
         if (lineaAccessService.puedeVerMantenimiento()) {
             SideNavItem mantenimientoPreventivo = new SideNavItem("Mantenimiento Preventivo");

@@ -158,7 +158,8 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
         responde.
       - Un registro por arranque: inicio, fin, duracion, kWh generados, carga maxima, prueba o corte
         de red (contadores del controlador: horas 41239, kWh 41231, arranques 41241).
-      - No se guardan las tensiones de red del controlador (ya las mide TR2 por el PLC).
+      - No se guardan las tensiones de red del controlador (ya las mide TR2 por el PLC). Cambiado en G5:
+        se guardan, porque el analisis las usa para separar marcha en paralelo de marcha en isla.
 - [x] G2. (2026-10-08) Pantalla `generador` (menu "Generador", alcance como alarmas): Estado actual en vivo cada
       15 s (Red TR2 / Generador / Motor con semaforo; motor con limites provisorios de 24 V), Arranques
       (con carga maxima) y Tendencias (bateria, refrigerante, aceite, kW, corrientes, tension, Hz, RPM).
@@ -169,6 +170,24 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       temperatura fuera de rango en marcha.
 - [x] G4. (2026-10-08) Corrientes, kW (total y por fase), kVAr, kVA y PF confirmados con carga contra TR2 y
       el contador; se guardan desde entonces (columnas agregadas solas a la tabla del mes).
+- [x] G5. (2026-10-09) Varios generadores con mapa de registros por modelo, sin recompilar: el mapa salio del
+      codigo a `C:/LineaBaseX/config/generador-modelos.json` (lista cerrada de parametros `ParametroGenerador`,
+      tipos UInt16/Int16/UInt32/Int32/Float32, divisor, pedidos agrupados con fallback por parametro,
+      `confirmado` false = se ve en vivo pero no se guarda). Lector generico `LectorControlador` (solo funcion 03),
+      verificado contra el InteliGen 200: 34 de 34 valores en 68 ms. Se guardan tambien las tensiones y la
+      frecuencia de red del controlador (hacen falta para saber si trabajo en paralelo o en isla).
+- [x] G6. (2026-10-09) Menu "Grupo Electrogeno" > Generadores (selector de generador, red asociada generica,
+      aviso de retorno a la red, pestana Registros solo ADMIN para leer rangos y guardar fotos CSV en
+      `C:/LineaBaseX/generador/fotos`) y > Analisis (`generador/analisis`): por dia/semana/mes energia importada
+      de la red (kWh del medidor del trafo), exportada a la red (KWhR del PM5110, verificado: igual a la integral
+      de la potencia negativa, TR2 octubre 98,3 vs 98,1 kWh), generada (contador del controlador), consumo del
+      tablero = importado + generado - exportado, aporte del generador, horas en paralelo / isla / vacio,
+      arranques y carga maxima; y "Consumo por medidor" (todo el periodo o solo con el generador en marcha):
+      consumio / intermitente / consumo minimo / en cero / sin datos. "En cero" revisa todas las lecturas (contador
+      sin subir y ninguna potencia distinta de cero), para no confundir cargas intermitentes como los compresores.
+- [ ] G7. Generador Caterpillar (ComAp InteliGen 500, 192.168.0.201, junto a TR1 = `Trafo1`): ya cargado en
+      `generador-config.json`. Falta: habilitar Modbus TCP en el controlador y confirmar el mapa (hoy es una copia
+      del InteliGen 200, `confirmado: false`). Pasos en `docs/ig500/MAPA-REGISTROS.md`.
 
 ## Como se lee hoy (revisado 2026-10-07)
 - **PLC** (`PLCDataAcquisitionService`): el PLC es el maestro RS-485 y sondea los medidores cuyos

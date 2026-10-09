@@ -9,7 +9,7 @@ carga solo al abrir una sesion.
 seccion correspondiente (y la seccion 12 de pendientes). Si algo de aqui contradice el
 codigo, manda el codigo y hay que corregir este archivo.
 
-Ultima actualizacion: 2026-10-07. Las secciones marcadas **[resumen]** son una vista de alto
+Ultima actualizacion: 2026-10-09. Las secciones marcadas **[resumen]** son una vista de alto
 nivel que no se reviso a fondo: leer el codigo antes de modificar esa parte.
 Se eliminaron `ARCHITECTURE.md` y `README.md` de la raiz (obsoletos: plantilla de Vaadin y
 clases que ya no existen); este archivo los reemplaza. Los problemas ya resueltos estan en
@@ -55,7 +55,7 @@ navegador.
 | Ruta | Contenido |
 |---|---|
 | `data\lineabase` | Base H2: `jdbc:h2:file:C:/LineaBaseX/data/lineabase;AUTO_SERVER=TRUE`, usuario y clave **vacios**. `AUTO_SERVER` permite abrirla por JDBC (jar `h2-2.4.240` en `~/.m2`) con la app corriendo. |
-| `config\` | `plc-config.json`, `linea-id-config.json`, `mezcladores-config.json`, `extrusion-tag-config.json`. Se siembran desde `src/main/resources` en el primer arranque (`ConfigLoaderService`) y despues se editan a mano ahi, sin recompilar. |
+| `config\` | `plc-config.json`, `linea-id-config.json`, `mezcladores-config.json`, `extrusion-tag-config.json`, `generador-config.json` (generadores y su transformador), `generador-modelos.json` (mapa Modbus por modelo de controlador). Se siembran desde `src/main/resources` en el primer arranque (`ConfigLoaderService`) y despues se editan a mano ahi, sin recompilar. |
 | `{anio}\{mes}\...` | SQLite de energia: un archivo por mes, una tabla por linea/maquina, PK `fecha` (texto). Ruta armada en `RutaArchivosEnergia` (`BASE_PATH`). Ademas `{mes}Calidad` (solo mensual, medidores por pasarela, ver `com.example.calidad`). Muestreo cada 60 s (`DataAcquisitionTask.CYCLE_INTERVAL`; el comentario del codigo dice 6 s y esta mal). Nunca se purgan. |
 
 `docs/REGISTRO-DE-FALLAS.md` documenta las fallas ya resueltas (fuente de verdad, se importa en
@@ -74,7 +74,7 @@ reales. Si hace falta limpiar, se hace por JDBC (script en el scratchpad, creden
 | `alarmas` | Alarmas por umbral | ver seccion 7 |
 | `mezcladores` | Temperatura de mezcladores (DTB48) | ver seccion 8 |
 | `mantenimiento` | Mantenimiento preventivo y stock | ver seccion 9 |
-| `generador` | Generador con controlador ComAp InteliGen 200 (fase G, solo lectura) | `GeneradorView` (ruta `generador`, gate `puedeVerAlarmas()`), `GeneradorService` (en vivo, red TR2, arranques, tendencias), `GeneradorReaderService` (lee en el ciclo de 1 min: marcha = cada minuto, parado = cada 15 min, abre/cierra arranques), `GeneradorAlmacen` (`{mes}Generador` y `C:/LineaBaseX/generador/arranques`), `LecturaGenerador`. Config `generador-config.json`. Mapa en `docs/ig200/MAPA-REGISTROS.md` |
+| `generador` | Grupo electrogeno: generadores con controlador ComAp (fase G, **solo lectura**, funcion 03) | `GeneradorView` (ruta `generador`: selector de generador, Estado actual, Arranques, Tendencias, Registros solo ADMIN), `GeneradorAnalisisView` (ruta `generador/analisis`), `GeneradoresConfigService` (lee `generador-config.json` y `generador-modelos.json` en cada llamada), `LectorControlador` (lector generico por mapa + exploracion de registros), `GeneradorReaderService` (ciclo de 1 min: marcha = cada minuto, parado = cada 15 min, abre/cierra arranques; mapa sin confirmar = no guarda), `GeneradorAlmacen` (`{mes}Generador`, una columna por `ParametroGenerador`, y `C:/LineaBaseX/generador/arranques`), `GeneradorAnalisisService` (energia importada/exportada/generada por dia/semana/mes), `ConsumoMedidoresService` (que medidores consumieron o quedaron en cero), `GeneradorService`. Generadores: GenPower (InteliGen 200, Trafo2) y Caterpillar (InteliGen 500, Trafo1, mapa sin confirmar). Mapas en `docs/ig200/` y `docs/ig500/` |
 | `calidad` | calidad de energia (fase e del plan) | `CalidadEnergiaView` (ruta `calidad`), `CalidadEnergiaService` (lectura, bloques de 10 min, cumplimiento, limites), `ConfiguracionCalidad` y `TensionNominal` (H2), `Indicador`, `CalidadEnergiaAlmacen` (archivo SQLite mensual `{mes}Calidad`, una tabla por maquina, columnas nulables), `CalculoCalidad` (PF 4Q decodificado, desbalance calculado si el medidor no lo da), `LecturaCalidad`. Lo llena `PASReaderService` (solo medidores por pasarela) |
 | `medidores` | Catalogo de modelos de medidor y lector generico | `ModeloMedidor`/`RegistroModelo` (H2), `ParametroMedidor` (lista cerrada, 9 basicos + 27 de calidad, incluye KWH_RETORNO = columna KWhR), `ModeloMedidorService`, `DefinicionModelo` (copia inmutable por ciclo), `LectorMedidorService` (lectura en bloques, decodificacion, PF 4Q), `ModeloMedidorSeeder`, `ModelosMedidorView`. Detalle en `docs/PLAN-CALIDAD-ENERGIA.md` (fase B) |
 | `security` | Usuarios, roles, permisos | `Usuario`, `UsuarioRepository`, `UsuarioPrincipal`, `SecurityConfig`, `LineaAccessService`, `DataSeeder` (crea el admin inicial), `AdminSessionTimeoutFilter` |
@@ -116,7 +116,8 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `configuracion` | `ConfiguracionView` (hardware) | ADMIN |
 | `configuracion/medidores` | `ModelosMedidorView` (catalogo de modelos + Probar lectura) | ADMIN |
 | `calidad` | `CalidadEnergiaView` (Estado actual, Historico, Cumplimiento; Limites solo ADMIN) | gate `puedeVerAlarmas()` |
-| `generador` | `GeneradorView` (Estado actual en vivo, Arranques, Tendencias; solo lectura del controlador) | gate `puedeVerAlarmas()` |
+| `generador` | `GeneradorView` (selector de generador; Estado actual en vivo, Arranques, Tendencias; Registros solo ADMIN; solo lectura del controlador) | gate `puedeVerAlarmas()` |
+| `generador/analisis` | `GeneradorAnalisisView` (energia de red importada/exportada, generada, consumo del tablero, paralelo/isla/vacio; consumo por medidor) | gate `puedeVerAlarmas()` |
 | `mezcladores/config` | `MezcladoresConfigView` | gate `puedeVerMezcladores()` |
 | `mantenimiento` | `MantenimientoView` | gate `puedeVerMantenimiento()`; el formulario solo lo ve ADMIN |
 | `mantenimiento/personal` | `PersonalMantenimientoView` | ADMIN |
@@ -126,7 +127,8 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `admin/reparar-vip` | `ReparacionVipView` | ADMIN |
 
 **Menu lateral (`MainLayout.createSideNav()`):** Graficas (Tiempo Real, Historico), Consulta de
-Datos, Horometro, Alarmas (Alarmas Activas; Historial solo admin), Calidad de Energia (mismo alcance que alarmas), Mantenimiento Preventivo
+Datos, Horometro, Alarmas (Alarmas Activas; Historial solo admin), Calidad de Energia y Grupo Electrogeno
+(Generadores, Analisis) (mismo alcance que alarmas), Mantenimiento Preventivo
 (Mantenimiento Barril y Tornillos; Personal de Mantenimiento solo admin), Reportes (Barril y
 Tornillo), y solo admin: Usuarios, Reparar VIP Mensual, Configuracion (alarmas, hardware,
 Modelos de medidor, Mezcladores, Mantenimiento). Los padres usan `colapsarAlSalirDelMouse(...)`. "Mantenimiento
@@ -314,9 +316,13 @@ una opcion mas de la lista.
   `docs/PLAN-CALIDAD-ENERGIA.md` (fases A y B hechas el 2026-10-07; faltan registros de ION8600,
   PAC1020 y los de calidad, que el usuario carga desde la pantalla; luego C, D, E). Incluye el PF
   del PM5110 guardado sin decodificar.
-- **Generador Gen Power (InteliGen 200):** fase G de `docs/PLAN-CALIDAD-ENERGIA.md` (guardar segun estado,
-  historial de arranques, alarmas de condicion: bateria, precalentador, arranque fallido). Mapa de
-  registros confirmado en `docs/ig200/MAPA-REGISTROS.md`; solo lectura.
+- **Grupo electrogeno:** fase G de `docs/PLAN-CALIDAD-ENERGIA.md`. GenPower (InteliGen 200) completo;
+  Caterpillar (InteliGen 500, 192.168.0.201, TR1) cargado con mapa sin confirmar: pasos en
+  `docs/ig500/MAPA-REGISTROS.md`. Faltan las alarmas de condicion (G3: bateria, precalentador,
+  arranque fallido, sin comunicacion). Solo lectura siempre. Posible: asignar cada medidor a su
+  transformador para que "Consumo por medidor" muestre solo los de TR1 o TR2 (hoy muestra todos).
+- Los archivos mensuales de energia se pisan en el borde: el de septiembre tiene las primeras horas
+  del 1 de octubre. Quien sume por mes debe limitar cada archivo a su propio mes o descartar repetidos.
 - **Modulo de Mantenimiento Correctivo (MF21 + AMEF):** diseno acordado, sin implementar. Ver
   `docs/PLAN-MANTENIMIENTO-CORRECTIVO.md`. Falta el AMEF del usuario.
 - Campos que hoy violan la regla de datos (corregir sobre la marcha, no ahora): tecnico y

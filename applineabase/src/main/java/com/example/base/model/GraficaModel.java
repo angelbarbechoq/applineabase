@@ -970,6 +970,76 @@ public class GraficaModel {
                 "chart.appear(1000, 100);";
     }
 
+    /**
+     * Columnas apiladas por categoría (ej. energía por día: red + generador), con leyenda y
+     * tooltip por segmento. {@code valores.get(i)[s]} es el valor de la serie s en la categoría i
+     * (null = sin dato, no se dibuja). Separación de 2 px entre segmentos (borde del color del
+     * fondo) y esquinas redondeadas solo arriba del último segmento. Mismo armado de una sola vez
+     * que getBarChartScript (no es una serie temporal).
+     */
+    public static String getBarrasApiladasScript(String containerId, List<String> categorias, String[] series,
+                                                 String[] colores, List<Double[]> valores, String unidad) {
+        StringBuilder datos = new StringBuilder("[");
+        boolean hayNegativos = false;
+        for (int i = 0; i < categorias.size(); i++) {
+            if (i > 0) datos.append(",");
+            datos.append("{ categoria: ").append(jsString(categorias.get(i)));
+            Double[] fila = valores.get(i);
+            for (int s = 0; s < series.length; s++) {
+                datos.append(", v").append(s).append(": ").append(fila[s] == null ? "null" : String.valueOf(fila[s]));
+                if (fila[s] != null && fila[s] < 0) hayNegativos = true;
+            }
+            datos.append(" }");
+        }
+        datos.append("]");
+
+        StringBuilder js = new StringBuilder(scriptInicializarRoot(containerId))
+                .append("var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: false, panY: false, wheelX: 'none', wheelY: 'none', paddingTop: 10, layout: root.verticalLayout }));")
+                .append("var datos = ").append(datos).append(";")
+                .append("var xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, { categoryField: 'categoria', renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 20, cellStartLocation: 0.1, cellEndLocation: 0.9 }) }));")
+                .append("xAxis.get('renderer').labels.template.setAll({ rotation: ").append(categorias.size() > 8 ? "-45" : "0")
+                .append(", centerY: am5.p50, centerX: ").append(categorias.size() > 8 ? "am5.p100" : "am5.p50").append(", fontSize: '11px', fill: am5.color(0x52514e) });")
+                .append("xAxis.get('renderer').grid.template.setAll({ strokeOpacity: 0 });")
+                .append("xAxis.data.setAll(datos);")
+                // Valores negativos (ej. energía exportada) se apilan por debajo de cero.
+                .append("var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { ").append(hayNegativos ? "" : "min: 0, ")
+                .append("renderer: am5xy.AxisRendererY.new(root, {}) }));")
+                .append("yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x52514e), fontSize: '11px' });")
+                .append("yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });")
+                .append("yAxis.children.unshift(am5.Label.new(root, { rotation: -90, text: ").append(jsString(unidad))
+                .append(", y: am5.p50, centerX: am5.p50, fontSize: '11px', fill: am5.color(0x52514e) }));")
+                .append("var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));")
+                .append("legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x0b0b0b) });");
+        // Esquinas redondeadas arriba de la última serie positiva (la de arriba de la pila).
+        int superior = series.length - 1;
+        while (superior > 0 && tieneNegativos(valores, superior)) superior--;
+        for (int s = 0; s < series.length; s++) {
+            boolean ultima = s == superior;
+            js.append("(function() {")
+                    .append("var s = chart.series.push(am5xy.ColumnSeries.new(root, { name: ").append(jsString(series[s]))
+                    .append(", xAxis: xAxis, yAxis: yAxis, valueYField: 'v").append(s).append("', categoryXField: 'categoria', stacked: true }));")
+                    .append("s.columns.template.setAll({ fill: am5.color(").append(colores[s]).append("), stroke: am5.color(0xffffff), strokeWidth: 2, width: am5.percent(80)")
+                    .append(ultima ? ", cornerRadiusTL: 4, cornerRadiusTR: 4" : "")
+                    .append(", tooltipText: '{categoryX}\\n{name}: {valueY.formatNumber(\\u0022#,###\\u0022)} ").append(unidad.replace("'", "")).append("' });")
+                    .append("s.data.setAll(datos);")
+                    .append("legend.data.push(s);")
+                    .append("s.appear(800, 100);")
+                    .append("})();");
+        }
+        js.append("chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'none', xAxis: xAxis }));")
+                .append("chart.get('cursor').lineY.set('visible', false);")
+                .append("window.am5Charts[id] = { root: root, chart: chart };")
+                .append("chart.appear(800, 100);");
+        return js.toString();
+    }
+
+    private static boolean tieneNegativos(List<Double[]> valores, int serie) {
+        for (Double[] fila : valores) {
+            if (fila[serie] != null && fila[serie] < 0) return true;
+        }
+        return false;
+    }
+
     /** Escapa un string para insertarlo como literal JS entre comillas simples. */
     private static String jsString(String valor) {
         String seguro = valor == null ? "" : valor.replace("\\", "\\\\").replace("'", "\\'");

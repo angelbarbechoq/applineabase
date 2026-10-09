@@ -2,6 +2,7 @@ package com.example.generador.service;
 
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.generador.model.LecturaGenerador;
+import com.example.generador.model.ParametroGenerador;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,9 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Guardado del generador en SQLite:
@@ -34,21 +38,22 @@ public class GeneradorAlmacen {
     private static final Logger logger = LoggerFactory.getLogger(GeneradorAlmacen.class);
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
 
-    static final String[] COLUMNAS_CARGA = {"kw", "kw_l1", "kw_l2", "kw_l3", "kvar", "kva", "pf", "i_l1", "i_l2", "i_l3"};
-    /** Columnas de valores en el orden en que se insertan (después de fecha y estado). */
-    static final String[] COLUMNAS_VALOR = {"rpm", "frecuencia", "v_l1n", "v_l2n", "v_l3n", "v_l1l2", "v_l2l3", "v_l3l1",
-            "bateria", "presion_aceite", "temp_refrigerante", "kwh", "kvarh", "horas_marcha", "arranques",
-            "kw", "kw_l1", "kw_l2", "kw_l3", "kvar", "kva", "pf", "i_l1", "i_l2", "i_l3"};
+    /** Archivo|tabla cuyas columnas ya se verificaron en esta ejecución (evita consultar el esquema cada minuto). */
+    private final Set<String> esquemaVerificado = ConcurrentHashMap.newKeySet();
 
     private static void agregarColumnasSiFaltan(Connection c, String tabla, String[] columnas) throws SQLException {
-        java.util.Set<String> existentes = new java.util.HashSet<>();
+        agregarColumnasSiFaltan(c, tabla, columnas, new boolean[columnas.length]);
+    }
+
+    private static void agregarColumnasSiFaltan(Connection c, String tabla, String[] columnas, boolean[] enteras) throws SQLException {
+        Set<String> existentes = new HashSet<>();
         try (ResultSet rs = c.getMetaData().getColumns(null, null, tabla, null)) {
             while (rs.next()) existentes.add(rs.getString("COLUMN_NAME").toLowerCase());
         }
         try (Statement st = c.createStatement()) {
-            for (String col : columnas) {
-                if (!existentes.contains(col)) {
-                    st.executeUpdate("ALTER TABLE \"" + tabla + "\" ADD COLUMN " + col + " REAL");
+            for (int i = 0; i < columnas.length; i++) {
+                if (!existentes.contains(columnas[i])) {
+                    st.executeUpdate("ALTER TABLE \"" + tabla + "\" ADD COLUMN " + columnas[i] + (enteras[i] ? " INTEGER" : " REAL"));
                 }
             }
         }
@@ -86,35 +91,42 @@ public class GeneradorAlmacen {
             logger.error("No se pudo crear la carpeta de {}: {}", ruta, e.getMessage());
             return;
         }
+        ParametroGenerador[] params = ParametroGenerador.values();
         try (Connection c = abrir(ruta)) {
-            try (Statement st = c.createStatement()) {
-                st.executeUpdate("CREATE TABLE IF NOT EXISTS \"" + generador + "\" (fecha TEXT PRIMARY KEY NOT NULL, "
-                        + "estado TEXT, rpm REAL, frecuencia REAL, v_l1n REAL, v_l2n REAL, v_l3n REAL, "
-                        + "v_l1l2 REAL, v_l2l3 REAL, v_l3l1 REAL, bateria REAL, presion_aceite REAL, "
-                        + "temp_refrigerante REAL, kwh INTEGER, kvarh INTEGER, horas_marcha REAL, arranques INTEGER)");
-                // Columnas de carga agregadas el 2026-10-08 (confirmadas con carga contra TR2).
-                agregarColumnasSiFaltan(c, generador, COLUMNAS_CARGA);
+            if (esquemaVerificado.add(ruta + "|" + generador)) {
+                try (Statement st = c.createStatement()) {
+                    st.executeUpdate("CREATE TABLE IF NOT EXISTS \"" + generador + "\" (fecha TEXT PRIMARY KEY NOT NULL, estado TEXT)");
+                }
+                // Una columna por parámetro de la lista cerrada; las que falten se agregan (tablas de
+                // antes del mapa configurable, o parámetros nuevos).
+                String[] columnas = new String[params.length];
+                boolean[] enteras = new boolean[params.length];
+                for (int i = 0; i < params.length; i++) {
+                    columnas[i] = params[i].columna();
+                    enteras[i] = params[i].entero();
+                }
+                agregarColumnasSiFaltan(c, generador, columnas, enteras);
             }
             StringBuilder cols = new StringBuilder("fecha, estado");
             StringBuilder marcas = new StringBuilder("?, ?");
-            for (String col : COLUMNAS_VALOR) {
-                cols.append(", ").append(col);
+            for (ParametroGenerador p : params) {
+                cols.append(", ").append(p.columna());
                 marcas.append(", ?");
             }
             try (PreparedStatement ps = c.prepareStatement("INSERT OR REPLACE INTO \"" + generador
                     + "\" (" + cols + ") VALUES (" + marcas + ")")) {
                 ps.setString(1, l.fecha().format(FECHA));
                 ps.setString(2, l.enMarcha() ? "MARCHA" : "PARADO");
-                Object[] v = {l.rpm(), l.frecuencia(), l.vL1N(), l.vL2N(), l.vL3N(), l.vL1L2(), l.vL2L3(), l.vL3L1(),
-                        l.bateria(), l.presionAceite(), l.tempRefrigerante(), l.kwh(), l.kvarh(), l.horasMarcha(), l.arranques(),
-                        l.kw(), l.kwL1(), l.kwL2(), l.kwL3(), l.kvar(), l.kva(), l.pf(), l.iL1(), l.iL2(), l.iL3()};
-                for (int i = 0; i < v.length; i++) {
-                    if (v[i] == null) ps.setNull(i + 3, Types.REAL);
-                    else ps.setObject(i + 3, v[i]);
+                for (int i = 0; i < params.length; i++) {
+                    Double v = l.valor(params[i]);
+                    if (v == null) ps.setNull(i + 3, params[i].entero() ? Types.INTEGER : Types.REAL);
+                    else if (params[i].entero()) ps.setLong(i + 3, Math.round(v));
+                    else ps.setDouble(i + 3, v);
                 }
                 ps.executeUpdate();
             }
         } catch (SQLException e) {
+            esquemaVerificado.remove(ruta + "|" + generador);
             logger.error("Error guardando lectura de {} en {}: {}", generador, ruta, e.getMessage());
         }
     }

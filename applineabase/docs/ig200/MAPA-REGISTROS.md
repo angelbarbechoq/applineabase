@@ -10,6 +10,9 @@ pantalla del controlador y de la PC (fotos del usuario) y con TR2. Fotos complet
 Los valores de 32 bits hay que pedirlos enteros (2 registros juntos): pedir la mitad da 0x02.
 32768 (0x8000) = dato no disponible.
 
+Desde 2026-10-09 la app no tiene este mapa en el codigo: lo lee de
+`C:\LineaBaseX\config\generador-modelos.json` (modelo `InteliGen200`), que se edita sin recompilar.
+
 ## Confirmados (lectura = pantalla)
 | Registro | Base 0 | Dato | Tipo | Escala | Unidad | Evidencia |
 |---|---|---|---|---|---|---|

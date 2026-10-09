@@ -38,6 +38,8 @@ public class ConfigLoaderService {
     private static final String EXTRUSION_TAG_CONFIG_FILE = "extrusion-tag-config.json";
     /** Archivo propio: plc-config.json lo reescribe ConfiguracionView solo con plcs y gateways. */
     private static final String GENERADOR_CONFIG_FILE = "generador-config.json";
+    /** Mapa de registros por modelo de controlador de generador (se edita sin recompilar). */
+    private static final String GENERADOR_MODELOS_FILE = "generador-modelos.json";
 
     private final ObjectMapper objectMapper;
 
@@ -55,13 +57,21 @@ public class ConfigLoaderService {
         sembrarSiNoExiste(MEZCLADORES_CONFIG_FILE);
         sembrarSiNoExiste(EXTRUSION_TAG_CONFIG_FILE);
         sembrarSiNoExiste(GENERADOR_CONFIG_FILE);
+        sembrarSiNoExiste(GENERADOR_MODELOS_FILE);
     }
 
-    /** Generadores con controlador por Modbus TCP (solo lectura): nombre, modelo, ipAddress, unitId. */
+    /** Generadores con controlador por Modbus TCP (solo lectura): nombre, modelo, ipAddress, unitId, redAsociada. */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> loadGeneradoresConfig() {
         Object generadores = leerArchivo(GENERADOR_CONFIG_FILE).get("generadores");
         return generadores != null ? (List<Map<String, Object>>) generadores : List.of();
+    }
+
+    /** Modelos de controlador de generador con su mapa de registros. */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> loadGeneradorModelosConfig() {
+        Object modelos = leerArchivo(GENERADOR_MODELOS_FILE).get("modelos");
+        return modelos != null ? (List<Map<String, Object>>) modelos : List.of();
     }
 
     private void sembrarSiNoExiste(String nombreArchivo) {
