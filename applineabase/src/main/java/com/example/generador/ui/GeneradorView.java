@@ -271,6 +271,15 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 calidad.evaluar(Indicador.FRECUENCIA, l.redFrecuencia(), nomRed, cfg))));
         panelRed.add(fila("Tension L1-L2 / L2-L3 / L3-L1", tres(l.redVL1L2(), l.redVL2L3(), l.redVL3L1(), "V",
                 calidad.evaluar(Indicador.TENSION, prom(l.redVL1L2(), l.redVL2L3(), l.redVL3L1()), nomRed, cfg))));
+        if (l.redKw() != null) {
+            HorizontalLayout p = new HorizontalLayout(texto(String.format(Locale.ROOT, "%.0f kW", l.redKw())));
+            if (l.redKw() < 0) p.add(badgeNuevo("Retorno a la red", Estado.AVISO));
+            p.setAlignItems(Alignment.CENTER);
+            panelRed.add(fila("Importado de la red (controlador)", p));
+        }
+        if (l.cargaKw() != null) {
+            panelRed.add(fila("Carga del tablero (controlador)", texto(String.format(Locale.ROOT, "%.0f kW", l.cargaKw()))));
+        }
         Map<String, Object> medidor = service.ultimaRed(generador);
         if (!medidor.isEmpty()) {
             Double pw = num(medidor.get("PW"));
@@ -317,11 +326,20 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         // Motor.
         panelMotor.removeAll();
         panelMotor.add(titulo("Motor"));
+        ModeloControlador modelo = service.modelo(generador).orElse(null);
         panelMotor.add(fila("Bateria", valor(l.bateria(), "%.1f V", estadoBateria(l.bateria(), marcha))));
-        panelMotor.add(fila("Presion de aceite", marcha ? valor(l.presionAceite(), "%.1f bar", estadoAceite(l.presionAceite()))
-                : texto(fmt(l.presionAceite(), "%.1f") + " bar")));
-        panelMotor.add(fila("Temperatura refrigerante", marcha ? valor(l.tempRefrigerante(), "%.0f C", estadoTemp(l.tempRefrigerante()))
-                : texto(fmt(l.tempRefrigerante(), "%.0f") + " C")));
+        if (modelo != null && modelo.registro(ParametroGenerador.PRESION_ACEITE).isEmpty()) {
+            panelMotor.add(fila("Presion de aceite", nota("no lo mide este controlador")));
+        } else {
+            panelMotor.add(fila("Presion de aceite", marcha ? valor(l.presionAceite(), "%.1f bar", estadoAceite(l.presionAceite()))
+                    : texto(fmt(l.presionAceite(), "%.1f") + " bar")));
+        }
+        if (modelo != null && modelo.registro(ParametroGenerador.TEMP_REFRIGERANTE).isEmpty()) {
+            panelMotor.add(fila("Temperatura refrigerante", nota("no lo mide este controlador")));
+        } else {
+            panelMotor.add(fila("Temperatura refrigerante", marcha ? valor(l.tempRefrigerante(), "%.0f C", estadoTemp(l.tempRefrigerante()))
+                    : texto(fmt(l.tempRefrigerante(), "%.0f") + " C")));
+        }
         if (l.tempAceite() != null) panelMotor.add(fila("Temperatura de aceite", texto(fmt(l.tempAceite(), "%.0f") + " C")));
         if (l.nivelCombustible() != null) panelMotor.add(fila("Nivel de combustible", texto(fmt(l.nivelCombustible(), "%.0f") + " %")));
         if (l.consumoCombustible() != null) panelMotor.add(fila("Consumo de combustible", texto(fmt(l.consumoCombustible(), "%.1f") + " L/h")));

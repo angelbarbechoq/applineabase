@@ -44,6 +44,7 @@ public record LecturaGenerador(LocalDateTime fecha, Map<ParametroGenerador, Doub
     public Double redVL2L3() { return valor(RED_V_L2L3); }
     public Double redVL3L1() { return valor(RED_V_L3L1); }
     public Double redKw() { return valor(RED_KW); }
+    public Double cargaKw() { return valor(CARGA_KW); }
     public Double bateria() { return valor(BATERIA); }
     public Double presionAceite() { return valor(PRESION_ACEITE); }
     public Double tempRefrigerante() { return valor(TEMP_REFRIGERANTE); }

@@ -72,7 +72,20 @@ public final class LectorControlador {
             String motivo = errores.values().stream().findFirst().orElse("sin registros");
             throw new IOException("ningun registro del mapa " + modelo.modelo() + " respondio (" + motivo + ")");
         }
+        calcularPfSiFalta(modelo, valores);
         return new LecturaGenerador(LocalDateTime.now().withNano(0), valores, errores);
+    }
+
+    /**
+     * Si el modelo no tiene un registro de PF confirmado (InteliGen 500: en paralelo regula a PF 1.000 y los
+     * candidatos no se pueden distinguir), el PF se calcula con kW / kVA, dos registros confirmados.
+     */
+    static void calcularPfSiFalta(ModeloControlador modelo, Map<ParametroGenerador, Double> valores) {
+        if (modelo.registro(ParametroGenerador.PF).isPresent()) return;
+        Double kw = valores.get(ParametroGenerador.KW), kva = valores.get(ParametroGenerador.KVA);
+        if (kw != null && kva != null && kva > 0) {
+            valores.put(ParametroGenerador.PF, Math.round(Math.min(1.0, Math.abs(kw) / kva) * 1000) / 1000.0);
+        }
     }
 
     private static void poner(Map<ParametroGenerador, Double> valores, ParametroGenerador p, Double v) {

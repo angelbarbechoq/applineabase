@@ -211,9 +211,14 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       semilla del proyecto actualizada a la lista real (48). Editable en Configuracion de hardware (listas cerradas).
       El detalle de maquinas de un arranque muestra solo las del transformador del generador y el balance: arranque 715
       (TR2), maquinas 4.616 kWh de 5.569 kWh de consumo del tablero = 83% medido.
-- [ ] G7. Generador Caterpillar (ComAp InteliGen 500, 192.168.0.201, junto a TR1 = `Trafo1`): ya cargado en
-      `generador-config.json`. Falta: habilitar Modbus TCP en el controlador y confirmar el mapa (hoy es una copia
-      del InteliGen 200, `confirmado: false`). Pasos en `docs/ig500/MAPA-REGISTROS.md`.
+- [x] G7. (2026-10-09) Generador Caterpillar (ComAp InteliGen 500, 192.168.0.201, Unit ID 1, junto a TR1 = `Trafo1`)
+      conectado. El mapa del InteliGen 200 no servia (solo RPM); el del InteliGen 500 se armo con barrido de registros,
+      fotos de la pantalla y 4 lecturas seguidas: 32 valores confirmados (incluida bateria 41052 y carga del tablero
+      41280, parametro nuevo `CARGA_KW`), `confirmado: true`, guarda desde ese momento. PF calculado kW / kVA (en
+      paralelo regula a 1.000 y no hay registro distinguible). Aceite y temperatura: este controlador no los mide.
+      Observado: el controlador indica exportacion a la red y mide una sola fase de red; el medidor de TR1 marcaba
+      importacion de ~100 kW con PF 0,3-0,4: revisar el TC de red con el tecnico. Detalle en
+      `docs/ig500/MAPA-REGISTROS.md`.
 
 ## Como se lee hoy (revisado 2026-10-07)
 - **PLC** (`PLCDataAcquisitionService`): el PLC es el maestro RS-485 y sondea los medidores cuyos
