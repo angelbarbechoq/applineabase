@@ -6,6 +6,7 @@ import com.example.base.ui.MainLayout;
 import com.example.calidad.service.CalidadEnergiaService.Estado;
 import com.example.generador.model.CostoCombustible;
 import com.example.generador.model.Generador;
+import com.example.generador.model.TarifaRed;
 import com.example.generador.service.ConsumoMedidoresService;
 import com.example.generador.service.ConsumoMedidoresService.ConsumoMedidor;
 import com.example.generador.service.ConsumoMedidoresService.Ventana;
@@ -15,6 +16,7 @@ import com.example.generador.service.GeneradorAnalisisService.Agrupacion;
 import com.example.generador.service.GeneradorAnalisisService.Fila;
 import com.example.generador.service.GeneradorAnalisisService.PeriodoMarcha;
 import com.example.generador.service.GeneradorService;
+import com.example.generador.service.TarifaRedService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
@@ -25,6 +27,7 @@ import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
@@ -83,7 +86,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final GeneradorAnalisisService analisis;
     private final ConsumoMedidoresService consumoMedidores;
     private final CostoCombustibleService costos;
+    private final TarifaRedService tarifaService;
     private final LineaAccessService lineaAccessService;
+    private List<TarifaRed> tarifas = List.of();
+    private final Grid<TarifaRed> tarifasGrid = new Grid<>();
 
     private final ComboBox<String> generadorCombo = new ComboBox<>("Generador");
     private final ComboBox<Agrupacion> agrupacionCombo = new ComboBox<>("Ver por");
@@ -115,11 +121,12 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     public GeneradorAnalisisView(GeneradorService generadorService, GeneradorAnalisisService analisis,
                                  ConsumoMedidoresService consumoMedidores, CostoCombustibleService costos,
-                                 LineaAccessService lineaAccessService) {
+                                 TarifaRedService tarifaService, LineaAccessService lineaAccessService) {
         this.generadorService = generadorService;
         this.analisis = analisis;
         this.consumoMedidores = consumoMedidores;
         this.costos = costos;
+        this.tarifaService = tarifaService;
         this.lineaAccessService = lineaAccessService;
         setPadding(true);
         setSpacing(true);
@@ -174,7 +181,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         mensaje.getStyle().set("font-size", "12px").set("color", "#555");
 
         tabs.setWidthFull();
-        tabEnergia = tabs.add("Energia", crearEnergia());
+        tabEnergia = tabs.add("Resumen de energia", crearEnergia());
         tabs.add("Periodos en marcha", crearPeriodos());
         tabs.add("Costos", crearCostos());
         tabs.add("Consumo por medidor", crearSeccionMedidores());
@@ -284,7 +291,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + "sin tension de red; en vacio = en marcha con menos de " + (int) GeneradorAnalisisService.KW_VACIO + " kW. "
                 + "La separacion paralelo / isla existe desde el 09-10-2026 (antes no se guardaba la tension de red). "
                 + "El retorno se dibuja por debajo de cero. \"-\" = sin datos.");
-        VerticalLayout v = new VerticalLayout(tarjetasEnergia, chart, grid, nota);
+        VerticalLayout v = new VerticalLayout(descripcion("Todo el periodo elegido, este o no encendido el generador: por cada dia, "
+                + "semana o mes, cuanta energia entro al tablero desde la red (transformador), cuanta volvio a la red, cuanta puso el "
+                + "generador y cuanto consumio el tablero en total."), tarjetasEnergia, chart, grid, nota);
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -352,7 +361,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + "contadores del medidor del transformador asociado en ese mismo intervalo; las lecturas son de cada minuto y "
                 + "el minuto que cruza el inicio o el fin se reparte en proporcion. Consumo del tablero = tomado + generado - "
                 + "retornado. Paralelo / isla / vacio: minutos segun la tension de red y la carga (desde el 09-10-2026).");
-        VerticalLayout v = new VerticalLayout(tarjetasPeriodos, periodosGrid, nota);
+        VerticalLayout v = new VerticalLayout(descripcion("Solo los momentos en que el generador estuvo encendido: una fila por "
+                + "cada vez que arranco, con lo que trabajo y lo que se tomo y se retorno a la red mientras tanto."),
+                tarjetasPeriodos, periodosGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -398,6 +409,12 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 : String.format(Locale.ROOT, "%.1f", p.kwhGenerado() / c(p).getGalones()));
         columna(costosGrid, "Galones por hora", p -> c(p) == null || p.horas() <= 0 ? "-"
                 : String.format(Locale.ROOT, "%.1f", c(p).getGalones() / p.horas()));
+        columna(costosGrid, "Aprovechado (kWh)", p -> kwhNum(aprovechado(p)));
+        columna(costosGrid, "Tarifa red", p -> tarifa(p) == null ? "sin tarifa"
+                : String.format(Locale.ROOT, "$ %.4f", tarifa(p).getPrecioKwh()));
+        columna(costosGrid, "Costo en la red", p -> costoRed(p) == null ? "-" : dinero(costoRed(p)));
+        costosGrid.addComponentColumn(p -> ahorroSpan(ahorro(p))).setHeader("Ahorro").setAutoWidth(true).setFlexGrow(0)
+                .setTextAlign(ColumnTextAlign.END);
         costosGrid.addColumn(p -> c(p) == null ? "" : (c(p).getUsuario() == null ? "" : c(p).getUsuario())
                 + (c(p).getObservacion() == null ? "" : " - " + c(p).getObservacion()))
                 .setHeader("Cargado por / observacion").setAutoWidth(true);
@@ -413,11 +430,122 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Span nota = nota("Por cada periodo en marcha se cargan a mano los galones de diesel usados y el precio del galon"
                 + (lineaAccessService.esAdmin() ? " (boton Cargar / Editar)" : " (solo el administrador)")
                 + ". El costo, el costo por kWh generado, los kWh por galon y los galones por hora se calculan. "
+                + "Aprovechado = generado - retornado a la red (lo que volvio a la red no se ahorro: se asume que el distribuidor "
+                + "no lo paga). Costo en la red = aprovechado x tarifa vigente al inicio del periodo. Ahorro = costo en la red - "
+                + "costo del combustible; negativo (rojo) = el generador costo mas que la red. "
                 + "Los totales de arriba solo cuentan los periodos con combustible cargado.");
-        VerticalLayout v = new VerticalLayout(tarjetasCostos, costosGrid, nota);
+
+        H4 tituloTarifas = new H4("Tarifas de la red");
+        tituloTarifas.getStyle().set("margin", "16px 0 0 0");
+        tarifasGrid.addColumn(t -> MESES[t.getVigenteDesde().getMonthValue() - 1] + " " + t.getVigenteDesde().getYear())
+                .setHeader("Vigente desde").setAutoWidth(true).setFlexGrow(0);
+        tarifasGrid.addColumn(t -> String.format(Locale.ROOT, "$ %.4f", t.getPrecioKwh())).setHeader("Precio por kWh")
+                .setAutoWidth(true).setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
+        tarifasGrid.addColumn(t -> t.getObservacion() == null ? "" : t.getObservacion()).setHeader("Observacion").setAutoWidth(true);
+        tarifasGrid.addColumn(t -> (t.getUsuario() == null ? "" : t.getUsuario()) + " " + t.getFechaRegistro().format(CORTA))
+                .setHeader("Cargada por").setAutoWidth(true).setFlexGrow(0);
+        tarifasGrid.setWidth("760px");
+        tarifasGrid.setAllRowsVisible(true);
+        VerticalLayout seccionTarifas = new VerticalLayout(tituloTarifas, nota("Precio de la energia de la red por mes de vigencia "
+                + "(por ejemplo, el valor medio por kWh de la factura). Cada periodo usa la tarifa vigente en su inicio; rige hasta "
+                + "que se cargue otra." + (lineaAccessService.esAdmin() ? " Clic en una fila para editarla." : "")));
+        seccionTarifas.setPadding(false);
+        if (lineaAccessService.esAdmin()) {
+            Button nueva = new Button("Nueva tarifa", VaadinIcon.PLUS.create(), e -> abrirDialogoTarifa(null));
+            seccionTarifas.add(nueva);
+            tarifasGrid.addItemClickListener(e -> abrirDialogoTarifa(e.getItem()));
+        }
+        seccionTarifas.add(tarifasGrid);
+
+        VerticalLayout v = new VerticalLayout(descripcion("Lo que costo el combustible de cada periodo en marcha (cargado a mano) y la "
+                + "comparacion con lo que habria costado tomar esa energia de la red."), tarjetasCostos, costosGrid, nota, seccionTarifas);
         v.setPadding(false);
         v.setWidthFull();
         return v;
+    }
+
+    private TarifaRed tarifa(PeriodoMarcha p) {
+        return TarifaRedService.vigente(tarifas, p.inicio().toLocalDate()).orElse(null);
+    }
+
+    /** Energía del generador que se usó en la planta: generada - retornada a la red. */
+    private static Double aprovechado(PeriodoMarcha p) {
+        return p.kwhGenerado() == null ? null : Math.max(0, p.kwhGenerado() - (p.kwhRedExportada() == null ? 0 : p.kwhRedExportada()));
+    }
+
+    private Double costoRed(PeriodoMarcha p) {
+        Double a = aprovechado(p);
+        TarifaRed t = tarifa(p);
+        return a == null || t == null ? null : a * t.getPrecioKwh();
+    }
+
+    private Double ahorro(PeriodoMarcha p) {
+        Double red = costoRed(p);
+        return red == null || c(p) == null ? null : red - c(p).costo();
+    }
+
+    private static Span ahorroSpan(Double v) {
+        Span s = new Span(v == null ? "-" : dinero(v));
+        if (v != null) s.getStyle().set("color", v >= 0 ? "#155724" : "#721c24").set("font-weight", "600");
+        return s;
+    }
+
+    private void abrirDialogoTarifa(TarifaRed actual) {
+        Dialog d = new Dialog();
+        d.setHeaderTitle(actual == null ? "Nueva tarifa de la red" : "Editar tarifa de la red");
+        ComboBox<YearMonth> mes = new ComboBox<>("Vigente desde");
+        List<YearMonth> meses = new ArrayList<>();
+        for (YearMonth m = YearMonth.now().plusMonths(12); meses.size() < 60; m = m.minusMonths(1)) meses.add(m);
+        mes.setItems(meses);
+        mes.setItemLabelGenerator(m -> MESES[m.getMonthValue() - 1] + " " + m.getYear());
+        mes.setWidthFull();
+        NumberField precio = new NumberField("Precio por kWh ($)");
+        precio.setMin(0.0001);
+        precio.setMax(TarifaRedService.PRECIO_MAXIMO);
+        precio.setStep(0.0001);
+        precio.setWidthFull();
+        TextField observacion = new TextField("Observacion (opcional)");
+        observacion.setMaxLength(255);
+        observacion.setPlaceholder("ej. factura de septiembre, tarifa industrial");
+        observacion.setWidthFull();
+        if (actual != null) {
+            mes.setValue(YearMonth.from(actual.getVigenteDesde()));
+            mes.setReadOnly(true);
+            precio.setValue(actual.getPrecioKwh());
+            observacion.setValue(actual.getObservacion() == null ? "" : actual.getObservacion());
+        } else {
+            mes.setValue(YearMonth.now());
+        }
+        VerticalLayout contenido = new VerticalLayout(mes, precio, observacion);
+        contenido.setPadding(false);
+        contenido.setWidth("360px");
+        d.add(contenido);
+        Button guardar = new Button("Guardar", e -> {
+            if (mes.getValue() == null || precio.getValue() == null || precio.isInvalid()) {
+                Notification.show("Elija el mes e ingrese el precio por kWh", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            try {
+                tarifaService.guardar(mes.getValue(), precio.getValue(), observacion.getValue(), lineaAccessService.usuarioActual());
+                d.close();
+                verCostos();
+            } catch (IllegalArgumentException ex) {
+                Notification.show(ex.getMessage(), 4000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+        guardar.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        d.getFooter().add(new Button("Cancelar", e -> d.close()), guardar);
+        if (actual != null) {
+            Button borrar = new Button("Borrar", VaadinIcon.TRASH.create(), e -> {
+                tarifaService.borrar(actual);
+                d.close();
+                verCostos();
+            });
+            borrar.addThemeVariants(ButtonVariant.LUMO_ERROR);
+            d.getFooter().addComponentAsFirst(borrar);
+        }
+        d.open();
     }
 
     private CostoCombustible c(PeriodoMarcha p) {
@@ -426,9 +554,12 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     private void verCostos() {
         combustible = costos.porPeriodo(periodos);
+        tarifas = tarifaService.listar();
+        tarifasGrid.setItems(tarifas);
         costosGrid.setItems(periodos);
         double galones = 0, costo = 0, kwhConCombustible = 0, horasConCombustible = 0;
-        int cargados = 0;
+        double costoRed = 0, costoComparado = 0, kwhAprovechado = 0;
+        int cargados = 0, comparados = 0;
         for (PeriodoMarcha p : periodos) {
             CostoCombustible cc = c(p);
             if (cc == null) continue;
@@ -437,6 +568,13 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             costo += cc.costo();
             horasConCombustible += p.horas();
             if (p.kwhGenerado() != null) kwhConCombustible += p.kwhGenerado();
+            Double red = costoRed(p);
+            if (red != null) {
+                comparados++;
+                costoRed += red;
+                costoComparado += cc.costo();
+                kwhAprovechado += aprovechado(p);
+            }
         }
         tarjetasCostos.removeAll();
         tarjetasCostos.add(tarjeta("Galones usados", cargados == 0 ? "-" : String.format(Locale.ROOT, "%,.1f gal", galones),
@@ -450,6 +588,20 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 : String.format(Locale.ROOT, "%.1f kWh/gal", kwhConCombustible / galones), null));
         tarjetasCostos.add(tarjeta("Consumo por hora", cargados == 0 || horasConCombustible <= 0 ? "-"
                 : String.format(Locale.ROOT, "%.1f gal/h", galones / horasConCombustible), null));
+        if (cargados > 0 && comparados == 0) {
+            tarjetasCostos.add(tarjeta("Comparacion con la red", "sin tarifa", "cargue la tarifa de la red (abajo)"));
+            return;
+        }
+        if (comparados == 0) return;
+        tarjetasCostos.add(tarjeta("Costo en la red", dinero(costoRed), String.format(Locale.ROOT,
+                "%,.0f kWh aprovechados a %s/kWh medio", kwhAprovechado,
+                kwhAprovechado > 0 ? String.format(Locale.ROOT, "$ %.4f", costoRed / kwhAprovechado) : "-")));
+        double ahorro = costoRed - costoComparado;
+        Component t = tarjeta(ahorro >= 0 ? "Ahorro con el generador" : "Sobrecosto del generador", dinero(Math.abs(ahorro)),
+                comparados + " periodos comparados");
+        t.getElement().getStyle().set("border-color", ahorro >= 0 ? "#155724" : "#721c24")
+                .set("background-color", ahorro >= 0 ? "#d4edda" : "#f8d7da");
+        tarjetasCostos.add(t);
     }
 
     private void abrirDialogoCosto(PeriodoMarcha p) {
@@ -543,7 +695,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + "Intermitente = con potencia menos del 95% del tiempo, por ejemplo compresores que paran y arrancan. "
                 + "En los transformadores la potencia negativa (retorno a la red) cuenta como potencia. "
                 + "Sin datos = el medidor no tiene lecturas en ese intervalo.");
-        VerticalLayout v = new VerticalLayout(barra, medidoresMensaje, medidoresGrid, nota);
+        VerticalLayout v = new VerticalLayout(descripcion("Que maquinas (medidores de la planta) estaban consumiendo mientras el "
+                + "generador estuvo encendido, y cuales estaban paradas (en cero). Por ejemplo, en un corte de luz: que lineas siguieron "
+                + "trabajando con el generador. Tambien se puede calcular para todo el periodo elegido."),
+                barra, medidoresMensaje, medidoresGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -621,6 +776,14 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private static Span nota(String texto) {
         Span s = new Span(texto);
         s.getStyle().set("font-size", "12px").set("color", "#555");
+        return s;
+    }
+
+    /** Qué muestra la pestaña, en una línea, arriba de todo. */
+    private static Span descripcion(String texto) {
+        Span s = new Span(texto);
+        s.getStyle().set("font-size", "14px").set("color", "#0b0b0b").set("background-color", "#f3f4f6")
+                .set("padding", "8px 12px").set("border-radius", "6px").set("display", "block");
         return s;
     }
 

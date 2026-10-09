@@ -191,6 +191,12 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       mano galones de diesel y precio del galon, entidad H2 `CostoCombustible`, solo ADMIN; se calculan costo, costo
       por kWh, kWh por galon y galones por hora; el precio propuesto es el ultimo cargado) y Consumo por medidor.
       Verificado con el arranque 715 de GenPower: 7,5 h, 4.488 kWh generados, 278 tomados y 232 retornados a TR2.
+- [x] G9. (2026-10-09) Tarifa de la red para comparar (entidad H2 `TarifaRed`, $/kWh por mes de vigencia, una sola para
+      la planta, carga solo ADMIN en la pestana Costos). Por periodo: aprovechado = generado - retornado (lo retornado no
+      se valora: se asume que el distribuidor no lo paga), costo en la red = aprovechado x tarifa vigente al inicio,
+      ahorro = costo en la red - combustible (negativo = sobrecosto). Cada pestana del Analisis tiene arriba una linea
+      que explica que muestra; "Energia" paso a llamarse "Resumen de energia". Posible: tarifa por franja horaria
+      (punta/media/base) y cargo por demanda, si el usuario lo pide.
 - [ ] G7. Generador Caterpillar (ComAp InteliGen 500, 192.168.0.201, junto a TR1 = `Trafo1`): ya cargado en
       `generador-config.json`. Falta: habilitar Modbus TCP en el controlador y confirmar el mapa (hoy es una copia
       del InteliGen 200, `confirmado: false`). Pasos en `docs/ig500/MAPA-REGISTROS.md`.
