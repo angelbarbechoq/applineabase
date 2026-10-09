@@ -203,6 +203,14 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       cero) / Sin datos, con los nombres de las que no trabajaron. No se listan el transformador ni KWhPlanta1. Consumo
       minimo = menos de 1 kW medio mientras tuvo potencia (no repartido en todo el arranque: Linea34 con 2,2 h a ~2,6 kW es
       "a ratos"). Arranque 715: 33 trabajando, 3 a ratos, 2 con consumo minimo, 2 en cero (Linea08, Linea32).
+- [x] G11. (2026-10-09) Topologia de medidores dada por el usuario: en `linea-id-config.json` cada medidor tiene
+      `tipo` (MAQUINA, TRANSFORMADOR, GENERAL, SENSOR, NO_CONTAR), `transformador` (Trafo1 / Trafo2) y `dentroDe` para
+      submedidores (GA752, HornoL3 y OrientadoraL2 dentro de Inyeccion; ServicioAux y ServAuxP3LabCalid dentro de
+      TDGeneradorSA). MotorL3 y MotorL4 = NO_CONTAR; KWhPlanta1 = GENERAL; 5 sensores. Copia previa en
+      `C:/LineaBaseX/backup/2026-10-09-linea-id-config/` (orden de la lista sin cambios: es el que se escribe al PLC);
+      semilla del proyecto actualizada a la lista real (48). Editable en Configuracion de hardware (listas cerradas).
+      El detalle de maquinas de un arranque muestra solo las del transformador del generador y el balance: arranque 715
+      (TR2), maquinas 4.616 kWh de 5.569 kWh de consumo del tablero = 83% medido.
 - [ ] G7. Generador Caterpillar (ComAp InteliGen 500, 192.168.0.201, junto a TR1 = `Trafo1`): ya cargado en
       `generador-config.json`. Falta: habilitar Modbus TCP en el controlador y confirmar el mapa (hoy es una copia
       del InteliGen 200, `confirmado: false`). Pasos en `docs/ig500/MAPA-REGISTROS.md`.

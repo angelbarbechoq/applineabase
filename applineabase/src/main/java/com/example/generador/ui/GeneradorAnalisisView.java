@@ -4,7 +4,6 @@ import com.example.base.model.GraficaModel;
 import com.example.base.ui.ChartsView;
 import com.example.base.ui.MainLayout;
 import com.example.calidad.service.CalidadEnergiaService.Estado;
-import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.generador.model.CostoCombustible;
 import com.example.generador.model.Generador;
 import com.example.generador.model.TarifaRed;
@@ -53,9 +52,7 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
@@ -676,6 +673,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         maquinasTitulo.getStyle().set("margin", "16px 0 0 0");
         maquinasResumen.getStyle().set("font-size", "14px").set("display", "block");
         maquinasGrid.addColumn(ConsumoMedidor::medidor).setHeader("Maquina").setAutoWidth(true).setFlexGrow(0);
+        maquinasGrid.addColumn(c -> c.dentroDe() == null ? "" : "dentro de " + c.dentroDe()).setHeader("Submedidor")
+                .setAutoWidth(true).setFlexGrow(0);
         maquinasGrid.addColumn(ConsumoMedidor::zona).setHeader("Zona / grupo").setAutoWidth(true).setFlexGrow(0);
         maquinasGrid.addComponentColumn(GeneradorAnalisisView::badgeEstado).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
         columna(maquinasGrid, "Energia consumida (kWh)", c -> c.kwh() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwh()));
@@ -687,8 +686,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + "arrancaba, por ejemplo los compresores de aire. Parada, solo consumo minimo = la maquina no trabajo pero su medidor "
                 + "marco menos de " + (int) ConsumoMedidoresService.KW_MEDIO_MINIMO + " kW mientras tuvo potencia (tablero de control, luces). "
                 + "Parada (en cero) = todas sus lecturas del arranque fueron cero y su contador no subio (se revisan todas, no un "
-                + "promedio). Sin datos = su medidor no tiene lecturas en ese horario. No se listan el transformador ni el medidor "
-                + "general de la planta: su energia esta en la fila del arranque.");
+                + "promedio). Sin datos = su medidor no tiene lecturas en ese horario. Se listan solo las maquinas del "
+                + "transformador del generador (Configuracion de hardware); no entran el transformador, el medidor general, los "
+                + "sensores ni MotorL3 / MotorL4. Los submedidores (por ejemplo GA752 dentro de Inyeccion) se muestran pero no se "
+                + "suman dos veces en el balance.");
         VerticalLayout v = new VerticalLayout(maquinasTitulo, maquinasResumen, maquinasGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
@@ -708,16 +709,19 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             limpiarDetalleMaquinas();
             return;
         }
-        Set<String> excluir = new HashSet<>();
-        excluir.add(MaquinasVirtuales.KWH_PLANTA_1);
-        generadorService.generadores().forEach(g -> { if (g.redAsociada() != null) excluir.add(g.redAsociada()); });
-        List<ConsumoMedidor> lista = consumoMedidores.calcular(p.inicio(), p.fin(), excluir);
+        List<ConsumoMedidor> lista = consumoMedidores.calcular(p.inicio(), p.fin(), p.red());
         maquinasGrid.setItems(lista);
         maquinasGrid.setVisible(true);
         maquinasTitulo.setText(p.generador() + " trabajo desde el " + p.inicio().format(CORTA)
                 + (p.enCurso() ? " hasta ahora (sigue en marcha)" : " hasta el " + p.fin().format(CORTA))
-                + " (" + duracion(p.horas()) + ")");
+                + " (" + duracion(p.horas()) + ") con las maquinas de " + (p.red() == null ? "toda la planta" : p.red()));
         StringBuilder r = new StringBuilder("Genero " + kwh(p.kwhGenerado()) + ". ");
+        Double medido = ConsumoMedidoresService.sumaBalance(lista);
+        Double consumo = p.consumo();
+        if (medido != null && consumo != null && consumo > 0) {
+            r.append(String.format(Locale.ROOT, "Las maquinas de %s sumaron %,.0f kWh de los %,.0f kWh que consumio el tablero "
+                    + "(%.0f%% medido; el resto son cargas sin medidor y perdidas). ", p.red(), medido, consumo, medido / consumo * 100));
+        }
         r.append(grupo(lista, ConsumoMedidoresService.Estado.CONSUMIO, "Trabajando", false));
         r.append(grupo(lista, ConsumoMedidoresService.Estado.INTERMITENTE, "Trabajando a ratos", true));
         r.append(grupo(lista, ConsumoMedidoresService.Estado.CONSUMO_MINIMO, "Paradas con consumo minimo", true));

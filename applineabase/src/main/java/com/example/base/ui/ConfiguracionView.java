@@ -2,6 +2,7 @@ package com.example.base.ui;
 
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCIdWriterService;
+import com.example.medidores.TipoMedidor;
 import com.example.medidores.service.ModeloMedidorService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -125,6 +126,9 @@ public class ConfiguracionView extends VerticalLayout {
         lineasGrid.addColumn(l -> l.get("numeroSerie")).setHeader("Serial").setAutoWidth(true);
         lineasGrid.addColumn(l -> l.get("zona")).setHeader("Zona").setAutoWidth(true).setSortable(true);
         lineasGrid.addColumn(l -> l.get("grupo")).setHeader("Grupo").setAutoWidth(true).setSortable(true);
+        lineasGrid.addColumn(l -> TipoMedidor.de(l.get("tipo")).etiqueta()).setHeader("Tipo").setAutoWidth(true).setSortable(true);
+        lineasGrid.addColumn(l -> l.get("transformador")).setHeader("Transformador").setAutoWidth(true).setSortable(true);
+        lineasGrid.addColumn(l -> l.get("dentroDe")).setHeader("Dentro de").setAutoWidth(true).setSortable(true);
         lineasGrid.addComponentColumn(this::crearAccionesLinea).setHeader("Acciones").setAutoWidth(true);
         lineasGrid.setSizeFull();
 
@@ -175,7 +179,28 @@ public class ConfiguracionView extends VerticalLayout {
         grupoField.addCustomValueSetListener(e -> grupoField.setValue(e.getDetail()));
         grupoField.setHelperText("Agrupación libre para reportes (ej. Casa Fuerza). No afecta el acceso por zona.");
 
+        // Topología eléctrica (listas cerradas): qué transformador lo alimenta y si es submedidor de otro.
+        // La usan los balances del grupo electrógeno para no sumar dos veces ni contar sensores.
+        ComboBox<TipoMedidor> tipoField = new ComboBox<>("Tipo");
+        tipoField.setItems(TipoMedidor.values());
+        tipoField.setItemLabelGenerator(TipoMedidor::etiqueta);
+        tipoField.setValue(TipoMedidor.MAQUINA);
+        ComboBox<String> transformadorField = new ComboBox<>("Transformador");
+        transformadorField.setItems(lineas.stream()
+                .filter(l -> TipoMedidor.de(l.get("tipo")) == TipoMedidor.TRANSFORMADOR)
+                .map(l -> String.valueOf(l.get("lineaMaquina"))).sorted().collect(Collectors.toList()));
+        transformadorField.setHelperText("De que transformador se alimenta");
+        ComboBox<String> dentroDeField = new ComboBox<>("Dentro de (submedidor)");
+        dentroDeField.setItems(lineas.stream()
+                .filter(l -> l != lineaEnEdicion && TipoMedidor.de(l.get("tipo")) == TipoMedidor.MAQUINA && l.get("dentroDe") == null)
+                .map(l -> String.valueOf(l.get("lineaMaquina"))).sorted().collect(Collectors.toList()));
+        dentroDeField.setClearButtonVisible(true);
+        dentroDeField.setHelperText("Solo si este medidor esta dentro de otro tablero medido (ej. GA752 dentro de Inyeccion)");
+
         if (lineaEnEdicion != null) {
+            tipoField.setValue(TipoMedidor.de(lineaEnEdicion.get("tipo")));
+            transformadorField.setValue((String) lineaEnEdicion.get("transformador"));
+            dentroDeField.setValue((String) lineaEnEdicion.get("dentroDe"));
             idField.setValue(((Number) lineaEnEdicion.get("id")).intValue());
             nombreField.setValue(String.valueOf(lineaEnEdicion.getOrDefault("lineaMaquina", "")));
             String modeloActual = (String) lineaEnEdicion.get("modeloMedidor");
@@ -194,7 +219,8 @@ public class ConfiguracionView extends VerticalLayout {
             grupoField.setValue((String) lineaEnEdicion.get("grupo"));
         }
 
-        FormLayout form = new FormLayout(idField, nombreField, medidorField, plcField, serialField, zonaField, grupoField);
+        FormLayout form = new FormLayout(idField, nombreField, medidorField, plcField, serialField, zonaField, grupoField,
+                tipoField, transformadorField, dentroDeField);
         form.setResponsiveSteps(
                 new FormLayout.ResponsiveStep("0", 1),
                 new FormLayout.ResponsiveStep("320px", 2));
@@ -204,7 +230,7 @@ public class ConfiguracionView extends VerticalLayout {
         Button guardarBtn = new Button("Guardar", e -> {
             boolean ok = guardarLinea(lineaEnEdicion, idField.getValue(), nombreField.getValue(),
                     medidorField.getValue(), plcField.getValue(), serialField.getValue(), zonaField.getValue(),
-                    grupoField.getValue());
+                    grupoField.getValue(), tipoField.getValue(), transformadorField.getValue(), dentroDeField.getValue());
             if (ok) {
                 dialog.close();
             }
@@ -216,7 +242,17 @@ public class ConfiguracionView extends VerticalLayout {
     }
 
     private boolean guardarLinea(Map<String, Object> lineaEnEdicion, Integer id, String nombre, String medidor,
-                                  String plc, String serial, String zona, String grupo) {
+                                  String plc, String serial, String zona, String grupo,
+                                  TipoMedidor tipo, String transformador, String dentroDe) {
+        if (tipo == null) tipo = TipoMedidor.MAQUINA;
+        if (tipo == TipoMedidor.MAQUINA && (transformador == null || transformador.isBlank())) {
+            NotificacionesUtil.mostrarError("Indique de que transformador se alimenta la maquina");
+            return false;
+        }
+        if (dentroDe != null && dentroDe.equalsIgnoreCase(nombre)) {
+            NotificacionesUtil.mostrarError("Un medidor no puede estar dentro de si mismo");
+            return false;
+        }
         if (id == null) {
             NotificacionesUtil.mostrarError("El ID es obligatorio");
             return false;
@@ -264,6 +300,11 @@ public class ConfiguracionView extends VerticalLayout {
         } else {
             linea.put("grupo", grupo);
         }
+        linea.put("tipo", tipo.name());
+        if (transformador == null || transformador.isBlank()) linea.remove("transformador");
+        else linea.put("transformador", transformador);
+        if (dentroDe == null || dentroDe.isBlank() || tipo != TipoMedidor.MAQUINA) linea.remove("dentroDe");
+        else linea.put("dentroDe", dentroDe);
 
         configLoaderService.saveLineaIDConfig(lineas);
         Notification.show("Línea guardada", 2500, Notification.Position.BOTTOM_END)

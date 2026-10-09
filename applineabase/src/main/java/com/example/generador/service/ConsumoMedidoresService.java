@@ -2,8 +2,9 @@ package com.example.generador.service;
 
 import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.RutaArchivosEnergia;
-import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCDataQueryService;
+import com.example.medidores.TipoMedidor;
+import com.example.medidores.service.TopologiaMedidores;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -75,49 +76,57 @@ public class ConsumoMedidoresService {
     }
 
     /**
+     * @param dentroDe       medidor que lo contiene (submedidor) o null; los submedidores no se suman
+     *                       en el balance del transformador (ya están en el de arriba)
      * @param kwh            aumento del contador en los intervalos (null = sin lecturas de energía)
      * @param lecturas       lecturas de potencia en los intervalos
      * @param lecturasConCarga lecturas con potencia distinta de cero
      */
-    public record ConsumoMedidor(String medidor, String zona, Estado estado, Double kwh, Double kwMedio,
+    public record ConsumoMedidor(String medidor, String zona, String dentroDe, Estado estado, Double kwh, Double kwMedio,
                                  int lecturas, int lecturasConCarga) {
         public Double porcentajeConCarga() {
             return lecturas == 0 ? null : lecturasConCarga * 100.0 / lecturas;
         }
     }
 
-    private final ConfigLoaderService configLoaderService;
+    private final TopologiaMedidores topologia;
 
-    public ConsumoMedidoresService(ConfigLoaderService configLoaderService) {
-        this.configLoaderService = configLoaderService;
+    public ConsumoMedidoresService(TopologiaMedidores topologia) {
+        this.topologia = topologia;
     }
 
     /**
-     * Estado de cada máquina entre {@code desde} y {@code hasta} (un período en marcha).
+     * Estado de cada máquina de un transformador entre {@code desde} y {@code hasta} (un período en
+     * marcha). Solo máquinas: no entran el transformador, el medidor general, los sensores ni los
+     * marcados "no se cuenta" (MotorL3, MotorL4).
      *
-     * @param excluir medidores que no son máquinas (el transformador de la red y el medidor general de
-     *                la planta): su energía ya está en la fila del período.
+     * @param transformador null = las máquinas de todos los transformadores
      */
-    public List<ConsumoMedidor> calcular(LocalDateTime desde, LocalDateTime hasta, Set<String> excluir) {
-        return calcular(List.of(new Ventana(desde, hasta)), excluir);
+    public List<ConsumoMedidor> calcular(LocalDateTime desde, LocalDateTime hasta, String transformador) {
+        return calcular(List.of(new Ventana(desde, hasta)), transformador);
     }
 
-    List<ConsumoMedidor> calcular(List<Ventana> ventanas, Set<String> excluir) {
-        Map<String, String> zonas = new LinkedHashMap<>();
-        for (Map<String, Object> l : configLoaderService.loadLineaIDConfig()) {
-            String nombre = String.valueOf(l.get("lineaMaquina"));
-            if (nombre.isBlank() || "null".equals(nombre) || SENSORES.contains(nombre) || excluir.contains(nombre)
-                    || !PLCDataQueryService.esNombreMaquinaValido(nombre)) continue;
-            String zona = l.get("grupo") != null ? String.valueOf(l.get("grupo"))
-                    : l.get("zona") != null ? String.valueOf(l.get("zona")) : "";
-            zonas.putIfAbsent(nombre, zona);
+    /** Suma de las máquinas que van en el balance (sin submedidores), o null si ninguna tiene dato. */
+    public static Double sumaBalance(List<ConsumoMedidor> lista) {
+        Double total = null;
+        for (ConsumoMedidor c : lista) {
+            if (c.dentroDe() == null && c.kwh() != null) total = (total == null ? 0 : total) + c.kwh();
         }
+        return total;
+    }
+
+    List<ConsumoMedidor> calcular(List<Ventana> ventanas, String transformador) {
+        List<TopologiaMedidores.Medidor> maquinas = topologia.medidores().stream()
+                .filter(m -> m.tipo() == TipoMedidor.MAQUINA && !SENSORES.contains(m.nombre())
+                        && PLCDataQueryService.esNombreMaquinaValido(m.nombre())
+                        && (transformador == null || transformador.equals(m.transformador())))
+                .toList();
         double horas = 0;
         for (Ventana v : ventanas) horas += Duration.between(v.desde(), v.hasta()).toSeconds() / 3600.0;
 
         List<ConsumoMedidor> lista = new ArrayList<>();
-        for (Map.Entry<String, String> e : zonas.entrySet()) {
-            String m = e.getKey();
+        for (TopologiaMedidores.Medidor maquina : maquinas) {
+            String m = maquina.nombre();
             Double kwh = null;
             int lecturas = 0, conCarga = 0;
             for (YearMonth mes : meses(ventanas)) {
@@ -142,7 +151,7 @@ public class ConsumoMedidoresService {
             else if (kwConPotencia != null && kwConPotencia < KW_MEDIO_MINIMO) estado = Estado.CONSUMO_MINIMO;
             else if (lecturas > 0 && conCarga * 100.0 / lecturas < PORCENTAJE_CONTINUO) estado = Estado.INTERMITENTE;
             else estado = Estado.CONSUMIO;
-            lista.add(new ConsumoMedidor(m, e.getValue(), estado, kwh, kwMedio, lecturas, conCarga));
+            lista.add(new ConsumoMedidor(m, maquina.zona(), maquina.dentroDe(), estado, kwh, kwMedio, lecturas, conCarga));
         }
         lista.sort(Comparator.comparing((ConsumoMedidor c) -> c.estado().ordinal())
                 .thenComparing(c -> c.kwh() == null ? 0 : -c.kwh()));
