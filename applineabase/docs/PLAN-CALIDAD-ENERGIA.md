@@ -211,6 +211,12 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       semilla del proyecto actualizada a la lista real (48). Editable en Configuracion de hardware (listas cerradas).
       El detalle de maquinas de un arranque muestra solo las del transformador del generador y el balance: arranque 715
       (TR2), maquinas 4.616 kWh de 5.569 kWh de consumo del tablero = 83% medido.
+- [x] G13. (2026-10-09) Maquinas de un arranque con el umbral de encendido de cada una (el del horometro, AlarmaConfig
+      DETENCION / CICLO_COMPRESOR, default 15) en vez de 1 kW fijo: "Parada, consumo en espera" si nunca lo supero (ej.
+      Linea05 ~1,7 kW de su transformador de aislamiento, Mixer01, Linea01). Lo que consume una maquina parada (por debajo
+      de su umbral) es desperdicio: columna por maquina y total en el resumen del arranque (sin contar submedidores dos
+      veces). Energia en espera = kWh del contador x (potencia de los minutos parados / potencia total): no depende de si
+      el medidor guarda kW o W. Arranque 715 GenPower: 213 kWh de desperdicio; Caterpillar 09-10: 5,9 kWh.
 - [x] G12. (2026-10-09) Resumen de energia: el retorno a la red (KWhR del trafo) se cuenta solo mientras el
       generador estaba en marcha (de cada arranque a su parada, repartido por dia), no todo el dia. Antes el Caterpillar
       mostraba el 09-10 505 kWh "exportados" contra 194 generados (retorno de antes de que se registrara, 09:19); ahora

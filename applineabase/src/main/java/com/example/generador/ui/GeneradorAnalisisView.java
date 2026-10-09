@@ -679,18 +679,22 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         maquinasGrid.addColumn(ConsumoMedidor::zona).setHeader("Zona / grupo").setAutoWidth(true).setFlexGrow(0);
         maquinasGrid.addComponentColumn(GeneradorAnalisisView::badgeEstado).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
         columna(maquinasGrid, "Energia consumida (kWh)", c -> c.kwh() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwh()));
+        columna(maquinasGrid, "Parada consumiendo (desperdicio kWh)", c -> c.kwhEnEspera() == null || c.kwhEnEspera() < 0.05 ? "-"
+                : String.format(Locale.ROOT, "%,.1f", c.kwhEnEspera()));
         columna(maquinasGrid, "Potencia media (kW)", c -> c.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwMedio()));
-        columna(maquinasGrid, "Tiempo trabajando", c -> porcentaje0(c.porcentajeConCarga()));
+        columna(maquinasGrid, "Tiempo trabajando", c -> porcentaje0(c.porcentajeTrabajando()));
+        columna(maquinasGrid, "Umbral de encendido", c -> String.format(Locale.ROOT, "%.0f", c.umbral()));
         maquinasGrid.setWidthFull();
         maquinasGrid.setAllRowsVisible(true);
-        Span nota = nota("Trabajando = con potencia todo el arranque (95% del tiempo o mas). Trabajando a ratos = paraba y "
-                + "arrancaba, por ejemplo los compresores de aire. Parada, solo consumo minimo = la maquina no trabajo pero su medidor "
-                + "marco menos de " + (int) ConsumoMedidoresService.KW_MEDIO_MINIMO + " kW mientras tuvo potencia (tablero de control, luces). "
+        Span nota = nota("Trabajando = por encima de su umbral de encendido todo el arranque (95% del tiempo o mas). El umbral es el "
+                + "mismo del horometro (Horometro > Ajustar umbrales). Trabajando a ratos = paraba y arrancaba, por ejemplo los "
+                + "compresores de aire. Parada, consumo en espera = nunca supero su umbral pero consumio (ej. Linea05: su transformador "
+                + "de aislamiento, ~1,7 kW). Lo que consume una maquina parada es desperdicio: lo entrega igual el generador o la red. "
                 + "Parada (en cero) = todas sus lecturas del arranque fueron cero y su contador no subio (se revisan todas, no un "
                 + "promedio). Sin datos = su medidor no tiene lecturas en ese horario. Se listan solo las maquinas del "
                 + "transformador del generador (Configuracion de hardware); no entran el transformador, el medidor general, los "
                 + "sensores ni MotorL3 / MotorL4. Los submedidores (por ejemplo GA752 dentro de Inyeccion) se muestran pero no se "
-                + "suman dos veces en el balance.");
+                + "suman dos veces en el balance ni en el desperdicio.");
         VerticalLayout v = new VerticalLayout(maquinasTitulo, maquinasResumen, maquinasGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
@@ -725,9 +729,18 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         r.append(grupo(lista, ConsumoMedidoresService.Estado.CONSUMIO, "Trabajando", false));
         r.append(grupo(lista, ConsumoMedidoresService.Estado.INTERMITENTE, "Trabajando a ratos", true));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.CONSUMO_MINIMO, "Paradas con consumo minimo", true));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.EN_ESPERA, "Paradas consumiendo en espera", true));
         r.append(grupo(lista, ConsumoMedidoresService.Estado.EN_CERO, "Paradas (en cero)", true));
         r.append(grupo(lista, ConsumoMedidoresService.Estado.SIN_DATOS, "Sin datos", true));
+        double desperdicio = ConsumoMedidoresService.sumaEnEspera(lista);
+        if (desperdicio >= 0.05) {
+            List<String> detalle = lista.stream().filter(c -> c.dentroDe() == null && c.kwhEnEspera() != null && c.kwhEnEspera() >= 0.5)
+                    .sorted((x, y) -> Double.compare(y.kwhEnEspera(), x.kwhEnEspera()))
+                    .map(c -> String.format(Locale.ROOT, "%s %,.1f", c.medidor(), c.kwhEnEspera())).toList();
+            r.append(String.format(Locale.ROOT, "Desperdicio: las maquinas paradas consumieron %,.1f kWh mientras el generador estaba "
+                    + "en marcha, energia que entrego el generador o la red sin producir%s.", desperdicio,
+                    detalle.isEmpty() ? "" : " (" + String.join(", ", detalle) + " kWh)"));
+        }
         maquinasResumen.setText(r.toString().trim());
     }
 
@@ -743,11 +756,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Estado e = switch (c.estado()) {
             case CONSUMIO -> Estado.OK;
             case INTERMITENTE -> Estado.AVISO;
-            case CONSUMO_MINIMO, SIN_DATOS -> Estado.SIN_DATO;
-            case EN_CERO -> Estado.FUERA;
+            case EN_ESPERA -> Estado.FUERA;
+            case EN_CERO, SIN_DATOS -> Estado.SIN_DATO;
         };
-        String texto = c.estado() == ConsumoMedidoresService.Estado.INTERMITENTE && c.porcentajeConCarga() != null
-                ? String.format(Locale.ROOT, "Trabajando a ratos (%.0f%%)", c.porcentajeConCarga()) : c.estado().etiqueta();
+        String texto = c.estado() == ConsumoMedidoresService.Estado.INTERMITENTE && c.porcentajeTrabajando() != null
+                ? String.format(Locale.ROOT, "Trabajando a ratos (%.0f%%)", c.porcentajeTrabajando()) : c.estado().etiqueta();
         GeneradorView.badge(s, texto, e);
         return s;
     }
