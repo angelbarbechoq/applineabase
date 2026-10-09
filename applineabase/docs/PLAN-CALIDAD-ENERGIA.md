@@ -197,6 +197,12 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       ahorro = costo en la red - combustible (negativo = sobrecosto). Cada pestana del Analisis tiene arriba una linea
       que explica que muestra; "Energia" paso a llamarse "Resumen de energia". Posible: tarifa por franja horaria
       (punta/media/base) y cargo por demanda, si el usuario lo pide.
+- [x] G10. (2026-10-09) Se saco la pestana "Consumo por medidor" (sumaba todos los arranques del periodo y no se
+      entendia). Ahora en Periodos en marcha se hace clic en un arranque y abajo dice "GenPower trabajo desde ... hasta
+      ... con estas maquinas": Trabajando / Trabajando a ratos (% del tiempo) / Parada, solo consumo minimo / Parada (en
+      cero) / Sin datos, con los nombres de las que no trabajaron. No se listan el transformador ni KWhPlanta1. Consumo
+      minimo = menos de 1 kW medio mientras tuvo potencia (no repartido en todo el arranque: Linea34 con 2,2 h a ~2,6 kW es
+      "a ratos"). Arranque 715: 33 trabajando, 3 a ratos, 2 con consumo minimo, 2 en cero (Linea08, Linea32).
 - [ ] G7. Generador Caterpillar (ComAp InteliGen 500, 192.168.0.201, junto a TR1 = `Trafo1`): ya cargado en
       `generador-config.json`. Falta: habilitar Modbus TCP en el controlador y confirmar el mapa (hoy es una copia
       del InteliGen 200, `confirmado: false`). Pasos en `docs/ig500/MAPA-REGISTROS.md`.

@@ -4,7 +4,6 @@ import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCDataQueryService;
-import com.example.generador.model.Generador;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,13 +25,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Qué medidores consumieron y cuáles quedaron en cero en un conjunto de intervalos (todo un
- * período, o solo mientras el generador estuvo en marcha).
+ * Con qué máquinas trabajó el generador en un período en marcha: cuáles estaban trabajando y cuáles
+ * paradas entre el inicio y el fin del arranque.
  *
- * "En cero" se decide con TODAS las lecturas del intervalo, nunca con un promedio ni una lectura
- * suelta: el contador de kWh no subió y ninguna lectura de potencia fue mayor que cero. Así una
- * carga intermitente (compresores de aire que paran y arrancan) aparece como "intermitente" con el
- * porcentaje del tiempo con carga, no como parada.
+ * "Parada (en cero)" se decide con TODAS las lecturas del intervalo, nunca con un promedio ni una
+ * lectura suelta: el contador de kWh no subió y ninguna lectura de potencia fue distinta de cero. Así
+ * una carga intermitente (compresores de aire que paran y arrancan) aparece como "trabajando a ratos"
+ * con el porcentaje del tiempo con carga, no como parada.
  */
 @Service
 public class ConsumoMedidoresService {
@@ -45,9 +44,10 @@ public class ConsumoMedidoresService {
     /** Con potencia menos de este % del tiempo con lectura = intermitente. */
     private static final double PORCENTAJE_CONTINUO = 95.0;
     /**
-     * Potencia media (del contador de kWh, que está en kWh en todos los medidores; la columna PW no:
-     * algunos la guardan en W) por debajo de la cual solo hay consumo mínimo: el medidor no está en
-     * cero (ej. Mixer01 parado con ~50 W de un tablero auxiliar) pero la máquina no trabajó.
+     * Potencia media mientras hubo potencia (del contador de kWh, que está en kWh en todos los
+     * medidores; la columna PW no: algunos la guardan en W) por debajo de la cual solo hay consumo
+     * mínimo: el medidor no está en cero (ej. Mixer01 parado con ~50 W de un tablero auxiliar) pero la
+     * máquina no trabajó.
      */
     public static final double KW_MEDIO_MINIMO = 1.0;
     /** Salto máximo creíble del contador entre dos lecturas seguidas (kWh); más es basura de lectura. */
@@ -60,8 +60,8 @@ public class ConsumoMedidoresService {
     }
 
     public enum Estado {
-        CONSUMIO("Consumio"), INTERMITENTE("Intermitente"), CONSUMO_MINIMO("Consumo minimo"), EN_CERO("En cero"),
-        SIN_DATOS("Sin datos");
+        CONSUMIO("Trabajando"), INTERMITENTE("Trabajando a ratos"), CONSUMO_MINIMO("Parada, solo consumo minimo"),
+        EN_CERO("Parada (en cero)"), SIN_DATOS("Sin datos");
 
         private final String etiqueta;
 
@@ -87,42 +87,26 @@ public class ConsumoMedidoresService {
     }
 
     private final ConfigLoaderService configLoaderService;
-    private final GeneradorService generadorService;
 
-    public ConsumoMedidoresService(ConfigLoaderService configLoaderService, GeneradorService generadorService) {
+    public ConsumoMedidoresService(ConfigLoaderService configLoaderService) {
         this.configLoaderService = configLoaderService;
-        this.generadorService = generadorService;
     }
 
-    /** Intervalos en marcha de los generadores (arranques registrados), recortados al período y unidos si se pisan. */
-    public List<Ventana> ventanasEnMarcha(List<Generador> generadores, LocalDateTime desde, LocalDateTime hasta) {
-        List<Ventana> lista = new ArrayList<>();
-        for (Generador g : generadores) {
-            for (GeneradorService.Arranque a : generadorService.arranques(g)) {
-                LocalDateTime ini = a.inicio().isBefore(desde) ? desde : a.inicio();
-                LocalDateTime fin = a.fin() == null ? LocalDateTime.now() : a.fin();
-                if (fin.isAfter(hasta)) fin = hasta;
-                if (fin.isAfter(ini)) lista.add(new Ventana(ini, fin));
-            }
-        }
-        lista.sort(Comparator.comparing(Ventana::desde));
-        List<Ventana> unidas = new ArrayList<>();
-        for (Ventana v : lista) {
-            Ventana ult = unidas.isEmpty() ? null : unidas.get(unidas.size() - 1);
-            if (ult != null && !v.desde().isAfter(ult.hasta())) {
-                unidas.set(unidas.size() - 1, new Ventana(ult.desde(), v.hasta().isAfter(ult.hasta()) ? v.hasta() : ult.hasta()));
-            } else {
-                unidas.add(v);
-            }
-        }
-        return unidas;
+    /**
+     * Estado de cada máquina entre {@code desde} y {@code hasta} (un período en marcha).
+     *
+     * @param excluir medidores que no son máquinas (el transformador de la red y el medidor general de
+     *                la planta): su energía ya está en la fila del período.
+     */
+    public List<ConsumoMedidor> calcular(LocalDateTime desde, LocalDateTime hasta, Set<String> excluir) {
+        return calcular(List.of(new Ventana(desde, hasta)), excluir);
     }
 
-    public List<ConsumoMedidor> calcular(List<Ventana> ventanas) {
+    List<ConsumoMedidor> calcular(List<Ventana> ventanas, Set<String> excluir) {
         Map<String, String> zonas = new LinkedHashMap<>();
         for (Map<String, Object> l : configLoaderService.loadLineaIDConfig()) {
             String nombre = String.valueOf(l.get("lineaMaquina"));
-            if (nombre.isBlank() || "null".equals(nombre) || SENSORES.contains(nombre)
+            if (nombre.isBlank() || "null".equals(nombre) || SENSORES.contains(nombre) || excluir.contains(nombre)
                     || !PLCDataQueryService.esNombreMaquinaValido(nombre)) continue;
             String zona = l.get("grupo") != null ? String.valueOf(l.get("grupo"))
                     : l.get("zona") != null ? String.valueOf(l.get("zona")) : "";
@@ -148,10 +132,14 @@ public class ConsumoMedidoresService {
                 conCarga += p[1];
             }
             Double kwMedio = kwh == null || horas <= 0 ? null : kwh / horas;
+            // Potencia media mientras tuvo potencia (no repartida en todo el intervalo): una línea que
+            // trabajó 2 h de 8 a 30 kW no es "consumo mínimo" aunque su media de las 8 h sea baja.
+            Double kwConPotencia = kwh == null || horas <= 0 ? null
+                    : lecturas > 0 && conCarga > 0 ? kwh / (horas * conCarga / lecturas) : kwMedio;
             Estado estado;
             if (kwh == null && lecturas == 0) estado = Estado.SIN_DATOS;
             else if ((kwh == null || kwh <= 0) && conCarga == 0) estado = Estado.EN_CERO;
-            else if (kwMedio != null && kwMedio < KW_MEDIO_MINIMO) estado = Estado.CONSUMO_MINIMO;
+            else if (kwConPotencia != null && kwConPotencia < KW_MEDIO_MINIMO) estado = Estado.CONSUMO_MINIMO;
             else if (lecturas > 0 && conCarga * 100.0 / lecturas < PORCENTAJE_CONTINUO) estado = Estado.INTERMITENTE;
             else estado = Estado.CONSUMIO;
             lista.add(new ConsumoMedidor(m, e.getValue(), estado, kwh, kwMedio, lecturas, conCarga));

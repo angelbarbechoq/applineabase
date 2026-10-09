@@ -4,12 +4,12 @@ import com.example.base.model.GraficaModel;
 import com.example.base.ui.ChartsView;
 import com.example.base.ui.MainLayout;
 import com.example.calidad.service.CalidadEnergiaService.Estado;
+import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.generador.model.CostoCombustible;
 import com.example.generador.model.Generador;
 import com.example.generador.model.TarifaRed;
 import com.example.generador.service.ConsumoMedidoresService;
 import com.example.generador.service.ConsumoMedidoresService.ConsumoMedidor;
-import com.example.generador.service.ConsumoMedidoresService.Ventana;
 import com.example.generador.service.CostoCombustibleService;
 import com.example.generador.service.GeneradorAnalisisService;
 import com.example.generador.service.GeneradorAnalisisService.Agrupacion;
@@ -53,7 +53,9 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
@@ -66,7 +68,7 @@ import java.util.function.Function;
  *   se retornó a la red en ese mismo intervalo.
  * - Costos: galones y precio del galón cargados a mano por período en marcha; costo, costo por kWh
  *   y kWh por galón calculados.
- * - Consumo por medidor: qué medidores consumieron y cuáles quedaron en cero.
+ *   Al elegir un arranque se ve con qué máquinas trabajó el generador (trabajando / a ratos / paradas).
  */
 @PageTitle("Analisis grupo electrogeno | LineaBase")
 @Route(value = "generador/analisis", layout = MainLayout.class)
@@ -112,10 +114,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final Grid<PeriodoMarcha> costosGrid = new Grid<>();
     private Map<String, CostoCombustible> combustible = Map.of();
     private List<PeriodoMarcha> periodos = List.of();
-    // Consumo por medidor
-    private final ComboBox<String> modoMedidores = new ComboBox<>("Calcular sobre");
-    private final Grid<ConsumoMedidor> medidoresGrid = new Grid<>();
-    private final Span medidoresMensaje = new Span();
+    // Máquinas del período en marcha elegido
+    private final H4 maquinasTitulo = new H4();
+    private final Span maquinasResumen = new Span();
+    private final Grid<ConsumoMedidor> maquinasGrid = new Grid<>();
 
     private LocalDate desde, hasta;
 
@@ -184,7 +186,6 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         tabEnergia = tabs.add("Resumen de energia", crearEnergia());
         tabs.add("Periodos en marcha", crearPeriodos());
         tabs.add("Costos", crearCostos());
-        tabs.add("Consumo por medidor", crearSeccionMedidores());
         // El gráfico se arma con la pestaña visible (con display:none amCharts lo dibuja sin tamaño).
         tabs.addSelectedChangeListener(e -> {
             if (e.getSelectedTab() == tabEnergia && scriptGrafico != null) getElement().executeJs(scriptGrafico);
@@ -249,8 +250,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         periodos = analisis.periodosEnMarcha(gens, desde, hasta);
         verPeriodos();
         verCostos();
-        medidoresGrid.setItems(List.of());
-        medidoresMensaje.setText("Elija sobre que calcular y presione Calcular.");
+        limpiarDetalleMaquinas();
 
         String redes = gens.stream().map(Generador::redAsociada).filter(r -> r != null).distinct()
                 .reduce((x, y) -> x + " + " + y).orElse("sin red asociada");
@@ -356,14 +356,17 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         columna(periodosGrid, "Vacio (min)", p -> minutos(p.minVacio()));
         periodosGrid.addColumn(p -> p.red() == null ? "-" : p.red()).setHeader("Red").setAutoWidth(true).setFlexGrow(0);
         periodosGrid.setWidthFull();
-        periodosGrid.setHeight("520px");
+        periodosGrid.setHeight("360px");
+        periodosGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
+        periodosGrid.asSingleSelect().addValueChangeListener(e -> mostrarMaquinas(e.getValue()));
         Span nota = nota("Cada fila es una vez que el generador estuvo encendido (arranque registrado). Tomado y retornado = "
                 + "contadores del medidor del transformador asociado en ese mismo intervalo; las lecturas son de cada minuto y "
                 + "el minuto que cruza el inicio o el fin se reparte en proporcion. Consumo del tablero = tomado + generado - "
                 + "retornado. Paralelo / isla / vacio: minutos segun la tension de red y la carga (desde el 09-10-2026).");
         VerticalLayout v = new VerticalLayout(descripcion("Solo los momentos en que el generador estuvo encendido: una fila por "
-                + "cada vez que arranco, con lo que trabajo y lo que se tomo y se retorno a la red mientras tanto."),
-                tarjetasPeriodos, periodosGrid, nota);
+                + "cada vez que arranco, con lo que trabajo y lo que se tomo y se retorno a la red mientras tanto. "
+                + "Haga clic en un arranque para ver abajo con que maquinas trabajo."),
+                tarjetasPeriodos, periodosGrid, nota, crearDetalleMaquinas());
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -667,84 +670,79 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         d.open();
     }
 
-    // ================= Consumo por medidor =================
+    // ================= Máquinas de un período en marcha =================
 
-    private VerticalLayout crearSeccionMedidores() {
-        modoMedidores.setItems("Todo el periodo elegido", "Solo mientras el generador estuvo en marcha");
-        modoMedidores.setValue("Solo mientras el generador estuvo en marcha");
-        modoMedidores.setWidth("340px");
-        Button calcular = new Button("Calcular", VaadinIcon.CALC.create(), e -> calcularMedidores());
-        HorizontalLayout barra = new HorizontalLayout(modoMedidores, calcular);
-        barra.setAlignItems(Alignment.END);
-
-        medidoresGrid.addColumn(ConsumoMedidor::medidor).setHeader("Medidor").setAutoWidth(true).setFlexGrow(0);
-        medidoresGrid.addColumn(ConsumoMedidor::zona).setHeader("Zona / grupo").setAutoWidth(true).setFlexGrow(0);
-        medidoresGrid.addComponentColumn(GeneradorAnalisisView::badgeEstado).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
-        columna(medidoresGrid, "Energia (kWh)", c -> c.kwh() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwh()));
-        columna(medidoresGrid, "Potencia media (kW)", c -> c.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwMedio()));
-        columna(medidoresGrid, "Tiempo con potencia", c -> porcentaje0(c.porcentajeConCarga()));
-        medidoresGrid.addColumn(c -> c.lecturasConCarga() + " de " + c.lecturas())
-                .setHeader("Lecturas con potencia").setAutoWidth(true).setFlexGrow(0);
-        medidoresGrid.setWidthFull();
-        medidoresGrid.setHeight("520px");
-
-        medidoresMensaje.getStyle().set("font-size", "12px").set("color", "#555");
-        Span nota = nota("En cero = el contador de energia no subio y todas las lecturas de potencia del intervalo fueron cero "
-                + "(se revisan todas, no un promedio). Consumo minimo = hubo potencia pero la potencia media fue menor a "
-                + (int) ConsumoMedidoresService.KW_MEDIO_MINIMO + " kW (por ejemplo solo el tablero de control con la maquina parada). "
-                + "Intermitente = con potencia menos del 95% del tiempo, por ejemplo compresores que paran y arrancan. "
-                + "En los transformadores la potencia negativa (retorno a la red) cuenta como potencia. "
-                + "Sin datos = el medidor no tiene lecturas en ese intervalo.");
-        VerticalLayout v = new VerticalLayout(descripcion("Que maquinas (medidores de la planta) estaban consumiendo mientras el "
-                + "generador estuvo encendido, y cuales estaban paradas (en cero). Por ejemplo, en un corte de luz: que lineas siguieron "
-                + "trabajando con el generador. Tambien se puede calcular para todo el periodo elegido."),
-                barra, medidoresMensaje, medidoresGrid, nota);
+    private VerticalLayout crearDetalleMaquinas() {
+        maquinasTitulo.getStyle().set("margin", "16px 0 0 0");
+        maquinasResumen.getStyle().set("font-size", "14px").set("display", "block");
+        maquinasGrid.addColumn(ConsumoMedidor::medidor).setHeader("Maquina").setAutoWidth(true).setFlexGrow(0);
+        maquinasGrid.addColumn(ConsumoMedidor::zona).setHeader("Zona / grupo").setAutoWidth(true).setFlexGrow(0);
+        maquinasGrid.addComponentColumn(GeneradorAnalisisView::badgeEstado).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
+        columna(maquinasGrid, "Energia consumida (kWh)", c -> c.kwh() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwh()));
+        columna(maquinasGrid, "Potencia media (kW)", c -> c.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwMedio()));
+        columna(maquinasGrid, "Tiempo trabajando", c -> porcentaje0(c.porcentajeConCarga()));
+        maquinasGrid.setWidthFull();
+        maquinasGrid.setAllRowsVisible(true);
+        Span nota = nota("Trabajando = con potencia todo el arranque (95% del tiempo o mas). Trabajando a ratos = paraba y "
+                + "arrancaba, por ejemplo los compresores de aire. Parada, solo consumo minimo = la maquina no trabajo pero su medidor "
+                + "marco menos de " + (int) ConsumoMedidoresService.KW_MEDIO_MINIMO + " kW mientras tuvo potencia (tablero de control, luces). "
+                + "Parada (en cero) = todas sus lecturas del arranque fueron cero y su contador no subio (se revisan todas, no un "
+                + "promedio). Sin datos = su medidor no tiene lecturas en ese horario. No se listan el transformador ni el medidor "
+                + "general de la planta: su energia esta en la fila del arranque.");
+        VerticalLayout v = new VerticalLayout(maquinasTitulo, maquinasResumen, maquinasGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
+        limpiarDetalleMaquinas();
         return v;
     }
 
-    private void calcularMedidores() {
-        if (desde == null || hasta == null) return;
-        long t0 = System.currentTimeMillis();
-        LocalDateTime ini = desde.atStartOfDay();
-        LocalDateTime fin = hasta.atTime(23, 59, 59);
-        if (fin.isAfter(LocalDateTime.now())) fin = LocalDateTime.now();
-        List<Ventana> ventanas;
-        boolean soloMarcha = modoMedidores.getValue() != null && modoMedidores.getValue().startsWith("Solo");
-        if (soloMarcha) {
-            ventanas = consumoMedidores.ventanasEnMarcha(seleccionados(), ini, fin);
-            if (ventanas.isEmpty()) {
-                medidoresGrid.setItems(List.of());
-                medidoresMensaje.setText("El generador no tuvo arranques registrados en el periodo elegido.");
-                return;
-            }
-        } else {
-            ventanas = List.of(new Ventana(ini, fin));
+    private void limpiarDetalleMaquinas() {
+        maquinasTitulo.setText("Maquinas durante el arranque");
+        maquinasResumen.setText("Haga clic en un arranque de la lista para ver con que maquinas trabajo el generador.");
+        maquinasGrid.setItems(List.of());
+        maquinasGrid.setVisible(false);
+    }
+
+    private void mostrarMaquinas(PeriodoMarcha p) {
+        if (p == null) {
+            limpiarDetalleMaquinas();
+            return;
         }
-        List<ConsumoMedidor> lista = consumoMedidores.calcular(ventanas);
-        medidoresGrid.setItems(lista);
-        double horas = ventanas.stream().mapToDouble(v -> Duration.between(v.desde(), v.hasta()).toSeconds() / 3600.0).sum();
-        StringBuilder resumen = new StringBuilder();
-        for (ConsumoMedidoresService.Estado e : ConsumoMedidoresService.Estado.values()) {
-            long n = lista.stream().filter(c -> c.estado() == e).count();
-            if (resumen.length() > 0) resumen.append(", ");
-            resumen.append(n).append(" ").append(e.etiqueta().toLowerCase(Locale.ROOT));
-        }
-        medidoresMensaje.setText((soloMarcha ? ventanas.size() + " intervalos en marcha, " : "")
-                + String.format(Locale.ROOT, "%.1f h", horas) + ": " + resumen + " (" + (System.currentTimeMillis() - t0) + " ms).");
+        Set<String> excluir = new HashSet<>();
+        excluir.add(MaquinasVirtuales.KWH_PLANTA_1);
+        generadorService.generadores().forEach(g -> { if (g.redAsociada() != null) excluir.add(g.redAsociada()); });
+        List<ConsumoMedidor> lista = consumoMedidores.calcular(p.inicio(), p.fin(), excluir);
+        maquinasGrid.setItems(lista);
+        maquinasGrid.setVisible(true);
+        maquinasTitulo.setText(p.generador() + " trabajo desde el " + p.inicio().format(CORTA)
+                + (p.enCurso() ? " hasta ahora (sigue en marcha)" : " hasta el " + p.fin().format(CORTA))
+                + " (" + duracion(p.horas()) + ")");
+        StringBuilder r = new StringBuilder("Genero " + kwh(p.kwhGenerado()) + ". ");
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.CONSUMIO, "Trabajando", false));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.INTERMITENTE, "Trabajando a ratos", true));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.CONSUMO_MINIMO, "Paradas con consumo minimo", true));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.EN_CERO, "Paradas (en cero)", true));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.SIN_DATOS, "Sin datos", true));
+        maquinasResumen.setText(r.toString().trim());
+    }
+
+    /** "Trabajando a ratos: 3 (Linea17, Linea31, CabezalXTR2). " o vacío si no hay. */
+    private static String grupo(List<ConsumoMedidor> lista, ConsumoMedidoresService.Estado estado, String titulo, boolean nombres) {
+        List<String> m = lista.stream().filter(c -> c.estado() == estado).map(ConsumoMedidor::medidor).toList();
+        if (m.isEmpty()) return "";
+        return titulo + ": " + m.size() + (nombres ? " (" + String.join(", ", m) + ")" : " maquinas") + ". ";
     }
 
     private static Span badgeEstado(ConsumoMedidor c) {
         Span s = new Span();
         Estado e = switch (c.estado()) {
             case CONSUMIO -> Estado.OK;
-            case INTERMITENTE, CONSUMO_MINIMO -> Estado.AVISO;
+            case INTERMITENTE -> Estado.AVISO;
+            case CONSUMO_MINIMO, SIN_DATOS -> Estado.SIN_DATO;
             case EN_CERO -> Estado.FUERA;
-            case SIN_DATOS -> Estado.SIN_DATO;
         };
         String texto = c.estado() == ConsumoMedidoresService.Estado.INTERMITENTE && c.porcentajeConCarga() != null
-                ? String.format(Locale.ROOT, "Intermitente (%.0f%%)", c.porcentajeConCarga()) : c.estado().etiqueta();
+                ? String.format(Locale.ROOT, "Trabajando a ratos (%.0f%%)", c.porcentajeConCarga()) : c.estado().etiqueta();
         GeneradorView.badge(s, texto, e);
         return s;
     }
