@@ -185,6 +185,12 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       arranques y carga maxima; y "Consumo por medidor" (todo el periodo o solo con el generador en marcha):
       consumio / intermitente / consumo minimo / en cero / sin datos. "En cero" revisa todas las lecturas (contador
       sin subir y ninguna potencia distinta de cero), para no confundir cargas intermitentes como los compresores.
+- [x] G8. (2026-10-09) Analisis en pestanas: Energia (lo de G6), Periodos en marcha (por arranque: duracion, generado,
+      tomado de la red y retornado a la red en ese mismo intervalo con el minuto del borde repartido en proporcion,
+      consumo del tablero, aporte, carga media/maxima, minutos en paralelo/isla/vacio), Costos (por arranque se cargan a
+      mano galones de diesel y precio del galon, entidad H2 `CostoCombustible`, solo ADMIN; se calculan costo, costo
+      por kWh, kWh por galon y galones por hora; el precio propuesto es el ultimo cargado) y Consumo por medidor.
+      Verificado con el arranque 715 de GenPower: 7,5 h, 4.488 kWh generados, 278 tomados y 232 retornados a TR2.
 - [ ] G7. Generador Caterpillar (ComAp InteliGen 500, 192.168.0.201, junto a TR1 = `Trafo1`): ya cargado en
       `generador-config.json`. Falta: habilitar Modbus TCP en el controlador y confirmar el mapa (hoy es una copia
       del InteliGen 200, `confirmado: false`). Pasos en `docs/ig500/MAPA-REGISTROS.md`.

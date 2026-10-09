@@ -41,7 +41,8 @@ public class GeneradorService {
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern(RutaArchivosEnergia.FORMATO_FECHA_HORA);
     private static final DateTimeFormatter FECHA_ARCHIVO = DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss");
 
-    public record Arranque(LocalDateTime inicio, LocalDateTime fin, Double duracionMin, Long kwhGenerados,
+    /** Un arranque registrado. id = clave de la fila en el SQLite de arranques (para enlazar el combustible). */
+    public record Arranque(long id, LocalDateTime inicio, LocalDateTime fin, Double duracionMin, Long kwhGenerados,
                            Double kwMax, Double horasInicio, Double horasFin, Integer arranqueNro, boolean inicioEstimado) {
     }
 
@@ -97,9 +98,9 @@ public class GeneradorService {
         }
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta.replace('\\', '/') + "?mode=ro");
              ResultSet r = c.createStatement().executeQuery("SELECT inicio, fin, duracion_min, kwh_generados, kw_max, "
-                     + "horas_inicio, horas_fin, arranques_contador, inicio_estimado FROM \"" + g.nombre() + "\" ORDER BY id DESC LIMIT 500")) {
+                     + "horas_inicio, horas_fin, arranques_contador, inicio_estimado, id FROM \"" + g.nombre() + "\" ORDER BY id DESC LIMIT 2000")) {
             while (r.next()) {
-                lista.add(new Arranque(fecha(r.getString(1)), fecha(r.getString(2)), num(r, 3),
+                lista.add(new Arranque(r.getLong(10), fecha(r.getString(1)), fecha(r.getString(2)), num(r, 3),
                         r.getObject(4) == null ? null : r.getLong(4), num(r, 5), num(r, 6), num(r, 7),
                         r.getObject(8) == null ? null : r.getInt(8), r.getInt(9) == 1));
             }

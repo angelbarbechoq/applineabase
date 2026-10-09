@@ -119,6 +119,12 @@ public class GeneradorAnalisisService {
                                    Double arranques, Double redV) {
     }
 
+    private final GeneradorService generadorService;
+
+    public GeneradorAnalisisService(GeneradorService generadorService) {
+        this.generadorService = generadorService;
+    }
+
     /**
      * Filas por período entre dos fechas (inclusive) para uno o varios generadores. Con varios, la
      * red es la suma de sus transformadores asociados (cada uno una vez).
@@ -187,31 +193,113 @@ public class GeneradorAnalisisService {
         };
     }
 
+    // ================= Períodos en marcha =================
+
+    /**
+     * Un período en marcha (un arranque): lo que trabajó el generador y lo que pasó con la red en ese
+     * mismo intervalo. fin = ahora si sigue en marcha.
+     */
+    public record PeriodoMarcha(String generador, String red, long arranqueId, Integer nro, LocalDateTime inicio,
+                                LocalDateTime fin, boolean enCurso, boolean inicioEstimado,
+                                Double kwhGenerado, Double kwhRedImportada, Double kwhRedExportada, Double kwMax,
+                                double minParalelo, double minIsla, double minVacio) {
+
+        public double horas() {
+            return Duration.between(inicio, fin).toSeconds() / 3600.0;
+        }
+
+        public Double kwMedio() {
+            return kwhGenerado == null || horas() <= 0 ? null : kwhGenerado / horas();
+        }
+
+        public Double consumo() {
+            if (kwhRedImportada == null && kwhGenerado == null) return null;
+            return Math.max(0, nz(kwhRedImportada) + nz(kwhGenerado) - nz(kwhRedExportada));
+        }
+
+        public Double aporteGenerador() {
+            Double c = consumo();
+            if (c == null || c <= 0 || kwhGenerado == null) return null;
+            return Math.max(0, Math.min(100, (kwhGenerado - nz(kwhRedExportada)) / c * 100));
+        }
+    }
+
+    /** Arranques que se pisan con el período elegido (completos, no recortados), del más reciente al más viejo. */
+    public List<PeriodoMarcha> periodosEnMarcha(List<Generador> generadores, LocalDate desde, LocalDate hasta) {
+        LocalDateTime ini = desde.atStartOfDay();
+        LocalDateTime fin = hasta.atTime(23, 59, 59);
+        List<PeriodoMarcha> lista = new ArrayList<>();
+        for (Generador g : generadores) {
+            List<GeneradorService.Arranque> arranques = generadorService.arranques(g).stream()
+                    .filter(a -> !a.inicio().isAfter(fin) && (a.fin() == null || !a.fin().isBefore(ini))).toList();
+            if (arranques.isEmpty()) continue;
+            LocalDate primero = arranques.stream().map(a -> a.inicio().toLocalDate()).min(LocalDate::compareTo).orElse(desde);
+            LocalDate ultimo = arranques.stream().map(a -> a.fin() == null ? LocalDate.now() : a.fin().toLocalDate())
+                    .max(LocalDate::compareTo).orElse(hasta);
+            TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, primero, ultimo);
+            TreeMap<LocalDateTime, Double> kwhGen = new TreeMap<>();
+            lecturas.values().forEach(l -> { if (l.kwh() != null && l.kwh() > 0) kwhGen.put(l.fecha(), l.kwh()); });
+            boolean redValida = g.redAsociada() != null && PLCDataQueryService.esNombreMaquinaValido(g.redAsociada());
+            TreeMap<LocalDateTime, Double> importada = redValida ? serieContador(g.redAsociada(), false, primero, ultimo) : new TreeMap<>();
+            TreeMap<LocalDateTime, Double> exportada = redValida ? serieContador(g.redAsociada(), true, primero, ultimo) : new TreeMap<>();
+
+            for (GeneradorService.Arranque a : arranques) {
+                LocalDateTime f = a.fin() == null ? LocalDateTime.now().withNano(0) : a.fin();
+                Double generado = a.kwhGenerados() != null ? Double.valueOf(a.kwhGenerados())
+                        : deltaEnVentana(kwhGen, a.inicio(), f, KW_MAX_GENERADOR);
+                double[] min = new double[3]; // paralelo, isla, vacío
+                Double kwMax = a.kwMax();
+                LecturaGuardada previa = null;
+                for (LecturaGuardada l : lecturas.subMap(a.inicio(), true, f, true).values()) {
+                    if (previa != null && previa.marcha()) {
+                        double m = Math.min(Duration.between(previa.fecha(), l.fecha()).toSeconds() / 60.0, MAX_MIN_POR_LECTURA);
+                        if (previa.kw() != null && previa.kw() < KW_VACIO) min[2] += m;
+                        else if (previa.redV() != null && previa.redV() >= V_RED_PRESENTE) min[0] += m;
+                        else if (previa.redV() != null) min[1] += m;
+                    }
+                    if (l.marcha() && l.kw() != null && (kwMax == null || l.kw() > kwMax)) kwMax = l.kw();
+                    previa = l;
+                }
+                lista.add(new PeriodoMarcha(g.nombre(), g.redAsociada(), a.id(), a.arranqueNro(), a.inicio(), f, a.fin() == null,
+                        a.inicioEstimado(), generado, deltaEnVentana(importada, a.inicio(), f, KW_MAX_RED),
+                        deltaEnVentana(exportada, a.inicio(), f, KW_MAX_RED), kwMax, min[0], min[1], min[2]));
+            }
+        }
+        lista.sort((x, y) -> y.inicio().compareTo(x.inicio()));
+        return lista;
+    }
+
+    /**
+     * Aumento de un contador dentro de [ini, fin]. Las lecturas son cada ~1 min y no coinciden con el
+     * inicio/fin del arranque: el intervalo que cruza un borde aporta en proporción al tiempo que cae
+     * adentro. null = sin lecturas que cubran el intervalo.
+     */
+    static Double deltaEnVentana(TreeMap<LocalDateTime, Double> serie, LocalDateTime ini, LocalDateTime fin, double kwMax) {
+        Map.Entry<LocalDateTime, Double> a = serie.floorEntry(ini);
+        if (a == null) a = serie.ceilingEntry(ini);
+        if (a == null || a.getKey().isAfter(fin)) return null;
+        double total = 0;
+        boolean cubierto = false;
+        for (Map.Entry<LocalDateTime, Double> b : serie.tailMap(a.getKey(), false).entrySet()) {
+            long tramo = Duration.between(a.getKey(), b.getKey()).toSeconds();
+            LocalDateTime desdeAdentro = a.getKey().isAfter(ini) ? a.getKey() : ini;
+            LocalDateTime hastaAdentro = b.getKey().isBefore(fin) ? b.getKey() : fin;
+            long adentro = Duration.between(desdeAdentro, hastaAdentro).toSeconds();
+            Double d = tramo <= 0 ? null : delta(a.getValue(), b.getValue(), kwMax * tramo / 3600.0 + 1);
+            if (d != null && adentro > 0) {
+                total += d * adentro / tramo;
+                cubierto = true;
+            }
+            if (!b.getKey().isBefore(fin)) break;
+            a = b;
+        }
+        return cubierto ? total : null;
+    }
+
     // ================= Generador =================
 
     private void acumularGenerador(Generador g, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
-        TreeMap<LocalDateTime, LecturaGuardada> lecturas = new TreeMap<>();
-        for (YearMonth m = YearMonth.from(desde.minusDays(1)); !m.isAfter(YearMonth.from(hasta)); m = m.plusMonths(1)) {
-            String ruta = GeneradorAlmacen.rutaLecturas(m);
-            if (!new File(ruta).exists()) continue;
-            try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta.replace('\\', '/') + "?mode=ro");
-                 ResultSet r = c.createStatement().executeQuery("SELECT * FROM \"" + g.nombre() + "\"")) {
-                Set<String> cols = columnas(r.getMetaData());
-                while (r.next()) {
-                    LocalDateTime f = fecha(r.getString("fecha"));
-                    if (f == null || f.toLocalDate().isBefore(desde.minusDays(1)) || f.toLocalDate().isAfter(hasta)) continue;
-                    Double v1 = num(r, cols, "red_v_l1l2"), v2 = num(r, cols, "red_v_l2l3"), v3 = num(r, cols, "red_v_l3l1");
-                    Double redV = v1 == null || v2 == null || v3 == null ? null : (v1 + v2 + v3) / 3.0;
-                    lecturas.put(f, new LecturaGuardada(f, "MARCHA".equals(r.getString("estado")), num(r, cols, "kw"),
-                            num(r, cols, "kwh"), num(r, cols, "horas_marcha"), num(r, cols, "arranques"), redV));
-                }
-            } catch (Exception e) {
-                if (!String.valueOf(e.getMessage()).contains("no such table")) {
-                    logger.warn("Analisis: no se pudieron leer las lecturas de {} en {}: {}", g.nombre(), ruta, e.getMessage());
-                }
-            }
-        }
-
+        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, desde, hasta);
         LecturaGuardada a = null;
         for (LecturaGuardada b : lecturas.values()) {
             LocalDate dia = b.fecha().toLocalDate();
@@ -251,6 +339,32 @@ public class GeneradorAnalisisService {
         }
     }
 
+    /** Lecturas guardadas del generador entre el día anterior a {@code desde} y {@code hasta} (sin repetidas). */
+    private TreeMap<LocalDateTime, LecturaGuardada> lecturasGenerador(Generador g, LocalDate desde, LocalDate hasta) {
+        TreeMap<LocalDateTime, LecturaGuardada> lecturas = new TreeMap<>();
+        for (YearMonth m = YearMonth.from(desde.minusDays(1)); !m.isAfter(YearMonth.from(hasta)); m = m.plusMonths(1)) {
+            String ruta = GeneradorAlmacen.rutaLecturas(m);
+            if (!new File(ruta).exists()) continue;
+            try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta.replace('\\', '/') + "?mode=ro");
+                 ResultSet r = c.createStatement().executeQuery("SELECT * FROM \"" + g.nombre() + "\"")) {
+                Set<String> cols = columnas(r.getMetaData());
+                while (r.next()) {
+                    LocalDateTime f = fecha(r.getString("fecha"));
+                    if (f == null || f.toLocalDate().isBefore(desde.minusDays(1)) || f.toLocalDate().isAfter(hasta)) continue;
+                    Double v1 = num(r, cols, "red_v_l1l2"), v2 = num(r, cols, "red_v_l2l3"), v3 = num(r, cols, "red_v_l3l1");
+                    Double redV = v1 == null || v2 == null || v3 == null ? null : (v1 + v2 + v3) / 3.0;
+                    lecturas.put(f, new LecturaGuardada(f, "MARCHA".equals(r.getString("estado")), num(r, cols, "kw"),
+                            num(r, cols, "kwh"), num(r, cols, "horas_marcha"), num(r, cols, "arranques"), redV));
+                }
+            } catch (Exception e) {
+                if (!String.valueOf(e.getMessage()).contains("no such table")) {
+                    logger.warn("Analisis: no se pudieron leer las lecturas de {} en {}: {}", g.nombre(), ruta, e.getMessage());
+                }
+            }
+        }
+        return lecturas;
+    }
+
     // ================= Red (medidor del transformador, leído por PLC) =================
 
     private void acumularRed(String maquina, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
@@ -258,14 +372,18 @@ public class GeneradorAnalisisService {
             logger.warn("Analisis: nombre de red invalido {}", maquina);
             return;
         }
-        TreeMap<LocalDateTime, Double> importada = new TreeMap<>();
-        TreeMap<LocalDateTime, Double> exportada = new TreeMap<>();
+        sumarDeltas(serieContador(maquina, false, desde, hasta), dias, true);
+        sumarDeltas(serieContador(maquina, true, desde, hasta), dias, false);
+    }
+
+    /** Contador del medidor de la red: kWh importado (archivo normal) o KWhR exportado (archivo VIP). */
+    private TreeMap<LocalDateTime, Double> serieContador(String maquina, boolean exportada, LocalDate desde, LocalDate hasta) {
+        TreeMap<LocalDateTime, Double> serie = new TreeMap<>();
         for (YearMonth m = YearMonth.from(desde.minusDays(1)); !m.isAfter(YearMonth.from(hasta)); m = m.plusMonths(1)) {
-            leerContador(RutaArchivosEnergia.construirRutaMensual(m.getYear(), m.getMonthValue(), false), maquina, "kwh", desde, hasta, importada);
-            leerContador(RutaArchivosEnergia.construirRutaMensual(m.getYear(), m.getMonthValue(), true), maquina, "KWhR", desde, hasta, exportada);
+            leerContador(RutaArchivosEnergia.construirRutaMensual(m.getYear(), m.getMonthValue(), exportada), maquina,
+                    exportada ? "KWhR" : "kwh", desde, hasta, serie);
         }
-        sumarDeltas(importada, dias, true);
-        sumarDeltas(exportada, dias, false);
+        return serie;
     }
 
     private void leerContador(String ruta, String maquina, String columna, LocalDate desde, LocalDate hasta,
