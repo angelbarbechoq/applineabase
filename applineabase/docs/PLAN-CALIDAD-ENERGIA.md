@@ -211,6 +211,13 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       semilla del proyecto actualizada a la lista real (48). Editable en Configuracion de hardware (listas cerradas).
       El detalle de maquinas de un arranque muestra solo las del transformador del generador y el balance: arranque 715
       (TR2), maquinas 4.616 kWh de 5.569 kWh de consumo del tablero = 83% medido.
+- [x] G15. (2026-10-09) Enfoque estiaje: el indicador principal es "Tomado de la red" (% del consumo del tablero, meta 0;
+      semaforo verde hasta 2%, amarillo hasta 10%, rojo por encima). Consumo = generador + red (suman 100%); lo entregado a la
+      red va aparte en kWh (excedente) y como Balance neto = tomado - entregado. Se quito "Generado / consumo" (el 125%
+      confundia). Tarjetas KPI con semaforo, grafico por arranque (barras: generador + red arriba, entregado abajo), y al
+      hacer clic en un arranque: KPIs, barra 100% de origen del consumo y grafico minuto a minuto (generador, consumo del
+      tablero, red +tomado/-entregado). Caterpillar 121: de la red 1,3%, balance -1.166 kWh, 10% del tiempo tomando;
+      GenPower 715: 5,3%, balance -8 kWh, 48% del tiempo tomando (potencia fija ~600 kW contra un consumo que oscila).
 - [x] G14. (2026-10-09) "Aporte" se separo en tres datos (resumen, periodos en marcha y detalle del arranque):
       Generado / consumo (puede pasar de 100%: el excedente volvio a la red), Cubierto por el generador ((generado -
       retornado) / consumo, maximo 100%: lo que falta se tomo de la red en los minutos en que no alcanzaba) y Tiempo con

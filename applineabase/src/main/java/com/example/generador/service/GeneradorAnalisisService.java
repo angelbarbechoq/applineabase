@@ -92,10 +92,30 @@ public class GeneradorAnalisisService {
             return Math.max(0, Math.min(100, (generado - nz(redExportada)) / c * 100));
         }
 
-        /** Generado / consumo (%): pasa de 100 cuando sobró energía y volvió a la red. */
-        public Double generadoSobreConsumo() {
+        /** Lo que puso el generador en el consumo del tablero: generado - retornado. */
+        public Double generadorUsado() {
+            return generado == null ? null : Math.max(0, generado - nz(redExportada));
+        }
+
+        /** Parte del consumo que se tomó de la red (%): el indicador de estiaje, meta 0. */
+        public Double porcentajeDeRed() {
             Double c = consumo();
-            return c == null || c <= 0 || generado == null ? null : generado / c * 100;
+            return c == null || c <= 0 || redImportada == null ? null : Math.min(100, redImportada / c * 100);
+        }
+
+        /** Tomado - entregado a la red: negativo = se entregó más de lo que se tomó. */
+        public Double balanceNeto() {
+            return redImportada == null ? null : redImportada - nz(redExportada);
+        }
+    }
+
+    /** Semáforo del indicador "tomado de la red" (% del consumo): verde hasta 2%, amarillo hasta 10%. */
+    public static final double RED_VERDE_HASTA = 2.0, RED_AMARILLO_HASTA = 10.0;
+
+    /** Un minuto en marcha: lo que dio el generador y lo que pasó por el transformador (+ tomado, - entregado). */
+    public record MinutoMarcha(LocalDateTime fecha, Double generadorKw, Double redKw) {
+        public Double consumoKw() {
+            return generadorKw == null || redKw == null ? null : generadorKw + redKw;
         }
     }
 
@@ -207,25 +227,35 @@ public class GeneradorAnalisisService {
      * mismo intervalo. fin = ahora si sigue en marcha.
      */
     /**
-     * @param lecturasExcedente lecturas del medidor del trafo con potencia negativa: en ese minuto el generador
-     *                          cubría todo el consumo del tablero y además entregaba a la red
-     * @param lecturasRed       lecturas del medidor del trafo en el período
+     * @param lecturasTomando lecturas del medidor del trafo con potencia positiva: en ese minuto se tomaba de la red
+     * @param lecturasRed     lecturas del medidor del trafo en el período
+     * @param picoTomadoKw    máxima potencia tomada de la red en el período (null si nunca se tomó)
      */
     public record PeriodoMarcha(String generador, String red, long arranqueId, Integer nro, LocalDateTime inicio,
                                 LocalDateTime fin, boolean enCurso, boolean inicioEstimado,
                                 Double kwhGenerado, Double kwhRedImportada, Double kwhRedExportada, Double kwMax,
                                 double minParalelo, double minIsla, double minVacio,
-                                int lecturasExcedente, int lecturasRed) {
+                                int lecturasTomando, int lecturasRed, Double picoTomadoKw) {
 
-        /** Generado / consumo (%): pasa de 100 cuando sobró energía y volvió a la red. */
-        public Double generadoSobreConsumo() {
-            Double c = consumo();
-            return c == null || c <= 0 || kwhGenerado == null ? null : kwhGenerado / c * 100;
+        /** Lo que puso el generador en el consumo del tablero: generado - retornado. */
+        public Double generadorUsado() {
+            return kwhGenerado == null ? null : Math.max(0, kwhGenerado - nz(kwhRedExportada));
         }
 
-        /** % del tiempo en que el generador cubrió todo el consumo y además entregó a la red. */
-        public Double porcentajeExcedente() {
-            return lecturasRed == 0 ? null : lecturasExcedente * 100.0 / lecturasRed;
+        /** Parte del consumo que se tomó de la red (%): el indicador de estiaje, meta 0. */
+        public Double porcentajeDeRed() {
+            Double c = consumo();
+            return c == null || c <= 0 || kwhRedImportada == null ? null : Math.min(100, kwhRedImportada / c * 100);
+        }
+
+        /** Tomado - entregado a la red: negativo = se entregó más de lo que se tomó. */
+        public Double balanceNeto() {
+            return kwhRedImportada == null ? null : kwhRedImportada - nz(kwhRedExportada);
+        }
+
+        /** % del tiempo en que se tomó de la red. */
+        public Double porcentajeTiempoTomando() {
+            return lecturasRed == 0 ? null : lecturasTomando * 100.0 / lecturasRed;
         }
 
         public double horas() {
@@ -285,18 +315,44 @@ public class GeneradorAnalisisService {
                     if (l.marcha() && l.kw() != null && (kwMax == null || l.kw() > kwMax)) kwMax = l.kw();
                     previa = l;
                 }
-                int lecturasRed = 0, excedente = 0;
+                int lecturasRed = 0, tomando = 0;
+                Double pico = null;
                 for (Double pw : potenciaRed.subMap(a.inicio(), true, f, true).values()) {
                     lecturasRed++;
-                    if (pw < 0) excedente++;
+                    if (pw > 0) {
+                        tomando++;
+                        if (pico == null || pw > pico) pico = pw;
+                    }
                 }
                 lista.add(new PeriodoMarcha(g.nombre(), g.redAsociada(), a.id(), a.arranqueNro(), a.inicio(), f, a.fin() == null,
                         a.inicioEstimado(), generado, deltaEnVentana(importada, a.inicio(), f, KW_MAX_RED),
                         deltaEnVentana(exportada, a.inicio(), f, KW_MAX_RED), kwMax, min[0], min[1], min[2],
-                        excedente, lecturasRed));
+                        tomando, lecturasRed, pico));
             }
         }
         lista.sort((x, y) -> y.inicio().compareTo(x.inicio()));
+        return lista;
+    }
+
+    /**
+     * Minuto a minuto de un período en marcha: potencia del generador (lo guardado del controlador) y
+     * potencia del medidor del transformador en la lectura más cercana anterior (hasta 90 s), para graficar
+     * cuándo se tomó de la red y cuándo se le entregó.
+     */
+    public List<MinutoMarcha> minutosMarcha(PeriodoMarcha p) {
+        List<MinutoMarcha> lista = new ArrayList<>();
+        Generador g = generadorService.generadores().stream().filter(x -> x.nombre().equals(p.generador())).findFirst().orElse(null);
+        if (g == null) return lista;
+        LocalDate desde = p.inicio().toLocalDate(), hasta = p.fin().toLocalDate();
+        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, desde, hasta);
+        boolean redValida = p.red() != null && PLCDataQueryService.esNombreMaquinaValido(p.red());
+        TreeMap<LocalDateTime, Double> potenciaRed = redValida ? seriePotencia(p.red(), desde, hasta) : new TreeMap<>();
+        for (LecturaGuardada l : lecturas.subMap(p.inicio(), true, p.fin(), true).values()) {
+            if (!l.marcha()) continue;
+            Map.Entry<LocalDateTime, Double> red = potenciaRed.floorEntry(l.fecha());
+            Double redKw = red != null && Duration.between(red.getKey(), l.fecha()).toSeconds() <= 90 ? red.getValue() : null;
+            lista.add(new MinutoMarcha(l.fecha(), l.kw(), redKw));
+        }
         return lista;
     }
 
