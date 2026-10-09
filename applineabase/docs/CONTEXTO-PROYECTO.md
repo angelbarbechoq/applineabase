@@ -320,7 +320,7 @@ una opcion mas de la lista.
   Caterpillar (InteliGen 500, 192.168.0.201, TR1) cargado con mapa sin confirmar: pasos en
   `docs/ig500/MAPA-REGISTROS.md`. Faltan las alarmas de condicion (G3: bateria, precalentador,
   arranque fallido, sin comunicacion). Solo lectura siempre. Posible: asignar cada medidor a su
-  transformador para que "Consumo por medidor" muestre solo los de TR1 o TR2 (hoy muestra todos).
+  transformador para que la lista de maquinas de un arranque muestre solo las de TR1 o TR2 (hoy muestra todas).
 - Los archivos mensuales de energia se pisan en el borde: el de septiembre tiene las primeras horas
   del 1 de octubre. Quien sume por mes debe limitar cada archivo a su propio mes o descartar repetidos.
 - **Modulo de Mantenimiento Correctivo (MF21 + AMEF):** diseno acordado, sin implementar. Ver
