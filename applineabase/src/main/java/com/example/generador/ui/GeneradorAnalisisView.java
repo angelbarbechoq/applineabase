@@ -272,7 +272,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         columna(grid, "En paralelo (kWh)", f -> kwhNum(f.generadoParalelo()));
         columna(grid, "En isla (kWh)", f -> kwhNum(f.generadoIsla()));
         columna(grid, "Consumo tablero (kWh)", f -> kwhNum(f.consumo()));
-        columna(grid, "Aporte generador", f -> porcentaje(f.aporteGenerador()));
+        columna(grid, "Generado / consumo", f -> porcentaje(f.generadoSobreConsumo()));
+        columna(grid, "Cubierto por el generador", f -> porcentaje(f.aporteGenerador()));
         columna(grid, "Horas marcha", f -> horas(f.horasMarcha()));
         columna(grid, "En paralelo (h)", f -> horas(f.horasParalelo()));
         columna(grid, "En isla (h)", f -> horas(f.horasIsla()));
@@ -308,7 +309,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 t.generadoParalelo() == null && t.generadoIsla() == null ? null
                         : "en paralelo " + kwh(t.generadoParalelo()) + " / en isla " + kwh(t.generadoIsla())));
         tarjetasEnergia.add(tarjeta("Consumo del tablero", kwh(t.consumo()), "importado + generado - retornado"));
-        tarjetasEnergia.add(tarjeta("Aporte del generador", porcentaje(t.aporteGenerador()), "del consumo del tablero"));
+        tarjetasEnergia.add(tarjeta("Generado / consumo", porcentaje(t.generadoSobreConsumo()),
+                "mas de 100% = sobro energia y volvio a la red"));
+        tarjetasEnergia.add(tarjeta("Cubierto por el generador", porcentaje(t.aporteGenerador()), "del consumo del tablero"));
         tarjetasEnergia.add(tarjeta("Horas de marcha", horas(t.horasMarcha()),
                 "paralelo " + horas(t.horasParalelo()) + " / isla " + horas(t.horasIsla()) + " / vacio " + horas(t.horasVacio())));
         tarjetasEnergia.add(tarjeta("Arranques", t.arranques() == null ? "-" : String.valueOf(t.arranques()), null));
@@ -346,7 +349,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         columna(periodosGrid, "Tomado de la red (kWh)", p -> kwhNum(p.kwhRedImportada()));
         columna(periodosGrid, "Retornado a la red (kWh)", p -> kwhNum(p.kwhRedExportada()));
         columna(periodosGrid, "Consumo tablero (kWh)", p -> kwhNum(p.consumo()));
-        columna(periodosGrid, "Aporte generador", p -> porcentaje(p.aporteGenerador()));
+        columna(periodosGrid, "Generado / consumo", p -> porcentaje(p.generadoSobreConsumo()));
+        columna(periodosGrid, "Cubierto por el generador", p -> porcentaje(p.aporteGenerador()));
+        columna(periodosGrid, "Tiempo con excedente", p -> p.porcentajeExcedente() == null ? "-"
+                : String.format(Locale.ROOT, "%.0f %%", p.porcentajeExcedente()));
         columna(periodosGrid, "Carga media (kW)", p -> p.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%.0f", p.kwMedio()));
         columna(periodosGrid, "Carga max (kW)", p -> p.kwMax() == null ? "-" : String.format(Locale.ROOT, "%.0f", p.kwMax()));
         columna(periodosGrid, "Paralelo (min)", p -> minutos(p.minParalelo()));
@@ -360,7 +366,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Span nota = nota("Cada fila es una vez que el generador estuvo encendido (arranque registrado). Tomado y retornado = "
                 + "contadores del medidor del transformador asociado en ese mismo intervalo; las lecturas son de cada minuto y "
                 + "el minuto que cruza el inicio o el fin se reparte en proporcion. Consumo del tablero = tomado + generado - "
-                + "retornado. Paralelo / isla / vacio: minutos segun la tension de red y la carga (desde el 09-10-2026).");
+                + "retornado. Generado / consumo: mas de 100% = el generador produjo mas de lo que consumio el tablero y lo que sobro "
+                + "volvio a la red. Cubierto por el generador = parte del consumo que puso el generador (nunca pasa de 100%); lo que "
+                + "falta hasta 100% se tomo de la red en los minutos en que el generador no alcanzaba. Tiempo con excedente = minutos "
+                + "en que el generador cubrio todo el consumo y ademas entrego a la red (el medidor del transformador marco potencia "
+                + "negativa). Paralelo / isla / vacio: minutos segun la tension de red y la carga (desde el 09-10-2026).");
         VerticalLayout v = new VerticalLayout(descripcion("Solo los momentos en que el generador estuvo encendido: una fila por "
                 + "cada vez que arranco, con lo que trabajo y lo que se tomo y se retorno a la red mientras tanto. "
                 + "Haga clic en un arranque para ver abajo con que maquinas trabajo."),
@@ -389,6 +399,13 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         tarjetasPeriodos.add(tarjeta("Tomado de la red", kwh(imp), "mientras el generador estaba encendido"));
         tarjetasPeriodos.add(tarjeta("Retornado a la red", kwh(exp), "mientras el generador estaba encendido"));
         tarjetasPeriodos.add(tarjeta("Consumo del tablero", kwh(cons), "tomado + generado - retornado"));
+        if (gen != null && cons != null && cons > 0) {
+            tarjetasPeriodos.add(tarjeta("Generado / consumo", porcentaje(gen / cons * 100),
+                    "mas de 100% = sobro energia y volvio a la red"));
+            tarjetasPeriodos.add(tarjeta("Cubierto por el generador",
+                    porcentaje(Math.max(0, Math.min(100, (gen - (exp == null ? 0 : exp)) / cons * 100))),
+                    "el resto se tomo de la red"));
+        }
     }
 
     // ================= Costos =================
@@ -720,9 +737,23 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         maquinasTitulo.setText(p.generador() + " trabajo desde el " + p.inicio().format(CORTA)
                 + (p.enCurso() ? " hasta ahora (sigue en marcha)" : " hasta el " + p.fin().format(CORTA))
                 + " (" + duracion(p.horas()) + ") con las maquinas de " + (p.red() == null ? "toda la planta" : p.red()));
-        StringBuilder r = new StringBuilder("Genero " + kwh(p.kwhGenerado()) + ". ");
-        Double medido = ConsumoMedidoresService.sumaBalance(lista);
+        StringBuilder r = new StringBuilder("Genero " + kwh(p.kwhGenerado()));
         Double consumo = p.consumo();
+        if (p.generadoSobreConsumo() != null && consumo != null) {
+            r.append(String.format(Locale.ROOT, ", el %.0f%% de los %,.0f kWh que consumio el tablero: cubrio el %.1f%% del consumo",
+                    p.generadoSobreConsumo(), consumo, p.aporteGenerador()));
+            if (p.kwhRedExportada() != null && p.kwhRedExportada() >= 0.5) {
+                r.append(String.format(Locale.ROOT, " y le sobraron %,.0f kWh que volvieron a la red", p.kwhRedExportada()));
+            }
+            if (p.kwhRedImportada() != null && p.kwhRedImportada() >= 0.5) {
+                r.append(String.format(Locale.ROOT, "; se tomaron %,.0f kWh de la red en los minutos en que no alcanzaba", p.kwhRedImportada()));
+            }
+            if (p.porcentajeExcedente() != null) {
+                r.append(String.format(Locale.ROOT, ". Cubrio todo el consumo y entrego a la red el %.0f%% del tiempo", p.porcentajeExcedente()));
+            }
+        }
+        r.append(". ");
+        Double medido = ConsumoMedidoresService.sumaBalance(lista);
         if (medido != null && consumo != null && consumo > 0) {
             r.append(String.format(Locale.ROOT, "Las maquinas de %s sumaron %,.0f kWh de los %,.0f kWh que consumio el tablero "
                     + "(%.0f%% medido; el resto son cargas sin medidor y perdidas). ", p.red(), medido, consumo, medido / consumo * 100));

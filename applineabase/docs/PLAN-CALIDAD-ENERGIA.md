@@ -211,6 +211,11 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       semilla del proyecto actualizada a la lista real (48). Editable en Configuracion de hardware (listas cerradas).
       El detalle de maquinas de un arranque muestra solo las del transformador del generador y el balance: arranque 715
       (TR2), maquinas 4.616 kWh de 5.569 kWh de consumo del tablero = 83% medido.
+- [x] G14. (2026-10-09) "Aporte" se separo en tres datos (resumen, periodos en marcha y detalle del arranque):
+      Generado / consumo (puede pasar de 100%: el excedente volvio a la red), Cubierto por el generador ((generado -
+      retornado) / consumo, maximo 100%: lo que falta se tomo de la red en los minutos en que no alcanzaba) y Tiempo con
+      excedente (% de lecturas del trafo con potencia negativa). Caterpillar 121: 124,7% / 98,6% / 89% del tiempo;
+      GenPower 715: 99,7% / 94,5% / 51% (TR2 oscila entre importar y exportar).
 - [x] G13. (2026-10-09) Maquinas de un arranque con el umbral de encendido de cada una (el del horometro, AlarmaConfig
       DETENCION / CICLO_COMPRESOR, default 15) en vez de 1 kW fijo: "Parada, consumo en espera" si nunca lo supero (ej.
       Linea05 ~1,7 kW de su transformador de aislamiento, Mixer01, Linea01). Lo que consume una maquina parada (por debajo

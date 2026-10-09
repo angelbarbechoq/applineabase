@@ -91,6 +91,12 @@ public class GeneradorAnalisisService {
             if (c == null || c <= 0 || generado == null) return null;
             return Math.max(0, Math.min(100, (generado - nz(redExportada)) / c * 100));
         }
+
+        /** Generado / consumo (%): pasa de 100 cuando sobró energía y volvió a la red. */
+        public Double generadoSobreConsumo() {
+            Double c = consumo();
+            return c == null || c <= 0 || generado == null ? null : generado / c * 100;
+        }
     }
 
     /** Acumulado de un día (campos null hasta que llega un dato). */
@@ -200,10 +206,27 @@ public class GeneradorAnalisisService {
      * Un período en marcha (un arranque): lo que trabajó el generador y lo que pasó con la red en ese
      * mismo intervalo. fin = ahora si sigue en marcha.
      */
+    /**
+     * @param lecturasExcedente lecturas del medidor del trafo con potencia negativa: en ese minuto el generador
+     *                          cubría todo el consumo del tablero y además entregaba a la red
+     * @param lecturasRed       lecturas del medidor del trafo en el período
+     */
     public record PeriodoMarcha(String generador, String red, long arranqueId, Integer nro, LocalDateTime inicio,
                                 LocalDateTime fin, boolean enCurso, boolean inicioEstimado,
                                 Double kwhGenerado, Double kwhRedImportada, Double kwhRedExportada, Double kwMax,
-                                double minParalelo, double minIsla, double minVacio) {
+                                double minParalelo, double minIsla, double minVacio,
+                                int lecturasExcedente, int lecturasRed) {
+
+        /** Generado / consumo (%): pasa de 100 cuando sobró energía y volvió a la red. */
+        public Double generadoSobreConsumo() {
+            Double c = consumo();
+            return c == null || c <= 0 || kwhGenerado == null ? null : kwhGenerado / c * 100;
+        }
+
+        /** % del tiempo en que el generador cubrió todo el consumo y además entregó a la red. */
+        public Double porcentajeExcedente() {
+            return lecturasRed == 0 ? null : lecturasExcedente * 100.0 / lecturasRed;
+        }
 
         public double horas() {
             return Duration.between(inicio, fin).toSeconds() / 3600.0;
@@ -243,6 +266,7 @@ public class GeneradorAnalisisService {
             boolean redValida = g.redAsociada() != null && PLCDataQueryService.esNombreMaquinaValido(g.redAsociada());
             TreeMap<LocalDateTime, Double> importada = redValida ? serieContador(g.redAsociada(), false, primero, ultimo) : new TreeMap<>();
             TreeMap<LocalDateTime, Double> exportada = redValida ? serieContador(g.redAsociada(), true, primero, ultimo) : new TreeMap<>();
+            TreeMap<LocalDateTime, Double> potenciaRed = redValida ? seriePotencia(g.redAsociada(), primero, ultimo) : new TreeMap<>();
 
             for (GeneradorService.Arranque a : arranques) {
                 LocalDateTime f = a.fin() == null ? LocalDateTime.now().withNano(0) : a.fin();
@@ -261,9 +285,15 @@ public class GeneradorAnalisisService {
                     if (l.marcha() && l.kw() != null && (kwMax == null || l.kw() > kwMax)) kwMax = l.kw();
                     previa = l;
                 }
+                int lecturasRed = 0, excedente = 0;
+                for (Double pw : potenciaRed.subMap(a.inicio(), true, f, true).values()) {
+                    lecturasRed++;
+                    if (pw < 0) excedente++;
+                }
                 lista.add(new PeriodoMarcha(g.nombre(), g.redAsociada(), a.id(), a.arranqueNro(), a.inicio(), f, a.fin() == null,
                         a.inicioEstimado(), generado, deltaEnVentana(importada, a.inicio(), f, KW_MAX_RED),
-                        deltaEnVentana(exportada, a.inicio(), f, KW_MAX_RED), kwMax, min[0], min[1], min[2]));
+                        deltaEnVentana(exportada, a.inicio(), f, KW_MAX_RED), kwMax, min[0], min[1], min[2],
+                        excedente, lecturasRed));
             }
         }
         lista.sort((x, y) -> y.inicio().compareTo(x.inicio()));
@@ -423,6 +453,27 @@ public class GeneradorAnalisisService {
             }
         }
         return unidos;
+    }
+
+    /** Potencia del medidor de la red minuto a minuto (archivo VIP); negativa = entregando a la red. */
+    private TreeMap<LocalDateTime, Double> seriePotencia(String maquina, LocalDate desde, LocalDate hasta) {
+        TreeMap<LocalDateTime, Double> serie = new TreeMap<>();
+        for (YearMonth m = YearMonth.from(desde.minusDays(1)); !m.isAfter(YearMonth.from(hasta)); m = m.plusMonths(1)) {
+            String ruta = RutaArchivosEnergia.construirRutaMensual(m.getYear(), m.getMonthValue(), true);
+            if (!new File(ruta).exists()) continue;
+            try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta.replace('\\', '/') + "?mode=ro");
+                 ResultSet r = c.createStatement().executeQuery("SELECT fecha, PW FROM " + maquina)) {
+                while (r.next()) {
+                    LocalDateTime f = fecha(r.getString(1));
+                    if (f != null && !f.toLocalDate().isBefore(desde) && !f.toLocalDate().isAfter(hasta)) serie.put(f, r.getDouble(2));
+                }
+            } catch (Exception e) {
+                if (!String.valueOf(e.getMessage()).contains("no such table")) {
+                    logger.warn("Analisis: no se pudo leer PW de {} en {}: {}", maquina, ruta, e.getMessage());
+                }
+            }
+        }
+        return serie;
     }
 
     /** Contador del medidor de la red: kWh importado (archivo normal) o KWhR exportado (archivo VIP). */
