@@ -211,6 +211,10 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       semilla del proyecto actualizada a la lista real (48). Editable en Configuracion de hardware (listas cerradas).
       El detalle de maquinas de un arranque muestra solo las del transformador del generador y el balance: arranque 715
       (TR2), maquinas 4.616 kWh de 5.569 kWh de consumo del tablero = 83% medido.
+- [x] G12. (2026-10-09) Resumen de energia: el retorno a la red (KWhR del trafo) se cuenta solo mientras el
+      generador estaba en marcha (de cada arranque a su parada, repartido por dia), no todo el dia. Antes el Caterpillar
+      mostraba el 09-10 505 kWh "exportados" contra 194 generados (retorno de antes de que se registrara, 09:19); ahora
+      2,5 kWh, igual que su fila en Periodos en marcha. El importado sigue siendo de todo el dia.
 - [x] G7. (2026-10-09) Generador Caterpillar (ComAp InteliGen 500, 192.168.0.201, Unit ID 1, junto a TR1 = `Trafo1`)
       conectado. El mapa del InteliGen 200 no servia (solo RPM); el del InteliGen 500 se armo con barrido de registros,
       fotos de la pantalla y 4 lecturas seguidas: 32 valores confirmados (incluida bateria 41052 y carga del tablero

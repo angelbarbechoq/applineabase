@@ -139,7 +139,8 @@ public class GeneradorAnalisisService {
             acumularGenerador(g, desde, hasta, dias);
         }
         for (String red : redes) {
-            acumularRed(red, desde, hasta, dias);
+            List<Generador> deEstaRed = generadores.stream().filter(g -> red.equals(g.redAsociada())).toList();
+            acumularRed(red, tramosEnMarcha(deEstaRed), desde, hasta, dias);
         }
 
         List<Fila> filas = new ArrayList<>();
@@ -367,13 +368,61 @@ public class GeneradorAnalisisService {
 
     // ================= Red (medidor del transformador, leído por PLC) =================
 
-    private void acumularRed(String maquina, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
+    /**
+     * Importado: todo el día (la red alimenta el tablero siempre). Retorno a la red: solo mientras el
+     * generador estaba en marcha (de cada arranque a su parada), repartido por día. Contar el retorno de
+     * todo el día daba inconsistencias: retorno en días o en horas en que el generador no estaba
+     * registrado (ej. Caterpillar el 09-10: 505 kWh "exportados" contra 194 generados desde las 09:19).
+     */
+    private void acumularRed(String maquina, List<Tramo> enMarcha, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
         if (!PLCDataQueryService.esNombreMaquinaValido(maquina)) {
             logger.warn("Analisis: nombre de red invalido {}", maquina);
             return;
         }
         sumarDeltas(serieContador(maquina, false, desde, hasta), dias, true);
-        sumarDeltas(serieContador(maquina, true, desde, hasta), dias, false);
+        for (Acum a : dias.values()) {
+            if (a.redImportada != null && a.redExportada == null) a.redExportada = 0.0;
+        }
+        TreeMap<LocalDateTime, Double> exportada = serieContador(maquina, true, desde, hasta);
+        LocalDateTime inicioPeriodo = desde.atStartOfDay();
+        LocalDateTime finPeriodo = hasta.plusDays(1).atStartOfDay();
+        for (Tramo t : enMarcha) {
+            LocalDateTime a = t.desde().isBefore(inicioPeriodo) ? inicioPeriodo : t.desde();
+            LocalDateTime fin = t.hasta().isAfter(finPeriodo) ? finPeriodo : t.hasta();
+            while (a.isBefore(fin)) {
+                LocalDateTime finDia = a.toLocalDate().plusDays(1).atStartOfDay();
+                if (finDia.isAfter(fin)) finDia = fin;
+                Double d = deltaEnVentana(exportada, a, finDia, KW_MAX_RED);
+                Acum acum = dias.get(a.toLocalDate());
+                if (d != null && acum != null) acum.redExportada = suma(acum.redExportada, d);
+                a = finDia;
+            }
+        }
+    }
+
+    private record Tramo(LocalDateTime desde, LocalDateTime hasta) {
+    }
+
+    /** Intervalos en marcha (arranques registrados) de los generadores, unidos si se pisan. */
+    private List<Tramo> tramosEnMarcha(List<Generador> generadores) {
+        List<Tramo> lista = new ArrayList<>();
+        for (Generador g : generadores) {
+            for (GeneradorService.Arranque a : generadorService.arranques(g)) {
+                LocalDateTime fin = a.fin() == null ? LocalDateTime.now().withNano(0) : a.fin();
+                if (fin.isAfter(a.inicio())) lista.add(new Tramo(a.inicio(), fin));
+            }
+        }
+        lista.sort((x, y) -> x.desde().compareTo(y.desde()));
+        List<Tramo> unidos = new ArrayList<>();
+        for (Tramo t : lista) {
+            Tramo ult = unidos.isEmpty() ? null : unidos.get(unidos.size() - 1);
+            if (ult != null && !t.desde().isAfter(ult.hasta())) {
+                unidos.set(unidos.size() - 1, new Tramo(ult.desde(), t.hasta().isAfter(ult.hasta()) ? t.hasta() : ult.hasta()));
+            } else {
+                unidos.add(t);
+            }
+        }
+        return unidos;
     }
 
     /** Contador del medidor de la red: kWh importado (archivo normal) o KWhR exportado (archivo VIP). */

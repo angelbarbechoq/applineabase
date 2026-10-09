@@ -59,7 +59,7 @@ import java.util.function.Function;
 
 /**
  * Análisis del grupo electrógeno, con el mismo filtro (generador y período) para todas las pestañas:
- * - Energía: importada de la red, exportada a la red (retorno), generada y consumo del tablero por
+ * - Energía: importada de la red, retornada a la red (solo con el generador en marcha), generada y consumo del tablero por
  *   día, semana o mes; horas en paralelo / isla / vacío; arranques.
  * - Períodos en marcha: por cada arranque, lo que trabajó el generador y lo que se tomó de la red y
  *   se retornó a la red en ese mismo intervalo.
@@ -267,7 +267,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
         grid.addColumn(Fila::periodo).setHeader("Periodo").setAutoWidth(true).setFlexGrow(0).setFrozen(true);
         columna(grid, "Importado red (kWh)", f -> kwhNum(f.redImportada()));
-        columna(grid, "Exportado red (kWh)", f -> kwhNum(f.redExportada()));
+        columna(grid, "Retornado en marcha (kWh)", f -> kwhNum(f.redExportada()));
         columna(grid, "Generado (kWh)", f -> kwhNum(f.generado()));
         columna(grid, "En paralelo (kWh)", f -> kwhNum(f.generadoParalelo()));
         columna(grid, "En isla (kWh)", f -> kwhNum(f.generadoIsla()));
@@ -282,15 +282,16 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         grid.setWidthFull();
         grid.setHeight("420px");
 
-        Span nota = nota("Importado y exportado (retorno) = contadores de energia del medidor del transformador asociado "
-                + "(PLC). Generado = contador de energia del controlador del generador. Consumo del tablero = importado + "
-                + "generado - exportado. En paralelo = el generador tenia carga y habia tension de red; en isla = con carga y "
+        Span nota = nota("Importado y retornado = contadores de energia del medidor del transformador asociado (PLC). El "
+                + "importado es de todo el dia; el retornado solo cuenta mientras el generador estaba en marcha (desde cada arranque "
+                + "hasta su parada). Generado = contador de energia del controlador del generador. Consumo del tablero = importado + "
+                + "generado - retornado. En paralelo = el generador tenia carga y habia tension de red; en isla = con carga y "
                 + "sin tension de red; en vacio = en marcha con menos de " + (int) GeneradorAnalisisService.KW_VACIO + " kW. "
-                + "La separacion paralelo / isla existe desde el 09-10-2026 (antes no se guardaba la tension de red). "
-                + "El retorno se dibuja por debajo de cero. \"-\" = sin datos.");
-        VerticalLayout v = new VerticalLayout(descripcion("Todo el periodo elegido, este o no encendido el generador: por cada dia, "
-                + "semana o mes, cuanta energia entro al tablero desde la red (transformador), cuanta volvio a la red, cuanta puso el "
-                + "generador y cuanto consumio el tablero en total."), tarjetasEnergia, chart, grid, nota);
+                + "Datos del generador: GenPower desde el 08-10-2026, Caterpillar desde el 09-10-2026 09:19. "
+                + "La separacion paralelo / isla existe desde el 09-10-2026. El retorno se dibuja por debajo de cero. \"-\" = sin datos.");
+        VerticalLayout v = new VerticalLayout(descripcion("Todo el periodo elegido: por cada dia, semana o mes, cuanta energia entro "
+                + "al tablero desde la red (transformador), cuanta puso el generador, cuanta volvio a la red mientras el generador estaba "
+                + "en marcha, y cuanto consumio el tablero en total."), tarjetasEnergia, chart, grid, nota);
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -302,11 +303,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         grid.setItems(filas);
         tarjetasEnergia.removeAll();
         tarjetasEnergia.add(tarjeta("Importado de la red", kwh(t.redImportada()), null));
-        tarjetasEnergia.add(tarjeta("Exportado a la red (retorno)", kwh(t.redExportada()), null));
+        tarjetasEnergia.add(tarjeta("Retornado a la red", kwh(t.redExportada()), "con el generador en marcha"));
         tarjetasEnergia.add(tarjeta("Generado", kwh(t.generado()),
                 t.generadoParalelo() == null && t.generadoIsla() == null ? null
                         : "en paralelo " + kwh(t.generadoParalelo()) + " / en isla " + kwh(t.generadoIsla())));
-        tarjetasEnergia.add(tarjeta("Consumo del tablero", kwh(t.consumo()), "importado + generado - exportado"));
+        tarjetasEnergia.add(tarjeta("Consumo del tablero", kwh(t.consumo()), "importado + generado - retornado"));
         tarjetasEnergia.add(tarjeta("Aporte del generador", porcentaje(t.aporteGenerador()), "del consumo del tablero"));
         tarjetasEnergia.add(tarjeta("Horas de marcha", horas(t.horasMarcha()),
                 "paralelo " + horas(t.horasParalelo()) + " / isla " + horas(t.horasIsla()) + " / vacio " + horas(t.horasVacio())));
@@ -321,7 +322,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                     f.redExportada() == null || f.redExportada() == 0 ? null : -f.redExportada()});
         }
         scriptGrafico = GraficaModel.getBarrasApiladasScript(CHART_ID, categorias,
-                new String[]{"Importado de la red", "Generado", "Exportado a la red (retorno)"},
+                new String[]{"Importado de la red", "Generado", "Retornado a la red (generador en marcha)"},
                 new String[]{AZUL, NARANJA, AQUA}, valores, "kWh");
         if (tabs.getSelectedTab() == tabEnergia) getElement().executeJs(scriptGrafico);
     }
