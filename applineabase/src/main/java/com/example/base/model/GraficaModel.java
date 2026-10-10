@@ -145,7 +145,9 @@ public class GraficaModel {
 
                         "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));" +
                         "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
-                        // PASO 5: Crear CURSOR con ejes (pero sin snapToSeries aún)
+                        // PASO 5: Crear CURSOR con ejes. Sin snapToSeries: con esa opción amCharts5
+                        // muestra solo el tooltip de la serie a la que se pega el cursor y oculta el
+                        // de las demás (cada serie busca su punto con snapTooltip, ver PASO 7).
                         "var cursor = chart.set('cursor', am5xy.XYCursor.new(root, { yAxis: yAxis, xAxis: xAxis, behavior: 'zoomXY' }));" +
                         "cursor.lineX.setAll({ visible: true });" +
                         "cursor.lineY.setAll({ visible: true });" +
@@ -155,10 +157,13 @@ public class GraficaModel {
                         discontinuasJs.toString() +
                         seriesNamesJs.toString() +
                         unidadJs +
-                        // PASO 7: CREAR SERIES con tooltips individuales
+                        // PASO 7: CREAR SERIES con tooltips individuales.
+                        // snapTooltip: cada serie muestra el tooltip de su punto más cercano al
+                        // cursor. Sin esto el eje (base de 1 segundo, un dato por minuto) solo da
+                        // tooltip si el cursor cae justo en el segundo del dato.
                         "var seriesList = [];" +
                         "for(var i=0; i < " + nGraficas + "; i++) {" +
-                        "  var series = chart.series.push(am5xy.LineSeries.new(root, { name: seriesNames[i], xAxis: xAxis, yAxis: yAxis, valueYField: 'value', valueXField: 'date', strokeWidth: 2, snapToTooltip: true }));" +
+                        "  var series = chart.series.push(am5xy.LineSeries.new(root, { name: seriesNames[i], xAxis: xAxis, yAxis: yAxis, valueYField: 'value', valueXField: 'date', strokeWidth: 2, snapTooltip: true }));" +
                         // series.set('stroke', ...) es el que manda (color propio de la serie) —
                         // sin esto, amCharts5 puede pisar lo que se puso en strokes.template con su
                         // propio color automático. Pero forzarlo SIEMPRE cambiaba el color de TODOS
@@ -191,15 +196,6 @@ public class GraficaModel {
                         (mostrarLeyenda ?
                         "var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50 }));" +
                         "legend.data.setAll(chart.series.values);" : "") +
-
-                        // PASO 8: ASIGNAR snapToSeries al cursor DESPUÉS de tener series
-                        "cursor.setAll({ snapToSeries: seriesList, snapToSeriesBy: 'x' });" +
-                        // Con 2+ series, amCharts5 por defecto solo muestra el tooltip de la serie
-                        // más cercana al cursor, no el de todas — se fuerza a mostrar el de cada
-                        // una en cada movimiento para poder comparar los valores a simple vista.
-                        "cursor.events.on('cursormoved', function() {" +
-                        "  seriesList.forEach(function(s) { s.showTooltip(); });" +
-                        "});" +
 
                         // PASO 10: Almacenar referencias globales.
                         // aplicarZoomCalculado es la ÚNICA función que aplica el zoom piso+percentil
