@@ -1032,11 +1032,13 @@ public class GraficaModel {
 
     /**
      * Minuto a minuto de un período en marcha de un generador: línea del generador, línea del consumo del
-     * tablero y columnas de la red (positivas = tomado de la red, en azul; negativas = entregado a la red,
-     * en verde agua). Donde la línea del generador va por encima de la del consumo, sobra y se entrega.
+     * transformador y columnas de la red (positivas = tomado de la red, en azul; negativas = entregado a la
+     * red, en verde agua). Donde la línea del generador va por encima de la del consumo, sobra y se entrega.
+     *
+     * @param nombreConsumo nombre de la línea de consumo, ej. "Consumo del Transformador 1"
      */
     public static String getMarchaMinutoScript(String containerId, List<Long> tiempos, List<Double> generador,
-                                               List<Double> consumo, List<Double> red,
+                                               List<Double> consumo, List<Double> red, String nombreConsumo,
                                                String colorGenerador, String colorRed, String colorEntregado) {
         StringBuilder datos = new StringBuilder("[");
         for (int i = 0; i < tiempos.size(); i++) {
@@ -1064,7 +1066,7 @@ public class GraficaModel {
                 + "var gen = chart.series.push(am5xy.LineSeries.new(root, { name: 'Generador', xAxis: xAxis, yAxis: yAxis, valueYField: 'g', valueXField: 't', stroke: am5.color(" + colorGenerador + "), fill: am5.color(" + colorGenerador + "), tooltip: am5.Tooltip.new(root, { labelText: 'Generador: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
                 + "gen.strokes.template.setAll({ strokeWidth: 2 });"
                 + "gen.data.setAll(datos);"
-                + "var cons = chart.series.push(am5xy.LineSeries.new(root, { name: 'Consumo del tablero', xAxis: xAxis, yAxis: yAxis, valueYField: 'c', valueXField: 't', stroke: am5.color(0x52514e), fill: am5.color(0x52514e), tooltip: am5.Tooltip.new(root, { labelText: 'Consumo: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
+                + "var cons = chart.series.push(am5xy.LineSeries.new(root, { name: '" + nombreConsumo.replace("'", "") + "', xAxis: xAxis, yAxis: yAxis, valueYField: 'c', valueXField: 't', stroke: am5.color(0x52514e), fill: am5.color(0x52514e), tooltip: am5.Tooltip.new(root, { labelText: 'Consumo: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
                 + "cons.strokes.template.setAll({ strokeWidth: 2 });"
                 + "cons.data.setAll(datos);"
                 + "var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));"

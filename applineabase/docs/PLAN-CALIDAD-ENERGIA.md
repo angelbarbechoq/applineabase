@@ -222,6 +222,13 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       (desperdicio) y sin medidor / perdidas. Caterpillar 121 (25,4 h): consumo 11.944, medido 10.599 (desperdicio 110),
       sin medidor 11,3%; GenPower 715 (34,9 h): consumo 19.958, medido 17.218 (desperdicio 480), sin medidor 13,7%.
       CompAP queda encendida todo el arranque; Linea18 encendida 32,8 h y apagada 2,1 h.
+- [x] G18. (2026-10-10) Terminos y balance simple, a pedido del usuario. Estados de maquina: Encendido / Energizado y sin
+      produccion (parte del arranque) / Apagado, consumo minimo / Apagado (en cero) / Sin datos; tiempos "encendido" y
+      "sin produccion". En pantalla nunca "el tablero": "Transformador 1 / 2" y "la planta" para el medidor general (columna
+      Red -> Transformador, consumo del transformador en tarjetas, grilla, grafico minuto a minuto y lectura en vivo del
+      controlador). Balance del arranque simple: generado / consumido por las maquinas del transformador / entregado a la
+      red, con barras y una linea con la diferencia; el desperdicio se deja para despues (memoria
+      `project_desperdicio_balance_pendiente`). Caterpillar 121 (26,8 h): 16.089 / 11.259 / 3.488 kWh, diferencia 1.342.
 - [x] G16. (2026-10-10) Historial propio de eventos del generador, a semejanza del historial de ComAp (motivo + valores
       del momento). El historial interno del controlador (350 eventos) no se publica por Modbus y en ComAp anteriores leerlo
       exigia escribir un indice: descartado por la regla de solo lectura. La lista de alarmas activas si es de solo lectura

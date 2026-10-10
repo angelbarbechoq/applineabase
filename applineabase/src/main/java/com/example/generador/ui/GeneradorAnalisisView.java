@@ -59,13 +59,14 @@ import java.util.function.Function;
 
 /**
  * Análisis del grupo electrógeno, con el mismo filtro (generador y período) para todas las pestañas:
- * - Energía: importada de la red, retornada a la red (solo con el generador en marcha), generada y consumo del tablero por
- *   día, semana o mes; horas en paralelo / isla / vacío; arranques.
+ * - Energía: importada de la red, retornada a la red (solo con el generador en marcha), generada y consumo del
+ *   transformador por día, semana o mes; horas en paralelo / isla / vacío; arranques.
  * - Períodos en marcha: por cada arranque, lo que trabajó el generador y lo que se tomó de la red y
  *   se retornó a la red en ese mismo intervalo.
  * - Costos: galones y precio del galón cargados a mano por período en marcha; costo, costo por kWh
  *   y kWh por galón calculados.
- *   Al elegir un arranque se ve con qué máquinas trabajó el generador (trabajando / a ratos / paradas).
+ *   Al elegir un arranque se ve su balance y con qué máquinas trabajó el generador (encendido / con paradas / apagado).
+ * En pantalla se nombra el transformador ("Transformador 1"), nunca "el tablero".
  */
 @PageTitle("Analisis grupo electrogeno | LineaBase")
 @Route(value = "generador/analisis", layout = MainLayout.class)
@@ -105,6 +106,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     // Energía
     private final HorizontalLayout tarjetasEnergia = new HorizontalLayout();
     private final Grid<Fila> grid = new Grid<>();
+    private Grid.Column<Fila> colConsumo;
     // Períodos en marcha
     private final HorizontalLayout tarjetasPeriodos = new HorizontalLayout();
     private final Grid<PeriodoMarcha> periodosGrid = new Grid<>();
@@ -116,9 +118,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     // Máquinas del período en marcha elegido
     private final H4 maquinasTitulo = new H4();
     private final HorizontalLayout kpisDetalle = new HorizontalLayout();
-    private final Div barraOrigen = new Div();
+    private final Div balance = new Div();
     private final Div chartMinutos = new Div();
-    private final Div balanceTabla = new Div();
     private final Span maquinasResumen = new Span();
     private final Grid<ConsumoMedidor> maquinasGrid = new Grid<>();
 
@@ -257,7 +258,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         limpiarDetalleMaquinas();
 
         String redes = gens.stream().map(Generador::redAsociada).filter(r -> r != null).distinct()
-                .reduce((x, y) -> x + " + " + y).orElse("sin red asociada");
+                .map(GeneradorView::nombreRed).reduce((x, y) -> x + " + " + y).orElse("sin red asociada");
         mensaje.setText(gens.stream().map(Generador::nombre).reduce((x, y) -> x + " + " + y).orElse("") + " con " + redes
                 + ", del " + desde.format(DIA) + " al " + hasta.format(DIA) + " (" + (System.currentTimeMillis() - t0) + " ms).");
     }
@@ -278,7 +279,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         columna(grid, "Generado (kWh)", f -> kwhNum(f.generado()));
         columna(grid, "En paralelo (kWh)", f -> kwhNum(f.generadoParalelo()));
         columna(grid, "En isla (kWh)", f -> kwhNum(f.generadoIsla()));
-        columna(grid, "Consumo tablero (kWh)", f -> kwhNum(f.consumo()));
+        colConsumo = columna(grid, "Consumo del transformador (kWh)", f -> kwhNum(f.consumo()));
         grid.addComponentColumn(f -> badgeRed(f.porcentajeDeRed())).setHeader("De la red (meta 0)").setAutoWidth(true).setFlexGrow(0);
         columna(grid, "Del generador", f -> porcentaje(f.aporteGenerador()));
         columna(grid, "Balance neto red (kWh)", f -> kwhNum(f.balanceNeto()));
@@ -291,18 +292,19 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         grid.setWidthFull();
         grid.setHeight("420px");
 
-        Span nota = nota("De la red = parte del consumo del tablero que se tomo de la red (meta en estiaje: 0; verde hasta "
+        Span nota = nota("De la red = parte del consumo del transformador que se tomo de la red (meta en estiaje: 0; verde hasta "
                 + (int) GeneradorAnalisisService.RED_VERDE_HASTA + "%, amarillo hasta " + (int) GeneradorAnalisisService.RED_AMARILLO_HASTA
                 + "%, rojo por encima). Del generador = el resto; las dos suman 100%. Balance neto = tomado - entregado a la red "
                 + "(negativo = se entrego mas de lo que se tomo). Tomado y entregado = contadores de energia del medidor del "
                 + "transformador asociado (PLC). Lo tomado es de todo el dia; lo entregado solo cuenta mientras el generador estaba en "
-                + "marcha. Generado = contador del controlador del generador. Consumo del tablero = tomado + generado - entregado. En paralelo = el generador tenia carga y habia tension de red; en isla = con carga y "
+                + "marcha. Generado = contador del controlador del generador. Consumo del transformador = tomado + generado - entregado "
+                + "(lo que consumieron las cargas de ese transformador, sea de la red o del generador). En paralelo = el generador tenia carga y habia tension de red; en isla = con carga y "
                 + "sin tension de red; en vacio = en marcha con menos de " + (int) GeneradorAnalisisService.KW_VACIO + " kW. "
                 + "Datos del generador: GenPower desde el 08-10-2026, Caterpillar desde el 09-10-2026 09:19. "
                 + "La separacion paralelo / isla existe desde el 09-10-2026. El retorno se dibuja por debajo de cero. \"-\" = sin datos.");
-        VerticalLayout v = new VerticalLayout(descripcion("Todo el periodo elegido: por cada dia, semana o mes, cuanta energia entro "
-                + "al tablero desde la red (transformador), cuanta puso el generador, cuanta volvio a la red mientras el generador estaba "
-                + "en marcha, y cuanto consumio el tablero en total."), tarjetasEnergia, chart, grid, nota);
+        VerticalLayout v = new VerticalLayout(descripcion("Todo el periodo elegido: por cada dia, semana o mes, cuanta energia se "
+                + "tomo de la red, cuanta puso el generador, cuanta volvio a la red mientras el generador estaba en marcha, y cuanto "
+                + "consumio el transformador en total."), tarjetasEnergia, chart, grid, nota);
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -315,7 +317,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         tarjetasEnergia.removeAll();
         tarjetasEnergia.add(kpiTomadoDeRed(t.porcentajeDeRed(), t.redImportada(), t.consumo()));
         tarjetasEnergia.add(kpiBalance(t.balanceNeto(), t.consumo()));
-        tarjetasEnergia.add(tarjeta("Consumo del tablero", kwh(t.consumo()),
+        String deRedes = GeneradorView.deRedes(gens.stream().map(Generador::redAsociada).toList());
+        colConsumo.setHeader("Consumo " + deRedes + " (kWh)");
+        tarjetasEnergia.add(tarjeta("Consumo " + deRedes, kwh(t.consumo()),
                 "generador " + kwh(t.generadorUsado()) + " + red " + kwh(t.redImportada())));
         tarjetasEnergia.add(tarjeta("Generado", kwh(t.generado()),
                 t.generadoParalelo() == null && t.generadoIsla() == null ? null
@@ -333,7 +337,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             valores.add(new Double[]{f.generadorUsado(), f.redImportada(),
                     f.redExportada() == null || f.redExportada() == 0 ? null : -f.redExportada()});
         }
-        // Arriba de cero, el consumo del tablero partido en generador + red; abajo, el excedente entregado.
+        // Arriba de cero, el consumo del transformador partido en generador + red; abajo, el excedente entregado.
         scriptGrafico = GraficaModel.getBarrasApiladasScript(CHART_ID, categorias,
                 new String[]{"Puso el generador", "Tomado de la red", "Entregado a la red (excedente)"},
                 new String[]{NARANJA, AZUL, AQUA}, valores, "kWh");
@@ -355,7 +359,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             return s;
         }).setHeader("Fin").setAutoWidth(true).setFlexGrow(0);
         columna(periodosGrid, "Duracion", p -> duracion(p.horas()));
-        columna(periodosGrid, "Consumo tablero (kWh)", p -> kwhNum(p.consumo()));
+        columna(periodosGrid, "Consumo del transformador (kWh)", p -> kwhNum(p.consumo()));
         periodosGrid.addComponentColumn(p -> badgeRed(p.porcentajeDeRed())).setHeader("De la red (meta 0)").setAutoWidth(true).setFlexGrow(0);
         columna(periodosGrid, "Tomado de la red (kWh)", p -> kwhNum(p.kwhRedImportada()));
         columna(periodosGrid, "Del generador", p -> porcentaje(p.aporteGenerador()));
@@ -370,16 +374,16 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         columna(periodosGrid, "Paralelo (min)", p -> minutos(p.minParalelo()));
         columna(periodosGrid, "Isla (min)", p -> minutos(p.minIsla()));
         columna(periodosGrid, "Vacio (min)", p -> minutos(p.minVacio()));
-        periodosGrid.addColumn(p -> p.red() == null ? "-" : p.red()).setHeader("Red").setAutoWidth(true).setFlexGrow(0);
+        periodosGrid.addColumn(p -> GeneradorView.nombreRed(p.red())).setHeader("Transformador").setAutoWidth(true).setFlexGrow(0);
         periodosGrid.setWidthFull();
         periodosGrid.setHeight("360px");
         periodosGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
         periodosGrid.asSingleSelect().addValueChangeListener(e -> mostrarMaquinas(e.getValue()));
-        Span nota = nota("Cada fila es una vez que el generador estuvo encendido. De la red = parte del consumo del tablero que se "
+        Span nota = nota("Cada fila es una vez que el generador estuvo encendido. De la red = parte del consumo del transformador que se "
                 + "tomo de la red en los minutos en que el generador no alcanzaba (meta 0; verde hasta "
                 + (int) GeneradorAnalisisService.RED_VERDE_HASTA + "%, amarillo hasta " + (int) GeneradorAnalisisService.RED_AMARILLO_HASTA
                 + "%). Del generador = el resto (suman 100%). Entregado a la red = excedente en los minutos en que el generador daba mas "
-                + "de lo que consumia el tablero. Balance neto = tomado - entregado (negativo = se entrego mas de lo que se tomo). "
+                + "de lo que consumia el transformador. Balance neto = tomado - entregado (negativo = se entrego mas de lo que se tomo). "
                 + "Tiempo tomando de la red y pico: cuanto tiempo y con cuanta potencia falto. Tomado y entregado salen de los contadores "
                 + "del medidor del transformador; el minuto que cruza el inicio o el fin se reparte en proporcion. Paralelo / isla / "
                 + "vacio: minutos segun la tension de red y la carga (desde el 09-10-2026).");
@@ -419,7 +423,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         tarjetasPeriodos.add(tarjeta("Tiempo tomando de la red", lecturas == 0 ? "-" : String.format(Locale.ROOT, "%.0f %%", tomando * 100.0 / lecturas),
                 (lecturas == 0 ? "" : tomando + " de " + lecturas + " minutos") + (pico == null ? "" : String.format(Locale.ROOT, "; pico %.0f kW", pico))));
         tarjetasPeriodos.add(tarjeta("Entregado a la red", kwh(exp), "excedente mientras el generador estaba encendido"));
-        tarjetasPeriodos.add(tarjeta("Consumo del tablero", kwh(cons), cons == null ? null
+        tarjetasPeriodos.add(tarjeta("Consumo " + GeneradorView.deRedes(seleccionados().stream().map(Generador::redAsociada).toList()),
+                kwh(cons), cons == null ? null
                 : "generador " + kwh(gen == null ? null : Math.max(0, gen - (exp == null ? 0 : exp))) + " + red " + kwh(imp)));
         tarjetasPeriodos.add(tarjeta("Generado", kwh(gen), periodos.size() + " arranques, " + duracion(horas)
                 + (horas > 0 && gen != null ? String.format(Locale.ROOT, ", %.0f kW medio", gen / horas) : "")));
@@ -755,37 +760,35 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         maquinasGrid.addColumn(ConsumoMedidor::zona).setHeader("Zona / grupo").setAutoWidth(true).setFlexGrow(0);
         maquinasGrid.addComponentColumn(GeneradorAnalisisView::badgeEstado).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
         columna(maquinasGrid, "Energia consumida (kWh)", c -> c.kwh() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwh()));
-        columna(maquinasGrid, "Apagada consumiendo (desperdicio kWh)", c -> c.kwhEnEspera() == null || c.kwhEnEspera() < 0.05 ? "-"
+        columna(maquinasGrid, "Sin produccion (desperdicio kWh)", c -> c.kwhEnEspera() == null || c.kwhEnEspera() < 0.05 ? "-"
                 : String.format(Locale.ROOT, "%,.1f", c.kwhEnEspera()));
         columna(maquinasGrid, "Potencia media (kW)", c -> c.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwMedio()));
-        columna(maquinasGrid, "Tiempo encendida", c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS ? "-" : duracion(c.horasEncendida()));
-        columna(maquinasGrid, "Tiempo apagada", c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS ? "-" : duracion(c.horasApagada()));
+        columna(maquinasGrid, "Tiempo encendido", c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS ? "-" : duracion(c.horasEncendida()));
+        columna(maquinasGrid, "Tiempo sin produccion", c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS ? "-" : duracion(c.horasSinProduccion()));
         columna(maquinasGrid, "Umbral de encendido", c -> String.format(Locale.ROOT, "%.0f", c.umbral()));
-        columna(maquinasGrid, "Apagada si pasa bajo el umbral", c -> c.lecturasConfirmacion() + " min seguidos");
+        columna(maquinasGrid, "Sin produccion tras", c -> c.lecturasConfirmacion() + " min bajo el umbral");
         maquinasGrid.setWidthFull();
         maquinasGrid.setAllRowsVisible(true);
-        Span nota = nota("Cada maquina esta encendida o apagada; no se mide un porcentaje de carga, porque la carga de una linea "
-                + "depende del producto. Apagada = paso los minutos indicados seguidos por debajo de su umbral de encendido, el "
-                + "mismo del horometro (Horometro > Ajustar umbrales): 5 minutos para las lineas y demas maquinas, como el horometro. "
-                + "Los compresores paran y arrancan solos en su ciclo normal (paradas de 10 a 30 minutos), asi que se dan por "
-                + "apagados recien despues de " + ConsumoMedidoresService.MINUTOS_COMPRESOR_APAGADO + " minutos seguidos sin carga; "
-                + "una parada del ciclo cuenta como encendido. Encendida y apagada = estuvo encendida una parte del arranque y "
-                + "apagada otra (ver los tiempos). Lo que consume una maquina apagada es desperdicio (ej. Linea05: su transformador "
-                + "de aislamiento, ~1,7 kW): lo entrega igual el generador o la red. Apagada (en cero) = todas sus lecturas del "
-                + "arranque fueron cero y su contador no subio. Sin datos = su medidor no tiene lecturas en ese horario. Se listan "
-                + "solo las maquinas del transformador del generador (Configuracion de hardware); no entran el transformador ni el "
-                + "medidor general (bajan su carga porque el generador esta en marcha, no es desperdicio), los sensores ni "
-                + "MotorL3 / MotorL4. Los submedidores (por ejemplo GA752 dentro de Inyeccion) se muestran pero no se suman dos "
-                + "veces en el balance ni en el desperdicio.");
+        Span nota = nota("No se mide un porcentaje de carga: la carga de una linea depende del producto. Sin produccion = paso los "
+                + "minutos indicados seguidos por debajo de su umbral de encendido, el mismo del horometro (Horometro > Ajustar "
+                + "umbrales): 5 minutos para las lineas y demas maquinas. Los compresores paran y arrancan solos en su ciclo normal "
+                + "(paradas de 10 a 30 minutos), asi que cuentan sin produccion recien despues de "
+                + ConsumoMedidoresService.MINUTOS_COMPRESOR_APAGADO + " minutos seguidos sin carga; una parada del ciclo cuenta como "
+                + "encendido. Encendido = todo el arranque. Energizado y sin produccion = encendido una parte del arranque y sin "
+                + "produccion otra (ver los tiempos). Apagado, consumo minimo = no produjo en todo el arranque pero consumio (ej. "
+                + "Linea05: su transformador de aislamiento, ~1,7 kW). Apagado (en cero) = todas sus lecturas fueron cero y su "
+                + "contador no subio. Lo que se consume sin produccion es desperdicio: lo entrega igual el generador o la red. Sin "
+                + "datos = su medidor no tiene lecturas en ese horario. Se listan solo las maquinas del transformador del generador "
+                + "(Configuracion de hardware); no entran los transformadores ni el medidor general (bajan su carga porque el "
+                + "generador esta en marcha, no es desperdicio), los sensores ni MotorL3 / MotorL4. Los submedidores (por ejemplo "
+                + "GA752 dentro de Inyeccion) se muestran pero no se suman dos veces en el balance ni en el desperdicio.");
         kpisDetalle.setWidthFull();
         kpisDetalle.getStyle().set("flex-wrap", "wrap");
-        barraOrigen.setWidthFull();
+        balance.setWidthFull();
         chartMinutos.setId(CHART_MINUTOS);
         chartMinutos.setWidthFull();
         chartMinutos.setHeight("340px");
-        balanceTabla.getStyle().set("max-width", "760px").set("width", "100%");
-        VerticalLayout v = new VerticalLayout(maquinasTitulo, kpisDetalle, barraOrigen, chartMinutos, balanceTabla, maquinasResumen,
-                maquinasGrid, nota);
+        VerticalLayout v = new VerticalLayout(maquinasTitulo, kpisDetalle, balance, chartMinutos, maquinasResumen, maquinasGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
         limpiarDetalleMaquinas();
@@ -799,35 +802,78 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         maquinasGrid.setItems(List.of());
         maquinasGrid.setVisible(false);
         kpisDetalle.removeAll();
-        barraOrigen.removeAll();
-        barraOrigen.setVisible(false);
+        balance.removeAll();
+        balance.setVisible(false);
         chartMinutos.setVisible(false);
-        balanceTabla.removeAll();
-        balanceTabla.setVisible(false);
     }
 
-    /** Barra de 100%: de dónde salió el consumo del tablero (generador / red). */
-    private void mostrarBarraOrigen(PeriodoMarcha p) {
-        barraOrigen.removeAll();
+    /**
+     * Balance simple del arranque (pedido del usuario: de lo simple a lo complejo): generado, consumido
+     * por las máquinas del transformador (suma de sus medidores, sin contar los submedidores dos veces) y
+     * entregado a la red. Debajo, la barra de 100% de dónde salió el consumo del transformador. El
+     * desperdicio queda para una etapa siguiente.
+     */
+    private void mostrarBalance(PeriodoMarcha p, List<ConsumoMedidor> lista) {
+        balance.removeAll();
         Double consumo = p.consumo(), gen = p.generadorUsado(), red = p.kwhRedImportada();
         if (consumo == null || consumo <= 0 || gen == null || red == null) {
-            barraOrigen.setVisible(false);
+            balance.setVisible(false);
             return;
         }
+        double generado = p.kwhGenerado() == null ? 0 : p.kwhGenerado();
+        double entregado = p.kwhRedExportada() == null ? 0 : p.kwhRedExportada();
+        Double consumido = ConsumoMedidoresService.sumaBalance(lista);
+
+        Span titulo = new Span("Balance del arranque");
+        titulo.getStyle().set("font-size", "14px").set("font-weight", "700").set("color", "#0b0b0b");
+        double max = Math.max(generado, Math.max(entregado, consumido == null ? 0 : consumido));
+        Div filas = new Div();
+        filas.getStyle().set("display", "grid").set("grid-template-columns", "minmax(200px, auto) 1fr auto")
+                .set("column-gap", "12px").set("row-gap", "6px").set("align-items", "center").set("font-size", "13px")
+                .set("margin", "4px 0");
+        filaBalance(filas, "Generado por " + p.generador(), generado, max, "#eb6834");
+        filaBalance(filas, "Consumido por las maquinas " + GeneradorView.deRed(p.red()), consumido, max, "#52514e");
+        filaBalance(filas, "Entregado a la red", entregado, max, "#1baf7a");
+        balance.add(titulo, filas);
+        if (consumido != null) {
+            double diferencia = generado - consumido - entregado;
+            Span nota = new Span(String.format(Locale.ROOT, "Generado - consumido - entregado = %,.0f kWh: consumo que ningun medidor de "
+                    + "maquina registra (alumbrado, cargas sin medidor) y perdidas%s.", diferencia,
+                    red >= 0.5 ? String.format(Locale.ROOT, ", menos lo tomado de la red (%,.0f kWh)", red) : ""));
+            nota.getStyle().set("font-size", "12px").set("color", "#52514e");
+            balance.add(nota);
+        }
+
         double pctGen = Math.max(0, Math.min(100, gen / consumo * 100)), pctRed = 100 - pctGen;
-        Span titulo = new Span(String.format(Locale.ROOT, "De donde salio el consumo del tablero (100%% = %,.0f kWh)", consumo));
-        titulo.getStyle().set("font-size", "13px").set("font-weight", "600").set("color", "#0b0b0b");
+        Span subtitulo = new Span(String.format(Locale.ROOT, "De donde salio el consumo %s (100%% = %,.0f kWh)",
+                GeneradorView.deRed(p.red()), consumo));
+        subtitulo.getStyle().set("font-size", "13px").set("font-weight", "600").set("color", "#0b0b0b").set("display", "block")
+                .set("margin-top", "10px");
         Div barra = new Div();
         barra.getStyle().set("display", "flex").set("width", "100%").set("height", "30px").set("border-radius", "6px")
                 .set("overflow", "hidden").set("margin", "4px 0");
         barra.add(segmento(pctGen, "#eb6834", String.format(Locale.ROOT, "Generador %.1f%%", pctGen)),
                 segmento(pctRed, "#2a78d6", String.format(Locale.ROOT, "Red %.1f%%", pctRed)));
         Span leyenda = new Span(String.format(Locale.ROOT, "Generador %.1f%% (%,.0f kWh)   |   Red %.1f%% (%,.0f kWh), meta 0%%"
-                + "   |   Entregado a la red: %,.0f kWh (excedente, no es parte del consumo)",
-                pctGen, gen, pctRed, red, p.kwhRedExportada() == null ? 0 : p.kwhRedExportada()));
+                + "   |   Entregado a la red: %,.0f kWh (excedente, no es parte del consumo)", pctGen, gen, pctRed, red, entregado));
         leyenda.getStyle().set("font-size", "12px").set("color", "#52514e");
-        barraOrigen.add(titulo, barra, leyenda);
-        barraOrigen.setVisible(true);
+        balance.add(subtitulo, barra, leyenda);
+        balance.setVisible(true);
+    }
+
+    /** Una fila del balance: concepto, barra proporcional al mayor de los tres y kWh. */
+    private static void filaBalance(Div filas, String concepto, Double kwh, double max, String color) {
+        Span c = new Span(concepto);
+        Div fondo = new Div();
+        fondo.getStyle().set("height", "18px").set("background-color", "#f0f0f0").set("border-radius", "4px");
+        Div barra = new Div();
+        double pct = kwh == null || max <= 0 ? 0 : Math.max(0, kwh) / max * 100;
+        barra.getStyle().set("height", "100%").set("width", String.format(Locale.ROOT, "%.2f%%", pct))
+                .set("background-color", color).set("border-radius", "4px");
+        fondo.add(barra);
+        Span v = new Span(kwh == null ? "sin datos" : String.format(Locale.ROOT, "%,.0f kWh", kwh));
+        v.getStyle().set("font-weight", "700").set("text-align", "right");
+        filas.add(c, fondo, v);
     }
 
     private static Div segmento(double pct, String color, String texto) {
@@ -839,7 +885,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         return d;
     }
 
-    /** Gráfico minuto a minuto del arranque: generador, consumo del tablero y red (+ tomado / - entregado). */
+    /** Gráfico minuto a minuto del arranque: generador, consumo del transformador y red (+ tomado / - entregado). */
     private void mostrarGraficoMinutos(PeriodoMarcha p) {
         List<GeneradorAnalisisService.MinutoMarcha> minutos = analisis.minutosMarcha(p);
         if (minutos.isEmpty()) {
@@ -855,7 +901,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             red.add(m.redKw());
         }
         chartMinutos.setVisible(true);
-        getElement().executeJs(GraficaModel.getMarchaMinutoScript(CHART_MINUTOS, t, gen, consumo, red, NARANJA, AZUL, AQUA));
+        getElement().executeJs(GraficaModel.getMarchaMinutoScript(CHART_MINUTOS, t, gen, consumo, red,
+                "Consumo " + GeneradorView.deRed(p.red()), NARANJA, AZUL, AQUA));
     }
 
     private void mostrarMaquinas(PeriodoMarcha p) {
@@ -868,7 +915,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         maquinasGrid.setVisible(true);
         maquinasTitulo.setText(p.generador() + " trabajo desde el " + p.inicio().format(CORTA)
                 + (p.enCurso() ? " hasta ahora (sigue en marcha)" : " hasta el " + p.fin().format(CORTA))
-                + " (" + duracion(p.horas()) + ") con las maquinas de " + (p.red() == null ? "toda la planta" : p.red()));
+                + " (" + duracion(p.horas()) + ") con las maquinas " + GeneradorView.deRed(p.red()));
         kpisDetalle.removeAll();
         kpisDetalle.add(kpiTomadoDeRed(p.porcentajeDeRed(), p.kwhRedImportada(), p.consumo()));
         kpisDetalle.add(kpiBalance(p.balanceNeto(), p.consumo()));
@@ -879,14 +926,16 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         kpisDetalle.add(tarjeta("Entregado a la red", kwh(p.kwhRedExportada()), "excedente"));
         kpisDetalle.add(tarjeta("Generado", kwh(p.kwhGenerado()), p.kwMedio() == null ? null
                 : String.format(Locale.ROOT, "%.0f kW medio", p.kwMedio())));
-        mostrarBarraOrigen(p);
+        mostrarBalance(p, lista);
         mostrarGraficoMinutos(p);
 
         Double consumo = p.consumo();
         StringBuilder r = new StringBuilder();
         if (consumo != null && p.porcentajeDeRed() != null) {
-            r.append(String.format(Locale.ROOT, "El tablero consumio %,.0f kWh: el generador puso el %.1f%% y de la red se tomo el %.1f%% "
-                    + "(%,.0f kWh)", consumo, p.aporteGenerador(), p.porcentajeDeRed(), p.kwhRedImportada()));
+            String nombre = GeneradorView.nombreRed(p.red());
+            r.append(String.format(Locale.ROOT, "%s consumio %,.0f kWh: el generador puso el %.1f%% y de la red se tomo el %.1f%% "
+                    + "(%,.0f kWh)", nombre.startsWith("la ") ? "La planta" : "El " + nombre, consumo, p.aporteGenerador(),
+                    p.porcentajeDeRed(), p.kwhRedImportada()));
             if (p.porcentajeTiempoTomando() != null && p.kwhRedImportada() >= 0.5) {
                 r.append(String.format(Locale.ROOT, ", en el %.0f%% del tiempo", p.porcentajeTiempoTomando()));
             }
@@ -900,87 +949,24 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             }
             r.append(". ");
         }
-        mostrarBalance(p, lista);
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.ENCENDIDA, "Encendidas", false));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.ENCENDIDA_Y_APAGADA, "Encendidas una parte y apagadas otra", true));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.APAGADA_CONSUMO, "Apagadas consumiendo en espera", true));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.APAGADA_CERO, "Apagadas (en cero)", true));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.ENCENDIDO, "Encendido todo el arranque", false));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.ENERGIZADO_Y_SIN_PRODUCCION, "Energizado y sin produccion", true));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.APAGADO_CONSUMO_MINIMO, "Apagado, consumo minimo", true));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.APAGADO_CERO, "Apagado (en cero)", true));
         r.append(grupo(lista, ConsumoMedidoresService.Estado.SIN_DATOS, "Sin datos", true));
         double desperdicio = ConsumoMedidoresService.sumaEnEspera(lista);
         if (desperdicio >= 0.05) {
             List<String> detalle = lista.stream().filter(c -> c.dentroDe() == null && c.kwhEnEspera() != null && c.kwhEnEspera() >= 0.5)
                     .sorted((x, y) -> Double.compare(y.kwhEnEspera(), x.kwhEnEspera()))
                     .map(c -> String.format(Locale.ROOT, "%s %,.1f", c.medidor(), c.kwhEnEspera())).toList();
-            r.append(String.format(Locale.ROOT, "Desperdicio: las maquinas apagadas consumieron %,.1f kWh mientras el generador estaba "
-                    + "en marcha, energia que entrego el generador o la red sin producir%s.", desperdicio,
+            r.append(String.format(Locale.ROOT, "Desperdicio: las maquinas sin produccion consumieron %,.1f kWh mientras el generador "
+                    + "estaba en marcha, energia que entrego el generador o la red sin producir%s.", desperdicio,
                     detalle.isEmpty() ? "" : " (" + String.join(", ", detalle) + " kWh)"));
         }
         maquinasResumen.setText(r.toString().trim());
     }
 
-    /**
-     * Balance del arranque: lo que entró al tablero del transformador (generado + tomado de la red -
-     * entregado a la red) contra lo que midieron los medidores de sus máquinas (encendidas y apagadas)
-     * y la diferencia (cargas sin medidor y pérdidas).
-     */
-    private void mostrarBalance(PeriodoMarcha p, List<ConsumoMedidor> lista) {
-        balanceTabla.removeAll();
-        Double consumo = p.consumo();
-        if (consumo == null || consumo <= 0) {
-            balanceTabla.setVisible(false);
-            return;
-        }
-        String tablero = p.red() == null ? "la planta" : p.red();
-        Double medido = ConsumoMedidoresService.sumaBalance(lista);
-        double desperdicio = ConsumoMedidoresService.sumaEnEspera(lista);
-
-        Div tabla = new Div();
-        tabla.getStyle().set("display", "grid").set("grid-template-columns", "1fr auto auto").set("column-gap", "24px")
-                .set("row-gap", "2px").set("font-size", "13px").set("border", "1px solid #e2e3e5").set("border-radius", "6px")
-                .set("padding", "8px 12px");
-        filaBalanceTitulo(tabla, "Lo que entro al tablero de " + tablero);
-        filaBalance(tabla, "Generado por " + p.generador(), p.kwhGenerado(), null, false);
-        filaBalance(tabla, "Tomado de la red", p.kwhRedImportada(), null, false);
-        filaBalance(tabla, "Entregado a la red (excedente, se resta)",
-                p.kwhRedExportada() == null ? null : -p.kwhRedExportada(), null, false);
-        filaBalance(tabla, "Consumo del tablero de " + tablero, consumo, 100.0, true);
-        filaBalanceTitulo(tabla, "Lo que midieron las maquinas de " + tablero);
-        if (medido == null) {
-            filaBalance(tabla, "Sin lecturas de los medidores de las maquinas", null, null, false);
-        } else {
-            double encendidas = medido - desperdicio;
-            double sinMedidor = consumo - medido;
-            filaBalance(tabla, "Maquinas encendidas", encendidas, encendidas / consumo * 100, false);
-            filaBalance(tabla, "Maquinas apagadas (desperdicio)", desperdicio, desperdicio / consumo * 100, false);
-            filaBalance(tabla, "Total medido en las maquinas", medido, medido / consumo * 100, true);
-            filaBalance(tabla, sinMedidor >= 0 ? "Sin medidor y perdidas (consumo - medido)"
-                    : "Medido de mas (diferencia entre medidores)", sinMedidor, sinMedidor / consumo * 100, false);
-        }
-        Span titulo = new Span("Balance del arranque");
-        titulo.getStyle().set("font-size", "13px").set("font-weight", "600").set("color", "#0b0b0b");
-        balanceTabla.add(titulo, tabla);
-        balanceTabla.setVisible(true);
-    }
-
-    private static void filaBalanceTitulo(Div tabla, String texto) {
-        Span s = new Span(texto);
-        s.getStyle().set("grid-column", "1 / -1").set("font-weight", "600").set("color", "#52514e").set("margin-top", "6px");
-        tabla.add(s);
-    }
-
-    private static void filaBalance(Div tabla, String concepto, Double kwh, Double pct, boolean total) {
-        Span c = new Span(concepto);
-        Span v = new Span(kwh == null ? "-" : String.format(Locale.ROOT, "%,.0f kWh", kwh));
-        Span pc = new Span(pct == null ? "" : String.format(Locale.ROOT, "%.1f %%", pct));
-        v.getStyle().set("text-align", "right");
-        pc.getStyle().set("text-align", "right").set("color", "#52514e");
-        if (total) {
-            for (Span s : List.of(c, v, pc)) s.getStyle().set("font-weight", "700").set("border-top", "1px solid #c8c8c8");
-        }
-        tabla.add(c, v, pc);
-    }
-
-    /** "Apagadas consumiendo en espera: 2 (Linea05, Mixer01). " o vacío si no hay. */
+    /** "Apagado, consumo minimo: 2 (Linea05, Mixer01). " o vacío si no hay. */
     private static String grupo(List<ConsumoMedidor> lista, ConsumoMedidoresService.Estado estado, String titulo, boolean nombres) {
         List<String> m = lista.stream().filter(c -> c.estado() == estado).map(ConsumoMedidor::medidor).toList();
         if (m.isEmpty()) return "";
@@ -990,10 +976,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private static Span badgeEstado(ConsumoMedidor c) {
         Span s = new Span();
         Estado e = switch (c.estado()) {
-            case ENCENDIDA -> Estado.OK;
-            case ENCENDIDA_Y_APAGADA -> Estado.AVISO;
-            case APAGADA_CONSUMO -> Estado.FUERA;
-            case APAGADA_CERO, SIN_DATOS -> Estado.SIN_DATO;
+            case ENCENDIDO -> Estado.OK;
+            case ENERGIZADO_Y_SIN_PRODUCCION -> Estado.AVISO;
+            case APAGADO_CONSUMO_MINIMO -> Estado.FUERA;
+            case APAGADO_CERO, SIN_DATOS -> Estado.SIN_DATO;
         };
         GeneradorView.badge(s, c.estado().etiqueta(), e);
         return s;
@@ -1001,8 +987,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     // ================= Utilidades =================
 
-    private static <T> void columna(Grid<T> g, String titulo, Function<T, String> valor) {
-        g.addColumn(valor::apply).setHeader(titulo).setAutoWidth(true).setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
+    private static <T> Grid.Column<T> columna(Grid<T> g, String titulo, Function<T, String> valor) {
+        return g.addColumn(valor::apply).setHeader(titulo).setAutoWidth(true).setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
     }
 
     private static Component tarjeta(String titulo, String valor, String detalle) {

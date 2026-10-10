@@ -31,21 +31,21 @@ import java.util.Set;
 
 /**
  * Con qué máquinas trabajó el generador en un período en marcha: cuáles estuvieron encendidas, cuáles
- * apagadas consumiendo en espera y cuáles en cero, entre el inicio y el fin del arranque.
+ * tuvieron paradas, cuáles apagadas con consumo mínimo y cuáles en cero, entre el inicio y el fin del arranque.
  *
- * Encendida o apagada, sin porcentajes de "carga": la carga de una línea depende del producto. Se usa
+ * Encendida o parada, sin porcentajes de "carga": la carga de una línea depende del producto. Se usa
  * el criterio del horómetro y de la advertencia de detención (Horómetro > Ajustar umbrales): la
- * máquina está apagada cuando pasa un tiempo seguido por debajo de su umbral de encendido (5 lecturas
- * para las líneas, como el horómetro). Los compresores paran y arrancan solos en su ciclo normal (los
- * datos de octubre muestran paradas de 10 a 30 minutos), así que para ellos "apagado" es más de
- * {@link #MINUTOS_COMPRESOR_APAGADO} minutos seguidos por debajo del umbral; una parada del ciclo es
- * parte de su trabajo.
+ * máquina está parada cuando pasa un tiempo seguido por debajo de su umbral de encendido (5 lecturas
+ * para las líneas, como el horómetro); si en ese tiempo consume, está energizada sin producción. Los
+ * compresores paran y arrancan solos en su ciclo normal (los datos de octubre muestran paradas de 10 a
+ * 30 minutos), así que para ellos la parada es más de {@link #MINUTOS_COMPRESOR_APAGADO} minutos
+ * seguidos por debajo del umbral; una parada del ciclo es parte de su trabajo.
  *
- * Lo que consume una máquina apagada es desperdicio (ej. Linea05 con ~1,7 kW de su transformador de
- * aislamiento): lo entrega igual el generador o la red. Los transformadores y el medidor general no
+ * Lo que consume una máquina sin producción es desperdicio (ej. Linea05 con ~1,7 kW de su transformador
+ * de aislamiento): lo entrega igual el generador o la red. Los transformadores y el medidor general no
  * están en esta lista: bajan su carga porque el generador está en marcha, no es desperdicio.
  *
- * "Apagada (en cero)" se decide con TODAS las lecturas del intervalo, nunca con un promedio ni una
+ * "Apagado (en cero)" se decide con TODAS las lecturas del intervalo, nunca con un promedio ni una
  * lectura suelta: el contador de kWh no subió y ninguna lectura de potencia fue distinta de cero.
  */
 @Service
@@ -71,9 +71,14 @@ public class ConsumoMedidoresService {
     public record Ventana(LocalDateTime desde, LocalDateTime hasta) {
     }
 
+    /**
+     * Encendido = por encima del umbral todo el arranque (las pausas cortas cuentan). Energizado y sin
+     * producción = encendido una parte del arranque y sin producción otra. Apagado, consumo mínimo = nunca
+     * superó el umbral pero consumió. Términos elegidos por el usuario.
+     */
     public enum Estado {
-        ENCENDIDA("Encendida"), ENCENDIDA_Y_APAGADA("Encendida y apagada"), APAGADA_CONSUMO("Apagada, consumo en espera"),
-        APAGADA_CERO("Apagada (en cero)"), SIN_DATOS("Sin datos");
+        ENCENDIDO("Encendido"), ENERGIZADO_Y_SIN_PRODUCCION("Energizado y sin produccion"),
+        APAGADO_CONSUMO_MINIMO("Apagado, consumo minimo"), APAGADO_CERO("Apagado (en cero)"), SIN_DATOS("Sin datos");
 
         private final String etiqueta;
 
@@ -92,13 +97,13 @@ public class ConsumoMedidoresService {
      * @param umbral               umbral de encendido de la máquina (en la misma unidad que su potencia guardada)
      * @param lecturasConfirmacion lecturas seguidas bajo el umbral (una por minuto) para darla por apagada
      * @param kwh                  aumento del contador en los intervalos (null = sin lecturas de energía)
-     * @param kwhEnEspera          parte de kwh consumida con la máquina apagada: desperdicio
-     * @param horasEncendida       tiempo del período con la máquina encendida
-     * @param horasApagada         tiempo del período con la máquina apagada
+     * @param kwhEnEspera          parte de kwh consumida sin producción (máquina parada): desperdicio
+     * @param horasEncendida       tiempo del período con la máquina encendida (pausas cortas incluidas)
+     * @param horasSinProduccion   tiempo del período sin producción (parada, con consumo o en cero)
      */
     public record ConsumoMedidor(String medidor, String zona, String dentroDe, Estado estado, double umbral,
                                  int lecturasConfirmacion, Double kwh, Double kwhEnEspera, Double kwMedio,
-                                 double horasEncendida, double horasApagada) {
+                                 double horasEncendida, double horasSinProduccion) {
     }
 
     private record Criterio(double umbral, int lecturasConfirmacion) {
@@ -214,23 +219,23 @@ public class ConsumoMedidoresService {
 
             Estado estado;
             if (lecturas == 0) estado = Estado.SIN_DATOS;
-            else if (encendida == 0) estado = (kwh == null || kwh <= 0) && conPotencia == 0 ? Estado.APAGADA_CERO : Estado.APAGADA_CONSUMO;
-            else if (apagada == 0) estado = Estado.ENCENDIDA;
-            else estado = Estado.ENCENDIDA_Y_APAGADA;
-            // Energía en espera: la del contador repartida según la potencia de los minutos apagada (la
+            else if (encendida == 0) estado = (kwh == null || kwh <= 0) && conPotencia == 0 ? Estado.APAGADO_CERO : Estado.APAGADO_CONSUMO_MINIMO;
+            else if (apagada == 0) estado = Estado.ENCENDIDO;
+            else estado = Estado.ENERGIZADO_Y_SIN_PRODUCCION;
+            // Energía sin producción: la del contador repartida según la potencia de los minutos parada (la
             // proporción no depende de si el medidor guarda la potencia en kW o en W).
             Double kwhEnEspera;
             if (kwh == null || estado == Estado.SIN_DATOS) kwhEnEspera = null;
-            else if (estado == Estado.APAGADA_CONSUMO || estado == Estado.APAGADA_CERO) kwhEnEspera = kwh;
-            else if (estado == Estado.ENCENDIDA) kwhEnEspera = 0.0;
+            else if (estado == Estado.APAGADO_CONSUMO_MINIMO || estado == Estado.APAGADO_CERO) kwhEnEspera = kwh;
+            else if (estado == Estado.ENCENDIDO) kwhEnEspera = 0.0;
             else kwhEnEspera = potenciaTotal > 0 ? kwh * potenciaApagada / potenciaTotal : 0.0;
-            // El tiempo se reparte sobre la duración del período según las lecturas, así encendida +
-            // apagada da el total aunque falte alguna lectura suelta.
+            // El tiempo se reparte sobre la duración del período según las lecturas, así encendido + sin
+            // producción da el total aunque falte alguna lectura suelta.
             double horasEncendida = lecturas == 0 ? 0 : horas * encendida / lecturas;
-            double horasApagada = lecturas == 0 ? 0 : horas - horasEncendida;
+            double horasSinProduccion = lecturas == 0 ? 0 : horas - horasEncendida;
             Double kwMedio = kwh == null || horas <= 0 ? null : kwh / horas;
             lista.add(new ConsumoMedidor(m, maquina.zona(), maquina.dentroDe(), estado, criterio.umbral(),
-                    criterio.lecturasConfirmacion(), kwh, kwhEnEspera, kwMedio, horasEncendida, horasApagada));
+                    criterio.lecturasConfirmacion(), kwh, kwhEnEspera, kwMedio, horasEncendida, horasSinProduccion));
         }
         lista.sort(Comparator.comparing((ConsumoMedidor c) -> c.estado().ordinal())
                 .thenComparing(c -> c.kwh() == null ? 0 : -c.kwh()));

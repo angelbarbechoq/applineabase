@@ -33,7 +33,7 @@ public enum ParametroGenerador {
     RED_V_L2L3("red_v_l2l3", "Red V L2-L3", "V", false),
     RED_V_L3L1("red_v_l3l1", "Red V L3-L1", "V", false),
     RED_KW("red_kw", "Red kW importados (negativo = retorno a la red)", "kW", false),
-    CARGA_KW("carga_kw", "Carga del tablero kW (medida por el controlador)", "kW", false),
+    CARGA_KW("carga_kw", "Consumo del transformador kW (medido por el controlador)", "kW", false),
     BATERIA("bateria", "Tension de bateria", "V", false),
     PRESION_ACEITE("presion_aceite", "Presion de aceite", "bar", false),
     TEMP_REFRIGERANTE("temp_refrigerante", "Temperatura refrigerante", "C", false),

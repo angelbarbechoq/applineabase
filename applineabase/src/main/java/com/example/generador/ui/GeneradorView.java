@@ -8,6 +8,7 @@ import com.example.calidad.model.Indicador;
 import com.example.calidad.service.CalidadEnergiaService;
 import com.example.calidad.service.CalidadEnergiaService.Estado;
 import com.example.dataacquisition.FactorPotenciaUtil;
+import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.generador.model.EventoGenerador;
 import com.example.generador.model.Generador;
 import com.example.generador.model.LecturaGenerador;
@@ -368,7 +369,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         // Red: tensiones y frecuencia del controlador; potencia/corrientes/PF del medidor del transformador (PLC).
         String red = generador.redAsociada();
         panelRed.removeAll();
-        panelRed.add(titulo("Red (" + (red == null ? "-" : red) + ")"));
+        panelRed.add(titulo("Red (" + nombreRed(red) + ")"));
         double nomRed = calidad.tensionNominal(red == null ? "" : red);
         panelRed.add(fila("Frecuencia", valor(l.redFrecuencia(), "%.1f Hz",
                 calidad.evaluar(Indicador.FRECUENCIA, l.redFrecuencia(), nomRed, cfg))));
@@ -381,7 +382,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             panelRed.add(fila("Importado de la red (controlador)", p));
         }
         if (l.cargaKw() != null) {
-            panelRed.add(fila("Carga del tablero (controlador)", texto(String.format(Locale.ROOT, "%.0f kW", l.cargaKw()))));
+            panelRed.add(fila("Consumo " + deRed(red) + " (controlador)", texto(String.format(Locale.ROOT, "%.0f kW", l.cargaKw()))));
         }
         Map<String, Object> medidor = service.ultimaRed(generador);
         if (!medidor.isEmpty()) {
@@ -721,6 +722,34 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         Span s = new Span();
         badge(s, texto, e);
         return s;
+    }
+
+    /**
+     * Nombre para mostrar de la red de un generador: "Trafo1" = "Transformador 1"; el medidor general
+     * (o sin red) = "la planta". En pantalla se habla del transformador, no de "el tablero".
+     */
+    static String nombreRed(String red) {
+        if (red == null || red.isBlank() || MaquinasVirtuales.KWH_PLANTA_1.equals(red)) return "la planta";
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("Trafo(\\d+)").matcher(red);
+        return m.matches() ? "Transformador " + m.group(1) : red;
+    }
+
+    /** "del Transformador 1" / "de la planta". */
+    static String deRed(String red) {
+        String n = nombreRed(red);
+        return n.startsWith("la ") ? "de " + n : "del " + n;
+    }
+
+    /** Varias redes: "del Transformador 1", "de los transformadores 1 y 2" o "de la planta". */
+    static String deRedes(List<String> redes) {
+        List<String> nombres = redes.stream().map(GeneradorView::nombreRed).distinct().toList();
+        if (nombres.isEmpty()) return "de la planta";
+        if (nombres.size() == 1) return deRed(redes.get(0));
+        if (nombres.stream().allMatch(n -> n.startsWith("Transformador "))) {
+            List<String> nros = nombres.stream().map(n -> n.substring("Transformador ".length())).toList();
+            return "de los transformadores " + String.join(", ", nros.subList(0, nros.size() - 1)) + " y " + nros.get(nros.size() - 1);
+        }
+        return "de " + String.join(" y ", nombres);
     }
 
     static void badge(Span s, String texto, Estado e) {
