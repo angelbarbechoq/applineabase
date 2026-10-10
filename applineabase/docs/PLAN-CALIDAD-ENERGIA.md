@@ -211,6 +211,17 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       semilla del proyecto actualizada a la lista real (48). Editable en Configuracion de hardware (listas cerradas).
       El detalle de maquinas de un arranque muestra solo las del transformador del generador y el balance: arranque 715
       (TR2), maquinas 4.616 kWh de 5.569 kWh de consumo del tablero = 83% medido.
+- [x] G17. (2026-10-10) Maquinas de un arranque encendidas o apagadas, sin "% del tiempo trabajando" (se leia como carga,
+      y la carga de una linea depende del producto). Apagada = N lecturas seguidas bajo su umbral de encendido: la
+      ventana del horometro (DETENCION, 5) para lineas y demas; los compresores (CICLO_COMPRESOR) paran 10 a 30 min en su
+      ciclo normal (datos de octubre: CompAP hasta 60 min, Sauer 4-15 min y paradas reales de horas), asi que se dan por
+      apagados con 60 min seguidos. Estados: Encendida / Encendida y apagada (con tiempo encendida y apagada) / Apagada,
+      consumo en espera / Apagada (en cero) / Sin datos. Desperdicio = lo consumido en los minutos apagada (reparto por
+      potencia). Transformadores y medidor general no se listan (bajan carga por el generador, no es desperdicio). Nuevo
+      "Balance del arranque": generado + tomado - entregado = consumo del tablero, contra maquinas encendidas, apagadas
+      (desperdicio) y sin medidor / perdidas. Caterpillar 121 (25,4 h): consumo 11.944, medido 10.599 (desperdicio 110),
+      sin medidor 11,3%; GenPower 715 (34,9 h): consumo 19.958, medido 17.218 (desperdicio 480), sin medidor 13,7%.
+      CompAP queda encendida todo el arranque; Linea18 encendida 32,8 h y apagada 2,1 h.
 - [x] G16. (2026-10-10) Historial propio de eventos del generador, a semejanza del historial de ComAp (motivo + valores
       del momento). El historial interno del controlador (350 eventos) no se publica por Modbus y en ComAp anteriores leerlo
       exigia escribir un indice: descartado por la regla de solo lectura. La lista de alarmas activas si es de solo lectura

@@ -118,6 +118,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final HorizontalLayout kpisDetalle = new HorizontalLayout();
     private final Div barraOrigen = new Div();
     private final Div chartMinutos = new Div();
+    private final Div balanceTabla = new Div();
     private final Span maquinasResumen = new Span();
     private final Grid<ConsumoMedidor> maquinasGrid = new Grid<>();
 
@@ -754,29 +755,37 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         maquinasGrid.addColumn(ConsumoMedidor::zona).setHeader("Zona / grupo").setAutoWidth(true).setFlexGrow(0);
         maquinasGrid.addComponentColumn(GeneradorAnalisisView::badgeEstado).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
         columna(maquinasGrid, "Energia consumida (kWh)", c -> c.kwh() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwh()));
-        columna(maquinasGrid, "Parada consumiendo (desperdicio kWh)", c -> c.kwhEnEspera() == null || c.kwhEnEspera() < 0.05 ? "-"
+        columna(maquinasGrid, "Apagada consumiendo (desperdicio kWh)", c -> c.kwhEnEspera() == null || c.kwhEnEspera() < 0.05 ? "-"
                 : String.format(Locale.ROOT, "%,.1f", c.kwhEnEspera()));
         columna(maquinasGrid, "Potencia media (kW)", c -> c.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwMedio()));
-        columna(maquinasGrid, "Tiempo trabajando", c -> porcentaje0(c.porcentajeTrabajando()));
+        columna(maquinasGrid, "Tiempo encendida", c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS ? "-" : duracion(c.horasEncendida()));
+        columna(maquinasGrid, "Tiempo apagada", c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS ? "-" : duracion(c.horasApagada()));
         columna(maquinasGrid, "Umbral de encendido", c -> String.format(Locale.ROOT, "%.0f", c.umbral()));
+        columna(maquinasGrid, "Apagada si pasa bajo el umbral", c -> c.lecturasConfirmacion() + " min seguidos");
         maquinasGrid.setWidthFull();
         maquinasGrid.setAllRowsVisible(true);
-        Span nota = nota("Trabajando = por encima de su umbral de encendido todo el arranque (95% del tiempo o mas). El umbral es el "
-                + "mismo del horometro (Horometro > Ajustar umbrales). Trabajando a ratos = paraba y arrancaba, por ejemplo los "
-                + "compresores de aire. Parada, consumo en espera = nunca supero su umbral pero consumio (ej. Linea05: su transformador "
-                + "de aislamiento, ~1,7 kW). Lo que consume una maquina parada es desperdicio: lo entrega igual el generador o la red. "
-                + "Parada (en cero) = todas sus lecturas del arranque fueron cero y su contador no subio (se revisan todas, no un "
-                + "promedio). Sin datos = su medidor no tiene lecturas en ese horario. Se listan solo las maquinas del "
-                + "transformador del generador (Configuracion de hardware); no entran el transformador, el medidor general, los "
-                + "sensores ni MotorL3 / MotorL4. Los submedidores (por ejemplo GA752 dentro de Inyeccion) se muestran pero no se "
-                + "suman dos veces en el balance ni en el desperdicio.");
+        Span nota = nota("Cada maquina esta encendida o apagada; no se mide un porcentaje de carga, porque la carga de una linea "
+                + "depende del producto. Apagada = paso los minutos indicados seguidos por debajo de su umbral de encendido, el "
+                + "mismo del horometro (Horometro > Ajustar umbrales): 5 minutos para las lineas y demas maquinas, como el horometro. "
+                + "Los compresores paran y arrancan solos en su ciclo normal (paradas de 10 a 30 minutos), asi que se dan por "
+                + "apagados recien despues de " + ConsumoMedidoresService.MINUTOS_COMPRESOR_APAGADO + " minutos seguidos sin carga; "
+                + "una parada del ciclo cuenta como encendido. Encendida y apagada = estuvo encendida una parte del arranque y "
+                + "apagada otra (ver los tiempos). Lo que consume una maquina apagada es desperdicio (ej. Linea05: su transformador "
+                + "de aislamiento, ~1,7 kW): lo entrega igual el generador o la red. Apagada (en cero) = todas sus lecturas del "
+                + "arranque fueron cero y su contador no subio. Sin datos = su medidor no tiene lecturas en ese horario. Se listan "
+                + "solo las maquinas del transformador del generador (Configuracion de hardware); no entran el transformador ni el "
+                + "medidor general (bajan su carga porque el generador esta en marcha, no es desperdicio), los sensores ni "
+                + "MotorL3 / MotorL4. Los submedidores (por ejemplo GA752 dentro de Inyeccion) se muestran pero no se suman dos "
+                + "veces en el balance ni en el desperdicio.");
         kpisDetalle.setWidthFull();
         kpisDetalle.getStyle().set("flex-wrap", "wrap");
         barraOrigen.setWidthFull();
         chartMinutos.setId(CHART_MINUTOS);
         chartMinutos.setWidthFull();
         chartMinutos.setHeight("340px");
-        VerticalLayout v = new VerticalLayout(maquinasTitulo, kpisDetalle, barraOrigen, chartMinutos, maquinasResumen, maquinasGrid, nota);
+        balanceTabla.getStyle().set("max-width", "760px").set("width", "100%");
+        VerticalLayout v = new VerticalLayout(maquinasTitulo, kpisDetalle, barraOrigen, chartMinutos, balanceTabla, maquinasResumen,
+                maquinasGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
         limpiarDetalleMaquinas();
@@ -793,6 +802,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         barraOrigen.removeAll();
         barraOrigen.setVisible(false);
         chartMinutos.setVisible(false);
+        balanceTabla.removeAll();
+        balanceTabla.setVisible(false);
     }
 
     /** Barra de 100%: de dónde salió el consumo del tablero (generador / red). */
@@ -889,29 +900,87 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             }
             r.append(". ");
         }
-        Double medido = ConsumoMedidoresService.sumaBalance(lista);
-        if (medido != null && consumo != null && consumo > 0) {
-            r.append(String.format(Locale.ROOT, "Las maquinas de %s sumaron %,.0f kWh de los %,.0f kWh que consumio el tablero "
-                    + "(%.0f%% medido; el resto son cargas sin medidor y perdidas). ", p.red(), medido, consumo, medido / consumo * 100));
-        }
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.CONSUMIO, "Trabajando", false));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.INTERMITENTE, "Trabajando a ratos", true));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.EN_ESPERA, "Paradas consumiendo en espera", true));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.EN_CERO, "Paradas (en cero)", true));
+        mostrarBalance(p, lista);
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.ENCENDIDA, "Encendidas", false));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.ENCENDIDA_Y_APAGADA, "Encendidas una parte y apagadas otra", true));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.APAGADA_CONSUMO, "Apagadas consumiendo en espera", true));
+        r.append(grupo(lista, ConsumoMedidoresService.Estado.APAGADA_CERO, "Apagadas (en cero)", true));
         r.append(grupo(lista, ConsumoMedidoresService.Estado.SIN_DATOS, "Sin datos", true));
         double desperdicio = ConsumoMedidoresService.sumaEnEspera(lista);
         if (desperdicio >= 0.05) {
             List<String> detalle = lista.stream().filter(c -> c.dentroDe() == null && c.kwhEnEspera() != null && c.kwhEnEspera() >= 0.5)
                     .sorted((x, y) -> Double.compare(y.kwhEnEspera(), x.kwhEnEspera()))
                     .map(c -> String.format(Locale.ROOT, "%s %,.1f", c.medidor(), c.kwhEnEspera())).toList();
-            r.append(String.format(Locale.ROOT, "Desperdicio: las maquinas paradas consumieron %,.1f kWh mientras el generador estaba "
+            r.append(String.format(Locale.ROOT, "Desperdicio: las maquinas apagadas consumieron %,.1f kWh mientras el generador estaba "
                     + "en marcha, energia que entrego el generador o la red sin producir%s.", desperdicio,
                     detalle.isEmpty() ? "" : " (" + String.join(", ", detalle) + " kWh)"));
         }
         maquinasResumen.setText(r.toString().trim());
     }
 
-    /** "Trabajando a ratos: 3 (Linea17, Linea31, CabezalXTR2). " o vacío si no hay. */
+    /**
+     * Balance del arranque: lo que entró al tablero del transformador (generado + tomado de la red -
+     * entregado a la red) contra lo que midieron los medidores de sus máquinas (encendidas y apagadas)
+     * y la diferencia (cargas sin medidor y pérdidas).
+     */
+    private void mostrarBalance(PeriodoMarcha p, List<ConsumoMedidor> lista) {
+        balanceTabla.removeAll();
+        Double consumo = p.consumo();
+        if (consumo == null || consumo <= 0) {
+            balanceTabla.setVisible(false);
+            return;
+        }
+        String tablero = p.red() == null ? "la planta" : p.red();
+        Double medido = ConsumoMedidoresService.sumaBalance(lista);
+        double desperdicio = ConsumoMedidoresService.sumaEnEspera(lista);
+
+        Div tabla = new Div();
+        tabla.getStyle().set("display", "grid").set("grid-template-columns", "1fr auto auto").set("column-gap", "24px")
+                .set("row-gap", "2px").set("font-size", "13px").set("border", "1px solid #e2e3e5").set("border-radius", "6px")
+                .set("padding", "8px 12px");
+        filaBalanceTitulo(tabla, "Lo que entro al tablero de " + tablero);
+        filaBalance(tabla, "Generado por " + p.generador(), p.kwhGenerado(), null, false);
+        filaBalance(tabla, "Tomado de la red", p.kwhRedImportada(), null, false);
+        filaBalance(tabla, "Entregado a la red (excedente, se resta)",
+                p.kwhRedExportada() == null ? null : -p.kwhRedExportada(), null, false);
+        filaBalance(tabla, "Consumo del tablero de " + tablero, consumo, 100.0, true);
+        filaBalanceTitulo(tabla, "Lo que midieron las maquinas de " + tablero);
+        if (medido == null) {
+            filaBalance(tabla, "Sin lecturas de los medidores de las maquinas", null, null, false);
+        } else {
+            double encendidas = medido - desperdicio;
+            double sinMedidor = consumo - medido;
+            filaBalance(tabla, "Maquinas encendidas", encendidas, encendidas / consumo * 100, false);
+            filaBalance(tabla, "Maquinas apagadas (desperdicio)", desperdicio, desperdicio / consumo * 100, false);
+            filaBalance(tabla, "Total medido en las maquinas", medido, medido / consumo * 100, true);
+            filaBalance(tabla, sinMedidor >= 0 ? "Sin medidor y perdidas (consumo - medido)"
+                    : "Medido de mas (diferencia entre medidores)", sinMedidor, sinMedidor / consumo * 100, false);
+        }
+        Span titulo = new Span("Balance del arranque");
+        titulo.getStyle().set("font-size", "13px").set("font-weight", "600").set("color", "#0b0b0b");
+        balanceTabla.add(titulo, tabla);
+        balanceTabla.setVisible(true);
+    }
+
+    private static void filaBalanceTitulo(Div tabla, String texto) {
+        Span s = new Span(texto);
+        s.getStyle().set("grid-column", "1 / -1").set("font-weight", "600").set("color", "#52514e").set("margin-top", "6px");
+        tabla.add(s);
+    }
+
+    private static void filaBalance(Div tabla, String concepto, Double kwh, Double pct, boolean total) {
+        Span c = new Span(concepto);
+        Span v = new Span(kwh == null ? "-" : String.format(Locale.ROOT, "%,.0f kWh", kwh));
+        Span pc = new Span(pct == null ? "" : String.format(Locale.ROOT, "%.1f %%", pct));
+        v.getStyle().set("text-align", "right");
+        pc.getStyle().set("text-align", "right").set("color", "#52514e");
+        if (total) {
+            for (Span s : List.of(c, v, pc)) s.getStyle().set("font-weight", "700").set("border-top", "1px solid #c8c8c8");
+        }
+        tabla.add(c, v, pc);
+    }
+
+    /** "Apagadas consumiendo en espera: 2 (Linea05, Mixer01). " o vacío si no hay. */
     private static String grupo(List<ConsumoMedidor> lista, ConsumoMedidoresService.Estado estado, String titulo, boolean nombres) {
         List<String> m = lista.stream().filter(c -> c.estado() == estado).map(ConsumoMedidor::medidor).toList();
         if (m.isEmpty()) return "";
@@ -921,14 +990,12 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private static Span badgeEstado(ConsumoMedidor c) {
         Span s = new Span();
         Estado e = switch (c.estado()) {
-            case CONSUMIO -> Estado.OK;
-            case INTERMITENTE -> Estado.AVISO;
-            case EN_ESPERA -> Estado.FUERA;
-            case EN_CERO, SIN_DATOS -> Estado.SIN_DATO;
+            case ENCENDIDA -> Estado.OK;
+            case ENCENDIDA_Y_APAGADA -> Estado.AVISO;
+            case APAGADA_CONSUMO -> Estado.FUERA;
+            case APAGADA_CERO, SIN_DATOS -> Estado.SIN_DATO;
         };
-        String texto = c.estado() == ConsumoMedidoresService.Estado.INTERMITENTE && c.porcentajeTrabajando() != null
-                ? String.format(Locale.ROOT, "Trabajando a ratos (%.0f%%)", c.porcentajeTrabajando()) : c.estado().etiqueta();
-        GeneradorView.badge(s, texto, e);
+        GeneradorView.badge(s, c.estado().etiqueta(), e);
         return s;
     }
 
@@ -1025,10 +1092,6 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     private static String porcentaje(Double v) {
         return v == null ? "-" : String.format(Locale.ROOT, "%.1f %%", v);
-    }
-
-    private static String porcentaje0(Double v) {
-        return v == null ? "-" : String.format(Locale.ROOT, "%.0f %%", v);
     }
 
     private static String dinero(double v) {

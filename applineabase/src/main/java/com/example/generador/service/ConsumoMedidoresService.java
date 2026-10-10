@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -29,15 +30,22 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Con qué máquinas trabajó el generador en un período en marcha: cuáles estaban trabajando, cuáles
- * paradas consumiendo en espera y cuáles en cero, entre el inicio y el fin del arranque.
+ * Con qué máquinas trabajó el generador en un período en marcha: cuáles estuvieron encendidas, cuáles
+ * apagadas consumiendo en espera y cuáles en cero, entre el inicio y el fin del arranque.
  *
- * "Trabajando" se decide con el umbral de encendido de cada máquina, el mismo del horómetro y de la
- * advertencia de detención (Horómetro > Ajustar umbrales): por debajo del umbral la máquina está
- * parada aunque consuma (ej. Linea05 con ~1,7 kW de su transformador de aislamiento). Esa energía
- * de una máquina parada es desperdicio: la entrega igual el generador o la red.
+ * Encendida o apagada, sin porcentajes de "carga": la carga de una línea depende del producto. Se usa
+ * el criterio del horómetro y de la advertencia de detención (Horómetro > Ajustar umbrales): la
+ * máquina está apagada cuando pasa un tiempo seguido por debajo de su umbral de encendido (5 lecturas
+ * para las líneas, como el horómetro). Los compresores paran y arrancan solos en su ciclo normal (los
+ * datos de octubre muestran paradas de 10 a 30 minutos), así que para ellos "apagado" es más de
+ * {@link #MINUTOS_COMPRESOR_APAGADO} minutos seguidos por debajo del umbral; una parada del ciclo es
+ * parte de su trabajo.
  *
- * "Parada (en cero)" se decide con TODAS las lecturas del intervalo, nunca con un promedio ni una
+ * Lo que consume una máquina apagada es desperdicio (ej. Linea05 con ~1,7 kW de su transformador de
+ * aislamiento): lo entrega igual el generador o la red. Los transformadores y el medidor general no
+ * están en esta lista: bajan su carga porque el generador está en marcha, no es desperdicio.
+ *
+ * "Apagada (en cero)" se decide con TODAS las lecturas del intervalo, nunca con un promedio ni una
  * lectura suelta: el contador de kWh no subió y ninguna lectura de potencia fue distinta de cero.
  */
 @Service
@@ -48,10 +56,12 @@ public class ConsumoMedidoresService {
     /** Sensores que se guardan como "línea" pero no miden energía (mismo criterio que AlarmaConfigSeeder). */
     private static final Set<String> SENSORES = Set.of(MaquinasVirtuales.TEMPERATURA_AMBIENTE, MaquinasVirtuales.TEMPERATURA_AGUA,
             "PsiAireP1", "PsiAgua", "BarCompHP");
-    /** Trabajando (por encima del umbral) menos de este % del tiempo con lectura = a ratos. */
-    private static final double PORCENTAJE_CONTINUO = 95.0;
     /** Mismo valor por defecto que el horómetro cuando la máquina no tiene umbral configurado. */
     public static final double UMBRAL_DEFECTO = 15.0;
+    /** Lecturas seguidas bajo el umbral que confirman apagado: el valor por defecto del horómetro (DETENCION). */
+    public static final int VENTANA_DEFECTO = 5;
+    /** Compresores (CICLO_COMPRESOR): minutos seguidos bajo el umbral para darlos por apagados y no en su ciclo. */
+    public static final int MINUTOS_COMPRESOR_APAGADO = 60;
     /** Salto máximo creíble del contador entre dos lecturas seguidas (kWh); más es basura de lectura. */
     private static final double SALTO_MAXIMO_KWH = 20000;
     private static final DateTimeFormatter CLAVE = DateTimeFormatter.ofPattern("yyyyMMddHH:mm:ss");
@@ -62,8 +72,8 @@ public class ConsumoMedidoresService {
     }
 
     public enum Estado {
-        CONSUMIO("Trabajando"), INTERMITENTE("Trabajando a ratos"), EN_ESPERA("Parada, consumo en espera"),
-        EN_CERO("Parada (en cero)"), SIN_DATOS("Sin datos");
+        ENCENDIDA("Encendida"), ENCENDIDA_Y_APAGADA("Encendida y apagada"), APAGADA_CONSUMO("Apagada, consumo en espera"),
+        APAGADA_CERO("Apagada (en cero)"), SIN_DATOS("Sin datos");
 
         private final String etiqueta;
 
@@ -77,19 +87,24 @@ public class ConsumoMedidoresService {
     }
 
     /**
-     * @param dentroDe        medidor que lo contiene (submedidor) o null; los submedidores no se suman
-     *                        en el balance del transformador (ya están en el de arriba)
-     * @param umbral          umbral de encendido de la máquina (en la misma unidad que su potencia guardada)
-     * @param kwh             aumento del contador en los intervalos (null = sin lecturas de energía)
-     * @param kwhEnEspera     parte de kwh consumida con la máquina parada (por debajo del umbral): desperdicio
-     * @param lecturas        lecturas de potencia en los intervalos
-     * @param lecturasTrabajando lecturas por encima del umbral
+     * @param dentroDe             medidor que lo contiene (submedidor) o null; los submedidores no se suman
+     *                             en el balance del transformador (ya están en el de arriba)
+     * @param umbral               umbral de encendido de la máquina (en la misma unidad que su potencia guardada)
+     * @param lecturasConfirmacion lecturas seguidas bajo el umbral (una por minuto) para darla por apagada
+     * @param kwh                  aumento del contador en los intervalos (null = sin lecturas de energía)
+     * @param kwhEnEspera          parte de kwh consumida con la máquina apagada: desperdicio
+     * @param horasEncendida       tiempo del período con la máquina encendida
+     * @param horasApagada         tiempo del período con la máquina apagada
      */
     public record ConsumoMedidor(String medidor, String zona, String dentroDe, Estado estado, double umbral,
-                                 Double kwh, Double kwhEnEspera, Double kwMedio, int lecturas, int lecturasTrabajando) {
-        public Double porcentajeTrabajando() {
-            return lecturas == 0 ? null : lecturasTrabajando * 100.0 / lecturas;
-        }
+                                 int lecturasConfirmacion, Double kwh, Double kwhEnEspera, Double kwMedio,
+                                 double horasEncendida, double horasApagada) {
+    }
+
+    private record Criterio(double umbral, int lecturasConfirmacion) {
+    }
+
+    private record Lectura(String clave, double pw) {
     }
 
     private final TopologiaMedidores topologia;
@@ -120,7 +135,7 @@ public class ConsumoMedidoresService {
         return total;
     }
 
-    /** Desperdicio: energía de máquinas paradas (por debajo de su umbral), sin contar submedidores dos veces. */
+    /** Desperdicio: energía de máquinas apagadas, sin contar submedidores dos veces. */
     public static double sumaEnEspera(List<ConsumoMedidor> lista) {
         double total = 0;
         for (ConsumoMedidor c : lista) {
@@ -129,13 +144,20 @@ public class ConsumoMedidoresService {
         return total;
     }
 
-    /** Umbral de encendido por máquina: el de DETENCION (o CICLO_COMPRESOR), como el horómetro. */
-    private Map<String, Double> umbrales() {
-        Map<String, Double> mapa = new HashMap<>();
+    /**
+     * Umbral y confirmación de apagado por máquina: los de DETENCION (como el horómetro) o, si solo
+     * tiene CICLO_COMPRESOR, su umbral con {@link #MINUTOS_COMPRESOR_APAGADO}.
+     */
+    private Map<String, Criterio> criterios() {
+        Map<String, Criterio> mapa = new HashMap<>();
         for (AlarmaConfig c : alarmaConfigRepository.findAll()) {
             if (c.getUmbralMinimoKw() == null) continue;
-            if (c.getTipoAlarma() == TipoAlarma.DETENCION) mapa.put(c.getLineaMaquina(), c.getUmbralMinimoKw());
-            else if (c.getTipoAlarma() == TipoAlarma.CICLO_COMPRESOR) mapa.putIfAbsent(c.getLineaMaquina(), c.getUmbralMinimoKw());
+            if (c.getTipoAlarma() == TipoAlarma.DETENCION) {
+                int ventana = c.getVentanaCiclos() != null && c.getVentanaCiclos() > 0 ? c.getVentanaCiclos() : VENTANA_DEFECTO;
+                mapa.put(c.getLineaMaquina(), new Criterio(c.getUmbralMinimoKw(), ventana));
+            } else if (c.getTipoAlarma() == TipoAlarma.CICLO_COMPRESOR) {
+                mapa.putIfAbsent(c.getLineaMaquina(), new Criterio(c.getUmbralMinimoKw(), MINUTOS_COMPRESOR_APAGADO));
+            }
         }
         return mapa;
     }
@@ -146,17 +168,15 @@ public class ConsumoMedidoresService {
                         && PLCDataQueryService.esNombreMaquinaValido(m.nombre())
                         && (transformador == null || transformador.equals(m.transformador())))
                 .toList();
-        Map<String, Double> umbrales = umbrales();
+        Map<String, Criterio> criterios = criterios();
         double horas = 0;
         for (Ventana v : ventanas) horas += Duration.between(v.desde(), v.hasta()).toSeconds() / 3600.0;
 
         List<ConsumoMedidor> lista = new ArrayList<>();
         for (TopologiaMedidores.Medidor maquina : maquinas) {
             String m = maquina.nombre();
-            double umbral = umbrales.getOrDefault(m, UMBRAL_DEFECTO);
+            Criterio criterio = criterios.getOrDefault(m, new Criterio(UMBRAL_DEFECTO, VENTANA_DEFECTO));
             Double kwh = null;
-            int lecturas = 0, conPotencia = 0, trabajando = 0;
-            double potenciaEspera = 0, potenciaTotal = 0;
             for (YearMonth mes : meses(ventanas)) {
                 // Cada archivo mensual se limita a su propio mes: el de septiembre repite las
                 // primeras horas del 1 de octubre y se contarían dos veces.
@@ -164,31 +184,78 @@ public class ConsumoMedidoresService {
                 if (delMes.isEmpty()) continue;
                 Double k = kwhEnVentanas(RutaArchivosEnergia.construirRutaMensual(mes.getYear(), mes.getMonthValue(), false), m, delMes);
                 if (k != null) kwh = (kwh == null ? 0 : kwh) + k;
-                double[] p = potenciaEnVentanas(RutaArchivosEnergia.construirRutaMensual(mes.getYear(), mes.getMonthValue(), true), m, delMes, umbral);
-                lecturas += (int) p[0];
-                conPotencia += (int) p[1];
-                trabajando += (int) p[2];
-                potenciaEspera += p[3];
-                potenciaTotal += p[4];
             }
-            Double kwMedio = kwh == null || horas <= 0 ? null : kwh / horas;
+
+            int lecturas = 0, conPotencia = 0, encendida = 0, apagada = 0;
+            double potenciaApagada = 0, potenciaTotal = 0;
+            for (Ventana v : ventanas) {
+                // Se leen unos minutos antes y después del período para saber si una parada que lo
+                // cruza ya venía de antes o sigue después (si no, se cortaría y no llegaría a confirmarse).
+                long margen = criterio.lecturasConfirmacion() + 1L;
+                List<Lectura> l = lecturasPotencia(m, v.desde().minusMinutes(margen), v.hasta().plusMinutes(margen));
+                boolean[] apagadas = marcarApagadas(l, criterio.umbral(), criterio.lecturasConfirmacion());
+                String desde = v.desde().format(CLAVE), hasta = v.hasta().format(CLAVE);
+                for (int i = 0; i < l.size(); i++) {
+                    String k = l.get(i).clave();
+                    if (k.compareTo(desde) < 0 || k.compareTo(hasta) > 0) continue;
+                    double pw = l.get(i).pw();
+                    lecturas++;
+                    if (pw != 0) conPotencia++;
+                    double positiva = Math.max(pw, 0);
+                    potenciaTotal += positiva;
+                    if (apagadas[i]) {
+                        apagada++;
+                        potenciaApagada += positiva;
+                    } else {
+                        encendida++;
+                    }
+                }
+            }
+
             Estado estado;
-            if (kwh == null && lecturas == 0) estado = Estado.SIN_DATOS;
-            else if ((kwh == null || kwh <= 0) && conPotencia == 0) estado = Estado.EN_CERO;
-            else if (trabajando == 0) estado = Estado.EN_ESPERA;
-            else if (lecturas > 0 && trabajando * 100.0 / lecturas < PORCENTAJE_CONTINUO) estado = Estado.INTERMITENTE;
-            else estado = Estado.CONSUMIO;
-            // Energía en espera: la del contador repartida según la potencia de los minutos parados (la
+            if (lecturas == 0) estado = Estado.SIN_DATOS;
+            else if (encendida == 0) estado = (kwh == null || kwh <= 0) && conPotencia == 0 ? Estado.APAGADA_CERO : Estado.APAGADA_CONSUMO;
+            else if (apagada == 0) estado = Estado.ENCENDIDA;
+            else estado = Estado.ENCENDIDA_Y_APAGADA;
+            // Energía en espera: la del contador repartida según la potencia de los minutos apagada (la
             // proporción no depende de si el medidor guarda la potencia en kW o en W).
-            Double kwhEnEspera = kwh == null ? null
-                    : estado == Estado.EN_ESPERA ? kwh
-                    : potenciaTotal > 0 ? kwh * potenciaEspera / potenciaTotal : 0.0;
-            lista.add(new ConsumoMedidor(m, maquina.zona(), maquina.dentroDe(), estado, umbral, kwh, kwhEnEspera, kwMedio,
-                    lecturas, trabajando));
+            Double kwhEnEspera;
+            if (kwh == null || estado == Estado.SIN_DATOS) kwhEnEspera = null;
+            else if (estado == Estado.APAGADA_CONSUMO || estado == Estado.APAGADA_CERO) kwhEnEspera = kwh;
+            else if (estado == Estado.ENCENDIDA) kwhEnEspera = 0.0;
+            else kwhEnEspera = potenciaTotal > 0 ? kwh * potenciaApagada / potenciaTotal : 0.0;
+            // El tiempo se reparte sobre la duración del período según las lecturas, así encendida +
+            // apagada da el total aunque falte alguna lectura suelta.
+            double horasEncendida = lecturas == 0 ? 0 : horas * encendida / lecturas;
+            double horasApagada = lecturas == 0 ? 0 : horas - horasEncendida;
+            Double kwMedio = kwh == null || horas <= 0 ? null : kwh / horas;
+            lista.add(new ConsumoMedidor(m, maquina.zona(), maquina.dentroDe(), estado, criterio.umbral(),
+                    criterio.lecturasConfirmacion(), kwh, kwhEnEspera, kwMedio, horasEncendida, horasApagada));
         }
         lista.sort(Comparator.comparing((ConsumoMedidor c) -> c.estado().ordinal())
                 .thenComparing(c -> c.kwh() == null ? 0 : -c.kwh()));
         return lista;
+    }
+
+    /**
+     * Marca las lecturas que forman parte de una racha de al menos {@code confirmacion} lecturas
+     * seguidas por debajo del umbral (máquina apagada). Una racha más corta es una pausa: la máquina
+     * sigue encendida (igual que el horómetro, que confirma el apagado retroactivo al inicio de la racha).
+     */
+    private static boolean[] marcarApagadas(List<Lectura> lecturas, double umbral, int confirmacion) {
+        boolean[] apagadas = new boolean[lecturas.size()];
+        int i = 0;
+        while (i < lecturas.size()) {
+            if (lecturas.get(i).pw() >= umbral) {
+                i++;
+                continue;
+            }
+            int j = i;
+            while (j < lecturas.size() && lecturas.get(j).pw() < umbral) j++;
+            if (j - i >= confirmacion) Arrays.fill(apagadas, i, j, true);
+            i = j;
+        }
+        return apagadas;
     }
 
     private static List<YearMonth> meses(List<Ventana> ventanas) {
@@ -251,30 +318,34 @@ public class ConsumoMedidoresService {
     }
 
     /**
-     * [lecturas, lecturas con potencia distinta de cero, lecturas por encima del umbral (trabajando),
-     * suma de potencia de las lecturas paradas con consumo (0 &lt; PW &lt; umbral), suma de potencia positiva].
-     * Se compara la potencia guardada contra el umbral tal cual, igual que el horómetro.
+     * Potencia (PW) de la máquina entre {@code desde} y {@code hasta}, en orden, de los archivos VIP
+     * mensuales (cada uno limitado a su propio mes, por el solapamiento en el borde). Se compara contra
+     * el umbral tal cual, igual que el horómetro.
      */
-    private double[] potenciaEnVentanas(String ruta, String maquina, List<Ventana> ventanas, double umbral) {
-        if (!new File(ruta).exists()) return new double[5];
-        String sql = "SELECT count(*), sum(CASE WHEN PW <> 0 THEN 1 ELSE 0 END), sum(CASE WHEN PW >= ? THEN 1 ELSE 0 END), "
-                + "sum(CASE WHEN PW > 0 AND PW < ? THEN PW ELSE 0 END), sum(CASE WHEN PW > 0 THEN PW ELSE 0 END) FROM ("
-                + " SELECT PW, " + casoVentana(ventanas) + " AS w FROM ("
-                + "  SELECT PW, " + SQL_CLAVE + " AS k FROM \"" + maquina + "\")"
-                + ") WHERE w IS NOT NULL";
-        try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta.replace('\\', '/') + "?mode=ro");
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setDouble(1, umbral);
-            ps.setDouble(2, umbral);
-            ponerVentanas(ps, ventanas, 3);
-            try (ResultSet r = ps.executeQuery()) {
-                return r.next() ? new double[]{r.getInt(1), r.getInt(2), r.getInt(3), r.getDouble(4), r.getDouble(5)} : new double[5];
+    private List<Lectura> lecturasPotencia(String maquina, LocalDateTime desde, LocalDateTime hasta) {
+        List<Lectura> lecturas = new ArrayList<>();
+        for (YearMonth mes = YearMonth.from(desde); !mes.isAfter(YearMonth.from(hasta)); mes = mes.plusMonths(1)) {
+            LocalDateTime ini = mes.atDay(1).atStartOfDay();
+            LocalDateTime fin = mes.atEndOfMonth().atTime(23, 59, 59);
+            LocalDateTime a = desde.isBefore(ini) ? ini : desde;
+            LocalDateTime b = hasta.isAfter(fin) ? fin : hasta;
+            String ruta = RutaArchivosEnergia.construirRutaMensual(mes.getYear(), mes.getMonthValue(), true);
+            if (b.isBefore(a) || !new File(ruta).exists()) continue;
+            String sql = "SELECT k, PW FROM (SELECT " + SQL_CLAVE + " AS k, PW FROM \"" + maquina + "\")"
+                    + " WHERE k BETWEEN ? AND ? AND PW IS NOT NULL ORDER BY k";
+            try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta.replace('\\', '/') + "?mode=ro");
+                 PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setString(1, a.format(CLAVE));
+                ps.setString(2, b.format(CLAVE));
+                try (ResultSet r = ps.executeQuery()) {
+                    while (r.next()) lecturas.add(new Lectura(r.getString(1), r.getDouble(2)));
+                }
+            } catch (Exception e) {
+                if (!String.valueOf(e.getMessage()).contains("no such table")) {
+                    logger.warn("Consumo por medidor: no se pudo leer PW de {} en {}: {}", maquina, ruta, e.getMessage());
+                }
             }
-        } catch (Exception e) {
-            if (!String.valueOf(e.getMessage()).contains("no such table")) {
-                logger.warn("Consumo por medidor: no se pudo leer PW de {} en {}: {}", maquina, ruta, e.getMessage());
-            }
-            return new double[5];
         }
+        return lecturas;
     }
 }
