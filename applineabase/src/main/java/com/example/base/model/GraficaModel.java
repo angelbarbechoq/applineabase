@@ -143,14 +143,15 @@ public class GraficaModel {
                         "xTooltip.label.setAll({ fontSize: '11px', textAlign: 'center' });" +
                         "xAxis.set('tooltipDateFormat', 'dd-MM-yyyy\\nHH:mm:ss');" +
 
+                        // Sin tooltip en el eje Y: marcaba la altura libre del mouse, no un dato.
                         "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));" +
-                        "yAxis.set('tooltip', am5.Tooltip.new(root, {}));" +
                         // PASO 5: Crear CURSOR con ejes. Sin snapToSeries: con esa opción amCharts5
                         // muestra solo el tooltip de la serie a la que se pega el cursor y oculta el
                         // de las demás (cada serie busca su punto con snapTooltip, ver PASO 7).
+                        // Solo la línea vertical: la horizontal seguía al mouse sin marcar ningún dato.
                         "var cursor = chart.set('cursor', am5xy.XYCursor.new(root, { yAxis: yAxis, xAxis: xAxis, behavior: 'zoomXY' }));" +
                         "cursor.lineX.setAll({ visible: true });" +
-                        "cursor.lineY.setAll({ visible: true });" +
+                        "cursor.lineY.setAll({ visible: false });" +
 
                         // PASO 6: Definir colores y nombres
                         colors +
