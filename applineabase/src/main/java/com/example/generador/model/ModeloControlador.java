@@ -13,9 +13,10 @@ import java.util.Optional;
  *                   0x02 si el pedido incluye un registro que no existe, así que solo se sube
  *                   cuando se sabe que los del hueco existen (0 = solo registros contiguos).
  * @param noDisponible8000 0x8000 (16 bits) / 0x80000000 (32 bits) = dato no disponible (ComAp).
+ * @param listaAlarmas dónde está la lista de alarmas activas del controlador (null = no se lee).
  */
 public record ModeloControlador(String modelo, String descripcion, boolean confirmado, int maxHueco,
-                               boolean noDisponible8000, List<Registro> registros) {
+                               boolean noDisponible8000, List<Registro> registros, ListaAlarmas listaAlarmas) {
 
     public enum Tipo {
         UINT16(1), INT16(1), UINT32(2), INT32(2), FLOAT32(2);
@@ -44,6 +45,13 @@ public record ModeloControlador(String modelo, String descripcion, boolean confi
         public int cantidad() {
             return tipo.cantidad();
         }
+    }
+
+    /**
+     * Lista de alarmas del controlador (ComAp: cantidad en 44215 y cada alarma en un bloque de 27
+     * registros desde 44216; solo lectura). Registros en numeración 4xxxx.
+     */
+    public record ListaAlarmas(int registroCantidad, int primerRegistro, int largoRegistro, int maximo) {
     }
 
     public Optional<Registro> registro(ParametroGenerador p) {

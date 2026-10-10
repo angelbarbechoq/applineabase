@@ -1,11 +1,12 @@
 {
-  "_ayuda" : "Mapa de registros Modbus por modelo de controlador de generador. Solo lectura (funcion 03). registro = numero 4xxxx de la lista del fabricante (base 0 = registro - 40001). tipo: UINT16, INT16, UINT32, INT32, FLOAT32 (32 bits: palabra alta primero; ordenPalabras BAJA_PRIMERO para invertir). divisor: el valor leido se divide por este numero. parametro: uno de la lista cerrada (RPM, FRECUENCIA, V_L1N.., V_L1L2.., I_L1.., KW, KW_L1.., KVAR, KVA, PF, RED_FRECUENCIA, RED_V_L1N.., RED_V_L1L2.., RED_KW, CARGA_KW, BATERIA, PRESION_ACEITE, TEMP_REFRIGERANTE, TEMP_ACEITE, NIVEL_COMBUSTIBLE, CONSUMO_COMBUSTIBLE, KWH, KVARH, RED_KWH, RED_KVARH, HORAS_MARCHA, ARRANQUES). confirmado false = se ve en vivo pero no se guarda historial. maxHueco = registros sin mapear que se aceptan dentro de un pedido (ComAp contesta 0x02 si el pedido incluye un registro que no existe). Los cambios valen desde el ciclo siguiente, sin reiniciar.",
+  "_ayuda" : "Mapa de registros Modbus por modelo de controlador de generador. Solo lectura (funcion 03). registro = numero 4xxxx de la lista del fabricante (base 0 = registro - 40001). tipo: UINT16, INT16, UINT32, INT32, FLOAT32 (32 bits: palabra alta primero; ordenPalabras BAJA_PRIMERO para invertir). divisor: el valor leido se divide por este numero. parametro: uno de la lista cerrada (RPM, FRECUENCIA, V_L1N.., V_L1L2.., I_L1.., KW, KW_L1.., KVAR, KVA, PF, RED_FRECUENCIA, RED_V_L1N.., RED_V_L1L2.., RED_KW, CARGA_KW, BATERIA, PRESION_ACEITE, TEMP_REFRIGERANTE, TEMP_ACEITE, NIVEL_COMBUSTIBLE, CONSUMO_COMBUSTIBLE, KWH, KVARH, RED_KWH, RED_KVARH, HORAS_MARCHA, ARRANQUES). confirmado false = se ve en vivo pero no se guarda historial. listaAlarmas = lista de alarmas activas del controlador (ComAp: cantidad en 44215 y una alarma cada 27 registros desde 44216, solo lectura); la usa el historial de eventos. maxHueco = registros sin mapear que se aceptan dentro de un pedido (ComAp contesta 0x02 si el pedido incluye un registro que no existe). Los cambios valen desde el ciclo siguiente, sin reiniciar.",
   "modelos" : [ {
     "modelo" : "InteliGen200",
     "descripcion" : "ComAp InteliGen 200, aplicacion Standard GC. Confirmado el 2026-10-08 contra la pantalla del controlador, TR2 y el contador de energia (docs/ig200/MAPA-REGISTROS.md).",
     "confirmado" : true,
     "maxHueco" : 2,
     "noDisponible8000" : true,
+    "listaAlarmas" : { "cantidad" : 44215, "primerRegistro" : 44216, "largoRegistro" : 27, "maximo" : 16 },
     "registros" : [
       { "parametro" : "RPM", "registro" : 41001, "tipo" : "UINT16", "divisor" : 1 },
       { "parametro" : "KW", "registro" : 41020, "tipo" : "INT16", "divisor" : 1 },
@@ -48,6 +49,7 @@
     "confirmado" : true,
     "maxHueco" : 0,
     "noDisponible8000" : true,
+    "listaAlarmas" : { "cantidad" : 44215, "primerRegistro" : 44216, "largoRegistro" : 27, "maximo" : 16 },
     "registros" : [
       { "parametro" : "RPM", "registro" : 41001, "tipo" : "UINT16", "divisor" : 1 },
       { "parametro" : "KW", "registro" : 41002, "tipo" : "INT16", "divisor" : 1 },

@@ -8,8 +8,11 @@ import com.example.calidad.model.Indicador;
 import com.example.calidad.service.CalidadEnergiaService;
 import com.example.calidad.service.CalidadEnergiaService.Estado;
 import com.example.dataacquisition.FactorPotenciaUtil;
+import com.example.generador.model.EventoGenerador;
 import com.example.generador.model.Generador;
 import com.example.generador.model.LecturaGenerador;
+import com.example.generador.model.TipoEventoGenerador;
+import com.example.generador.service.HistorialEventosService;
 import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.ParametroGenerador;
 import com.example.generador.service.GeneradorService;
@@ -99,6 +102,12 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final Grid<Arranque> arranquesGrid = new Grid<>();
     private final Span tendenciaMensaje = new Span();
     private final Grid<FilaRegistro> registrosGrid = new Grid<>();
+    private final HistorialEventosService historial;
+    private final Grid<EventoGenerador> eventosGrid = new Grid<>();
+    private final ComboBox<Integer> eventosPeriodo = new ComboBox<>("Periodo");
+    private final ComboBox<TipoEventoGenerador> eventosTipo = new ComboBox<>("Evento");
+    private final Span eventosMensaje = new Span();
+    private List<EventoGenerador> eventos = List.of();
     private final Span registrosMensaje = new Span();
     private List<FilaRegistro> ultimaExploracion = List.of();
     private Map<Integer, Integer> exploracionAnterior = Map.of();
@@ -121,10 +130,12 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         VARIABLES.put("Nivel de combustible (%)", new String[]{"nivel_combustible"});
     }
 
-    public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService) {
+    public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService,
+                         HistorialEventosService historial) {
         this.service = service;
         this.calidad = calidad;
         this.lineaAccessService = lineaAccessService;
+        this.historial = historial;
         List<Generador> lista = service.generadores();
         this.generador = lista.isEmpty() ? null : lista.get(0);
 
@@ -159,6 +170,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         tabs.setSizeFull();
         tabs.add("Estado actual", crearEstado());
         tabs.add("Arranques", crearArranques());
+        tabs.add("Historial de eventos", crearEventos());
         tabs.add("Tendencias", crearTendencias());
         if (lineaAccessService.esAdmin()) {
             tabs.add("Registros", crearRegistros());
@@ -212,7 +224,98 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         registrosMensaje.setText("");
         tendenciaMensaje.setText("Lo guardado: cada minuto en marcha, cada 15 min parado. La bateria y la temperatura parado "
                 + "muestran si el generador esta listo para arrancar.");
+        cargarEventos();
         refrescar();
+    }
+
+    // ================= Historial de eventos =================
+
+    private VerticalLayout crearEventos() {
+        eventosPeriodo.setItems(1, 7, 30, 90, 365);
+        eventosPeriodo.setItemLabelGenerator(d -> d == 1 ? "Ultimas 24 h" : d == 365 ? "Ultimo anio" : "Ultimos " + d + " dias");
+        eventosPeriodo.setValue(30);
+        eventosPeriodo.setWidth("170px");
+        eventosTipo.setItems(TipoEventoGenerador.values());
+        eventosTipo.setItemLabelGenerator(TipoEventoGenerador::etiqueta);
+        eventosTipo.setPlaceholder("Todos");
+        eventosTipo.setClearButtonVisible(true);
+        eventosTipo.setWidth("220px");
+        Button ver = new Button("Ver", VaadinIcon.SEARCH.create(), e -> cargarEventos());
+        ver.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        var descarga = com.example.base.ui.CsvUtil.crearLinkDescarga("eventos-generador.csv", this::csvEventos, "Descargar CSV");
+        HorizontalLayout filtros = new HorizontalLayout(eventosPeriodo, eventosTipo, ver, descarga);
+        filtros.setAlignItems(Alignment.END);
+        filtros.getStyle().set("flex-wrap", "wrap");
+
+        eventosGrid.addColumn(ev -> ev.id() == null ? "" : String.valueOf(ev.id())).setHeader("Nro").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> ev.fecha().format(HORA)).setHeader("Fecha y hora").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addComponentColumn(ev -> badgeNuevo(ev.tipo().etiqueta(), estadoDe(ev.tipo()))).setHeader("Evento").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> ev.descripcion() == null ? "" : ev.descripcion()).setHeader("Descripcion").setAutoWidth(true);
+        eventosGrid.addColumn(ev -> fmt(ev.rpm(), "%.0f")).setHeader("RPM").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.kw(), "%.0f")).setHeader("kW").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.pf(), "%.2f")).setHeader("PF").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.frecuencia(), "%.1f")).setHeader("Hz gen").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.vGen(), "%.0f")).setHeader("V gen").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.iGen(), "%.0f")).setHeader("I gen").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.redFrecuencia(), "%.1f")).setHeader("Hz red").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.vRed(), "%.0f")).setHeader("V red").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.bateria(), "%.1f")).setHeader("Bateria").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.tempRefrigerante(), "%.0f")).setHeader("Temp").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.horasMarcha(), "%.1f")).setHeader("Horas").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> ev.kwh() == null ? "-" : String.format(Locale.ROOT, "%,d", ev.kwh())).setHeader("kWh").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> ev.arranques() == null ? "-" : String.valueOf(ev.arranques())).setHeader("Arranques").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.setSizeFull();
+
+        eventosMensaje.getStyle().set("font-size", "12px").set("color", "#555");
+        Span nota = nota("Historial armado por la app, como el historial del controlador ComAp: cada evento con los valores de ese momento. "
+                + "Se detecta leyendo el controlador cada minuto (solo lectura): arranque y parada (un arranque de menos de 1 minuto "
+                + "se detecta por el contador de arranques), toma de carga y vacio (" + (int) com.example.generador.service.GeneradorAnalisisService.KW_VACIO
+                + " kW), falla y retorno de red (tension de red del controlador), alarmas de la lista de alarmas del controlador, y "
+                + "comunicacion perdida o recuperada. \"Inicio de lectura\" marca cuando arranco la app (antes de eso, hueco). "
+                + "El historial interno del controlador (350 eventos) no se puede leer por Modbus sin escribirle: se ve en el controlador o con InteliConfig.");
+        VerticalLayout v = new VerticalLayout(filtros, eventosMensaje, eventosGrid, nota);
+        v.setSizeFull();
+        v.setPadding(false);
+        v.setFlexGrow(1, eventosGrid);
+        return v;
+    }
+
+    private void cargarEventos() {
+        if (generador == null) return;
+        int dias = eventosPeriodo.getValue() == null ? 30 : eventosPeriodo.getValue();
+        LocalDateTime hasta = LocalDateTime.now();
+        eventos = historial.listar(generador.nombre(), hasta.minusDays(dias), hasta, eventosTipo.getValue());
+        eventosGrid.setItems(eventos);
+        eventosMensaje.setText(eventos.size() + " eventos de " + generador.nombre() + (eventos.isEmpty()
+                ? ". El historial empieza a llenarse desde que se activo esta version." : "."));
+    }
+
+    private java.io.InputStream csvEventos() {
+        StringBuilder sb = new StringBuilder("﻿Nro;Fecha y hora;Evento;Descripcion;RPM;kW;PF;Hz gen;V gen;I gen;Hz red;V red;Bateria;Temp;Horas;kWh;Arranques\n");
+        for (EventoGenerador ev : eventos) {
+            sb.append(ev.id()).append(';').append(ev.fecha().format(HORA)).append(';')
+                    .append(com.example.base.ui.CsvUtil.escape(ev.tipo().etiqueta())).append(';')
+                    .append(com.example.base.ui.CsvUtil.escape(ev.descripcion() == null ? "" : ev.descripcion())).append(';')
+                    .append(csv(ev.rpm())).append(';').append(csv(ev.kw())).append(';').append(csv(ev.pf())).append(';')
+                    .append(csv(ev.frecuencia())).append(';').append(csv(ev.vGen())).append(';').append(csv(ev.iGen())).append(';')
+                    .append(csv(ev.redFrecuencia())).append(';').append(csv(ev.vRed())).append(';').append(csv(ev.bateria())).append(';')
+                    .append(csv(ev.tempRefrigerante())).append(';').append(csv(ev.horasMarcha())).append(';')
+                    .append(ev.kwh() == null ? "" : ev.kwh()).append(';').append(ev.arranques() == null ? "" : ev.arranques()).append('\n');
+        }
+        return new java.io.ByteArrayInputStream(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private static String csv(Double v) {
+        return v == null ? "" : String.valueOf(v);
+    }
+
+    private static Estado estadoDe(TipoEventoGenerador t) {
+        return switch (t.nivel()) {
+            case NORMAL -> Estado.SIN_DATO;
+            case BUENO -> Estado.OK;
+            case AVISO -> Estado.AVISO;
+            case FALLA -> Estado.FUERA;
+        };
     }
 
     // ================= Estado actual =================

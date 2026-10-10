@@ -68,11 +68,18 @@ public class GeneradoresConfigService {
                     }
                 }
             }
+            ModeloControlador.ListaAlarmas alarmas = null;
+            if (m.get("listaAlarmas") instanceof Map<?, ?> la && la.get("cantidad") instanceof Number cant
+                    && la.get("primerRegistro") instanceof Number primero) {
+                int largo = la.get("largoRegistro") instanceof Number l ? l.intValue() : 27;
+                int maximo = la.get("maximo") instanceof Number mx ? mx.intValue() : 16;
+                alarmas = new ModeloControlador.ListaAlarmas(cant.intValue(), primero.intValue(), largo, maximo);
+            }
             lista.add(new ModeloControlador(modelo, texto(m.get("descripcion")),
                     Boolean.TRUE.equals(m.get("confirmado")),
                     m.get("maxHueco") instanceof Number n ? Math.max(0, n.intValue()) : 0,
                     !Boolean.FALSE.equals(m.get("noDisponible8000")),
-                    List.copyOf(registros)));
+                    List.copyOf(registros), alarmas));
         }
         return lista;
     }

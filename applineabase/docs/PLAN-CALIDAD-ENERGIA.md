@@ -211,6 +211,14 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       semilla del proyecto actualizada a la lista real (48). Editable en Configuracion de hardware (listas cerradas).
       El detalle de maquinas de un arranque muestra solo las del transformador del generador y el balance: arranque 715
       (TR2), maquinas 4.616 kWh de 5.569 kWh de consumo del tablero = 83% medido.
+- [x] G16. (2026-10-10) Historial propio de eventos del generador, a semejanza del historial de ComAp (motivo + valores
+      del momento). El historial interno del controlador (350 eventos) no se publica por Modbus y en ComAp anteriores leerlo
+      exigia escribir un indice: descartado por la regla de solo lectura. La lista de alarmas activas si es de solo lectura
+      (guia IG200: cantidad en 44215, una alarma cada 27 registros desde 44216; verificado en IG200 e IG500, hoy vacia;
+      falta ver el formato del texto con una alarma real). La app detecta cada minuto: inicio de lectura, arranque, parada,
+      arranque breve (contador de arranques), toma carga / vacio, falla / retorno de red, alarma / alarma resuelta, sin
+      comunicacion / recuperada. Archivo `C:/LineaBaseX/generador/eventos` (tabla por generador). Pestana "Historial de
+      eventos" en Generadores con filtro de periodo y tipo, y descarga CSV. Solo con mapa confirmado.
 - [x] G15. (2026-10-09) Enfoque estiaje: el indicador principal es "Tomado de la red" (% del consumo del tablero, meta 0;
       semaforo verde hasta 2%, amarillo hasta 10%, rojo por encima). Consumo = generador + red (suman 100%); lo entregado a la
       red va aparte en kWh (excedente) y como Balance neto = tomado - entregado. Se quito "Generado / consumo" (el 125%

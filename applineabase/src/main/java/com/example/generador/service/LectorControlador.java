@@ -73,7 +73,44 @@ public final class LectorControlador {
             throw new IOException("ningun registro del mapa " + modelo.modelo() + " respondio (" + motivo + ")");
         }
         calcularPfSiFalta(modelo, valores);
-        return new LecturaGenerador(LocalDateTime.now().withNano(0), valores, errores);
+        return new LecturaGenerador(LocalDateTime.now().withNano(0), valores, errores, leerAlarmas(c, unitId, modelo));
+    }
+
+    /**
+     * Lista de alarmas activas del controlador (solo lectura): cantidad y un bloque por alarma, cuyo
+     * texto se decodifica como ASCII (2 caracteres por registro). null si el modelo no la tiene o si
+     * el controlador no la entrega: no corta la lectura de valores.
+     */
+    static List<String> leerAlarmas(ModbusTcpConexion c, int unitId, ModeloControlador modelo) throws IOException {
+        ModeloControlador.ListaAlarmas la = modelo.listaAlarmas();
+        if (la == null) return null;
+        try {
+            int cantidad = c.leerHolding(unitId, la.registroCantidad() - 40001, 1)[0];
+            if (cantidad == 0x8000) return null;
+            List<String> alarmas = new ArrayList<>();
+            for (int i = 0; i < Math.min(cantidad, la.maximo()); i++) {
+                int[] regs = c.leerHolding(unitId, la.primerRegistro() - 40001 + i * la.largoRegistro(), la.largoRegistro());
+                alarmas.add(textoAlarma(regs));
+            }
+            return alarmas;
+        } catch (ModbusTcpConexion.ExcepcionModbus e) {
+            return null;
+        }
+    }
+
+    /** Texto ASCII de un registro de la lista de alarmas; si no tiene texto, sus valores en hexadecimal. */
+    static String textoAlarma(int[] regs) {
+        StringBuilder sb = new StringBuilder();
+        for (int v : regs) {
+            for (int b : new int[]{(v >> 8) & 0xFF, v & 0xFF}) {
+                sb.append(b >= 32 && b < 127 ? (char) b : ' ');
+            }
+        }
+        String texto = sb.toString().replaceAll("\\s+", " ").trim();
+        if (texto.length() >= 3) return texto;
+        StringBuilder hex = new StringBuilder("Alarma sin texto (");
+        for (int i = 0; i < Math.min(regs.length, 8); i++) hex.append(i == 0 ? "" : " ").append(String.format("%04X", regs[i] & 0xFFFF));
+        return hex.append(")").toString();
     }
 
     /**

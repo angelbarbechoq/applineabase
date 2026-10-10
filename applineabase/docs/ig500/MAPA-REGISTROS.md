@@ -49,6 +49,12 @@ PF 1.000.
   tenerlos haria falta conectar la computadora del motor al InteliGen 500 por CAN J1939; si se hace, se agregan
   al mapa sin recompilar. La pantalla del generador muestra "no lo mide este controlador".
 
+## Lista de alarmas (comun a InteliGen 200 y 500, guia IG200)
+Cantidad de alarmas activas en 44215 (direccion 4214) y cada alarma en un bloque de 27 registros desde 44216
+(direccion 4215), solo lectura. Verificado el 2026-10-10 en los dos controladores (cantidad 0). Falta ver como viene
+el texto con una alarma real: la app lo decodifica como ASCII. El historial interno de eventos del controlador no se
+publica por Modbus (en ComAp anteriores habia que escribir un indice): la app arma su propio historial.
+
 ## Pendientes
 - **Potencia de red del controlador:** 41298 = -126 fijo durante un minuto mientras carga - generador iba
   de -107 a -125 (pantalla "Mains Import P" -139). No se usa.

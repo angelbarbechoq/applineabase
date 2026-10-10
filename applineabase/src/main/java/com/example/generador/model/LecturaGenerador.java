@@ -10,9 +10,11 @@ import static com.example.generador.model.ParametroGenerador.*;
  * null = el modelo no mapea ese valor, o el controlador no lo da en ese momento (0x8000).
  *
  * @param errores parámetros cuyo pedido falló (motivo), para mostrarlos al verificar un mapa.
+ * @param alarmas texto de cada alarma de la lista de alarmas del controlador (vacía = sin alarmas;
+ *                null = el modelo no la tiene o no se pudo leer).
  */
 public record LecturaGenerador(LocalDateTime fecha, Map<ParametroGenerador, Double> valores,
-                               Map<ParametroGenerador, String> errores) {
+                               Map<ParametroGenerador, String> errores, java.util.List<String> alarmas) {
 
     public Double valor(ParametroGenerador p) {
         return valores.get(p);
