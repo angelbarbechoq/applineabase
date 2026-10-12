@@ -77,7 +77,9 @@ public class HistorialEventosService {
                     + (marcha ? "en marcha" + (Boolean.TRUE.equals(carga) ? " con carga" : " en vacio") : "parado")
                     + (red == null ? "" : red ? ", con red" : ", sin red"), l));
             if (l.alarmas() != null) {
-                for (String a : l.alarmas()) nuevos.add(EventoGenerador.de(t, ALARMA, a + " (activa al iniciar la lectura)", l));
+                for (String a : l.alarmas()) {
+                    nuevos.add(EventoGenerador.de(t, ALARMA, nombreAlarma(a) + ": " + estadoAlarma(a) + " (ya estaba al iniciar la lectura)", l));
+                }
             }
         } else {
             if (Boolean.FALSE.equals(e.comunicando)) nuevos.add(EventoGenerador.de(t, COMUNICACION_RECUPERADA, "El controlador volvio a responder", l));
@@ -102,8 +104,7 @@ public class HistorialEventosService {
                 nuevos.add(EventoGenerador.de(t, red ? RETORNO_RED : FALLA_RED, red ? "Volvio la tension de red" : "Sin tension de red", l));
             }
             if (l.alarmas() != null && e.alarmas != null) {
-                for (String a : l.alarmas()) if (!e.alarmas.contains(a)) nuevos.add(EventoGenerador.de(t, ALARMA, a, l));
-                for (String a : e.alarmas) if (!l.alarmas().contains(a)) nuevos.add(EventoGenerador.de(t, ALARMA_RESUELTA, a, l));
+                nuevos.addAll(cambiosAlarmas(t, e.alarmas, l.alarmas(), l));
             }
         }
         e.comunicando = true;
@@ -115,9 +116,71 @@ public class HistorialEventosService {
         guardar(generador, nuevos);
     }
 
+    // ================= Alarmas de la lista del controlador =================
+    // ComAp antepone al texto "!" si la alarma está activa ahora y "*" si todavía no se confirmó (reset).
+    // Visto el 2026-10-12 en el GenPower: "*Emergency Stop" con el pulsador ya suelto y sin reset, y
+    // "!*Emergency Stop" + "!*E-STOP" al volver a pulsarlo. Una alarma se sigue por su nombre (sin esos
+    // signos): un cambio de signo es un cambio de estado de la misma alarma, no una alarma nueva.
+
+    /** Nombre de la alarma sin los signos de estado de ComAp ("!*E-STOP" = "E-STOP"). */
+    public static String nombreAlarma(String texto) {
+        return texto == null ? "" : texto.replaceFirst("^[!*\\s]+", "").trim();
+    }
+
+    private static String signos(String texto) {
+        if (texto == null) return "";
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^[!*\\s]*").matcher(texto);
+        return m.find() ? m.group() : "";
+    }
+
+    /** Activa ahora (ComAp: "!"). */
+    public static boolean alarmaActiva(String texto) {
+        return signos(texto).contains("!");
+    }
+
+    /** Todavía sin confirmar / sin reset (ComAp: "*"). */
+    public static boolean alarmaSinConfirmar(String texto) {
+        return signos(texto).contains("*");
+    }
+
+    /** Estado en palabras: "activa ahora, sin reset", "ya no esta activa, falta el reset en el controlador"... */
+    public static String estadoAlarma(String texto) {
+        boolean activa = alarmaActiva(texto), sinReset = alarmaSinConfirmar(texto);
+        if (activa) return sinReset ? "activa ahora, sin reset" : "activa ahora, confirmada";
+        return sinReset ? "ya no esta activa, falta el reset en el controlador" : "en la lista del controlador";
+    }
+
+    /** Eventos por los cambios de la lista de alarmas entre dos lecturas, siguiendo cada alarma por su nombre. */
+    private static List<EventoGenerador> cambiosAlarmas(LocalDateTime t, Set<String> antes, List<String> ahora, LecturaGenerador l) {
+        Map<String, String> previas = new java.util.LinkedHashMap<>(), actuales = new java.util.LinkedHashMap<>();
+        for (String a : antes) previas.put(nombreAlarma(a), a);
+        for (String a : ahora) actuales.put(nombreAlarma(a), a);
+        List<EventoGenerador> eventos = new ArrayList<>();
+        for (Map.Entry<String, String> x : actuales.entrySet()) {
+            String nombre = x.getKey(), texto = x.getValue(), previo = previas.get(nombre);
+            if (previo == null) {
+                eventos.add(EventoGenerador.de(t, ALARMA, nombre + ": " + estadoAlarma(texto), l));
+            } else if (alarmaActiva(texto) && !alarmaActiva(previo)) {
+                eventos.add(EventoGenerador.de(t, ALARMA, nombre + ": activa de nuevo", l));
+            } else if (!alarmaActiva(texto) && alarmaActiva(previo)) {
+                eventos.add(EventoGenerador.de(t, ALARMA_INACTIVA, nombre + ": " + estadoAlarma(texto), l));
+            } else if (!alarmaSinConfirmar(texto) && alarmaSinConfirmar(previo)) {
+                eventos.add(EventoGenerador.de(t, ALARMA_CONFIRMADA, nombre + ": confirmada en el controlador"
+                        + (alarmaActiva(texto) ? ", sigue activa" : ""), l));
+            }
+        }
+        for (String nombre : previas.keySet()) {
+            if (!actuales.containsKey(nombre)) {
+                eventos.add(EventoGenerador.de(t, ALARMA_RESUELTA, nombre + ": salio de la lista del controlador (reseteada)", l));
+            }
+        }
+        return eventos;
+    }
+
     /**
-     * Alarmas de la lista del controlador según la última lectura de fondo (cada minuto). Vacía si no
-     * tiene alarmas o todavía no se leyó; sirve para avisar de un generador que no está en pantalla.
+     * Alarmas de la lista del controlador según la última lectura de fondo (cada minuto), con sus
+     * signos de estado. Vacía si no tiene alarmas o todavía no se leyó; sirve para avisar de un
+     * generador que no está en pantalla.
      */
     public List<String> alarmasActivas(String generador) {
         Estado e = estados.get(generador);
@@ -125,18 +188,43 @@ public class HistorialEventosService {
     }
 
     /**
-     * Cuándo apareció una alarma: el último evento ALARMA con ese texto. {@code inicioLectura} = true si
-     * ya estaba activa cuando arrancó la app (apareció antes de esa hora). Null si no está en el historial.
+     * Desde cuándo está la alarma en su estado actual: el último evento ALARMA (aparece o se activa de
+     * nuevo) o ALARMA_INACTIVA con ese nombre. {@code inicioLectura} = true si ya estaba cuando arrancó la
+     * app (apareció antes de esa hora). Null si no está en el historial. Acepta también los eventos
+     * guardados antes de separar el nombre de los signos ("*Emergency Stop").
      */
     public Aparicion aparicion(String generador, String alarma) {
+        String nombre = nombreAlarma(alarma);
         LocalDateTime ahora = LocalDateTime.now();
-        for (EventoGenerador ev : listar(generador, ahora.minusDays(365), ahora, ALARMA)) {
-            String d = ev.descripcion();
-            if (d == null) continue;
-            if (d.equals(alarma)) return new Aparicion(ev.fecha(), false);
-            if (d.startsWith(alarma + " (")) return new Aparicion(ev.fecha(), true);
+        Aparicion alIniciar = null;
+        LocalDateTime resueltaEn = null;
+        for (EventoGenerador ev : listar(generador, ahora.minusDays(365), ahora, null)) {
+            String d = nombreAlarma(ev.descripcion());
+            if (!(d.equals(nombre) || d.startsWith(nombre + ":") || d.startsWith(nombre + " ("))) continue;
+            if (ev.tipo() == ALARMA_RESUELTA) {
+                if (resueltaEn == null) resueltaEn = ev.fecha();
+                continue;
+            }
+            if (ev.tipo() != ALARMA && ev.tipo() != ALARMA_INACTIVA) continue;
+            // Una "resuelta" en el mismo segundo que la alarma fue solo un cambio de signo ("*" -> "!*"), que antes
+            // del 2026-10-12 se anotaba como alarma nueva + resuelta; una resuelta posterior corta la búsqueda.
+            if (resueltaEn != null && !resueltaEn.equals(ev.fecha())) break;
+            if (!d.contains("al iniciar la lectura")) return new Aparicion(ev.fecha(), false);
+            // Ya estaba al reiniciar la app: se busca hacia atrás cuándo apareció de verdad, si no se resolvió antes.
+            if (alIniciar == null) alIniciar = new Aparicion(ev.fecha(), true);
         }
-        return null;
+        return alIniciar;
+    }
+
+    /** Id del último evento guardado del generador (0 si no hay), para saber si hay eventos nuevos. */
+    public long ultimoId(String generador) {
+        if (!new File(ruta()).exists()) return 0;
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta().replace('\\', '/') + "?mode=ro");
+             ResultSet r = c.createStatement().executeQuery("SELECT max(id) FROM \"" + generador + "\"")) {
+            return r.next() ? r.getLong(1) : 0;
+        } catch (Exception ex) {
+            return 0;
+        }
     }
 
     public record Aparicion(LocalDateTime fecha, boolean inicioLectura) {

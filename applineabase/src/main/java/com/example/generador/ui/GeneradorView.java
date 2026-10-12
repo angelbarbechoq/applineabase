@@ -112,6 +112,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final ComboBox<TipoEventoGenerador> eventosTipo = new ComboBox<>("Evento");
     private final Span eventosMensaje = new Span();
     private List<EventoGenerador> eventos = List.of();
+    /** Id del último evento cargado en la grilla: si el historial tiene uno nuevo, se recarga sola. */
+    private long ultimoEventoMostrado;
     private final Span registrosMensaje = new Span();
     private List<FilaRegistro> ultimaExploracion = List.of();
     private Map<Integer, Integer> exploracionAnterior = Map.of();
@@ -290,6 +292,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         if (generador == null) return;
         int dias = eventosPeriodo.getValue() == null ? 30 : eventosPeriodo.getValue();
         LocalDateTime hasta = LocalDateTime.now();
+        ultimoEventoMostrado = historial.ultimoId(generador.nombre());
         eventos = historial.listar(generador.nombre(), hasta.minusDays(dias), hasta, eventosTipo.getValue());
         eventosGrid.setItems(eventos);
         eventosMensaje.setText(eventos.size() + " eventos de " + generador.nombre() + (eventos.isEmpty()
@@ -337,7 +340,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         selector.getDataProvider().refreshAll();
         List<String> otros = service.generadores().stream()
                 .filter(g -> !g.nombre().equals(generador.nombre()) && !historial.alarmasActivas(g.nombre()).isEmpty())
-                .map(g -> g.nombre() + ": " + String.join(", ", historial.alarmasActivas(g.nombre()))).toList();
+                .map(g -> g.nombre() + ": " + historial.alarmasActivas(g.nombre()).stream()
+                        .map(HistorialEventosService::nombreAlarma).collect(Collectors.joining(", "))).toList();
         boolean propias = alarmas != null && !alarmas.isEmpty();
         if (!propias && otros.isEmpty()) {
             alertaAlarmas.setVisible(false);
@@ -358,16 +362,24 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             for (String a : alarmas) {
                 HistorialEventosService.Aparicion ap = historial.aparicion(generador.nombre(), a);
                 String desde = ap == null ? "" : ap.inicioLectura()
-                        ? " - activa desde antes del " + ap.fecha().format(CORTA) + " (cuando la app empezo a leer)"
-                        : " - desde el " + ap.fecha().format(CORTA);
-                Span texto = new Span(a + desde);
-                texto.getStyle().set("font-weight", "700").set("display", "block").set("margin-top", "4px");
+                        ? ", desde antes del " + ap.fecha().format(CORTA) + " (cuando la app empezo a leer)"
+                        : ", desde el " + ap.fecha().format(CORTA);
+                Span nombre = new Span(HistorialEventosService.nombreAlarma(a));
+                nombre.getStyle().set("font-weight", "700");
+                boolean activa = HistorialEventosService.alarmaActiva(a);
+                Span estado = badgeNuevo(HistorialEventosService.estadoAlarma(a), activa ? Estado.FUERA : Estado.AVISO);
+                Span cuando = new Span(desde.isEmpty() ? "" : desde.substring(2));
+                cuando.getStyle().set("font-size", "13px");
+                Div linea = new Div(nombre, estado, cuando);
+                linea.getStyle().set("display", "flex").set("align-items", "center").set("gap", "8px").set("flex-wrap", "wrap")
+                        .set("margin-top", "6px");
                 Span explicacion = new Span(explicarAlarma(a));
                 explicacion.getStyle().set("font-size", "13px").set("display", "block");
-                caja.add(texto, explicacion);
+                caja.add(linea, explicacion);
             }
-            Span nota = new Span("Texto tal como lo envia el controlador (lista de alarmas, solo lectura). Queda en el Historial de eventos; "
-                    + "cuando desaparezca de la lista se anota como alarma resuelta.");
+            Span nota = new Span("Lista de alarmas del controlador (solo lectura). El controlador marca con \"!\" la alarma activa y con "
+                    + "\"*\" la que todavia no tiene reset. Todo queda en el Historial de eventos: cuando aparece, se activa de nuevo, deja "
+                    + "de estar activa, se confirma o sale de la lista (reseteada).");
             nota.getStyle().set("font-size", "11px").set("display", "block").set("margin-top", "4px");
             caja.add(nota);
             alertaAlarmas.add(caja);
@@ -387,8 +399,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
      * interruptor y enfría). Lo demás: revisar en el controlador.
      */
     static String explicarAlarma(String texto) {
-        String t = texto.replaceFirst("^[*\\s]+", "").toLowerCase(Locale.ROOT);
-        if (t.contains("emergency stop") || t.contains("emerg")) {
+        String t = HistorialEventosService.nombreAlarma(texto).toLowerCase(Locale.ROOT);
+        if (t.contains("emergency stop") || t.contains("emerg") || t.contains("e-stop")) {
             return "Parada de emergencia: el generador no arranca, ni siquiera por un corte de red, hasta soltar el pulsador "
                     + "de emergencia y hacer el reset de fallas en el controlador.";
         }
@@ -427,6 +439,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private void refrescar() {
         if (generador == null) return;
         arranquesGrid.setItems(service.arranques(generador));
+        // El historial se recarga solo cuando la lectura de fondo (cada minuto) guardó un evento nuevo.
+        if (historial.ultimoId(generador.nombre()) != ultimoEventoMostrado) cargarEventos();
         LecturaGenerador l;
         try {
             l = service.leerEnVivo(generador);

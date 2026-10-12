@@ -15,6 +15,10 @@ public enum TipoEventoGenerador {
     FALLA_RED("Falla de red", Nivel.FALLA),
     RETORNO_RED("Retorno de red", Nivel.BUENO),
     ALARMA("Alarma", Nivel.FALLA),
+    /** Sigue en la lista del controlador pero ya no está activa: falta el reset. */
+    ALARMA_INACTIVA("Alarma ya no activa, falta reset", Nivel.AVISO),
+    /** Confirmada en el controlador (se quitó el "*"); puede seguir activa. */
+    ALARMA_CONFIRMADA("Alarma confirmada", Nivel.AVISO),
     ALARMA_RESUELTA("Alarma resuelta", Nivel.BUENO),
     SIN_COMUNICACION("Sin comunicacion", Nivel.FALLA),
     COMUNICACION_RECUPERADA("Comunicacion recuperada", Nivel.BUENO);

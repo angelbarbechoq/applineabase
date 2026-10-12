@@ -229,6 +229,12 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       Wrn; lo demas "revisar en el controlador"). Se actualiza con la lectura en vivo (15 s); sin comunicacion usa la
       ultima lectura de fondo. El selector marca "(ALARMA)" y una linea amarilla avisa si otro generador tiene alarmas.
       Pendiente (G3): llevarlas tambien a Alarmas Activas y a los avisos del navegador.
+      Ajuste el mismo dia: ComAp antepone "!" (activa ahora) y "*" (sin confirmar / sin reset). 07:03 "*Emergency Stop"
+      (pulsador suelto, sin reset); 08:15 el usuario volvio a pulsar: "!*Emergency Stop" + "!*E-STOP" (bloque crudo:
+      0000 0201 + texto ASCII). La app lo anotaba como alarma nueva + "resuelta"; ahora sigue cada alarma por su nombre
+      y anota: Alarma (aparece o se activa de nuevo), Alarma ya no activa (falta reset), Alarma confirmada y Alarma
+      resuelta (sale de la lista). El aviso muestra el nombre con su estado, y la pestana del historial se recarga sola
+      cuando hay un evento nuevo (antes solo con "Ver").
 - [x] G18. (2026-10-10) Terminos y balance simple, a pedido del usuario. Estados de maquina: Encendido / Energizado y sin
       produccion (parte del arranque) / Apagado, consumo minimo / Apagado (en cero) / Sin datos; tiempos "encendido" y
       "sin produccion". En pantalla nunca "el tablero": "Transformador 1 / 2" y "la planta" para el medidor general (columna
