@@ -94,6 +94,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     private final Span descripcion = new Span();
     private final Span avisoMapa = new Span();
+    /** Aviso de alarmas del controlador, arriba de las pestañas (se ve en todas). */
+    private final Div alertaAlarmas = new Div();
+    private final ComboBox<Generador> selector = new ComboBox<>();
     private final Span estadoBadge = new Span();
     private final Span estadoHora = new Span();
     private final Span erroresLectura = new Span();
@@ -148,9 +151,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             return;
         }
 
-        ComboBox<Generador> selector = new ComboBox<>();
         selector.setItems(lista);
-        selector.setItemLabelGenerator(Generador::nombre);
+        // El que tiene alarmas en el controlador se marca en la lista, para verlo desde la pantalla de otro.
+        selector.setItemLabelGenerator(g -> historial.alarmasActivas(g.nombre()).isEmpty() ? g.nombre() : g.nombre() + " (ALARMA)");
         selector.setValue(generador);
         selector.setWidth("220px");
         selector.addValueChangeListener(e -> {
@@ -176,7 +179,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         if (lineaAccessService.esAdmin()) {
             tabs.add("Registros", crearRegistros());
         }
-        add(cabecera, avisoMapa, tabs);
+        alertaAlarmas.setWidthFull();
+        alertaAlarmas.setVisible(false);
+        add(cabecera, avisoMapa, alertaAlarmas, tabs);
         setFlexGrow(1, tabs);
         cambiarGenerador();
     }
@@ -319,6 +324,83 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         };
     }
 
+    // ================= Alarmas del controlador =================
+
+    /**
+     * Aviso rojo con las alarmas de la lista del controlador del generador elegido (texto tal como lo
+     * envía, desde cuándo y qué significa), y una línea con los otros generadores que tengan alarmas.
+     *
+     * @param ultimaConocida true = no hubo comunicación y se muestra la última lectura de fondo
+     */
+    private void mostrarAlarmas(List<String> alarmas, boolean ultimaConocida) {
+        alertaAlarmas.removeAll();
+        selector.getDataProvider().refreshAll();
+        List<String> otros = service.generadores().stream()
+                .filter(g -> !g.nombre().equals(generador.nombre()) && !historial.alarmasActivas(g.nombre()).isEmpty())
+                .map(g -> g.nombre() + ": " + String.join(", ", historial.alarmasActivas(g.nombre()))).toList();
+        boolean propias = alarmas != null && !alarmas.isEmpty();
+        if (!propias && otros.isEmpty()) {
+            alertaAlarmas.setVisible(false);
+            return;
+        }
+        if (propias) {
+            Div caja = new Div();
+            caja.getStyle().set("background-color", "#f8d7da").set("color", "#721c24").set("border", "2px solid #721c24")
+                    .set("border-radius", "6px").set("padding", "8px 12px");
+            var icono = VaadinIcon.WARNING.create();
+            icono.getStyle().set("margin-right", "6px");
+            Span titulo = new Span("ALARMA EN EL CONTROLADOR DE " + generador.nombre().toUpperCase(Locale.ROOT) + " (" + alarmas.size() + ")"
+                    + (ultimaConocida ? " - ultima lectura conocida, sin comunicacion ahora" : ""));
+            titulo.getStyle().set("font-weight", "700").set("font-size", "15px");
+            Div cabeza = new Div(icono, titulo);
+            cabeza.getStyle().set("display", "flex").set("align-items", "center");
+            caja.add(cabeza);
+            for (String a : alarmas) {
+                HistorialEventosService.Aparicion ap = historial.aparicion(generador.nombre(), a);
+                String desde = ap == null ? "" : ap.inicioLectura()
+                        ? " - activa desde antes del " + ap.fecha().format(CORTA) + " (cuando la app empezo a leer)"
+                        : " - desde el " + ap.fecha().format(CORTA);
+                Span texto = new Span(a + desde);
+                texto.getStyle().set("font-weight", "700").set("display", "block").set("margin-top", "4px");
+                Span explicacion = new Span(explicarAlarma(a));
+                explicacion.getStyle().set("font-size", "13px").set("display", "block");
+                caja.add(texto, explicacion);
+            }
+            Span nota = new Span("Texto tal como lo envia el controlador (lista de alarmas, solo lectura). Queda en el Historial de eventos; "
+                    + "cuando desaparezca de la lista se anota como alarma resuelta.");
+            nota.getStyle().set("font-size", "11px").set("display", "block").set("margin-top", "4px");
+            caja.add(nota);
+            alertaAlarmas.add(caja);
+        }
+        if (!otros.isEmpty()) {
+            Span s = new Span("Otro generador con alarma: " + String.join("   |   ", otros) + " (elijalo en la lista para ver el detalle).");
+            s.getStyle().set("background-color", "#fff3cd").set("color", "#856404").set("padding", "6px 10px").set("border-radius", "6px")
+                    .set("font-size", "13px").set("display", "block").set("margin-top", propias ? "6px" : "0");
+            alertaAlarmas.add(s);
+        }
+        alertaAlarmas.setVisible(true);
+    }
+
+    /**
+     * Qué significa una alarma de la lista de ComAp, por su texto: la parada de emergencia y el tipo que
+     * indica el prefijo (Sd = parada por protección, Wrn = aviso, Stp = parada lenta, BOC = abre el
+     * interruptor y enfría). Lo demás: revisar en el controlador.
+     */
+    static String explicarAlarma(String texto) {
+        String t = texto.replaceFirst("^[*\\s]+", "").toLowerCase(Locale.ROOT);
+        if (t.contains("emergency stop") || t.contains("emerg")) {
+            return "Parada de emergencia: el generador no arranca, ni siquiera por un corte de red, hasta soltar el pulsador "
+                    + "de emergencia y hacer el reset de fallas en el controlador.";
+        }
+        if (t.startsWith("sd ")) {
+            return "Parada por proteccion: el generador no arranca hasta resolver la causa y hacer el reset en el controlador.";
+        }
+        if (t.startsWith("stp ")) return "Parada lenta por proteccion (con enfriamiento): revisar la causa y hacer el reset en el controlador.";
+        if (t.startsWith("boc ")) return "Proteccion que abre el interruptor del generador y lo enfria: revisar la causa en el controlador.";
+        if (t.startsWith("wrn ")) return "Aviso: el generador puede seguir trabajando, pero hay que revisar la causa.";
+        return "Revisar en la pantalla del controlador.";
+    }
+
     // ================= Estado actual =================
 
     private VerticalLayout crearEstado() {
@@ -355,8 +437,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             panelRed.removeAll();
             panelGen.removeAll();
             panelMotor.removeAll();
+            mostrarAlarmas(historial.alarmasActivas(generador.nombre()), true);
             return;
         }
+        mostrarAlarmas(l.alarmas(), false);
         boolean marcha = l.enMarcha();
         badge(estadoBadge, l.rpm() == null ? "SIN RPM" : marcha ? "EN MARCHA" : "PARADO",
                 l.rpm() == null ? Estado.AVISO : marcha ? Estado.OK : Estado.SIN_DATO);

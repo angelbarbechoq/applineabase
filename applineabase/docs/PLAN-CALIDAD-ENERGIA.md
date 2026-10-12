@@ -222,6 +222,13 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       (desperdicio) y sin medidor / perdidas. Caterpillar 121 (25,4 h): consumo 11.944, medido 10.599 (desperdicio 110),
       sin medidor 11,3%; GenPower 715 (34,9 h): consumo 19.958, medido 17.218 (desperdicio 480), sin medidor 13,7%.
       CompAP queda encendida todo el arranque; Linea18 encendida 32,8 h y apagada 2,1 h.
+- [x] G19. (2026-10-12) Aviso de alarmas en la pantalla de Generadores. Primera alarma real: GenPower "*Emergency Stop"
+      (07:03, el historial de eventos la anoto como ALARMA; el texto ASCII se decodifica bien). Arriba de las pestanas,
+      visible en todas: caja roja "ALARMA EN EL CONTROLADOR DE ..." con cada alarma tal como la envia el controlador, desde
+      cuando (ultimo evento ALARMA con ese texto) y que significa (parada de emergencia; prefijos ComAp Sd / Stp / BOC /
+      Wrn; lo demas "revisar en el controlador"). Se actualiza con la lectura en vivo (15 s); sin comunicacion usa la
+      ultima lectura de fondo. El selector marca "(ALARMA)" y una linea amarilla avisa si otro generador tiene alarmas.
+      Pendiente (G3): llevarlas tambien a Alarmas Activas y a los avisos del navegador.
 - [x] G18. (2026-10-10) Terminos y balance simple, a pedido del usuario. Estados de maquina: Encendido / Energizado y sin
       produccion (parte del arranque) / Apagado, consumo minimo / Apagado (en cero) / Sin datos; tiempos "encendido" y
       "sin produccion". En pantalla nunca "el tablero": "Transformador 1 / 2" y "la planta" para el medidor general (columna

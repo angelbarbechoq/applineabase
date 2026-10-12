@@ -115,6 +115,33 @@ public class HistorialEventosService {
         guardar(generador, nuevos);
     }
 
+    /**
+     * Alarmas de la lista del controlador según la última lectura de fondo (cada minuto). Vacía si no
+     * tiene alarmas o todavía no se leyó; sirve para avisar de un generador que no está en pantalla.
+     */
+    public List<String> alarmasActivas(String generador) {
+        Estado e = estados.get(generador);
+        return e == null || e.alarmas == null ? List.of() : List.copyOf(e.alarmas);
+    }
+
+    /**
+     * Cuándo apareció una alarma: el último evento ALARMA con ese texto. {@code inicioLectura} = true si
+     * ya estaba activa cuando arrancó la app (apareció antes de esa hora). Null si no está en el historial.
+     */
+    public Aparicion aparicion(String generador, String alarma) {
+        LocalDateTime ahora = LocalDateTime.now();
+        for (EventoGenerador ev : listar(generador, ahora.minusDays(365), ahora, ALARMA)) {
+            String d = ev.descripcion();
+            if (d == null) continue;
+            if (d.equals(alarma)) return new Aparicion(ev.fecha(), false);
+            if (d.startsWith(alarma + " (")) return new Aparicion(ev.fecha(), true);
+        }
+        return null;
+    }
+
+    public record Aparicion(LocalDateTime fecha, boolean inicioLectura) {
+    }
+
     /** El controlador no respondió: un evento cuando se pierde la comunicación (no uno por minuto). */
     public void registrarSinComunicacion(String generador, String motivo) {
         Estado e = estados.get(generador);

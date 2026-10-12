@@ -116,7 +116,7 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `configuracion` | `ConfiguracionView` (hardware) | ADMIN |
 | `configuracion/medidores` | `ModelosMedidorView` (catalogo de modelos + Probar lectura) | ADMIN |
 | `calidad` | `CalidadEnergiaView` (Estado actual, Historico, Cumplimiento; Limites solo ADMIN) | gate `puedeVerAlarmas()` |
-| `generador` | `GeneradorView` (selector de generador; Estado actual en vivo, Arranques, Historial de eventos, Tendencias; Registros solo ADMIN; solo lectura del controlador) | gate `puedeVerAlarmas()` |
+| `generador` | `GeneradorView` (selector de generador, marca "(ALARMA)"; aviso rojo con las alarmas del controlador arriba de las pestanas; Estado actual en vivo, Arranques, Historial de eventos, Tendencias; Registros solo ADMIN; solo lectura del controlador) | gate `puedeVerAlarmas()` |
 | `generador/analisis` | `GeneradorAnalisisView`, pestanas Resumen de energia (red importada/exportada, generada, consumo del tablero, paralelo/isla/vacio por dia/semana/mes), Periodos en marcha (por arranque; clic en uno = balance simple generado / consumido / entregado y con que maquinas trabajo) y Costos (galones y precio por arranque, tarifa de la red por mes y ahorro; cargar/editar solo ADMIN) | gate `puedeVerAlarmas()` |
 | `mezcladores/config` | `MezcladoresConfigView` | gate `puedeVerMezcladores()` |
 | `mantenimiento` | `MantenimientoView` | gate `puedeVerMantenimiento()`; el formulario solo lo ve ADMIN |

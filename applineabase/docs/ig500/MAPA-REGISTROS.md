@@ -51,8 +51,8 @@ PF 1.000.
 
 ## Lista de alarmas (comun a InteliGen 200 y 500, guia IG200)
 Cantidad de alarmas activas en 44215 (direccion 4214) y cada alarma en un bloque de 27 registros desde 44216
-(direccion 4215), solo lectura. Verificado el 2026-10-10 en los dos controladores (cantidad 0). Falta ver como viene
-el texto con una alarma real: la app lo decodifica como ASCII. El historial interno de eventos del controlador no se
+(direccion 4215), solo lectura. Verificado el 2026-10-10 en los dos controladores (cantidad 0) y el 2026-10-12 con una
+alarma real en el InteliGen 200 del GenPower: cantidad 1, texto ASCII "*Emergency Stop" (la app lo muestra tal cual). El historial interno de eventos del controlador no se
 publica por Modbus (en ComAp anteriores habia que escribir un indice): la app arma su propio historial.
 
 ## Pendientes
