@@ -11,6 +11,8 @@ import java.util.Optional;
 
 public interface AlarmaEventoRepository extends JpaRepository<AlarmaEvento, Long> {
     Optional<AlarmaEvento> findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(String lineaMaquina, TipoAlarma tipoAlarma);
+    /** Todas las activas de una máquina y tipo (un generador puede tener varias alarmas a la vez). */
+    List<AlarmaEvento> findByLineaMaquinaAndTipoAlarmaAndActivaTrue(String lineaMaquina, TipoAlarma tipoAlarma);
     List<AlarmaEvento> findAllByOrderByFechaInicioDesc();
     List<AlarmaEvento> findByFechaInicioAfterOrderByFechaInicioDesc(LocalDateTime fechaInicio);
     List<AlarmaEvento> findByActivaTrueOrderByFechaInicioDesc();

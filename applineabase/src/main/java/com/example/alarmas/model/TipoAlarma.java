@@ -10,5 +10,10 @@ public enum TipoAlarma {
     /** Factor de potencia (valor absoluto) por debajo del mínimo configurado. */
     FACTOR_POTENCIA_BAJO,
     /** El dispositivo (PLC o gateway PAS600L) no responde: falla el ping o la conexión Modbus. */
-    DISPOSITIVO_NO_DISPONIBLE
+    DISPOSITIVO_NO_DISPONIBLE,
+    /**
+     * Alarma de la lista de alarmas del controlador de un generador (ComAp). No se configura: la define el
+     * controlador. Un evento por alarma mientras esté en la lista (GeneradorAlarmasService).
+     */
+    ALARMA_GENERADOR
 }

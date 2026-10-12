@@ -128,7 +128,9 @@ public final class MainLayout extends AppLayout {
         addToNavbar(ultimoClickCard);
         addToNavbar(statusLayout);
 
-        if (lineaAccessService.puedeVerAlarmas()) {
+        // Avisos de alarmas nuevas: las de planta para quien ve Alarmas, las de los generadores para quien
+        // tiene "Ver Generadores" (ver revisarAlarmasNuevas).
+        if (lineaAccessService.puedeVerAlarmas() || lineaAccessService.puedeVerGeneradores()) {
             addAttachListener(e -> {
                 UI ui = e.getUI();
                 ui.setPollInterval(ALARMA_POLL_INTERVAL_MS);
@@ -141,8 +143,14 @@ public final class MainLayout extends AppLayout {
         LocalDateTime desde = ultimaRevisionAlarmas;
         ultimaRevisionAlarmas = LocalDateTime.now();
 
+        boolean alarmasPlanta = lineaAccessService.puedeVerAlarmas();
+        boolean alarmasGenerador = lineaAccessService.puedeVerGeneradores();
         List<AlarmaEvento> nuevas = alarmaEventoRepository.findByFechaInicioAfterOrderByFechaInicioDesc(desde);
         for (AlarmaEvento alarma : nuevas) {
+            boolean deGenerador = alarma.getTipoAlarma() == com.example.alarmas.model.TipoAlarma.ALARMA_GENERADOR;
+            if (deGenerador ? !alarmasGenerador : !alarmasPlanta) {
+                continue;
+            }
             if (alarma.isUrgente()) {
                 Notification.show("🔴 URGENTE: " + alarma.getMensaje(), 20000, Notification.Position.TOP_END)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
@@ -237,6 +245,9 @@ public final class MainLayout extends AppLayout {
             colapsarAlSalirDelMouse(alarmas);
             // Calidad de Energia: mismo alcance que alarmas (ADMIN y zona Mantenimiento).
             nav.addItem(new SideNavItem("Calidad de Energia", "calidad", VaadinIcon.FLASH.create()));
+        }
+        // Grupo Electrogeno: permiso propio "Ver Generadores" (ADMIN siempre).
+        if (lineaAccessService.puedeVerGeneradores()) {
             SideNavItem grupoElectrogeno = new SideNavItem("Grupo Electrogeno");
             grupoElectrogeno.setPrefixComponent(VaadinIcon.COGS.create());
             grupoElectrogeno.setExpanded(false);

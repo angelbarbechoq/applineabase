@@ -13,6 +13,7 @@ import com.example.generador.model.EventoGenerador;
 import com.example.generador.model.Generador;
 import com.example.generador.model.LecturaGenerador;
 import com.example.generador.model.TipoEventoGenerador;
+import com.example.generador.service.AlarmaComap;
 import com.example.generador.service.HistorialEventosService;
 import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.ParametroGenerador;
@@ -190,11 +191,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        if (!lineaAccessService.puedeVerAlarmas()) {
-            Notification.show("No tienes permiso para ver el generador", 3000, Notification.Position.MIDDLE)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            event.forwardTo(ChartsView.class);
-        }
+        AccesoGeneradores.verificar(event, lineaAccessService);
     }
 
     @Override
@@ -341,7 +338,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         List<String> otros = service.generadores().stream()
                 .filter(g -> !g.nombre().equals(generador.nombre()) && !historial.alarmasActivas(g.nombre()).isEmpty())
                 .map(g -> g.nombre() + ": " + historial.alarmasActivas(g.nombre()).stream()
-                        .map(HistorialEventosService::nombreAlarma).collect(Collectors.joining(", "))).toList();
+                        .map(AlarmaComap::nombre).collect(Collectors.joining(", "))).toList();
         boolean propias = alarmas != null && !alarmas.isEmpty();
         if (!propias && otros.isEmpty()) {
             alertaAlarmas.setVisible(false);
@@ -364,16 +361,16 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 String desde = ap == null ? "" : ap.inicioLectura()
                         ? ", desde antes del " + ap.fecha().format(CORTA) + " (cuando la app empezo a leer)"
                         : ", desde el " + ap.fecha().format(CORTA);
-                Span nombre = new Span(HistorialEventosService.nombreAlarma(a));
+                Span nombre = new Span(AlarmaComap.nombre(a));
                 nombre.getStyle().set("font-weight", "700");
-                boolean activa = HistorialEventosService.alarmaActiva(a);
-                Span estado = badgeNuevo(HistorialEventosService.estadoAlarma(a), activa ? Estado.FUERA : Estado.AVISO);
+                boolean activa = AlarmaComap.activa(a);
+                Span estado = badgeNuevo(AlarmaComap.estado(a), activa ? Estado.FUERA : Estado.AVISO);
                 Span cuando = new Span(desde.isEmpty() ? "" : desde.substring(2));
                 cuando.getStyle().set("font-size", "13px");
                 Div linea = new Div(nombre, estado, cuando);
                 linea.getStyle().set("display", "flex").set("align-items", "center").set("gap", "8px").set("flex-wrap", "wrap")
                         .set("margin-top", "6px");
-                Span explicacion = new Span(explicarAlarma(a));
+                Span explicacion = new Span(AlarmaComap.explicacion(a));
                 explicacion.getStyle().set("font-size", "13px").set("display", "block");
                 caja.add(linea, explicacion);
             }
@@ -391,26 +388,6 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             alertaAlarmas.add(s);
         }
         alertaAlarmas.setVisible(true);
-    }
-
-    /**
-     * Qué significa una alarma de la lista de ComAp, por su texto: la parada de emergencia y el tipo que
-     * indica el prefijo (Sd = parada por protección, Wrn = aviso, Stp = parada lenta, BOC = abre el
-     * interruptor y enfría). Lo demás: revisar en el controlador.
-     */
-    static String explicarAlarma(String texto) {
-        String t = HistorialEventosService.nombreAlarma(texto).toLowerCase(Locale.ROOT);
-        if (t.contains("emergency stop") || t.contains("emerg") || t.contains("e-stop")) {
-            return "Parada de emergencia: el generador no arranca, ni siquiera por un corte de red, hasta soltar el pulsador "
-                    + "de emergencia y hacer el reset de fallas en el controlador.";
-        }
-        if (t.startsWith("sd ")) {
-            return "Parada por proteccion: el generador no arranca hasta resolver la causa y hacer el reset en el controlador.";
-        }
-        if (t.startsWith("stp ")) return "Parada lenta por proteccion (con enfriamiento): revisar la causa y hacer el reset en el controlador.";
-        if (t.startsWith("boc ")) return "Proteccion que abre el interruptor del generador y lo enfria: revisar la causa en el controlador.";
-        if (t.startsWith("wrn ")) return "Aviso: el generador puede seguir trabajando, pero hay que revisar la causa.";
-        return "Revisar en la pantalla del controlador.";
     }
 
     // ================= Estado actual =================

@@ -222,6 +222,15 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       (desperdicio) y sin medidor / perdidas. Caterpillar 121 (25,4 h): consumo 11.944, medido 10.599 (desperdicio 110),
       sin medidor 11,3%; GenPower 715 (34,9 h): consumo 19.958, medido 17.218 (desperdicio 480), sin medidor 13,7%.
       CompAP queda encendida todo el arranque; Linea18 encendida 32,8 h y apagada 2,1 h.
+- [x] G20. (2026-10-12) Alarmas de los generadores en Alarmas Activas y avisos del navegador, y permiso propio.
+      Nuevo `TipoAlarma.ALARMA_GENERADOR` (no se configura; fuera del selector de Configuracion de alarmas).
+      `GeneradorAlarmasService` (lectura de fondo cada minuto): un `AlarmaEvento` por alarma mientras este en la lista
+      del controlador ("Generador GenPower: E-STOP (activa ahora, sin reset). Parada de emergencia: ..."), mensaje
+      actualizado al cambiar de estado, cerrado al salir de la lista. Urgente (aviso rojo con sonido y globo de Windows)
+      si impide arrancar: emergencia o prefijo Sd. Logica de texto ComAp unificada en `AlarmaComap`. Permiso "Ver
+      Generadores" en Usuarios (`Usuario.verGeneradores`, `puedeVerGeneradores()`, `AccesoGeneradores`): menu Grupo
+      Electrogeno, las dos pantallas, sus filas en Alarmas Activas y sus avisos del navegador. ADMIN siempre; antes se
+      usaba el alcance de alarmas (ADMIN y zona Mantenimiento).
 - [x] G19. (2026-10-12) Aviso de alarmas en la pantalla de Generadores. Primera alarma real: GenPower "*Emergency Stop"
       (07:03, el historial de eventos la anoto como ALARMA; el texto ASCII se decodifica bien). Arriba de las pestanas,
       visible en todas: caja roja "ALARMA EN EL CONTROLADOR DE ..." con cada alarma tal como la envia el controlador, desde

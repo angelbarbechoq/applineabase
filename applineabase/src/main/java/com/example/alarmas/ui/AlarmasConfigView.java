@@ -71,7 +71,8 @@ public class AlarmasConfigView extends VerticalLayout {
         lineaCombo.setWidth("220px");
 
         tipoSelect.setLabel("Tipo de alarma");
-        tipoSelect.setItems(TipoAlarma.values());
+        // Las alarmas del generador no se configuran aquí: las define su controlador.
+        tipoSelect.setItems(java.util.Arrays.stream(TipoAlarma.values()).filter(t -> t != TipoAlarma.ALARMA_GENERADOR).toList());
         tipoSelect.addValueChangeListener(e -> actualizarVisibilidadCampos(e.getValue()));
 
         grid.addColumn(AlarmaConfig::getLineaMaquina).setHeader("Línea/Máquina").setAutoWidth(true).setSortable(true);
@@ -124,6 +125,7 @@ public class AlarmasConfigView extends VerticalLayout {
             case FACTOR_POTENCIA_BAJO -> String.format("mín=%.3f", valor(c.getFactorPotenciaMinimo()));
             case DISPOSITIVO_NO_DISPONIBLE -> String.format("urgente tras %d lecturas fallidas",
                     c.getLecturasConsecutivasUrgente() == null ? 0 : c.getLecturasConsecutivasUrgente());
+            case ALARMA_GENERADOR -> "la define el controlador del generador";
         };
     }
 

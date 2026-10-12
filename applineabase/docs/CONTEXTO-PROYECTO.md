@@ -87,19 +87,20 @@ las anotaciones `@Uses` (seccion 10). Scheduler de 2 hilos (`ThreadPoolTaskSched
 ## 5. Seguridad, rutas y menu
 
 **Usuario:** username, clave (hash), rol `ADMIN` o `USUARIO`, `zona` (ignorada si es ADMIN),
-`habilitado`, y dos flags independientes de la zona: `verMezcladores` y `verMantenimiento`.
+`habilitado`, y tres flags independientes de la zona: `verMezcladores`, `verMantenimiento` y
+`verGeneradores` (Grupo Electrogeno y sus alarmas; los flags valen desde el proximo inicio de sesion).
 Usuarios en la base real a la fecha: `admin`, `mezcla`, `mantenimiento`, `produccion`, `LabMP`.
 La clave del admin no se guarda en este archivo.
 
 **`LineaAccessService`:** `getLineasPermitidas()` filtra por zona (ADMIN y zona Mantenimiento
 ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladores()`,
-`puedeVerMantenimiento()` (ADMIN o flag), `esAdmin()`, `usuarioActual()`.
+`puedeVerMantenimiento()`, `puedeVerGeneradores()` (ADMIN o flag), `esAdmin()`, `usuarioActual()`.
 
 **Patrones de acceso:**
 - Solo admin: `@RolesAllowed("ADMIN")` en la ruta.
 - Acceso por flag o zona: ruta `@PermitAll` + `BeforeEnterObserver` + clase `AccesoXxx.verificar(...)`
   (package-private, avisa con notificacion y hace `forwardTo(ChartsView.class)`). Existen
-  `AccesoAlarmas`, `AccesoMezcladores`, `AccesoMantenimiento`.
+  `AccesoAlarmas`, `AccesoMezcladores`, `AccesoMantenimiento`, `AccesoGeneradores`.
 - El checkbox del flag se agrega en `UsuariosView` (con tooltip: `Tooltip.forComponent(...)`,
   `withHoverDelay(200)`, `withHideDelay(5000)`; `Checkbox` no implementa `HasTooltip`).
 
@@ -110,14 +111,14 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `historico` | `HistoricoView` | todos; boton "Exportar CSV de todas las maquinas" solo ADMIN (`ExportacionCsvDialog` + `ExportacionCsvService`: ZIP con carpetas `Energia/` y `Voltaje-Corriente-Potencia-PF/`, dos CSV por tabla con todo el rango, elegido por meses o entre fechas: `tabla_mes_anio[_a_mes_anio].csv` o `tabla_dd-MM-yyyy[_a_dd-MM-yyyy].csv` (kWh, base normal) y `tablaVIP_...csv` (voltajes, corrientes, PW, PF, base VIP); no se juntan porque las dos bases graban en segundos distintos. `resumen.txt` separa con datos / en cero / sin datos) |
 | `query` | `DataQueryView` | todos |
 | `horometro` | `HorometroView` | todos (acciones extra solo ADMIN) |
-| `alarmas` | `AlarmasHistorialView` (Alarmas Activas) | gate `puedeVerAlarmas()` |
+| `alarmas` | `AlarmasHistorialView` (Alarmas Activas; las de los generadores solo con `puedeVerGeneradores()`) | gate `puedeVerAlarmas()` |
 | `alarmas/historial` | `AlarmasHistorialCompletoView` | ADMIN |
 | `alarmas/config` | `AlarmasConfigView` | ADMIN |
 | `configuracion` | `ConfiguracionView` (hardware) | ADMIN |
 | `configuracion/medidores` | `ModelosMedidorView` (catalogo de modelos + Probar lectura) | ADMIN |
 | `calidad` | `CalidadEnergiaView` (Estado actual, Historico, Cumplimiento; Limites solo ADMIN) | gate `puedeVerAlarmas()` |
-| `generador` | `GeneradorView` (selector de generador, marca "(ALARMA)"; aviso rojo con las alarmas del controlador arriba de las pestanas; Estado actual en vivo, Arranques, Historial de eventos, Tendencias; Registros solo ADMIN; solo lectura del controlador) | gate `puedeVerAlarmas()` |
-| `generador/analisis` | `GeneradorAnalisisView`, pestanas Resumen de energia (red importada/exportada, generada, consumo del tablero, paralelo/isla/vacio por dia/semana/mes), Periodos en marcha (por arranque; clic en uno = balance simple generado / consumido / entregado y con que maquinas trabajo) y Costos (galones y precio por arranque, tarifa de la red por mes y ahorro; cargar/editar solo ADMIN) | gate `puedeVerAlarmas()` |
+| `generador` | `GeneradorView` (selector de generador, marca "(ALARMA)"; aviso rojo con las alarmas del controlador arriba de las pestanas; Estado actual en vivo, Arranques, Historial de eventos, Tendencias; Registros solo ADMIN; solo lectura del controlador) | gate `puedeVerGeneradores()` |
+| `generador/analisis` | `GeneradorAnalisisView`, pestanas Resumen de energia (red importada/exportada, generada, consumo del tablero, paralelo/isla/vacio por dia/semana/mes), Periodos en marcha (por arranque; clic en uno = balance simple generado / consumido / entregado y con que maquinas trabajo) y Costos (galones y precio por arranque, tarifa de la red por mes y ahorro; cargar/editar solo ADMIN) | gate `puedeVerGeneradores()` |
 | `mezcladores/config` | `MezcladoresConfigView` | gate `puedeVerMezcladores()` |
 | `mantenimiento` | `MantenimientoView` | gate `puedeVerMantenimiento()`; el formulario solo lo ve ADMIN |
 | `mantenimiento/personal` | `PersonalMantenimientoView` | ADMIN |
@@ -127,13 +128,14 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `admin/reparar-vip` | `ReparacionVipView` | ADMIN |
 
 **Menu lateral (`MainLayout.createSideNav()`):** Graficas (Tiempo Real, Historico), Consulta de
-Datos, Horometro, Alarmas (Alarmas Activas; Historial solo admin), Calidad de Energia y Grupo Electrogeno
-(Generadores, Analisis) (mismo alcance que alarmas), Mantenimiento Preventivo
+Datos, Horometro, Alarmas (Alarmas Activas; Historial solo admin), Calidad de Energia (mismo alcance
+que alarmas), Grupo Electrogeno (Generadores, Analisis; `puedeVerGeneradores()`), Mantenimiento Preventivo
 (Mantenimiento Barril y Tornillos; Personal de Mantenimiento solo admin), Reportes (Barril y
 Tornillo), y solo admin: Usuarios, Reparar VIP Mensual, Configuracion (alarmas, hardware,
 Modelos de medidor, Mezcladores, Mantenimiento). Los padres usan `colapsarAlSalirDelMouse(...)`. "Mantenimiento
 Preventivo" y "Reportes" comparten el bloque `if (puedeVerMantenimiento())`. `MainLayout` tambien
-tiene un poll que muestra avisos de alarmas en el navegador (solo `puedeVerAlarmas()`).
+tiene un poll que muestra avisos de alarmas en el navegador: las de planta con `puedeVerAlarmas()` y las
+de los generadores (`ALARMA_GENERADOR`) con `puedeVerGeneradores()`.
 
 ## 6. Horometro (`com.example.horometro`)
 
@@ -159,7 +161,8 @@ tiene un poll que muestra avisos de alarmas en el navegador (solo `puedeVerAlarm
 
 - `TipoAlarma`: `DETENCION`, `CICLO_COMPRESOR`, `TEMPERATURA_ALTA`, `FACTOR_POTENCIA_BAJO`,
   `DISPOSITIVO_NO_DISPONIBLE` (esta ultima recien dispara tras N lecturas fallidas seguidas,
-  default 3).
+  default 3), `ALARMA_GENERADOR` (lista de alarmas del controlador ComAp, sin configuracion: un evento por
+  alarma mientras este en la lista, urgente si impide arrancar; `GeneradorAlarmasService`, cada minuto).
 - `AlarmaConfig` (config por linea + tipo: umbral, ventana, etc.), `AlarmaEvento` (historial,
   con flag urgente), `AlarmaEvaluatorService` (evalua al llegar datos), `AlarmaConfigSeeder`
   (valores por defecto).

@@ -55,6 +55,13 @@ public class Usuario {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean verMantenimiento = false;
 
+    /**
+     * Acceso a Grupo Electrogeno (Generadores y Analisis) y a sus alarmas en Alarmas Activas y en los
+     * avisos del navegador (mismo criterio que verMezcladores). Ignorado cuando el rol es ADMIN.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean verGeneradores = false;
+
     public Usuario() {
     }
 
@@ -116,6 +123,14 @@ public class Usuario {
 
     public void setVerMantenimiento(boolean verMantenimiento) {
         this.verMantenimiento = verMantenimiento;
+    }
+
+    public boolean isVerGeneradores() {
+        return verGeneradores;
+    }
+
+    public void setVerGeneradores(boolean verGeneradores) {
+        this.verGeneradores = verGeneradores;
     }
 
     public enum Rol {

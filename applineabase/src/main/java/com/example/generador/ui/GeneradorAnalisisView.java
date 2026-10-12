@@ -202,11 +202,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        if (!lineaAccessService.puedeVerAlarmas()) {
-            Notification.show("No tienes permiso para ver el grupo electrogeno", 3000, Notification.Position.MIDDLE)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            event.forwardTo(ChartsView.class);
-        }
+        AccesoGeneradores.verificar(event, lineaAccessService);
     }
 
     private void visibilidadPeriodo() {

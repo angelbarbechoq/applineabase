@@ -78,7 +78,7 @@ public class HistorialEventosService {
                     + (red == null ? "" : red ? ", con red" : ", sin red"), l));
             if (l.alarmas() != null) {
                 for (String a : l.alarmas()) {
-                    nuevos.add(EventoGenerador.de(t, ALARMA, nombreAlarma(a) + ": " + estadoAlarma(a) + " (ya estaba al iniciar la lectura)", l));
+                    nuevos.add(EventoGenerador.de(t, ALARMA, AlarmaComap.nombre(a) + ": " + AlarmaComap.estado(a) + " (ya estaba al iniciar la lectura)", l));
                 }
             }
         } else {
@@ -117,56 +117,26 @@ public class HistorialEventosService {
     }
 
     // ================= Alarmas de la lista del controlador =================
-    // ComAp antepone al texto "!" si la alarma está activa ahora y "*" si todavía no se confirmó (reset).
-    // Visto el 2026-10-12 en el GenPower: "*Emergency Stop" con el pulsador ya suelto y sin reset, y
-    // "!*Emergency Stop" + "!*E-STOP" al volver a pulsarlo. Una alarma se sigue por su nombre (sin esos
-    // signos): un cambio de signo es un cambio de estado de la misma alarma, no una alarma nueva.
-
-    /** Nombre de la alarma sin los signos de estado de ComAp ("!*E-STOP" = "E-STOP"). */
-    public static String nombreAlarma(String texto) {
-        return texto == null ? "" : texto.replaceFirst("^[!*\\s]+", "").trim();
-    }
-
-    private static String signos(String texto) {
-        if (texto == null) return "";
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^[!*\\s]*").matcher(texto);
-        return m.find() ? m.group() : "";
-    }
-
-    /** Activa ahora (ComAp: "!"). */
-    public static boolean alarmaActiva(String texto) {
-        return signos(texto).contains("!");
-    }
-
-    /** Todavía sin confirmar / sin reset (ComAp: "*"). */
-    public static boolean alarmaSinConfirmar(String texto) {
-        return signos(texto).contains("*");
-    }
-
-    /** Estado en palabras: "activa ahora, sin reset", "ya no esta activa, falta el reset en el controlador"... */
-    public static String estadoAlarma(String texto) {
-        boolean activa = alarmaActiva(texto), sinReset = alarmaSinConfirmar(texto);
-        if (activa) return sinReset ? "activa ahora, sin reset" : "activa ahora, confirmada";
-        return sinReset ? "ya no esta activa, falta el reset en el controlador" : "en la lista del controlador";
-    }
+    // Cada alarma se sigue por su nombre sin los signos "!" (activa) y "*" (sin reset) de ComAp
+    // (ver AlarmaComap): un cambio de signo es un cambio de estado de la misma alarma, no una alarma nueva.
 
     /** Eventos por los cambios de la lista de alarmas entre dos lecturas, siguiendo cada alarma por su nombre. */
     private static List<EventoGenerador> cambiosAlarmas(LocalDateTime t, Set<String> antes, List<String> ahora, LecturaGenerador l) {
         Map<String, String> previas = new java.util.LinkedHashMap<>(), actuales = new java.util.LinkedHashMap<>();
-        for (String a : antes) previas.put(nombreAlarma(a), a);
-        for (String a : ahora) actuales.put(nombreAlarma(a), a);
+        for (String a : antes) previas.put(AlarmaComap.nombre(a), a);
+        for (String a : ahora) actuales.put(AlarmaComap.nombre(a), a);
         List<EventoGenerador> eventos = new ArrayList<>();
         for (Map.Entry<String, String> x : actuales.entrySet()) {
             String nombre = x.getKey(), texto = x.getValue(), previo = previas.get(nombre);
             if (previo == null) {
-                eventos.add(EventoGenerador.de(t, ALARMA, nombre + ": " + estadoAlarma(texto), l));
-            } else if (alarmaActiva(texto) && !alarmaActiva(previo)) {
+                eventos.add(EventoGenerador.de(t, ALARMA, nombre + ": " + AlarmaComap.estado(texto), l));
+            } else if (AlarmaComap.activa(texto) && !AlarmaComap.activa(previo)) {
                 eventos.add(EventoGenerador.de(t, ALARMA, nombre + ": activa de nuevo", l));
-            } else if (!alarmaActiva(texto) && alarmaActiva(previo)) {
-                eventos.add(EventoGenerador.de(t, ALARMA_INACTIVA, nombre + ": " + estadoAlarma(texto), l));
-            } else if (!alarmaSinConfirmar(texto) && alarmaSinConfirmar(previo)) {
+            } else if (!AlarmaComap.activa(texto) && AlarmaComap.activa(previo)) {
+                eventos.add(EventoGenerador.de(t, ALARMA_INACTIVA, nombre + ": " + AlarmaComap.estado(texto), l));
+            } else if (!AlarmaComap.sinConfirmar(texto) && AlarmaComap.sinConfirmar(previo)) {
                 eventos.add(EventoGenerador.de(t, ALARMA_CONFIRMADA, nombre + ": confirmada en el controlador"
-                        + (alarmaActiva(texto) ? ", sigue activa" : ""), l));
+                        + (AlarmaComap.activa(texto) ? ", sigue activa" : ""), l));
             }
         }
         for (String nombre : previas.keySet()) {
@@ -194,12 +164,12 @@ public class HistorialEventosService {
      * guardados antes de separar el nombre de los signos ("*Emergency Stop").
      */
     public Aparicion aparicion(String generador, String alarma) {
-        String nombre = nombreAlarma(alarma);
+        String nombre = AlarmaComap.nombre(alarma);
         LocalDateTime ahora = LocalDateTime.now();
         Aparicion alIniciar = null;
         LocalDateTime resueltaEn = null;
         for (EventoGenerador ev : listar(generador, ahora.minusDays(365), ahora, null)) {
-            String d = nombreAlarma(ev.descripcion());
+            String d = AlarmaComap.nombre(ev.descripcion());
             if (!(d.equals(nombre) || d.startsWith(nombre + ":") || d.startsWith(nombre + " ("))) continue;
             if (ev.tipo() == ALARMA_RESUELTA) {
                 if (resueltaEn == null) resueltaEn = ev.fecha();

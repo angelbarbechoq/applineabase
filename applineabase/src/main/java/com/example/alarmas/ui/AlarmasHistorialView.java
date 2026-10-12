@@ -76,6 +76,10 @@ public class AlarmasHistorialView extends VerticalLayout implements BeforeEnterO
     }
 
     private void refrescarGrid() {
-        grid.setItems(eventoRepository.findByActivaTrueOrderByFechaInicioDesc());
+        // Las alarmas de los generadores solo para quien tiene "Ver Generadores" (ADMIN siempre).
+        boolean generadores = lineaAccessService.puedeVerGeneradores();
+        grid.setItems(eventoRepository.findByActivaTrueOrderByFechaInicioDesc().stream()
+                .filter(e -> generadores || e.getTipoAlarma() != com.example.alarmas.model.TipoAlarma.ALARMA_GENERADOR)
+                .toList());
     }
 }
