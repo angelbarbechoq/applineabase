@@ -43,6 +43,9 @@ navegador.
   `schema.sql` solo tiene parches puntuales.
 - Sesion: 12 h para USUARIO; ADMIN se cierra tras 1 h de inactividad (`AdminSessionTimeoutFilter`).
 - Compilar para verificar: `./mvnw.cmd -q -DskipTests compile`. No correr ni agregar tests.
+- Los tests (los corre `mvn package`) usan H2 en memoria, config en `target/` y
+  `app.adquisicion.habilitada=false` (`src/test/resources/application.properties`): sin la lectura
+  automatica, porque en esta PC llega a la planta, escribia en los SQLite reales y disparaba alarmas reales.
 - CI: `.github/workflows/e2e.yml` (mvnw package + Playwright E2E) corre despues de cada push.
 - Empaquetado: perfil `windows-app-image` (jpackage), se corre local. GraalVM native se
   descarto, no reintroducir.

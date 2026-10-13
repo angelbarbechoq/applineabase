@@ -1,6 +1,7 @@
 package com.example.dataacquisition.service;
 
 import com.example.generador.service.GeneradorReaderService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
@@ -14,8 +15,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Execution logic:
  * - Every second: increment counter
  * - Every 60 seconds: read all PLCs and PAS600L, then persist data to SQLite
+ *
+ * Se apaga con app.adquisicion.habilitada=false (lo hacen los tests): sin eso, "mvn package" en una
+ * PC que llega a los PLC levantaba la app de prueba leyendo la planta real, escribía esas lecturas en
+ * los SQLite reales de C:\LineaBaseX y disparaba alarmas reales que hacían fallar los tests.
  */
 @Component
+@ConditionalOnProperty(name = "app.adquisicion.habilitada", havingValue = "true", matchIfMissing = true)
 public class DataAcquisitionTask {
 
     private static final Logger logger = LoggerFactory.getLogger(DataAcquisitionTask.class);
