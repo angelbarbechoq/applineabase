@@ -74,6 +74,16 @@ public class ConfigLoaderService {
         return modelos != null ? (List<Map<String, Object>>) modelos : List.of();
     }
 
+    /** Los archivos de configuración que maneja la app (los que se pasan de un equipo a otro). */
+    public static final List<String> ARCHIVOS = List.of(PLC_CONFIG_FILE, LINEA_CONFIG_FILE, MEZCLADORES_CONFIG_FILE,
+            EXTRUSION_TAG_CONFIG_FILE, GENERADOR_CONFIG_FILE, GENERADOR_MODELOS_FILE);
+
+    /** Ruta de uno de {@link #ARCHIVOS} en la carpeta de configuración de este equipo. */
+    public Path rutaArchivo(String nombreArchivo) {
+        if (!ARCHIVOS.contains(nombreArchivo)) throw new IllegalArgumentException("Archivo de configuracion desconocido: " + nombreArchivo);
+        return resolverPath(nombreArchivo);
+    }
+
     private void sembrarSiNoExiste(String nombreArchivo) {
         Path destino = resolverPath(nombreArchivo);
         if (Files.exists(destino)) {

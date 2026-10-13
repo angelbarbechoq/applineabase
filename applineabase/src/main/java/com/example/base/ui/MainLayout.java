@@ -288,6 +288,7 @@ public final class MainLayout extends AppLayout {
             configuracion.addItem(new SideNavItem("Modelos de medidor", "configuracion/medidores", VaadinIcon.DASHBOARD.create()));
             configuracion.addItem(new SideNavItem("Configuración Mezcladores", "mezcladores/config", VaadinIcon.FIRE.create()));
             configuracion.addItem(new SideNavItem("Configuración Mantenimiento", "mantenimiento/config", VaadinIcon.TOOLS.create()));
+            configuracion.addItem(new SideNavItem("Pasar configuracion", "configuracion/traspaso", VaadinIcon.EXCHANGE.create()));
             nav.addItem(configuracion);
             colapsarAlSalirDelMouse(configuracion);
         }

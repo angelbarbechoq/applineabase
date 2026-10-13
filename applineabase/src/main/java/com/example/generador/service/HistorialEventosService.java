@@ -262,6 +262,66 @@ public class HistorialEventosService {
         }
     }
 
+    // ================= Eventos copiados del historial del controlador =================
+    // Se cargan a mano (no se leen por Modbus) y viajan con "Pasar configuracion" a otro equipo.
+
+    /** Eventos de tipo CONTROLADOR_* de cada generador (nombre de la tabla), del más viejo al más nuevo. */
+    public Map<String, List<EventoGenerador>> eventosDelControlador() {
+        Map<String, List<EventoGenerador>> resultado = new java.util.TreeMap<>();
+        if (!new File(ruta()).exists()) return resultado;
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta().replace('\\', '/') + "?mode=ro")) {
+            List<String> tablas = new ArrayList<>();
+            try (ResultSet r = c.createStatement().executeQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")) {
+                while (r.next()) tablas.add(r.getString(1));
+            }
+            for (String generador : tablas) {
+                List<EventoGenerador> lista = new ArrayList<>();
+                try (ResultSet r = c.createStatement().executeQuery("SELECT id, fecha, tipo, descripcion FROM \"" + generador
+                        + "\" WHERE tipo LIKE 'CONTROLADOR_%' ORDER BY id")) {
+                    while (r.next()) {
+                        LocalDateTime f = GeneradorAnalisisService.fecha(r.getString(2));
+                        TipoEventoGenerador t;
+                        try {
+                            t = TipoEventoGenerador.valueOf(r.getString(3));
+                        } catch (IllegalArgumentException ex) {
+                            continue;
+                        }
+                        if (f != null) lista.add(EventoGenerador.de(f, t, r.getString(4), null));
+                    }
+                }
+                if (!lista.isEmpty()) resultado.put(generador, lista);
+            }
+        } catch (Exception ex) {
+            logger.warn("No se pudieron leer los eventos del controlador: {}", ex.getMessage());
+        }
+        return resultado;
+    }
+
+    /**
+     * Agrega los eventos del controlador que falten (misma fecha, tipo y descripción = ya estaba).
+     * Con {@code aplicar} false solo cuenta cuántos se agregarían. Devuelve esa cantidad.
+     */
+    public int agregarDelControlador(String generador, List<EventoGenerador> eventos, boolean aplicar) {
+        Set<String> existentes = new java.util.HashSet<>();
+        if (new File(ruta()).exists()) {
+            try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta().replace('\\', '/') + "?mode=ro");
+                 ResultSet r = c.createStatement().executeQuery("SELECT fecha, tipo, descripcion FROM \"" + generador
+                         + "\" WHERE tipo LIKE 'CONTROLADOR_%'")) {
+                while (r.next()) existentes.add(r.getString(1) + "|" + r.getString(2) + "|" + r.getString(3));
+            } catch (Exception ex) {
+                if (!String.valueOf(ex.getMessage()).contains("no such table")) {
+                    logger.warn("No se pudo leer el historial de eventos de {}: {}", generador, ex.getMessage());
+                }
+            }
+        }
+        List<EventoGenerador> nuevos = new ArrayList<>();
+        for (EventoGenerador ev : eventos) {
+            if (existentes.add(ev.fecha().format(FECHA) + "|" + ev.tipo().name() + "|" + ev.descripcion())) nuevos.add(ev);
+        }
+        if (aplicar) guardar(generador, nuevos);
+        return nuevos.size();
+    }
+
     /** Eventos entre dos fechas, del más reciente al más viejo (tipo null = todos). */
     public List<EventoGenerador> listar(String generador, LocalDateTime desde, LocalDateTime hasta, TipoEventoGenerador tipo) {
         List<EventoGenerador> lista = new ArrayList<>();

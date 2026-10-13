@@ -79,6 +79,7 @@ reales. Si hace falta limpiar, se hace por JDBC (script en el scratchpad, creden
 | `medidores` | Catalogo de modelos de medidor y lector generico; topologia electrica | `TopologiaMedidores` + `TipoMedidor` (campos `tipo` MAQUINA/TRANSFORMADOR/GENERAL/SENSOR/NO_CONTAR, `transformador` y `dentroDe` de linea-id-config.json; solo se suman las MAQUINA que no estan dentro de otra), `ModeloMedidor`/`RegistroModelo` (H2), `ParametroMedidor` (lista cerrada, 9 basicos + 27 de calidad, incluye KWH_RETORNO = columna KWhR), `ModeloMedidorService`, `DefinicionModelo` (copia inmutable por ciclo), `LectorMedidorService` (lectura en bloques, decodificacion, PF 4Q), `ModeloMedidorSeeder`, `ModelosMedidorView`. Detalle en `docs/PLAN-CALIDAD-ENERGIA.md` (fase B) |
 | `security` | Usuarios, roles, permisos | `Usuario`, `UsuarioRepository`, `UsuarioPrincipal`, `SecurityConfig`, `LineaAccessService`, `DataSeeder` (crea el admin inicial), `AdminSessionTimeoutFilter` |
 | `tools` | Reparaciones puntuales | `ReparacionVipView`, `MergeVipMensualTool` |
+| `traspaso` | Pasar la configuracion de la PC de diseno al servidor (ver seccion 11) | `TraspasoConfiguracionService` (exportar ZIP; revisar sin escribir; importar con copia previa en `C:\LineaBaseX\backup\...-antes-de-importar-configuracion`: el ZIP de la configuracion anterior, `BACKUP TO` de la H2 y el archivo de eventos), `TraspasoConfiguracionView` |
 | `config` | `JacksonConfiguration` | |
 
 `Application.java` lleva `@EnableScheduling`, `@StyleSheet(Aura.STYLESHEET)`, `styles.css`, y
@@ -125,6 +126,7 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `mantenimiento/config` | `MantenimientoConfigView` | ADMIN |
 | `reportes/mantenimiento` | `EstadoMantenimientoView` | gate `puedeVerMantenimiento()`; escribir en Stock solo ADMIN |
 | `usuarios` | `UsuariosView` | ADMIN |
+| `configuracion/traspaso` | `TraspasoConfiguracionView` (Pasar configuracion: exportar / revisar / importar) | ADMIN |
 | `admin/reparar-vip` | `ReparacionVipView` | ADMIN |
 
 **Menu lateral (`MainLayout.createSideNav()`):** Graficas (Tiempo Real, Historico), Consulta de
@@ -132,7 +134,7 @@ Datos, Horometro, Alarmas (Alarmas Activas; Historial solo admin), Calidad de En
 que alarmas), Grupo Electrogeno (Generadores, Analisis; `puedeVerGeneradores()`), Mantenimiento Preventivo
 (Mantenimiento Barril y Tornillos; Personal de Mantenimiento solo admin), Reportes (Barril y
 Tornillo), y solo admin: Usuarios, Reparar VIP Mensual, Configuracion (alarmas, hardware,
-Modelos de medidor, Mezcladores, Mantenimiento). Los padres usan `colapsarAlSalirDelMouse(...)`. "Mantenimiento
+Modelos de medidor, Mezcladores, Mantenimiento, Pasar configuracion). Los padres usan `colapsarAlSalirDelMouse(...)`. "Mantenimiento
 Preventivo" y "Reportes" comparten el bloque `if (puedeVerMantenimiento())`. `MainLayout` tambien
 tiene un poll que muestra avisos de alarmas en el navegador: las de planta con `puedeVerAlarmas()` y las
 de los generadores (`ALARMA_GENERADOR`) con `puedeVerGeneradores()`.
@@ -303,6 +305,17 @@ una opcion mas de la lista.
 4. Trabajar inline, sin subagentes salvo investigacion realmente amplia.
 5. Cuando se debe leer/limpiar la base real, hacerlo por JDBC (H2 con `AUTO_SERVER`), avisando
    antes si el cambio es destructivo.
+6. **Esta PC es la de diseno; la app empaquetada corre en otra PC (el servidor).** El paquete solo trae la
+   configuracion de fabrica (semillas de `src/main/resources` y los `*Seeder`, que solo crean lo que falta). Lo
+   configurado aqui se lleva con Configuracion > Pasar configuracion: exportar (ZIP) aqui, copiar el ZIP a
+   `C:\LineaBaseX\importar\` del servidor, Revisar e Importar alli, y reiniciar la app. Viajan: los 6 JSON de
+   `C:\LineaBaseX\config`, las tablas de configuracion de la H2 (usuarios, alarma_config, modelos de medidor y sus
+   registros, configuracion_calidad, tension_nominal, planes y tecnicos de mantenimiento, tarifa_red) y los eventos
+   "Controlador: ..." de los generadores. Nunca el historial. Cada fila se busca por su clave natural (usuario, linea +
+   tipo de alarma, nombre de modelo, tag + tarea, CI...); lo que esta solo en el servidor se deja, salvo los registros
+   de un modelo que viene en el archivo; a un usuario existente no se le cambia la clave; `notificado` de los planes no
+   viaja. **Toda tabla nueva de configuracion se agrega a `TraspasoConfiguracionService.TABLAS`** (y todo JSON nuevo de
+   config a `ConfigLoaderService.ARCHIVOS`), si no, no pasa al servidor.
 
 ## 12. Decisiones descartadas y pendientes
 
@@ -352,5 +365,6 @@ una opcion mas de la lista.
 4. Agregar el item al menu en `MainLayout.createSideNav()` respetando la misma condicion de acceso.
 5. Componentes Vaadin nuevos: `@Uses` + regenerar `prod.bundle` (seccion 10).
 6. Textos de UI sin tildes ni voseo.
-7. Compilar, commit, push a `master`, y que el usuario pruebe en el 8080.
-8. **Actualizar este archivo** (seccion del modulo, rutas/menu de la seccion 5 y pendientes).
+7. Si el modulo tiene configuracion propia (tabla de catalogo o JSON), sumarla a "Pasar configuracion" (seccion 11).
+8. Compilar, commit, push a `master`, y que el usuario pruebe en el 8080.
+9. **Actualizar este archivo** (seccion del modulo, rutas/menu de la seccion 5 y pendientes).
