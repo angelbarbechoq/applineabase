@@ -75,7 +75,8 @@ public class HistorialEventosService {
             estados.put(generador, e);
             nuevos.add(EventoGenerador.de(t, INICIO_LECTURA, "La app empezo a leer el controlador; el generador estaba "
                     + (marcha ? "en marcha" + (Boolean.TRUE.equals(carga) ? " con carga" : " en vacio") : "parado")
-                    + (red == null ? "" : red ? ", con red" : ", sin red"), l));
+                    + (red == null ? "" : red ? ", con red" : ", sin red")
+                    + (l.desfaseReloj() == null ? "" : "; reloj del controlador " + LecturaGenerador.textoDesfase(l.desfaseReloj())), l));
             if (l.alarmas() != null) {
                 for (String a : l.alarmas()) {
                     nuevos.add(EventoGenerador.de(t, ALARMA, AlarmaComap.nombre(a) + ": " + AlarmaComap.estado(a) + " (ya estaba al iniciar la lectura)", l));
@@ -288,6 +289,8 @@ public class HistorialEventosService {
                 logger.warn("No se pudo leer el historial de eventos de {}: {}", generador, ex.getMessage());
             }
         }
+        // Por fecha y no por id: los eventos copiados del historial del controlador se cargan después de ocurridos.
+        lista.sort(java.util.Comparator.comparing(EventoGenerador::fecha).thenComparing(EventoGenerador::id).reversed());
         return lista;
     }
 

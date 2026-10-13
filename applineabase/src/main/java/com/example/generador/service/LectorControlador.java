@@ -73,7 +73,30 @@ public final class LectorControlador {
             throw new IOException("ningun registro del mapa " + modelo.modelo() + " respondio (" + motivo + ")");
         }
         calcularPfSiFalta(modelo, valores);
-        return new LecturaGenerador(LocalDateTime.now().withNano(0), valores, errores, leerAlarmas(c, unitId, modelo));
+        List<String> alarmas = leerAlarmas(c, unitId, modelo);
+        LocalDateTime reloj = leerReloj(c, unitId, modelo);
+        return new LecturaGenerador(LocalDateTime.now().withNano(0), valores, errores, alarmas, reloj);
+    }
+
+    /**
+     * Reloj del controlador (solo lectura): ComAp lo da en 4 registros BCD desde 44201 (hh mm | ss 00 |
+     * dd MM | aa 00), encontrado con un barrido el 2026-10-13. null si el modelo no lo tiene o no se pudo
+     * leer: no corta la lectura de valores.
+     */
+    static LocalDateTime leerReloj(ModbusTcpConexion c, int unitId, ModeloControlador modelo) throws IOException {
+        if (modelo.reloj() == null) return null;
+        try {
+            int[] v = c.leerHolding(unitId, modelo.reloj() - 40001, 4);
+            return LocalDateTime.of(2000 + bcd(v[3] >> 8), bcd(v[2] & 0xFF), bcd(v[2] >> 8),
+                    bcd(v[0] >> 8), bcd(v[0] & 0xFF), bcd(v[1] >> 8));
+        } catch (ModbusTcpConexion.ExcepcionModbus | java.time.DateTimeException e) {
+            return null;
+        }
+    }
+
+    private static int bcd(int b) {
+        b &= 0xFF;
+        return (b >> 4) * 10 + (b & 0x0F);
     }
 
     /**

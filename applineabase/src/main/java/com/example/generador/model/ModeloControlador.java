@@ -14,9 +14,12 @@ import java.util.Optional;
  *                   cuando se sabe que los del hueco existen (0 = solo registros contiguos).
  * @param noDisponible8000 0x8000 (16 bits) / 0x80000000 (32 bits) = dato no disponible (ComAp).
  * @param listaAlarmas dónde está la lista de alarmas activas del controlador (null = no se lee).
+ * @param reloj        primer registro (4xxxx) del reloj del controlador (null = no se lee). ComAp:
+ *                     4 registros en BCD desde 44201: hh mm | ss 00 | dd MM | aa 00.
  */
 public record ModeloControlador(String modelo, String descripcion, boolean confirmado, int maxHueco,
-                               boolean noDisponible8000, List<Registro> registros, ListaAlarmas listaAlarmas) {
+                               boolean noDisponible8000, List<Registro> registros, ListaAlarmas listaAlarmas,
+                               Integer reloj) {
 
     public enum Tipo {
         UINT16(1), INT16(1), UINT32(2), INT32(2), FLOAT32(2);

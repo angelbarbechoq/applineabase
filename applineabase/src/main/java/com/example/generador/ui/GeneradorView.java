@@ -277,7 +277,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 + "se detecta por el contador de arranques), toma de carga y vacio (" + (int) com.example.generador.service.GeneradorAnalisisService.KW_VACIO
                 + " kW), falla y retorno de red (tension de red del controlador), alarmas de la lista de alarmas del controlador, y "
                 + "comunicacion perdida o recuperada. \"Inicio de lectura\" marca cuando arranco la app (antes de eso, hueco). "
-                + "El historial interno del controlador (350 eventos) no se puede leer por Modbus sin escribirle: se ve en el controlador o con InteliConfig.");
+                + "El historial interno del controlador (350 eventos) no se puede leer por Modbus sin escribirle: se ve en el controlador o con InteliConfig. "
+                + "Los eventos \"Controlador: ...\" se copiaron de ese historial (pantalla History): la descripcion lleva el motivo de ComAp y la "
+                + "hora del controlador, y la fecha es la hora real (la del controlador corregida por el desfase de su reloj, aprox.). "
+                + "Protecciones de red, aperturas de interruptor y la isla quedan ahi aunque duren menos de un segundo.");
         VerticalLayout v = new VerticalLayout(filtros, eventosMensaje, eventosGrid, nota);
         v.setSizeFull();
         v.setPadding(false);
@@ -526,6 +529,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         panelMotor.add(fila("Arranques", texto(l.arranques() == null ? "-" : String.valueOf(l.arranques()))));
         panelMotor.add(fila("Energia generada", texto(l.kwh() == null ? "-" : String.format(Locale.ROOT, "%,d kWh", l.kwh()))));
         panelMotor.add(fila("Energia reactiva", texto(l.kvarh() == null ? "-" : String.format(Locale.ROOT, "%,d kVArh", l.kvarh()))));
+        if (l.relojControlador() != null) {
+            // Su historial interno (pantalla History) usa esta hora: si no esta en hora, sus eventos no coinciden con los de la planta.
+            long desfase = l.desfaseReloj();
+            HorizontalLayout p = new HorizontalLayout(texto(l.relojControlador().format(HORA)),
+                    badgeNuevo(LecturaGenerador.textoDesfase(desfase), Math.abs(desfase) < 60 ? Estado.OK : Estado.AVISO));
+            p.setAlignItems(Alignment.CENTER);
+            panelMotor.add(fila("Reloj del controlador", p));
+        }
     }
 
     private static Estado estadoBateria(Double v, boolean marcha) {

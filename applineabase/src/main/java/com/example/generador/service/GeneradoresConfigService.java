@@ -79,7 +79,8 @@ public class GeneradoresConfigService {
                     Boolean.TRUE.equals(m.get("confirmado")),
                     m.get("maxHueco") instanceof Number n ? Math.max(0, n.intValue()) : 0,
                     !Boolean.FALSE.equals(m.get("noDisponible8000")),
-                    List.copyOf(registros), alarmas));
+                    List.copyOf(registros), alarmas,
+                    m.get("reloj") instanceof Number reloj ? reloj.intValue() : null));
         }
         return lista;
     }

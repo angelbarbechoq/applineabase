@@ -55,7 +55,17 @@ Cantidad de alarmas activas en 44215 (direccion 4214) y cada alarma en un bloque
 alarma real en el InteliGen 200 del GenPower: cada bloque empieza con 0000 0201 y sigue el texto ASCII. Al texto se le
 anteponen "!" = activa ahora y "*" = sin confirmar (sin reset): "*Emergency Stop" con el pulsador ya suelto y sin reset;
 "!*Emergency Stop" + "!*E-STOP" con el pulsador presionado. La app sigue cada alarma por su nombre sin esos signos. El historial interno de eventos del controlador no se
-publica por Modbus (en ComAp anteriores habia que escribir un indice): la app arma su propio historial.
+publica por Modbus (en ComAp anteriores habia que escribir un indice): la app arma su propio historial. Las protecciones de
+red (ROCOF, VectorShift, baja tension/frecuencia) y las aperturas del MCB del 11-10 no aparecieron en la lista (duran menos
+de 1 s): quedaron solo en el historial interno. Los 27 eventos de las fotos del 12-10 se cargaron a mano en el historial
+de la app: `historial-controlador-2026-10-12.csv` (tipos "Controlador: ...").
+
+## Reloj del controlador (44201-44204, BCD, solo lectura)
+Encontrado el 2026-10-13 con un barrido de 40001-49999 (registros con valor: 41001-41473 con huecos, 44201-44209,
+44213-44215, 45001-45004, 45101-45104, 45201). 44201 = hh mm, 44202 = ss 00, 44203 = dd MM, 44204 = aa 00, todo en BCD
+(ej. 1320 2600 1310 2600 = 13-10-2026 13:20:26). Va **27 min 39 s adelantado** (13-10); el 11-10 iba entre 26 min 00 s y
+26 min 56 s: se adelanta unos 20-50 s por dia. Campo `reloj` del modelo en generador-modelos.json. 44214 cambia
+(048A / 068A): sin identificar.
 
 ## Pendientes
 - **Potencia de red del controlador:** 41298 = -126 fijo durante un minuto mientras carga - generador iba

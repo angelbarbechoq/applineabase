@@ -1,0 +1,28 @@
+nro;fecha_controlador;evento;tipo_app;significado;hora_real_aprox
+-26;09/10/2026 00:19:28;Loaded;CONTROLADOR_EVENTO;El Caterpillar toma carga (inicio del arranque 121, junto con el GenPower);08/10/2026 23:52:58
+-25;11/10/2026 18:54:55;VectorShift;CONTROLADOR_PROTECCION;Proteccion de red: salto de vector;11/10/2026 18:28:25
+-24;11/10/2026 18:54:55;ROCOF;CONTROLADOR_PROTECCION;Proteccion de red: variacion rapida de frecuencia;11/10/2026 18:28:25
+-23;11/10/2026 18:54:56;MCB Opened;CONTROLADOR_INTERRUPTOR;Se abre el interruptor de la planta: el generador queda en isla;11/10/2026 18:28:26
+-22;11/10/2026 18:54:57;Mains/Bus L3L1 Under(voltage);CONTROLADOR_PROTECCION;Baja tension de red;11/10/2026 18:28:27
+-21;11/10/2026 18:54:58;Mains/Bus L1L2 Under(voltage);CONTROLADOR_PROTECCION;Baja tension de red;11/10/2026 18:28:28
+-20;11/10/2026 18:54:58;Mains/Bus L2L3 Under(voltage);CONTROLADOR_PROTECCION;Baja tension de red;11/10/2026 18:28:28
+-19;11/10/2026 18:54:58;Mains/Bus Underfreq;CONTROLADOR_PROTECCION;Baja frecuencia de red;11/10/2026 18:28:28
+-18;11/10/2026 19:10:08;RevSyncStarted;CONTROLADOR_EVENTO;Pasaron 900 s con la red normal: sincroniza para volver a la red (intento 1);11/10/2026 18:43:38
+-17;11/10/2026 19:10:10;MCB Closed;CONTROLADOR_INTERRUPTOR;Intento 1: cierra el interruptor de la planta;11/10/2026 18:43:40
+-16;11/10/2026 19:10:10;ROCOF;CONTROLADOR_PROTECCION;La ROCOF actua en el mismo segundo del cierre;11/10/2026 18:43:40
+-15;11/10/2026 19:10:10;MCB Opened;CONTROLADOR_INTERRUPTOR;Se abre otra vez: vuelve a isla y a esperar 900 s;11/10/2026 18:43:40
+-14;11/10/2026 19:25:10;RevSyncStarted;CONTROLADOR_EVENTO;900 s despues: sincroniza (intento 2);11/10/2026 18:58:40
+-13;11/10/2026 19:25:43;MCB Closed;CONTROLADOR_INTERRUPTOR;Intento 2: cierra el interruptor de la planta;11/10/2026 18:59:13
+-12;11/10/2026 19:25:43;ROCOF;CONTROLADOR_PROTECCION;La ROCOF actua en el mismo segundo del cierre;11/10/2026 18:59:13
+-11;11/10/2026 19:25:44;MCB Opened;CONTROLADOR_INTERRUPTOR;Se abre otra vez: vuelve a isla y a esperar 900 s;11/10/2026 18:59:14
+-10;11/10/2026 19:40:44;RevSyncStarted;CONTROLADOR_EVENTO;900 s despues: sincroniza (intento 3);11/10/2026 19:14:14
+-9;11/10/2026 19:40:50;MCB Closed;CONTROLADOR_INTERRUPTOR;Intento 3: cierra el interruptor de la planta;11/10/2026 19:14:20
+-8;11/10/2026 19:40:50;ROCOF;CONTROLADOR_PROTECCION;La ROCOF actua en el mismo segundo del cierre;11/10/2026 19:14:20
+-7;11/10/2026 19:40:50;MCB Opened;CONTROLADOR_INTERRUPTOR;Se abre otra vez: vuelve a isla y a esperar 900 s;11/10/2026 19:14:20
+-6;11/10/2026 19:55:50;RevSyncStarted;CONTROLADOR_EVENTO;900 s despues: sincroniza (intento 4);11/10/2026 19:29:20
+-5;11/10/2026 19:55:55;MCB Closed;CONTROLADOR_INTERRUPTOR;Intento 4: cierra y queda en paralelo con la red, fin de la isla;11/10/2026 19:29:25
+-4;12/10/2026 00:29:36;Soft Unload;CONTROLADOR_EVENTO;Descarga suave para la parada;12/10/2026 00:03:06
+-3;12/10/2026 00:30:03;Cooling;CONTROLADOR_EVENTO;Enfriamiento del motor;12/10/2026 00:03:33
+-2;12/10/2026 00:30:03;GCB Opened;CONTROLADOR_INTERRUPTOR;Se abre el interruptor del generador;12/10/2026 00:03:33
+-1;12/10/2026 00:32:03;Remote Stop;CONTROLADOR_EVENTO;Parada remota;12/10/2026 00:05:33
+0;12/10/2026 00:32:18;Ready;CONTROLADOR_EVENTO;Listo, en espera;12/10/2026 00:05:48

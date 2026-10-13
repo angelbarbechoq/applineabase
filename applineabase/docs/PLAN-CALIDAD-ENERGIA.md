@@ -222,6 +222,20 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       (desperdicio) y sin medidor / perdidas. Caterpillar 121 (25,4 h): consumo 11.944, medido 10.599 (desperdicio 110),
       sin medidor 11,3%; GenPower 715 (34,9 h): consumo 19.958, medido 17.218 (desperdicio 480), sin medidor 13,7%.
       CompAP queda encendida todo el arranque; Linea18 encendida 32,8 h y apagada 2,1 h.
+- [x] G21. (2026-10-13) Reloj de los controladores e historial del controlador en la app. Barrido de solo lectura de
+      40001-49999 en el IG500 (210 registros con valor; rangos 41001-41473, 44201-44215, 45001-45004, 45101-45104, 45201):
+      el reloj esta en 44201-44204 en BCD (hh mm | ss 00 | dd MM | aa 00), igual en el IG200. El 13-10 el GenPower iba
+      3 min 53 s adelantado y el Caterpillar 27 min 39 s; el 11-10 el Caterpillar iba entre 26 min 00 s y 26 min 56 s (lo
+      acotan las lecturas por minuto de la isla), asi que se adelanta unos 20-50 s por dia: avisar a SVF. Nuevo campo
+      `reloj` en generador-modelos.json; la pantalla del generador muestra el reloj y el desfase (aviso si pasa de 1 min) y
+      el evento "Inicio de lectura" lo anota. Historial: tipos `CONTROLADOR_PROTECCION`, `CONTROLADOR_INTERRUPTOR` y
+      `CONTROLADOR_EVENTO` para lo copiado del historial interno (pantalla History; no se lee por Modbus sin escribir); el
+      historial se ordena por fecha. Cargados los 27 eventos del Caterpillar del 08 al 12-10 (fotos del 12-10,
+      `docs/ig500/historial-controlador-2026-10-12.csv`, hora real = controlador - 26 min 30 s; respaldo previo en
+      `C:\LineaBaseX\backup\2026-10-13-eventos-generador\`). Por que el Caterpillar no tenia alarmas en la app: su lista de
+      alarmas estuvo vacia en todas las lecturas; ROCOF, VectorShift, baja tension/frecuencia de red y la apertura del MCB
+      duran menos de 1 s y quedan solo en el historial interno, no en la lista esperando reset (el GenPower si tuvo
+      alarmas en la lista: E-STOP y Wrn Stop fail).
 - [x] G20. (2026-10-12) Alarmas de los generadores en Alarmas Activas y avisos del navegador, y permiso propio.
       Nuevo `TipoAlarma.ALARMA_GENERADOR` (no se configura; fuera del selector de Configuracion de alarmas).
       `GeneradorAlarmasService` (lectura de fondo cada minuto): un `AlarmaEvento` por alarma mientras este en la lista

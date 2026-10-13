@@ -49,6 +49,10 @@ Desde 2026-10-09 la app no tiene este mapa en el codigo: lo lee de
 | 41043-41045 | 1042-1044 | Generador corriente L1, L2, L3 | UInt16 | 1 | A | 753/800/746 (en vacio 0) |
 Con carga: RPM 1800, 60,0 Hz, V L-L 458/456/458, kWh +2 en el momento de la foto.
 
+## Reloj del controlador (44201-44204, BCD, solo lectura)
+Igual que el InteliGen 500 (ver `docs/ig500/MAPA-REGISTROS.md`): 44201 = hh mm, 44202 = ss 00, 44203 = dd MM,
+44204 = aa 00. El 2026-10-13 iba **3 min 53 s adelantado** respecto de la PC. Campo `reloj` del modelo.
+
 ## Pendientes
 - 41047 (base 0 1046): cambia mucho entre lecturas (980, 64399, 65423...); quiza angulo de
   sincronismo. 41055-41057: cambian con la carga de la red (1022-1250 / 777-921 / 207-267) pero

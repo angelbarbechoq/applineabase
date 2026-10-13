@@ -21,7 +21,16 @@ public enum TipoEventoGenerador {
     ALARMA_CONFIRMADA("Alarma confirmada", Nivel.AVISO),
     ALARMA_RESUELTA("Alarma resuelta", Nivel.BUENO),
     SIN_COMUNICACION("Sin comunicacion", Nivel.FALLA),
-    COMUNICACION_RECUPERADA("Comunicacion recuperada", Nivel.BUENO);
+    COMUNICACION_RECUPERADA("Comunicacion recuperada", Nivel.BUENO),
+    // Copiados del historial interno del controlador (pantalla History; no se lee por Modbus sin escribirle).
+    // Fecha = hora real (la del controlador corregida por el desfase de su reloj); la descripción lleva el
+    // motivo de ComAp y la hora del controlador. Primera carga: docs/ig500/historial-controlador-2026-10-12.csv.
+    /** Protecciones de red (VectorShift, ROCOF, baja/alta tensión o frecuencia de red). */
+    CONTROLADOR_PROTECCION("Controlador: proteccion de red", Nivel.FALLA),
+    /** Apertura y cierre de los interruptores de la planta (MCB) y del generador (GCB). */
+    CONTROLADOR_INTERRUPTOR("Controlador: interruptor", Nivel.AVISO),
+    /** El resto del historial del controlador (Loaded, RevSyncStarted, Cooling, Ready...). */
+    CONTROLADOR_EVENTO("Controlador: evento", Nivel.NORMAL);
 
     /** Para el color en pantalla. */
     public enum Nivel { NORMAL, BUENO, AVISO, FALLA }
