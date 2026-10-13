@@ -423,7 +423,7 @@
     "id" : 204,
     "lineaMaquina" : "BarCompHP",
     "modeloMedidor" : "PM5110",
-    "nombrePLC" : "PLC1",
+    "nombrePLC" : "PLC5",
     "numeroSerie" : "null",
     "zona" : "Mantenimiento",
     "tipo" : "SENSOR",
