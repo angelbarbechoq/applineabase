@@ -14,6 +14,7 @@ import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Anchor;
+import com.vaadin.flow.component.html.AttachmentType;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Span;
@@ -23,9 +24,9 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.RolesAllowed;
 
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -69,12 +70,18 @@ public class TraspasoConfiguracionView extends VerticalLayout {
                 + "red; y los eventos copiados a mano del historial de los controladores de los generadores. No lleva "
                 + "historial: energia, horometro, alarmas ocurridas, mantenimientos realizados, stock, arranques."));
         descarga.setText("Exportar configuracion");
-        descarga.getElement().setAttribute("download", true);
         descarga.getElement().getThemeList().add("button");
         descarga.getElement().getThemeList().add("primary");
-        prepararDescarga();
-        // Cada clic descarga con la hora de ese momento en el nombre: se prepara el siguiente.
-        descarga.getElement().addEventListener("click", e -> prepararDescarga());
+        // Un solo enlace fijo: el archivo y su nombre (con la hora) se arman al pedirlo. Antes se cambiaba el enlace
+        // en cada clic y, si el pedido llegaba despues del cambio, el navegador recibia una respuesta vacia ("f.txt").
+        String usuario = acceso.usuarioActual();
+        descarga.setHref(event -> {
+            event.setFileName(TraspasoConfiguracionService.nombreArchivoExportacion());
+            event.setContentType("application/zip");
+            try (OutputStream out = event.getOutputStream()) {
+                service.exportar(out, usuario);
+            }
+        }, AttachmentType.DOWNLOAD);
         add(descarga);
         add(texto("El archivo contiene las claves cifradas de los usuarios: guardarlo y pasarlo con cuidado."));
 
@@ -121,13 +128,6 @@ public class TraspasoConfiguracionView extends VerticalLayout {
         add(diferencias);
 
         cargarArchivos();
-    }
-
-    private void prepararDescarga() {
-        StreamResource recurso = new StreamResource(TraspasoConfiguracionService.nombreArchivoExportacion(),
-                (out, session) -> service.exportar(out, acceso.usuarioActual()));
-        recurso.setContentType("application/zip");
-        descarga.setHref(recurso);
     }
 
     private void cargarArchivos() {
