@@ -26,3 +26,9 @@ C:*
 # Salida generada al correr las pruebas e2e/ (reportes, trazas, screenshots de fallos)
 e2e/playwright-report/
 e2e/test-results/
+
+# Informes para compartir (HTML/PDF): se guardan solo en disco, no se suben (pedido del usuario,
+# 2026-10-12; los ya subidos se sacaron del historial el 2026-10-16). Se sube solo la version para
+# el navegador del registro de fallas.
+/reportes/*
+!/reportes/reporte-de-fallas.html
