@@ -59,6 +59,11 @@ Igual que el InteliGen 500 (ver `docs/ig500/MAPA-REGISTROS.md`): 44201 = hh mm, 
   no coinciden con corrientes ni potencia de TR2. 41058 = 96-97 (¿PF de red x100?). 41082 = -104.
   41242-41244 = 10000 (probables contadores de mantenimiento; pantalla "Maintenance Timer 1 = 10000 h").
   41083 = 494-503. Sin evidencia: no usar.
-- Kilovatios de red (pantalla 645-687 kW): no se encontraron en 16 ni 32 bits.
+- Kilovatios de red (pantalla 645-687 kW): no se encontraron en 16 ni 32 bits. 2026-10-16: barrido completo de
+  40001-49999 (784 registros con valor: 41001-41095, 41104, 41145-41151, 41160, 41169, 41226-41393, 43001-43283, 43316,
+  43373-43380, 43437-43440, 43505, 43522-43723, 44201-44215) con 4 fotos cada 60 s contra TR2 (635-834 kW): ninguno lo
+  sigue, asi que el GenPower no tiene "consumo del transformador segun el controlador" (en el Caterpillar se retiro por
+  no coincidir). 41055-41057 (repetidos en 41280-41282) cambian con la carga (749/567/174 ... 965/714/207): parecen
+  corrientes de red con una fase muy baja, como el TC de red del Caterpillar. 41058 = 96-98.
 - Estado del motor/interruptores y alarmas: probablemente 41002-41003 y registros de bits; falta
   evidencia.

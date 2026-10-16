@@ -78,7 +78,6 @@
       { "parametro" : "RED_V_L2L3", "registro" : 41038, "tipo" : "UINT16", "divisor" : 1 },
       { "parametro" : "RED_V_L3L1", "registro" : 41039, "tipo" : "UINT16", "divisor" : 1 },
       { "parametro" : "BATERIA", "registro" : 41052, "tipo" : "UINT16", "divisor" : 10 },
-      { "parametro" : "CARGA_KW", "registro" : 41280, "tipo" : "INT16", "divisor" : 1 },
       { "parametro" : "KWH", "registro" : 41284, "tipo" : "UINT32", "divisor" : 1 },
       { "parametro" : "KVARH", "registro" : 41286, "tipo" : "UINT32", "divisor" : 1 },
       { "parametro" : "RED_KWH", "registro" : 41288, "tipo" : "UINT32", "divisor" : 1 },

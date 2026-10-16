@@ -32,7 +32,6 @@ PF 1.000.
 | 41037-41039 | Red V L1-L2, L2-L3, L3-L1 | UInt16 | 1 | 464/464/462 / 459-462 |
 | 41052 | Tension de bateria (Ubat) | UInt16 | 0.1 | Analog Inputs 27.9 V / 279 |
 | 41053 | Entrada D+ (no se guarda) | UInt16 | 0.1 | 0.0 V / 0 |
-| 41280 | Carga del tablero (Load P) segun el controlador | Int16 | 1 | 471 / 476-499; = generador + red del controlador |
 | 41284-41285 | Genset kWh | UInt32 | 1 | 52964 / 53014-53078, sube ~600 kW |
 | 41286-41287 | Genset kVArh | UInt32 | 1 | 13338 / 13338 |
 | 41288-41289 | Red (Mains) kWh | UInt32 | 1 | 5153051 / 5153055-5153060 |
@@ -66,6 +65,12 @@ Encontrado el 2026-10-13 con un barrido de 40001-49999 (registros con valor: 410
 (ej. 1320 2600 1310 2600 = 13-10-2026 13:20:26). Va **27 min 39 s adelantado** (13-10); el 11-10 iba entre 26 min 00 s y
 26 min 56 s: se adelanta unos 20-50 s por dia. Campo `reloj` del modelo en generador-modelos.json. 44214 cambia
 (048A / 068A): sin identificar.
+
+## Retirados
+- **41280 "Load P" (carga segun el controlador):** se quito del mapa el 2026-10-16. Con el generador parado vale 500
+  fijo (TR1 marcaba 426-765 kW); en marcha varia 400-690 kW pero no coincide con generador + TR1 (diferencias de
+  150-190 kW, ej. 09-10 16:08: 599 - 240 = 359 kW contra 514). Lo ya guardado (`carga_kw` en `octubreGenerador`) no se
+  usa. Coincide con la diferencia de abajo: el TC de red del controlador no mide lo mismo que el medidor de TR1.
 
 ## Pendientes
 - **Potencia de red del controlador:** 41298 = -126 fijo durante un minuto mientras carga - generador iba
