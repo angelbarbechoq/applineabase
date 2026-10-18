@@ -12,9 +12,11 @@ import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.generador.model.EventoGenerador;
 import com.example.generador.model.Generador;
 import com.example.generador.model.LecturaGenerador;
+import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.TipoEventoGenerador;
 import com.example.generador.service.AlarmaComap;
 import com.example.generador.service.HistorialEventosService;
+import com.example.generador.service.PlantaEnVivoService;
 import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.ParametroGenerador;
 import com.example.generador.service.GeneradorService;
@@ -25,6 +27,7 @@ import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
+import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -41,6 +44,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextField;
@@ -91,7 +95,12 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final GeneradorService service;
     private final CalidadEnergiaService calidad;
     private final LineaAccessService lineaAccessService;
+    private final PlantaEnVivoService plantaService;
     private Generador generador;
+    private final TabSheet tabs = new TabSheet();
+    private Tab tabPlanta;
+    private final Div plantaContenido = new Div();
+    private final Span plantaHora = new Span();
 
     private final Span descripcion = new Span();
     private final Span avisoMapa = new Span();
@@ -138,11 +147,12 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     }
 
     public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService,
-                         HistorialEventosService historial) {
+                         HistorialEventosService historial, PlantaEnVivoService plantaService) {
         this.service = service;
         this.calidad = calidad;
         this.lineaAccessService = lineaAccessService;
         this.historial = historial;
+        this.plantaService = plantaService;
         List<Generador> lista = service.generadores();
         this.generador = lista.isEmpty() ? null : lista.get(0);
 
@@ -173,8 +183,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         avisoMapa.getStyle().set("background-color", "#fff3cd").set("color", "#856404").set("padding", "6px 10px")
                 .set("border-radius", "6px").set("font-size", "13px");
 
-        TabSheet tabs = new TabSheet();
         tabs.setSizeFull();
+        // Primero lo global: la planta completa en vivo (todos los generadores y la red), después cada generador.
+        tabPlanta = tabs.add("Planta en vivo", crearPlanta());
         tabs.add("Estado actual", crearEstado());
         tabs.add("Arranques", crearArranques());
         tabs.add("Historial de eventos", crearEventos());
@@ -182,11 +193,15 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         if (lineaAccessService.esAdmin()) {
             tabs.add("Registros", crearRegistros());
         }
+        tabs.addSelectedChangeListener(e -> {
+            if (e.getSelectedTab() == tabPlanta) refrescarPlanta();
+        });
         alertaAlarmas.setWidthFull();
         alertaAlarmas.setVisible(false);
         add(cabecera, avisoMapa, alertaAlarmas, tabs);
         setFlexGrow(1, tabs);
         cambiarGenerador();
+        refrescarPlanta();
     }
 
     @Override
@@ -198,7 +213,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     protected void onAttach(AttachEvent e) {
         UI ui = e.getUI();
         ui.setPollInterval(POLL_MS);
-        pollRegistration = ui.addPollListener(p -> refrescar());
+        pollRegistration = ui.addPollListener(p -> {
+            refrescar();
+            if (tabPlanta != null && tabs.getSelectedTab() == tabPlanta) refrescarPlanta();
+        });
     }
 
     @Override
@@ -391,6 +409,165 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             alertaAlarmas.add(s);
         }
         alertaAlarmas.setVisible(true);
+    }
+
+    // ================= Planta en vivo =================
+
+    private static final String[] NARANJAS = {"#dd5f2a", "#f29b6b", "#a8441b", "#f6c09f"};
+    private static final String CHIP = "padding:2px 8px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;";
+
+    private VerticalLayout crearPlanta() {
+        Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> refrescarPlanta());
+        plantaHora.getStyle().set("font-size", "12px").set("color", "#555");
+        HorizontalLayout barra = new HorizontalLayout(plantaHora, actualizar);
+        barra.setAlignItems(Alignment.CENTER);
+        plantaContenido.setWidthFull();
+        Span nota = new Span("Cada generador se lee en vivo de su controlador (solo lectura); la red es el medidor de su "
+                + "transformador (PLC, ultimo minuto guardado), asi que entre uno y otro puede haber hasta un minuto. Consumo de la "
+                + "planta = lo que los generadores pusieron en la planta + lo importado de la red (suman 100 %); lo exportado a la "
+                + "red es el excedente de los generadores y va aparte. Se actualiza cada 15 s.");
+        nota.getStyle().set("font-size", "12px").set("color", "#555");
+        VerticalLayout v = new VerticalLayout(barra, plantaContenido, nota);
+        v.setPadding(false);
+        return v;
+    }
+
+    /** La planta ahora: primero el total (consumo, generadores, red), después una fila por generador. */
+    private void refrescarPlanta() {
+        PlantaEnVivoService.Planta p = plantaService.leer();
+        MetaImportacionRed meta = service.metaImportacionRed();
+        plantaHora.setText("Leido " + p.leido().format(HORA));
+        StringBuilder h = new StringBuilder("<div style='display:grid;gap:14px;width:100%;max-width:1150px'>");
+
+        if (!p.completa()) {
+            h.append("<div style='background:#fff3cd;color:#856404;padding:8px 12px;border-radius:6px;font-size:13px'>")
+                    .append("Cifras parciales: ");
+            p.filas().stream().filter(f -> !f.completa()).forEach(f -> h.append(esc(f.generador())).append(" (")
+                    .append(esc(f.error() == null ? "sin dato" : f.error())).append("). "));
+            h.append("El total de arriba no lo incluye.</div>");
+        }
+
+        // Total de la planta.
+        double consumo = p.consumo();
+        Double pctGen = p.porcentaje(p.consumidaDeGeneradores()), pctRed = p.porcentaje(p.importada());
+        String[] semaforo = colores(pctRed == null ? Estado.SIN_DATO : switch (meta.zona(pctRed)) {
+            case VERDE -> Estado.OK;
+            case AMARILLO -> Estado.AVISO;
+            case ROJO -> Estado.FUERA;
+        });
+        h.append("<div style='display:flex;flex-wrap:wrap;gap:12px'>")
+                .append(tarjetaPlanta("Consumo de la planta", kw(consumo), "generadores + red", "#4a525c"))
+                .append(tarjetaPlanta("Aporte de los generadores", kw(p.consumidaDeGeneradores()),
+                        pctTexto(pctGen) + " del consumo" + (p.generada() > p.consumidaDeGeneradores() + 0.5
+                                ? " (generan " + kw(p.generada()) + ")" : ""), "#dd5f2a"))
+                .append(tarjetaPlanta("Importada de la red", kw(p.importada()),
+                        "<span style='" + CHIP + "background:" + semaforo[0] + ";color:" + semaforo[1] + "'>" + pctTexto(pctRed)
+                                + " del consumo</span> meta 0 %", "#2a6fd0"))
+                .append(tarjetaPlanta("Exportada a la red", kw(p.exportada()), "excedente de los generadores", "#16956a"))
+                .append("</div>");
+
+        // Barra del consumo de la planta: lo que puso cada generador y lo importado de la red (100 %).
+        List<String[]> tramos = new ArrayList<>(); // nombre, kW, color
+        int i = 0;
+        for (PlantaEnVivoService.FilaGenerador f : p.filas()) {
+            if (f.completa()) tramos.add(new String[]{f.generador(), String.valueOf(f.consumidaEnPlanta()), NARANJAS[i % NARANJAS.length]});
+            i++;
+        }
+        tramos.add(new String[]{"Red", String.valueOf(p.importada()), "#2a6fd0"});
+        if (consumo > 0) {
+            h.append("<div style='display:grid;gap:6px'><div style='font-weight:600'>Consumo de la planta: ").append(kw(consumo)).append("</div>")
+                    .append("<div style='display:flex;height:34px;border-radius:4px;overflow:hidden;background:#e2e3e5'>");
+            for (String[] t : tramos) {
+                double pct = Double.parseDouble(t[1]) / consumo * 100;
+                if (pct <= 0) continue;
+                h.append("<div style='width:").append(String.format(Locale.ROOT, "%.2f%%", pct)).append(";background:").append(t[2])
+                        .append(";color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;"
+                                + "white-space:nowrap;overflow:hidden'>")
+                        .append(pct >= 12 ? esc(t[0]) + " " + pctTexto(pct) : "").append("</div>");
+            }
+            h.append("</div><div style='display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;color:#555'>");
+            for (String[] t : tramos) {
+                double v = Double.parseDouble(t[1]);
+                h.append("<span><i style='display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:")
+                        .append(t[2]).append("'></i>").append(esc(t[0])).append(": ").append(kw(v)).append(" (")
+                        .append(pctTexto(v / consumo * 100)).append(")</span>");
+            }
+            h.append("</div></div>");
+        }
+
+        // Detalle: una fila por generador.
+        String th = "<th style='text-align:right;padding:6px 10px;font-size:12px;color:#555;border-bottom:1px solid #ccc'>";
+        String thIzq = "<th style='text-align:left;padding:6px 10px;font-size:12px;color:#555;border-bottom:1px solid #ccc'>";
+        String td = "<td style='text-align:right;padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap'>";
+        String tdIzq = "<td style='text-align:left;padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap'>";
+        h.append("<div style='overflow-x:auto'><table style='border-collapse:collapse;width:100%;font-size:14px'><thead><tr>")
+                .append(thIzq).append("Generador</th>").append(thIzq).append("Estado</th>").append(th).append("Generada (kW)</th>")
+                .append(th).append("Consumida en planta (kW)</th>").append(th).append("% del consumo de la planta</th>")
+                .append(thIzq).append("Transformador</th>").append(th).append("Importada (kW)</th>").append(th).append("Exportada (kW)</th>")
+                .append(th).append("Consumo del transformador (kW)</th></tr></thead><tbody>");
+        for (PlantaEnVivoService.FilaGenerador f : p.filas()) {
+            String[] c = colores(switch (f.estado()) {
+                case EN_MARCHA -> Estado.OK;
+                case PARADO -> Estado.SIN_DATO;
+                case SIN_COMUNICACION -> Estado.FUERA;
+            });
+            h.append("<tr>").append(tdIzq).append("<b>").append(esc(f.generador())).append("</b></td>")
+                    .append(tdIzq).append("<span style='").append(CHIP).append("background:").append(c[0]).append(";color:").append(c[1])
+                    .append("'>").append(f.estado().etiqueta()).append("</span></td>")
+                    .append(td).append(num0(f.kwGenerador())).append("</td>")
+                    .append(td).append(num0(f.consumidaEnPlanta())).append("</td>")
+                    .append(td).append(f.consumidaEnPlanta() == null ? "-" : pctTexto(p.porcentaje(f.consumidaEnPlanta()))).append("</td>")
+                    .append(tdIzq).append(esc(nombreRed(f.red()))).append("</td>")
+                    .append(td).append(num0(f.importada())).append("</td>")
+                    .append(td).append(num0(f.exportada())).append("</td>")
+                    .append(td).append(num0(f.consumoTransformador())).append("</td></tr>");
+        }
+        String tdTotal = "<td style='text-align:right;padding:6px 10px;border-top:2px solid #333;font-weight:700;white-space:nowrap'>";
+        h.append("</tbody><tfoot><tr><td style='padding:6px 10px;border-top:2px solid #333;font-weight:700'>Total</td>")
+                .append("<td style='border-top:2px solid #333'></td>")
+                .append(tdTotal).append(num0(p.generada())).append("</td>")
+                .append(tdTotal).append(num0(p.consumidaDeGeneradores())).append("</td>")
+                .append(tdTotal).append(pctTexto(pctGen)).append("</td>")
+                .append("<td style='border-top:2px solid #333'></td>")
+                .append(tdTotal).append(num0(p.importada())).append("</td>")
+                .append(tdTotal).append(num0(p.exportada())).append("</td>")
+                .append(tdTotal).append(num0(consumo)).append("</td></tr></tfoot></table></div>");
+        h.append("</div>");
+        plantaContenido.removeAll();
+        plantaContenido.add(new Html(h.toString()));
+    }
+
+    private static String tarjetaPlanta(String titulo, String valor, String detalle, String color) {
+        return "<div style='flex:1 1 200px;border:1px solid #dce1e7;border-top:4px solid " + color + ";border-radius:4px;"
+                + "padding:12px 14px;display:grid;gap:4px'>"
+                + "<span style='font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#555'>" + titulo + "</span>"
+                + "<span style='font-size:26px;font-weight:700'>" + valor + "</span>"
+                + "<span style='font-size:13px;color:#555'>" + detalle + "</span></div>";
+    }
+
+    private static String[] colores(Estado e) {
+        return switch (e) {
+            case OK -> new String[]{"#d4edda", "#155724"};
+            case AVISO -> new String[]{"#fff3cd", "#856404"};
+            case FUERA -> new String[]{"#f8d7da", "#721c24"};
+            case SIN_DATO -> new String[]{"#e2e3e5", "#383d41"};
+        };
+    }
+
+    private static String kw(double v) {
+        return String.format(Locale.ROOT, "%,.0f kW", v);
+    }
+
+    private static String num0(Double v) {
+        return v == null ? "-" : String.format(Locale.ROOT, "%,.0f", v);
+    }
+
+    private static String pctTexto(Double v) {
+        return v == null ? "-" : String.format(Locale.ROOT, "%.1f %%", v);
+    }
+
+    private static String esc(String s) {
+        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("'", "&#39;");
     }
 
     // ================= Estado actual =================
