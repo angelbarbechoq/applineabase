@@ -62,6 +62,13 @@ public class Usuario {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean verGeneradores = false;
 
+    /**
+     * Acceso a Consumo por franja horaria (consumo y costo según la tarifa de la empresa eléctrica), mismo
+     * criterio que verMezcladores. Ignorado cuando el rol es ADMIN. Cargar tarifas y feriados sigue siendo ADMIN.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean verFranjaHoraria = false;
+
     public Usuario() {
     }
 
@@ -131,6 +138,14 @@ public class Usuario {
 
     public void setVerGeneradores(boolean verGeneradores) {
         this.verGeneradores = verGeneradores;
+    }
+
+    public boolean isVerFranjaHoraria() {
+        return verFranjaHoraria;
+    }
+
+    public void setVerFranjaHoraria(boolean verFranjaHoraria) {
+        this.verFranjaHoraria = verFranjaHoraria;
     }
 
     public enum Rol {

@@ -102,6 +102,19 @@ public class LineaAccessService {
         return principal.getUsuario().isVerGeneradores();
     }
 
+    /** Consumo por franja horaria: ADMIN, o el usuario puntual que tenga marcado "Ver Franja Horaria"
+     * (independiente de la zona — ver Usuario.verFranjaHoraria). */
+    public boolean puedeVerFranjaHoraria() {
+        if (esAdmin()) {
+            return true;
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {
+            return false;
+        }
+        return principal.getUsuario().isVerFranjaHoraria();
+    }
+
     public boolean esAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {

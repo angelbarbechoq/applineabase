@@ -44,6 +44,7 @@ public class UsuariosView extends VerticalLayout {
     private final Checkbox verMezcladoresCheckbox = new Checkbox("Ver Mezcladores");
     private final Checkbox verMantenimientoCheckbox = new Checkbox("Ver Mantenimiento");
     private final Checkbox verGeneradoresCheckbox = new Checkbox("Ver Generadores");
+    private final Checkbox verFranjaHorariaCheckbox = new Checkbox("Ver Franja Horaria");
     private final Span formTitle = new Span("Nuevo usuario");
 
     private Usuario usuarioEnEdicion;
@@ -85,6 +86,9 @@ public class UsuariosView extends VerticalLayout {
         configurarTooltip(verGeneradoresCheckbox,
                 "Concede acceso a Grupo Electrogeno (Generadores y Analisis) y a los avisos de alarmas de los generadores, "
                         + "sin necesidad de rol ADMIN");
+        configurarTooltip(verFranjaHorariaCheckbox,
+                "Concede acceso a Consumo por franja horaria (consumo y costo segun la tarifa de la empresa electrica), "
+                        + "sin necesidad de rol ADMIN. Cargar tarifas y feriados sigue siendo solo del ADMIN");
 
         Button guardarBtn = new Button("Guardar", e -> guardar());
         guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -94,7 +98,8 @@ public class UsuariosView extends VerticalLayout {
 
         HorizontalLayout formLayout = new HorizontalLayout(
                 usernameField, passwordField, rolSelect, zonaCombo, habilitadoCheckbox,
-                verMezcladoresCheckbox, verMantenimientoCheckbox, verGeneradoresCheckbox, guardarBtn, nuevoBtn
+                verMezcladoresCheckbox, verMantenimientoCheckbox, verGeneradoresCheckbox, verFranjaHorariaCheckbox,
+                guardarBtn, nuevoBtn
         );
         formLayout.setAlignItems(Alignment.END);
         formLayout.getStyle().set("flex-wrap", "wrap");
@@ -112,6 +117,8 @@ public class UsuariosView extends VerticalLayout {
                 .setHeader("Ver Mantenimiento").setAutoWidth(true);
         grid.addColumn(u -> u.getRol() == Usuario.Rol.ADMIN || u.isVerGeneradores() ? "Sí" : "No")
                 .setHeader("Ver Generadores").setAutoWidth(true);
+        grid.addColumn(u -> u.getRol() == Usuario.Rol.ADMIN || u.isVerFranjaHoraria() ? "Sí" : "No")
+                .setHeader("Ver Franja Horaria").setAutoWidth(true);
         grid.addComponentColumn(this::crearAccionesColumna).setHeader("Acciones").setAutoWidth(true);
         grid.setSizeFull();
 
@@ -141,6 +148,7 @@ public class UsuariosView extends VerticalLayout {
         verMezcladoresCheckbox.setValue(usuario.isVerMezcladores());
         verMantenimientoCheckbox.setValue(usuario.isVerMantenimiento());
         verGeneradoresCheckbox.setValue(usuario.isVerGeneradores());
+        verFranjaHorariaCheckbox.setValue(usuario.isVerFranjaHoraria());
     }
 
     private void limpiarFormulario() {
@@ -156,6 +164,7 @@ public class UsuariosView extends VerticalLayout {
         verMezcladoresCheckbox.setValue(false);
         verMantenimientoCheckbox.setValue(false);
         verGeneradoresCheckbox.setValue(false);
+        verFranjaHorariaCheckbox.setValue(false);
     }
 
     private void guardar() {
@@ -196,6 +205,7 @@ public class UsuariosView extends VerticalLayout {
         usuario.setVerMezcladores(verMezcladoresCheckbox.getValue());
         usuario.setVerMantenimiento(verMantenimientoCheckbox.getValue());
         usuario.setVerGeneradores(verGeneradoresCheckbox.getValue());
+        usuario.setVerFranjaHoraria(verFranjaHorariaCheckbox.getValue());
 
         usuarioRepository.save(usuario);
         Notification.show("Usuario guardado", 2500, Notification.Position.BOTTOM_END)

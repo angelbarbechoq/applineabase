@@ -246,6 +246,10 @@ public final class MainLayout extends AppLayout {
             // Calidad de Energia: mismo alcance que alarmas (ADMIN y zona Mantenimiento).
             nav.addItem(new SideNavItem("Calidad de Energia", "calidad", VaadinIcon.FLASH.create()));
         }
+        // Consumo por franja horaria (tarifa de la empresa electrica): permiso propio "Ver Franja Horaria" (ADMIN siempre).
+        if (lineaAccessService.puedeVerFranjaHoraria()) {
+            nav.addItem(new SideNavItem("Consumo por franja horaria", "energia/franja-horaria", VaadinIcon.DOLLAR.create()));
+        }
         // Grupo Electrogeno: permiso propio "Ver Generadores" (ADMIN siempre).
         if (lineaAccessService.puedeVerGeneradores()) {
             SideNavItem grupoElectrogeno = new SideNavItem("Grupo Electrogeno");

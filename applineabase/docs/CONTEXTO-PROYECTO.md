@@ -9,7 +9,7 @@ carga solo al abrir una sesion.
 seccion correspondiente (y la seccion 12 de pendientes). Si algo de aqui contradice el
 codigo, manda el codigo y hay que corregir este archivo.
 
-Ultima actualizacion: 2026-10-13. Las secciones marcadas **[resumen]** son una vista de alto
+Ultima actualizacion: 2026-10-17. Las secciones marcadas **[resumen]** son una vista de alto
 nivel que no se reviso a fondo: leer el codigo antes de modificar esa parte.
 Se eliminaron `ARCHITECTURE.md` y `README.md` de la raiz (obsoletos: plantilla de Vaadin y
 clases que ya no existen); este archivo los reemplaza. Los problemas ya resueltos estan en
@@ -80,6 +80,7 @@ reales. Si hace falta limpiar, se hace por JDBC (script en el scratchpad, creden
 | `generador` | Grupo electrogeno: generadores con controlador ComAp (fase G, **solo lectura**, funcion 03) | `GeneradorView` (ruta `generador`: selector de generador, Estado actual, Arranques, Tendencias, Registros solo ADMIN), `GeneradorAnalisisView` (ruta `generador/analisis`), `GeneradoresConfigService` (lee `generador-config.json` y `generador-modelos.json` en cada llamada), `LectorControlador` (lector generico por mapa + exploracion de registros), `GeneradorReaderService` (ciclo de 1 min: marcha = cada minuto, parado = cada 15 min, abre/cierra arranques; mapa sin confirmar = no guarda), `GeneradorAlmacen` (`{mes}Generador`, una columna por `ParametroGenerador`, y `C:/LineaBaseX/generador/arranques`), `HistorialEventosService` (historial propio de eventos tipo ComAp: arranque/parada, carga, red, alarmas de la lista de alarmas del controlador, comunicacion; `C:/LineaBaseX/generador/eventos`, ordenado por fecha; ademas los tipos "Controlador: ..." copiados a mano del historial interno, que no se lee por Modbus: 27 eventos del Caterpillar del 08 al 12-10 en `docs/ig500/historial-controlador-2026-10-12.csv`), reloj del controlador (44201-44204 BCD, campo `reloj` del modelo: la pantalla muestra cuanto va adelantado), `GeneradorAnalisisService` (energia importada/exportada/generada por dia/semana/mes y por periodo en marcha), `ConsumoMedidoresService` (con que maquinas trabajo el generador en un arranque: Encendido / Energizado y sin produccion / Apagado, consumo minimo / Apagado (en cero), con el umbral y la ventana del horometro, compresores 60 min; desperdicio = consumo sin produccion; en pantalla se dice "Transformador 1/2" o "la planta", nunca "el tablero"), `CostoCombustibleService` + entidad H2 `CostoCombustible` (galones y precio por arranque, enlazado por generador + id del arranque), `TarifaRedService` + entidad H2 `TarifaRed` ($/kWh por mes de vigencia), `GeneradorService`. Generadores: GenPower (InteliGen 200, Trafo2) y Caterpillar (InteliGen 500, Trafo1, mapa sin confirmar). Mapas en `docs/ig200/` y `docs/ig500/` |
 | `calidad` | calidad de energia (fase e del plan) | `CalidadEnergiaView` (ruta `calidad`), `CalidadEnergiaService` (lectura, bloques de 10 min, cumplimiento, limites), `ConfiguracionCalidad` y `TensionNominal` (H2), `Indicador`, `CalidadEnergiaAlmacen` (archivo SQLite mensual `{mes}Calidad`, una tabla por maquina, columnas nulables), `CalculoCalidad` (PF 4Q decodificado, desbalance calculado si el medidor no lo da), `LecturaCalidad`. Lo llena `PASReaderService` (solo medidores por pasarela) |
 | `medidores` | Catalogo de modelos de medidor y lector generico; topologia electrica | `TopologiaMedidores` + `TipoMedidor` (campos `tipo` MAQUINA/TRANSFORMADOR/GENERAL/SENSOR/NO_CONTAR, `transformador` y `dentroDe` de linea-id-config.json; solo se suman las MAQUINA que no estan dentro de otra), `ModeloMedidor`/`RegistroModelo` (H2), `ParametroMedidor` (lista cerrada, 9 basicos + 27 de calidad, incluye KWH_RETORNO = columna KWhR), `ModeloMedidorService`, `DefinicionModelo` (copia inmutable por ciclo), `LectorMedidorService` (lectura en bloques, decodificacion, PF 4Q), `ModeloMedidorSeeder`, `ModelosMedidorView`. Detalle en `docs/PLAN-CALIDAD-ENERGIA.md` (fase B) |
+| `franjahoraria` | Consumo y costo por franja horaria de la tarifa de la empresa electrica (A L-V 08-18, B L-V 18-22, C L-V 22-08 y S/D/F 22-18, D S/D/F 18-22; F = feriado cargado) | `ConsumoFranjaView` (ruta `energia/franja-horaria`), `Franja` (horarios fijos en el codigo), `ConsumoFranjaService` (contador kWh de KWhPlanta1, el medidor general: cada tramo entre lecturas se reparte por tiempo entre las franjas que cruza; tramo > 5 min = horas estimadas; lee los dias del borde en los archivos de los meses vecinos; cache en memoria de los meses cerrados), entidades H2 `TarifaFranja` (4 precios por mes, clave `mes`; un mes sin fila usa la del ultimo mes cargado antes, "heredada") y `Feriado` (clave `fecha`), `TarifaFranjaService`, `FeriadoService`. Contrastado con la planilla de la empresa: marzo, abril y junio 2026 a menos de 0,3 % por franja sin feriados; mayo coincide con solo el 1 de mayo como feriado; abril NO lleva el Viernes Santo. La tarifa unica de `generador` (`TarifaRed`) sigue aparte |
 | `security` | Usuarios, roles, permisos | `Usuario`, `UsuarioRepository`, `UsuarioPrincipal`, `SecurityConfig`, `LineaAccessService`, `DataSeeder` (crea el admin inicial), `AdminSessionTimeoutFilter` |
 | `tools` | Reparaciones puntuales | `ReparacionVipView`, `MergeVipMensualTool` |
 | `traspaso` | Pasar la configuracion de la PC de diseno al servidor (ver seccion 11) | `TraspasoConfiguracionService` (exportar ZIP; revisar sin escribir; importar con copia previa en `C:\LineaBaseX\backup\...-antes-de-importar-configuracion`: el ZIP de la configuracion anterior, `BACKUP TO` de la H2 y el archivo de eventos), `TraspasoConfiguracionView` |
@@ -91,20 +92,22 @@ las anotaciones `@Uses` (seccion 10). Scheduler de 2 hilos (`ThreadPoolTaskSched
 ## 5. Seguridad, rutas y menu
 
 **Usuario:** username, clave (hash), rol `ADMIN` o `USUARIO`, `zona` (ignorada si es ADMIN),
-`habilitado`, y tres flags independientes de la zona: `verMezcladores`, `verMantenimiento` y
-`verGeneradores` (Grupo Electrogeno y sus alarmas; los flags valen desde el proximo inicio de sesion).
+`habilitado`, y cuatro flags independientes de la zona: `verMezcladores`, `verMantenimiento`,
+`verGeneradores` (Grupo Electrogeno y sus alarmas) y `verFranjaHoraria` (Consumo por franja horaria);
+los flags valen desde el proximo inicio de sesion.
 Usuarios en la base real a la fecha: `admin`, `mezcla`, `mantenimiento`, `produccion`, `LabMP`.
 La clave del admin no se guarda en este archivo.
 
 **`LineaAccessService`:** `getLineasPermitidas()` filtra por zona (ADMIN y zona Mantenimiento
 ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladores()`,
-`puedeVerMantenimiento()`, `puedeVerGeneradores()` (ADMIN o flag), `esAdmin()`, `usuarioActual()`.
+`puedeVerMantenimiento()`, `puedeVerGeneradores()`, `puedeVerFranjaHoraria()` (ADMIN o flag), `esAdmin()`,
+`usuarioActual()`.
 
 **Patrones de acceso:**
 - Solo admin: `@RolesAllowed("ADMIN")` en la ruta.
 - Acceso por flag o zona: ruta `@PermitAll` + `BeforeEnterObserver` + clase `AccesoXxx.verificar(...)`
   (package-private, avisa con notificacion y hace `forwardTo(ChartsView.class)`). Existen
-  `AccesoAlarmas`, `AccesoMezcladores`, `AccesoMantenimiento`, `AccesoGeneradores`.
+  `AccesoAlarmas`, `AccesoMezcladores`, `AccesoMantenimiento`, `AccesoGeneradores`, `AccesoFranjaHoraria`.
 - El checkbox del flag se agrega en `UsuariosView` (con tooltip: `Tooltip.forComponent(...)`,
   `withHoverDelay(200)`, `withHideDelay(5000)`; `Checkbox` no implementa `HasTooltip`).
 
@@ -123,6 +126,7 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 | `calidad` | `CalidadEnergiaView` (Estado actual, Historico, Cumplimiento; Limites solo ADMIN) | gate `puedeVerAlarmas()` |
 | `generador` | `GeneradorView` (selector de generador, marca "(ALARMA)"; aviso rojo con las alarmas del controlador arriba de las pestanas; Estado actual en vivo, Arranques, Historial de eventos, Tendencias; Registros solo ADMIN; solo lectura del controlador) | gate `puedeVerGeneradores()` |
 | `generador/analisis` | `GeneradorAnalisisView`, pestanas Resumen de energia (red importada/exportada, generada, consumo del tablero, paralelo/isla/vacio por dia/semana/mes), Periodos en marcha (por arranque; clic en uno = balance simple generado / consumido / entregado y con que maquinas trabajo) y Costos (galones y precio por arranque, tarifa de la red por mes y ahorro; cargar/editar solo ADMIN) | gate `puedeVerGeneradores()` |
+| `energia/franja-horaria` | `ConsumoFranjaView`, pestanas Detalle del mes (tarjetas por franja, dona CSS de kWh, barras por dia, tabla por dia con costo, horas estimadas y sin datos), Meses anteriores (tabla por anio con el formato de la planilla de la empresa: kWh, precio facturado y $/kWh por franja; clic = detalle; CSV), Tarifas (4 precios por mes; verde propia, amarillo heredada, gris sin tarifa; cargar/editar/copiar del mes anterior solo ADMIN) y Feriados (opcional, cargar solo ADMIN) | gate `puedeVerFranjaHoraria()` |
 | `mezcladores/config` | `MezcladoresConfigView` | gate `puedeVerMezcladores()` |
 | `mantenimiento` | `MantenimientoView` | gate `puedeVerMantenimiento()`; el formulario solo lo ve ADMIN |
 | `mantenimiento/personal` | `PersonalMantenimientoView` | ADMIN |
@@ -134,7 +138,8 @@ ven todo), `puedeVerAlarmas()` (ADMIN o zona Mantenimiento), `puedeVerMezcladore
 
 **Menu lateral (`MainLayout.createSideNav()`):** Graficas (Tiempo Real, Historico), Consulta de
 Datos, Horometro, Alarmas (Alarmas Activas; Historial solo admin), Calidad de Energia (mismo alcance
-que alarmas), Grupo Electrogeno (Generadores, Analisis; `puedeVerGeneradores()`), Mantenimiento Preventivo
+que alarmas), Consumo por franja horaria (`puedeVerFranjaHoraria()`), Grupo Electrogeno (Generadores, Analisis;
+`puedeVerGeneradores()`), Mantenimiento Preventivo
 (Mantenimiento Barril y Tornillos; Personal de Mantenimiento solo admin), Reportes (Barril y
 Tornillo), y solo admin: Usuarios, Reparar VIP Mensual, Configuracion (alarmas, hardware,
 Modelos de medidor, Mezcladores, Mantenimiento, Pasar configuracion). Los padres usan `colapsarAlSalirDelMouse(...)`. "Mantenimiento
@@ -313,7 +318,8 @@ una opcion mas de la lista.
    configurado aqui se lleva con Configuracion > Pasar configuracion: exportar (ZIP) aqui, copiar el ZIP a
    `C:\LineaBaseX\importar\` del servidor, Revisar e Importar alli, y reiniciar la app. Viajan: los 6 JSON de
    `C:\LineaBaseX\config`, las tablas de configuracion de la H2 (usuarios, alarma_config, modelos de medidor y sus
-   registros, configuracion_calidad, tension_nominal, planes y tecnicos de mantenimiento, tarifa_red) y los eventos
+   registros, configuracion_calidad, tension_nominal, planes y tecnicos de mantenimiento, tarifa_red, tarifa_franja,
+   feriado) y los eventos
    "Controlador: ..." de los generadores. Nunca el historial. Cada fila se busca por su clave natural (usuario, linea +
    tipo de alarma, nombre de modelo, tag + tarea, CI...); lo que esta solo en el servidor se deja, salvo los registros
    de un modelo que viene en el archivo; a un usuario existente no se le cambia la clave; `notificado` de los planes no
@@ -355,6 +361,9 @@ una opcion mas de la lista.
   del horometro se analizo y no es problema de rendimiento).
 - Posible: aviso de stock minimo, mas equipos/planes ademas de Barril y Tornillo, mas reportes
   dentro del menu Reportes.
+- Posible (franja horaria): que el ahorro del generador (Analisis > Costos) use el precio de la franja de las
+  horas en que trabajo en vez de la tarifa unica `TarifaRed`; horarios de las franjas editables si la empresa
+  los cambia seguido; columna "kWh facturado" para comparar con la planilla.
 
 ## 13. Checklist para un modulo nuevo
 

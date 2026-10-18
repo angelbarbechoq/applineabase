@@ -67,7 +67,7 @@ public class TraspasoConfiguracionView extends VerticalLayout {
         add(texto("El archivo lleva: los archivos de configuracion (PLC, lineas y medidores, mezcladores, TAG, generadores y "
                 + "sus mapas de registros); usuarios y permisos; umbrales de alarmas y del horometro; modelos de medidor con "
                 + "sus registros; limites de calidad y tensiones nominales; planes de mantenimiento y tecnicos; tarifas de la "
-                + "red; y los eventos copiados a mano del historial de los controladores de los generadores. No lleva "
+                + "red; tarifas por franja horaria y feriados; y los eventos copiados a mano del historial de los controladores de los generadores. No lleva "
                 + "historial: energia, horometro, alarmas ocurridas, mantenimientos realizados, stock, arranques."));
         descarga.setText("Exportar configuracion");
         descarga.getElement().getThemeList().add("button");
