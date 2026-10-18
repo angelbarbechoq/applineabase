@@ -185,7 +185,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
         tabs.setSizeFull();
         // Primero lo global: la planta completa en vivo (todos los generadores y la red), después cada generador.
-        tabPlanta = tabs.add("Planta en vivo", crearPlanta());
+        tabPlanta = tabs.add("Balance energetico P1", crearPlanta());
         tabs.add("Estado actual", crearEstado());
         tabs.add("Arranques", crearArranques());
         tabs.add("Historial de eventos", crearEventos());
@@ -411,7 +411,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         alertaAlarmas.setVisible(true);
     }
 
-    // ================= Planta en vivo =================
+    // ================= Balance energético P1 (planta 1 en vivo) =================
 
     private static final String[] NARANJAS = {"#dd5f2a", "#f29b6b", "#a8441b", "#f6c09f"};
     private static final String CHIP = "padding:2px 8px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;";
