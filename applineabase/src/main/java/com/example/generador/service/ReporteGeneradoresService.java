@@ -3,7 +3,6 @@ package com.example.generador.service;
 import com.example.generador.model.CostoCombustible;
 import com.example.generador.model.Generador;
 import com.example.generador.model.MetaImportacionRed;
-import com.example.generador.model.TarifaRed;
 import com.example.generador.service.GeneradorAnalisisService.DiaMarcha;
 import com.example.generador.service.GeneradorAnalisisService.MinutoMarcha;
 import com.example.generador.service.GeneradorAnalisisService.PeriodoMarcha;
@@ -30,8 +29,8 @@ import java.util.TreeMap;
  * combustible y costo) y después el detalle (tabla por período, importación por período, balance diario y, opcional,
  * el perfil de potencia de cada arranque).
  *
- * Las cifras salen del mismo cálculo que la pestaña Períodos en marcha (contadores) y el combustible y la tarifa, de
- * lo cargado en Costos. Solo lectura.
+ * Las cifras salen del mismo cálculo que la pestaña Períodos en marcha (contadores); el combustible, de lo cargado en
+ * Costos, y el costo en la red, del mismo cálculo que Costos (precio de la franja horaria de cada hora). Solo lectura.
  */
 @Service
 public class ReporteGeneradoresService {
@@ -44,15 +43,13 @@ public class ReporteGeneradoresService {
     private final GeneradorService generadorService;
     private final GeneradorAnalisisService analisis;
     private final CostoCombustibleService costos;
-    private final TarifaRedService tarifas;
     private final ObjectMapper objectMapper;
 
     public ReporteGeneradoresService(GeneradorService generadorService, GeneradorAnalisisService analisis,
-                                     CostoCombustibleService costos, TarifaRedService tarifas, ObjectMapper objectMapper) {
+                                     CostoCombustibleService costos, ObjectMapper objectMapper) {
         this.generadorService = generadorService;
         this.analisis = analisis;
         this.costos = costos;
-        this.tarifas = tarifas;
         this.objectMapper = objectMapper;
     }
 
@@ -64,11 +61,9 @@ public class ReporteGeneradoresService {
     public void escribir(OutputStream out, List<Generador> generadores, LocalDate desde, LocalDate hasta) throws IOException {
         List<PeriodoMarcha> periodos = analisis.periodosEnMarcha(generadores, desde, hasta);
         Map<String, CostoCombustible> combustible = costos.porPeriodo(periodos);
-        List<TarifaRed> listaTarifas = tarifas.listar();
         List<Map<String, Object>> datos = new ArrayList<>();
         for (PeriodoMarcha p : periodos) {
-            datos.add(datosPeriodo(p, combustible.get(CostoCombustibleService.clave(p.generador(), p.arranqueId())),
-                    TarifaRedService.vigente(listaTarifas, p.inicio().toLocalDate()).orElse(null)));
+            datos.add(datosPeriodo(p, combustible.get(CostoCombustibleService.clave(p.generador(), p.arranqueId()))));
         }
         MetaImportacionRed meta = generadorService.metaImportacionRed();
         // "</" dentro del <script> cerraría la etiqueta: se escribe "<\/" (mismo texto para JavaScript).
@@ -82,7 +77,7 @@ public class ReporteGeneradoresService {
         out.write(html.getBytes(StandardCharsets.UTF_8));
     }
 
-    private Map<String, Object> datosPeriodo(PeriodoMarcha p, CostoCombustible c, TarifaRed tarifa) {
+    private Map<String, Object> datosPeriodo(PeriodoMarcha p, CostoCombustible c) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", p.generador() + "-" + p.arranqueId());
         m.put("generador", p.generador());
@@ -124,11 +119,10 @@ public class ReporteGeneradoresService {
             m.put("precioGalon", c.getPrecioGalon());
             m.put("costo", Math.round(c.costo() * 100) / 100.0);
         }
-        if (tarifa != null && p.kwhGenerado() != null) {
-            // Igual que la pestaña Costos: aprovechado = generado - exportado, valorizado a la tarifa vigente al inicio.
-            double aprovechado = Math.max(0, p.kwhGenerado() - (p.kwhRedExportada() == null ? 0 : p.kwhRedExportada()));
-            m.put("tarifaKwh", tarifa.getPrecioKwh());
-            m.put("costoRed", Math.round(aprovechado * tarifa.getPrecioKwh() * 100) / 100.0);
+        if (p.costoRed() != null) {
+            // Igual que la pestaña Costos: aprovechado = generado - exportado, al precio de la franja horaria de cada hora.
+            m.put("aprovechado", redondo(p.generadorUsado()));
+            m.put("costoRed", Math.round(p.costoRed() * 100) / 100.0);
         }
         return m;
     }

@@ -452,6 +452,7 @@ function generar() {
   const C = { k: comb.length, galones: suma(comb, "galones"), costo: suma(comb, "costo"), kwh: suma(comb, "generado"), horas: suma(comb, "horas") };
   const conTarifa = comb.filter(a => a.costoRed != null);
   C.costoRed = suma(conTarifa, "costoRed"); C.costoComparado = suma(conTarifa, "costo"); C.ahorro = C.costoRed - C.costoComparado;
+  C.kwhApro = suma(conTarifa, "aprovechado");
 
   const desde = fecha(seleccion[0].inicio), hasta = new Date(Math.max(...seleccion.map(a => fecha(a.fin))));
   const generadores = [...new Set(seleccion.map(a => a.generador))];
@@ -506,10 +507,13 @@ function generar() {
     ["", "Costo por kWh generado", C.k && C.kwh > 0 ? dinero(C.costo / C.kwh, 3) : null, C.k && C.galones > 0 ? `${fmt(C.kwh / C.galones, 1)} kWh por galón` : ""]
   ];
   if (conTarifa.length) {
+    const veces = C.costoRed > 0 ? C.costoComparado / C.costoRed : null;
     tarjetasDinero.push([C.ahorro >= 0 ? "bien" : "mal", C.ahorro >= 0 ? "Ahorro frente a la red" : "Sobrecosto frente a la red", dinero(Math.abs(C.ahorro), 0),
-      `esa energía importada de la red habría costado ${dinero(C.costoRed, 0)}`]);
+      `la misma energía comprada a la red habría costado ${dinero(C.costoRed, 0)}` +
+      (C.kwhApro > 0 ? ` (${dinero(C.costoRed / C.kwhApro, 3)} por kWh, según la franja horaria)` : "") +
+      (veces != null && C.ahorro < 0 ? `; generar costó ${fmt(veces, 1)} veces la red` : "")]);
   } else {
-    tarjetasDinero.push(["", "Ahorro frente a la red", "", C.k ? "Falta cargar la tarifa de la red en LineaBaseX (Grupo electrógeno > Análisis > Costos)." : ""]);
+    tarjetasDinero.push(["", "Ahorro frente a la red", "", C.k ? "Falta cargar la tarifa por franja horaria en LineaBaseX (Consumo por franja horaria > Tarifas)." : ""]);
   }
   // Opcional: lo que costo en diesel generar la energia que se exporto (exportada x costo por kWh generado).
   if (chkCostoExp.checked) {
@@ -548,7 +552,8 @@ function generar() {
   seleccion.filter(sinCarga).forEach(a =>
     notas.push(`El ${a.generador} del ${diaCorto(fecha(a.inicio))} a las ${hhmm(fecha(a.inicio))} estuvo ${fmt(a.horas * 60)} minutos en marcha sin carga: no generó, y la importación de la red en ese lapso (${fmt(a.tomado)} kWh) cuenta en el total.`));
   notas.push(`Importada de la red: verde hasta el ${pctUmbral(VERDE_HASTA)} del consumo, amarillo hasta el ${pctUmbral(AMARILLO_HASTA)} y rojo por encima; la meta es 0 %.`);
-  notas.push("Fuente: contadores de energía del controlador de cada generador y del medidor de su transformador (igual que la pantalla «Períodos en marcha» de LineaBaseX); combustible y tarifa, cargados en LineaBaseX.");
+  if (conTarifa.length) notas.push("Ahorro o sobrecosto frente a la red: cada kWh aprovechado (generado − exportado) valorizado al precio de la franja horaria (A, B, C o D) de la hora en que se generó, con la tarifa de su mes, contra el costo del diésel. Solo energía contra combustible: no incluye el mantenimiento del generador ni los demás cargos de la factura de la red.");
+  notas.push("Fuente: contadores de energía del controlador de cada generador y del medidor de su transformador (igual que la pantalla «Períodos en marcha» de LineaBaseX); combustible, tarifa por franja horaria y feriados, cargados en LineaBaseX.");
   document.getElementById("notas").innerHTML = notas.map(t => `<li>${t}</li>`).join("");
 
   document.getElementById("pie").innerHTML = `<span>Reporte de generadores · LineaBaseX · generado el ${GENERADO_EL}.</span>`;

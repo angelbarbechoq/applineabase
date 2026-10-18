@@ -1031,6 +1031,60 @@ public class GraficaModel {
     }
 
     /**
+     * Columnas agrupadas (una al lado de la otra, sin apilar) por categoría, para comparar valores en la misma
+     * unidad (ej. $/kWh del diésel y de la red por arranque). Mismo armado de una sola vez que
+     * getBarrasApiladasScript. {@code formato} = formato de número de amCharts del tooltip (ej. "#.000").
+     */
+    public static String getBarrasAgrupadasScript(String containerId, List<String> categorias, String[] series,
+                                                  String[] colores, List<Double[]> valores, String unidad, String formato) {
+        StringBuilder datos = new StringBuilder("[");
+        for (int i = 0; i < categorias.size(); i++) {
+            if (i > 0) datos.append(",");
+            datos.append("{ categoria: ").append(jsString(categorias.get(i)));
+            Double[] fila = valores.get(i);
+            for (int s = 0; s < series.length; s++) {
+                datos.append(", v").append(s).append(": ").append(fila[s] == null ? "null" : String.valueOf(fila[s]));
+            }
+            datos.append(" }");
+        }
+        datos.append("]");
+
+        StringBuilder js = new StringBuilder(scriptInicializarRoot(containerId))
+                .append("var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: false, panY: false, wheelX: 'none', wheelY: 'none', paddingTop: 10, layout: root.verticalLayout }));")
+                .append("var datos = ").append(datos).append(";")
+                .append("var xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, { categoryField: 'categoria', renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 20, cellStartLocation: 0.15, cellEndLocation: 0.85 }) }));")
+                .append("xAxis.get('renderer').labels.template.setAll({ rotation: ").append(categorias.size() > 6 ? "-45" : "0")
+                .append(", centerY: am5.p50, centerX: ").append(categorias.size() > 6 ? "am5.p100" : "am5.p50").append(", fontSize: '11px', fill: am5.color(0x52514e) });")
+                .append("xAxis.get('renderer').grid.template.setAll({ strokeOpacity: 0 });")
+                .append("xAxis.data.setAll(datos);")
+                .append("var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, renderer: am5xy.AxisRendererY.new(root, {}) }));")
+                .append("yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x52514e), fontSize: '11px' });")
+                .append("yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });")
+                .append("yAxis.children.unshift(am5.Label.new(root, { rotation: -90, text: ").append(jsString(unidad))
+                .append(", y: am5.p50, centerX: am5.p50, fontSize: '11px', fill: am5.color(0x52514e) }));")
+                .append("var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));")
+                .append("legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x0b0b0b) });");
+        for (int s = 0; s < series.length; s++) {
+            js.append("(function() {")
+                    .append("var s = chart.series.push(am5xy.ColumnSeries.new(root, { name: ").append(jsString(series[s]))
+                    .append(", xAxis: xAxis, yAxis: yAxis, valueYField: 'v").append(s).append("', categoryXField: 'categoria' }));")
+                    .append("s.columns.template.setAll({ fill: am5.color(").append(colores[s]).append("), stroke: am5.color(0xffffff), strokeWidth: 2, width: am5.percent(90)")
+                    .append(", cornerRadiusTL: 4, cornerRadiusTR: 4")
+                    .append(", tooltipText: '{categoryX}\\n{name}: {valueY.formatNumber(\\u0022").append(formato.replace("'", ""))
+                    .append("\\u0022)} ").append(unidad.replace("'", "")).append("' });")
+                    .append("s.data.setAll(datos);")
+                    .append("legend.data.push(s);")
+                    .append("s.appear(800, 100);")
+                    .append("})();");
+        }
+        js.append("chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'none', xAxis: xAxis }));")
+                .append("chart.get('cursor').lineY.set('visible', false);")
+                .append("window.am5Charts[id] = { root: root, chart: chart };")
+                .append("chart.appear(800, 100);");
+        return js.toString();
+    }
+
+    /**
      * Minuto a minuto de un período en marcha de un generador: línea del generador, línea del consumo del
      * transformador y columnas de la red (positivas = tomado de la red, en azul; negativas = entregado a la
      * red, en verde agua). Donde la línea del generador va por encima de la del consumo, sobra y se entrega.

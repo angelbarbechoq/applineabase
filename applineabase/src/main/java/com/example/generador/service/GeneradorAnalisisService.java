@@ -2,6 +2,11 @@ package com.example.generador.service;
 
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.PLCDataQueryService;
+import com.example.franjahoraria.model.Franja;
+import com.example.franjahoraria.model.TarifaFranja;
+import com.example.franjahoraria.service.FeriadoService;
+import com.example.franjahoraria.service.TarifaFranjaService;
+import com.example.franjahoraria.service.TarifaFranjaService.TarifaDelMes;
 import com.example.generador.model.Generador;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +25,8 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,6 +34,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Análisis del grupo electrógeno por día, semana o mes: energía generada (contador del
@@ -143,9 +152,14 @@ public class GeneradorAnalisisService {
     }
 
     private final GeneradorService generadorService;
+    private final TarifaFranjaService tarifaFranjaService;
+    private final FeriadoService feriadoService;
 
-    public GeneradorAnalisisService(GeneradorService generadorService) {
+    public GeneradorAnalisisService(GeneradorService generadorService, TarifaFranjaService tarifaFranjaService,
+                                    FeriadoService feriadoService) {
         this.generadorService = generadorService;
+        this.tarifaFranjaService = tarifaFranjaService;
+        this.feriadoService = feriadoService;
     }
 
     /**
@@ -227,12 +241,23 @@ public class GeneradorAnalisisService {
      * @param lecturasTomando lecturas del medidor del trafo con potencia positiva: en ese minuto se tomaba de la red
      * @param lecturasRed     lecturas del medidor del trafo en el período
      * @param picoTomadoKw    máxima potencia tomada de la red en el período (null si nunca se tomó)
+     * @param aprovechadoFranja kWh aprovechados (generado - entregado a la red) por franja horaria A..D, según la hora
+     *                        en que se generaron; null si las lecturas del generador no alcanzan para repartirlos
+     * @param costoRed        lo que habría costado lo aprovechado comprado a la red, con el precio de la franja de cada
+     *                        hora y la tarifa de su mes (Consumo por franja horaria); null sin reparto o sin tarifa
      */
     public record PeriodoMarcha(String generador, String red, long arranqueId, Integer nro, LocalDateTime inicio,
                                 LocalDateTime fin, boolean enCurso, boolean inicioEstimado,
                                 Double kwhGenerado, Double kwhRedImportada, Double kwhRedExportada, Double kwMax,
                                 double minParalelo, double minIsla, double minVacio,
-                                int lecturasTomando, int lecturasRed, Double picoTomadoKw) {
+                                int lecturasTomando, int lecturasRed, Double picoTomadoKw,
+                                double[] aprovechadoFranja, Double costoRed) {
+
+        /** $/kWh medio de la red en las horas en que trabajó el generador. */
+        public Double precioRedMedio() {
+            Double a = generadorUsado();
+            return costoRed == null || a == null || a <= 0 ? null : costoRed / a;
+        }
 
         /** Lo que puso el generador en el consumo del tablero: generado - retornado. */
         public Double generadorUsado() {
@@ -280,6 +305,9 @@ public class GeneradorAnalisisService {
         LocalDateTime ini = desde.atStartOfDay();
         LocalDateTime fin = hasta.atTime(23, 59, 59);
         List<PeriodoMarcha> lista = new ArrayList<>();
+        List<TarifaFranja> tarifas = tarifaFranjaService.listar();
+        Map<YearMonth, TarifaDelMes> tarifaPorMes = new HashMap<>();
+        Function<YearMonth, TarifaDelMes> tarifaDe = m -> tarifaPorMes.computeIfAbsent(m, k -> TarifaFranjaService.delMes(tarifas, k));
         for (Generador g : generadores) {
             List<GeneradorService.Arranque> arranques = generadorService.arranques(g).stream()
                     .filter(a -> !a.inicio().isAfter(fin) && (a.fin() == null || !a.fin().isBefore(ini))).toList();
@@ -294,6 +322,8 @@ public class GeneradorAnalisisService {
             TreeMap<LocalDateTime, Double> importada = redValida ? serieContador(g.redAsociada(), false, primero, ultimo) : new TreeMap<>();
             TreeMap<LocalDateTime, Double> exportada = redValida ? serieContador(g.redAsociada(), true, primero, ultimo) : new TreeMap<>();
             TreeMap<LocalDateTime, Double> potenciaRed = redValida ? seriePotencia(g.redAsociada(), primero, ultimo) : new TreeMap<>();
+            Set<LocalDate> feriados = feriadoService.fechasEntre(primero, ultimo);
+            Predicate<LocalDate> especial = d -> Franja.finDeSemana(d) || feriados.contains(d);
 
             for (GeneradorService.Arranque a : arranques) {
                 LocalDateTime f = a.fin() == null ? LocalDateTime.now().withNano(0) : a.fin();
@@ -321,10 +351,29 @@ public class GeneradorAnalisisService {
                         if (pico == null || pw > pico) pico = pw;
                     }
                 }
+                Double exportado = deltaEnVentana(exportada, a.inicio(), f, KW_MAX_RED);
+                // Comparación con la red: lo generado y lo entregado, repartidos por la franja de la hora en que ocurrieron.
+                // El total del arranque manda (contador del controlador al inicio y al fin): el reparto se escala a ese total.
+                double[] aprovechadoFranja = null;
+                Double costoRed = null;
+                Reparto rg = repartir(kwhGen, a.inicio(), f, KW_MAX_GENERADOR, especial, tarifaDe);
+                if (generado != null && rg.total() > 0) {
+                    Reparto re = repartir(exportada, a.inicio(), f, KW_MAX_RED, especial, tarifaDe);
+                    double escala = generado / rg.total();
+                    aprovechadoFranja = new double[rg.kwh().length];
+                    for (int i = 0; i < aprovechadoFranja.length; i++) {
+                        aprovechadoFranja[i] = Math.max(0, rg.kwh()[i] * escala - re.kwh()[i]);
+                    }
+                    double suma = Arrays.stream(aprovechadoFranja).sum();
+                    double aprovechado = Math.max(0, generado - nz(exportado));
+                    if (suma > 0) {
+                        for (int i = 0; i < aprovechadoFranja.length; i++) aprovechadoFranja[i] *= aprovechado / suma;
+                    }
+                    if (!rg.sinTarifa() && !re.sinTarifa()) costoRed = Math.max(0, rg.costo() * escala - re.costo());
+                }
                 lista.add(new PeriodoMarcha(g.nombre(), g.redAsociada(), a.id(), a.arranqueNro(), a.inicio(), f, a.fin() == null,
                         a.inicioEstimado(), generado, deltaEnVentana(importada, a.inicio(), f, KW_MAX_RED),
-                        deltaEnVentana(exportada, a.inicio(), f, KW_MAX_RED), kwMax, min[0], min[1], min[2],
-                        tomando, lecturasRed, pico));
+                        exportado, kwMax, min[0], min[1], min[2], tomando, lecturasRed, pico, aprovechadoFranja, costoRed));
             }
         }
         lista.sort((x, y) -> y.inicio().compareTo(x.inicio()));
@@ -407,6 +456,47 @@ public class GeneradorAnalisisService {
             a = b;
         }
         return cubierto ? total : null;
+    }
+
+    /** Lo que sumó un contador en una ventana, por franja horaria (A..D), y su valor con la tarifa de la red. */
+    record Reparto(double[] kwh, double costo, boolean sinTarifa) {
+        double total() {
+            return Arrays.stream(kwh).sum();
+        }
+    }
+
+    /**
+     * Igual que {@link #deltaEnVentana}, pero cada tramo entre dos lecturas se reparte entre las franjas que cruza
+     * (en proporción al tiempo) y se valoriza con el precio de esa franja en la tarifa de su mes. sinTarifa = algún
+     * pedazo cayó en un mes sin tarifa cargada (ni propia ni anterior).
+     */
+    static Reparto repartir(TreeMap<LocalDateTime, Double> serie, LocalDateTime ini, LocalDateTime fin, double kwMax,
+                            Predicate<LocalDate> diaEspecial, Function<YearMonth, TarifaDelMes> tarifaDe) {
+        double[] kwh = new double[Franja.values().length];
+        double costo = 0;
+        boolean sinTarifa = false;
+        Map.Entry<LocalDateTime, Double> a = serie.floorEntry(ini);
+        if (a == null) a = serie.ceilingEntry(ini);
+        if (a == null || a.getKey().isAfter(fin)) return new Reparto(kwh, 0, false);
+        for (Map.Entry<LocalDateTime, Double> b : serie.tailMap(a.getKey(), false).entrySet()) {
+            long tramo = Duration.between(a.getKey(), b.getKey()).toSeconds();
+            LocalDateTime desdeAdentro = a.getKey().isAfter(ini) ? a.getKey() : ini;
+            LocalDateTime hastaAdentro = b.getKey().isBefore(fin) ? b.getKey() : fin;
+            Double d = tramo <= 0 ? null : delta(a.getValue(), b.getValue(), kwMax * tramo / 3600.0 + 1);
+            if (d != null && hastaAdentro.isAfter(desdeAdentro)) {
+                double adentro = d * Duration.between(desdeAdentro, hastaAdentro).toSeconds() / tramo;
+                for (Franja.Pedazo p : Franja.partir(desdeAdentro, hastaAdentro, diaEspecial)) {
+                    double k = adentro * p.fraccion();
+                    kwh[p.franja().ordinal()] += k;
+                    TarifaDelMes t = tarifaDe.apply(YearMonth.from(p.desde()));
+                    if (t.sinTarifa()) sinTarifa = true;
+                    else costo += k * t.precio(p.franja());
+                }
+            }
+            if (!b.getKey().isBefore(fin)) break;
+            a = b;
+        }
+        return new Reparto(kwh, costo, sinTarifa);
     }
 
     // ================= Generador =================

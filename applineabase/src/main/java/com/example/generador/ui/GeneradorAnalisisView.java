@@ -6,8 +6,8 @@ import com.example.base.ui.MainLayout;
 import com.example.calidad.service.CalidadEnergiaService.Estado;
 import com.example.generador.model.CostoCombustible;
 import com.example.generador.model.Generador;
+import com.example.franjahoraria.model.Franja;
 import com.example.generador.model.MetaImportacionRed;
-import com.example.generador.model.TarifaRed;
 import com.example.generador.service.ConsumoMedidoresService;
 import com.example.generador.service.ConsumoMedidoresService.ConsumoMedidor;
 import com.example.generador.service.CostoCombustibleService;
@@ -17,7 +17,6 @@ import com.example.generador.service.GeneradorAnalisisService.Fila;
 import com.example.generador.service.GeneradorAnalisisService.PeriodoMarcha;
 import com.example.generador.service.GeneradorService;
 import com.example.generador.service.ReporteGeneradoresService;
-import com.example.generador.service.TarifaRedService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Html;
@@ -58,6 +57,7 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -69,8 +69,9 @@ import java.util.function.Function;
  *   transformador por día, semana o mes; horas en paralelo / isla / vacío; arranques.
  * - Períodos en marcha: por cada arranque, lo que trabajó el generador y lo que se tomó de la red y
  *   se retornó a la red en ese mismo intervalo.
- * - Costos: galones y precio del galón cargados a mano por período en marcha; costo, costo por kWh
- *   y kWh por galón calculados.
+ * - Costos: galones y precio del galón cargados a mano por período en marcha; comparación del costo del diésel con
+ *   lo que habría costado la misma energía en la red, con el precio de la franja horaria de cada hora (tarifas y
+ *   feriados de Consumo por franja horaria).
  *   Al elegir un arranque se ve su balance y con qué máquinas trabajó el generador (encendido / con paradas / apagado).
  * En pantalla se nombra el transformador ("Transformador 1"), nunca "el tablero".
  */
@@ -92,13 +93,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final GeneradorAnalisisService analisis;
     private final ConsumoMedidoresService consumoMedidores;
     private final CostoCombustibleService costos;
-    private final TarifaRedService tarifaService;
     private final ReporteGeneradoresService reporte;
     private final LineaAccessService lineaAccessService;
     /** Semáforo de la meta "consumo cero de la red" (generador-config.json); se relee en cada "Ver". */
     private MetaImportacionRed meta;
-    private List<TarifaRed> tarifas = List.of();
-    private final Grid<TarifaRed> tarifasGrid = new Grid<>();
 
     private final ComboBox<String> generadorCombo = new ComboBox<>("Generador");
     private final ComboBox<Agrupacion> agrupacionCombo = new ComboBox<>("Ver por");
@@ -107,9 +105,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final ComboBox<Integer> anioCombo = new ComboBox<>("Anio");
     private final Span mensaje = new Span();
     private final TabSheet tabs = new TabSheet();
-    private Tab tabEnergia, tabPeriodos;
-    private String scriptGrafico, scriptPeriodos;
+    private Tab tabEnergia, tabPeriodos, tabCostos;
+    private String scriptGrafico, scriptPeriodos, scriptCostos;
     private static final String CHART_PERIODOS = "chartdiv_periodos_marcha";
+    private static final String CHART_COSTOS = "chartdiv_costos_red";
     private static final String CHART_MINUTOS = "chartdiv_marcha_minutos";
 
     // Energía
@@ -122,6 +121,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final Grid<PeriodoMarcha> periodosGrid = new Grid<>();
     // Costos
     private final HorizontalLayout tarjetasCostos = new HorizontalLayout();
+    private final Div chartCostos = new Div();
     private final Grid<PeriodoMarcha> costosGrid = new Grid<>();
     private Map<String, CostoCombustible> combustible = Map.of();
     private List<PeriodoMarcha> periodos = List.of();
@@ -139,13 +139,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     public GeneradorAnalisisView(GeneradorService generadorService, GeneradorAnalisisService analisis,
                                  ConsumoMedidoresService consumoMedidores, CostoCombustibleService costos,
-                                 TarifaRedService tarifaService, ReporteGeneradoresService reporte,
-                                 LineaAccessService lineaAccessService) {
+                                 ReporteGeneradoresService reporte, LineaAccessService lineaAccessService) {
         this.generadorService = generadorService;
         this.analisis = analisis;
         this.consumoMedidores = consumoMedidores;
         this.costos = costos;
-        this.tarifaService = tarifaService;
         this.reporte = reporte;
         this.lineaAccessService = lineaAccessService;
         this.meta = generadorService.metaImportacionRed();
@@ -222,11 +220,12 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         tabs.setWidthFull();
         tabEnergia = tabs.add("Resumen de energia", crearEnergia());
         tabPeriodos = tabs.add("Periodos en marcha", crearPeriodos());
-        tabs.add("Costos", crearCostos());
+        tabCostos = tabs.add("Costos", crearCostos());
         // El gráfico se arma con la pestaña visible (con display:none amCharts lo dibuja sin tamaño).
         tabs.addSelectedChangeListener(e -> {
             if (e.getSelectedTab() == tabEnergia && scriptGrafico != null) getElement().executeJs(scriptGrafico);
             if (e.getSelectedTab() == tabPeriodos && scriptPeriodos != null) getElement().executeJs(scriptPeriodos);
+            if (e.getSelectedTab() == tabCostos && scriptCostos != null) getElement().executeJs(scriptCostos);
         });
 
         add(filtros, mensaje, tabs);
@@ -560,26 +559,31 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private VerticalLayout crearCostos() {
         tarjetasCostos.setWidthFull();
         tarjetasCostos.getStyle().set("flex-wrap", "wrap");
+        chartCostos.setId(CHART_COSTOS);
+        chartCostos.setWidthFull();
+        chartCostos.setHeight("320px");
         costosGrid.addColumn(PeriodoMarcha::generador).setHeader("Generador").setAutoWidth(true).setFlexGrow(0).setFrozen(true);
         costosGrid.addColumn(p -> p.nro() == null ? "-" : String.valueOf(p.nro())).setHeader("Nro").setAutoWidth(true).setFlexGrow(0);
         costosGrid.addColumn(p -> p.inicio().format(CORTA)).setHeader("Inicio").setAutoWidth(true).setFlexGrow(0);
         columna(costosGrid, "Duracion", p -> duracion(p.horas()) + (p.enCurso() ? " (en marcha)" : ""));
         columna(costosGrid, "Generado (kWh)", p -> kwhNum(p.kwhGenerado()));
+        columna(costosGrid, "Entregado a la red (kWh)", p -> kwhNum(p.kwhRedExportada()));
+        columna(costosGrid, "Aprovechado (kWh)", p -> kwhNum(p.generadorUsado()));
+        costosGrid.addColumn(GeneradorAnalisisView::franjas).setHeader("Aprovechado por franja (kWh)").setAutoWidth(true).setFlexGrow(0);
         columna(costosGrid, "Galones", p -> c(p) == null ? "-" : String.format(Locale.ROOT, "%,.2f", c(p).getGalones()));
         columna(costosGrid, "Precio galon", p -> c(p) == null ? "-" : dinero(c(p).getPrecioGalon()));
-        columna(costosGrid, "Costo", p -> c(p) == null ? "-" : dinero(c(p).costo()));
-        columna(costosGrid, "Costo por kWh", p -> c(p) == null || p.kwhGenerado() == null || p.kwhGenerado() <= 0 ? "-"
-                : String.format(Locale.ROOT, "$ %.3f", c(p).costo() / p.kwhGenerado()));
+        columna(costosGrid, "Costo diesel", p -> c(p) == null ? "-" : dinero(c(p).costo()));
+        columna(costosGrid, "Costo en la red", p -> p.costoRed() == null ? "-" : dinero(p.costoRed()));
+        columna(costosGrid, "Diesel $/kWh", p -> precioKwh(precioDiesel(p)));
+        columna(costosGrid, "Red $/kWh", p -> precioKwh(p.precioRedMedio()));
+        costosGrid.addComponentColumn(this::vecesSpan).setHeader("Generar vs red").setAutoWidth(true).setFlexGrow(0)
+                .setTextAlign(ColumnTextAlign.END);
+        costosGrid.addComponentColumn(p -> diferenciaSpan(diferencia(p))).setHeader("Diferencia").setAutoWidth(true).setFlexGrow(0)
+                .setTextAlign(ColumnTextAlign.END);
         columna(costosGrid, "kWh por galon", p -> c(p) == null || c(p).getGalones() <= 0 || p.kwhGenerado() == null ? "-"
                 : String.format(Locale.ROOT, "%.1f", p.kwhGenerado() / c(p).getGalones()));
         columna(costosGrid, "Galones por hora", p -> c(p) == null || p.horas() <= 0 ? "-"
                 : String.format(Locale.ROOT, "%.1f", c(p).getGalones() / p.horas()));
-        columna(costosGrid, "Aprovechado (kWh)", p -> kwhNum(aprovechado(p)));
-        columna(costosGrid, "Tarifa red", p -> tarifa(p) == null ? "sin tarifa"
-                : String.format(Locale.ROOT, "$ %.4f", tarifa(p).getPrecioKwh()));
-        columna(costosGrid, "Costo en la red", p -> costoRed(p) == null ? "-" : dinero(costoRed(p)));
-        costosGrid.addComponentColumn(p -> ahorroSpan(ahorro(p))).setHeader("Ahorro").setAutoWidth(true).setFlexGrow(0)
-                .setTextAlign(ColumnTextAlign.END);
         costosGrid.addColumn(p -> c(p) == null ? "" : (c(p).getUsuario() == null ? "" : c(p).getUsuario())
                 + (c(p).getObservacion() == null ? "" : " - " + c(p).getObservacion()))
                 .setHeader("Cargado por / observacion").setAutoWidth(true);
@@ -592,125 +596,67 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         costosGrid.setWidthFull();
         costosGrid.setHeight("520px");
-        Span nota = nota("Por cada periodo en marcha se cargan a mano los galones de diesel usados y el precio del galon"
+        Span nota = nota("Por cada arranque se cargan a mano los galones de diesel usados y el precio del galon"
                 + (lineaAccessService.esAdmin() ? " (boton Cargar / Editar)" : " (solo el administrador)")
-                + ". El costo, el costo por kWh generado, los kWh por galon y los galones por hora se calculan. "
-                + "Aprovechado = generado - retornado a la red (lo que volvio a la red no se ahorro: se asume que el distribuidor "
-                + "no lo paga). Costo en la red = aprovechado x tarifa vigente al inicio del periodo. Ahorro = costo en la red - "
-                + "costo del combustible; negativo (rojo) = el generador costo mas que la red. "
-                + "Los totales de arriba solo cuentan los periodos con combustible cargado.");
+                + "; al guardarlos aparece su comparacion. Aprovechado = generado - entregado a la red: lo que volvio a la red "
+                + "no reemplazo energia de la red ni se paga. Costo en la red = cada kWh aprovechado al precio de la franja "
+                + "horaria (A, B, C o D) de la hora en que se genero, con la tarifa de su mes y los feriados de Consumo por franja "
+                + "horaria. Diesel $/kWh = costo del diesel / kWh aprovechados. Generar vs red = costo del diesel / costo en la red: "
+                + "2.0 veces = generar costo el doble. Solo se compara energia contra combustible: no entran el mantenimiento del "
+                + "generador ni los otros cargos de la factura de la red (demanda, comercializacion). Las tarjetas de arriba suman "
+                + "solo los arranques con diesel cargado. Entregado a la red sin pago = kWh entregados x costo del diesel por kWh "
+                + "generado.");
 
-        H4 tituloTarifas = new H4("Tarifas de la red");
-        tituloTarifas.getStyle().set("margin", "16px 0 0 0");
-        tarifasGrid.addColumn(t -> MESES[t.getVigenteDesde().getMonthValue() - 1] + " " + t.getVigenteDesde().getYear())
-                .setHeader("Vigente desde").setAutoWidth(true).setFlexGrow(0);
-        tarifasGrid.addColumn(t -> String.format(Locale.ROOT, "$ %.4f", t.getPrecioKwh())).setHeader("Precio por kWh")
-                .setAutoWidth(true).setFlexGrow(0).setTextAlign(ColumnTextAlign.END);
-        tarifasGrid.addColumn(t -> t.getObservacion() == null ? "" : t.getObservacion()).setHeader("Observacion").setAutoWidth(true);
-        tarifasGrid.addColumn(t -> (t.getUsuario() == null ? "" : t.getUsuario()) + " " + t.getFechaRegistro().format(CORTA))
-                .setHeader("Cargada por").setAutoWidth(true).setFlexGrow(0);
-        tarifasGrid.setWidth("760px");
-        tarifasGrid.setAllRowsVisible(true);
-        VerticalLayout seccionTarifas = new VerticalLayout(tituloTarifas, nota("Precio de la energia de la red por mes de vigencia "
-                + "(por ejemplo, el valor medio por kWh de la factura). Cada periodo usa la tarifa vigente en su inicio; rige hasta "
-                + "que se cargue otra." + (lineaAccessService.esAdmin() ? " Clic en una fila para editarla." : "")));
-        seccionTarifas.setPadding(false);
-        if (lineaAccessService.esAdmin()) {
-            Button nueva = new Button("Nueva tarifa", VaadinIcon.PLUS.create(), e -> abrirDialogoTarifa(null));
-            seccionTarifas.add(nueva);
-            tarifasGrid.addItemClickListener(e -> abrirDialogoTarifa(e.getItem()));
-        }
-        seccionTarifas.add(tarifasGrid);
-
-        VerticalLayout v = new VerticalLayout(descripcion("Lo que costo el combustible de cada periodo en marcha (cargado a mano) y la "
-                + "comparacion con lo que habria costado tomar esa energia de la red."), tarjetasCostos, costosGrid, nota, seccionTarifas);
+        VerticalLayout v = new VerticalLayout(descripcion("Cuanto cuesta generar con diesel contra comprar la misma energia a la red, "
+                + "arranque por arranque. El precio de la red es el de la franja horaria de la hora en que se genero cada kWh."),
+                tarjetasCostos, chartCostos, costosGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
         return v;
     }
 
-    private TarifaRed tarifa(PeriodoMarcha p) {
-        return TarifaRedService.vigente(tarifas, p.inicio().toLocalDate()).orElse(null);
+    /** "A 5,699 · B 2,178 · C 27,208" (sin las franjas en cero). */
+    private static String franjas(PeriodoMarcha p) {
+        if (p.aprovechadoFranja() == null) return "-";
+        StringBuilder s = new StringBuilder();
+        for (Franja f : Franja.values()) {
+            double v = p.aprovechadoFranja()[f.ordinal()];
+            if (v < 0.5) continue;
+            s.append(s.isEmpty() ? "" : " · ").append(f.name()).append(' ').append(String.format(Locale.ROOT, "%,.0f", v));
+        }
+        return s.isEmpty() ? "-" : s.toString();
     }
 
-    /** Energía del generador que se usó en la planta: generada - retornada a la red. */
-    private static Double aprovechado(PeriodoMarcha p) {
-        return p.kwhGenerado() == null ? null : Math.max(0, p.kwhGenerado() - (p.kwhRedExportada() == null ? 0 : p.kwhRedExportada()));
+    /** $ de diésel por kWh aprovechado (la energía que reemplazó a la de la red). */
+    private Double precioDiesel(PeriodoMarcha p) {
+        Double a = p.generadorUsado();
+        return c(p) == null || a == null || a <= 0 ? null : c(p).costo() / a;
     }
 
-    private Double costoRed(PeriodoMarcha p) {
-        Double a = aprovechado(p);
-        TarifaRed t = tarifa(p);
-        return a == null || t == null ? null : a * t.getPrecioKwh();
+    /** Costo del diésel - costo en la red: positivo = generar salió más caro. */
+    private Double diferencia(PeriodoMarcha p) {
+        return c(p) == null || p.costoRed() == null ? null : c(p).costo() - p.costoRed();
     }
 
-    private Double ahorro(PeriodoMarcha p) {
-        Double red = costoRed(p);
-        return red == null || c(p) == null ? null : red - c(p).costo();
-    }
-
-    private static Span ahorroSpan(Double v) {
-        Span s = new Span(v == null ? "-" : dinero(v));
-        if (v != null) s.getStyle().set("color", v >= 0 ? "#155724" : "#721c24").set("font-weight", "600");
+    private Span vecesSpan(PeriodoMarcha p) {
+        Span s = new Span();
+        if (c(p) == null || p.costoRed() == null || p.costoRed() <= 0) {
+            s.setText("-");
+            return s;
+        }
+        double veces = c(p).costo() / p.costoRed();
+        GeneradorView.badge(s, String.format(Locale.ROOT, "%.1f veces", veces), veces > 1 ? Estado.FUERA : Estado.OK);
         return s;
     }
 
-    private void abrirDialogoTarifa(TarifaRed actual) {
-        Dialog d = new Dialog();
-        d.setHeaderTitle(actual == null ? "Nueva tarifa de la red" : "Editar tarifa de la red");
-        ComboBox<YearMonth> mes = new ComboBox<>("Vigente desde");
-        List<YearMonth> meses = new ArrayList<>();
-        for (YearMonth m = YearMonth.now().plusMonths(12); meses.size() < 60; m = m.minusMonths(1)) meses.add(m);
-        mes.setItems(meses);
-        mes.setItemLabelGenerator(m -> MESES[m.getMonthValue() - 1] + " " + m.getYear());
-        mes.setWidthFull();
-        NumberField precio = new NumberField("Precio por kWh ($)");
-        precio.setMin(0.0001);
-        precio.setMax(TarifaRedService.PRECIO_MAXIMO);
-        precio.setStep(0.0001);
-        precio.setWidthFull();
-        TextField observacion = new TextField("Observacion (opcional)");
-        observacion.setMaxLength(255);
-        observacion.setPlaceholder("ej. factura de septiembre, tarifa industrial");
-        observacion.setWidthFull();
-        if (actual != null) {
-            mes.setValue(YearMonth.from(actual.getVigenteDesde()));
-            mes.setReadOnly(true);
-            precio.setValue(actual.getPrecioKwh());
-            observacion.setValue(actual.getObservacion() == null ? "" : actual.getObservacion());
-        } else {
-            mes.setValue(YearMonth.now());
-        }
-        VerticalLayout contenido = new VerticalLayout(mes, precio, observacion);
-        contenido.setPadding(false);
-        contenido.setWidth("360px");
-        d.add(contenido);
-        Button guardar = new Button("Guardar", e -> {
-            if (mes.getValue() == null || precio.getValue() == null || precio.isInvalid()) {
-                Notification.show("Elija el mes e ingrese el precio por kWh", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-            try {
-                tarifaService.guardar(mes.getValue(), precio.getValue(), observacion.getValue(), lineaAccessService.usuarioActual());
-                d.close();
-                verCostos();
-            } catch (IllegalArgumentException ex) {
-                Notification.show(ex.getMessage(), 4000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
-            }
-        });
-        guardar.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        d.getFooter().add(new Button("Cancelar", e -> d.close()), guardar);
-        if (actual != null) {
-            Button borrar = new Button("Borrar", VaadinIcon.TRASH.create(), e -> {
-                tarifaService.borrar(actual);
-                d.close();
-                verCostos();
-            });
-            borrar.addThemeVariants(ButtonVariant.LUMO_ERROR);
-            d.getFooter().addComponentAsFirst(borrar);
-        }
-        d.open();
+    private static Span diferenciaSpan(Double v) {
+        Span s = new Span(v == null ? "-" : v >= 0 ? dinero(v) + " de mas" : dinero(-v) + " de ahorro");
+        if (v != null) s.getStyle().set("color", v > 0 ? "#721c24" : "#155724").set("font-weight", "600");
+        return s;
+    }
+
+    private static String precioKwh(Double v) {
+        return v == null ? "-" : String.format(Locale.ROOT, "$ %.3f", v);
     }
 
     private CostoCombustible c(PeriodoMarcha p) {
@@ -719,54 +665,89 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     private void verCostos() {
         combustible = costos.porPeriodo(periodos);
-        tarifas = tarifaService.listar();
-        tarifasGrid.setItems(tarifas);
         costosGrid.setItems(periodos);
-        double galones = 0, costo = 0, kwhConCombustible = 0, horasConCombustible = 0;
-        double costoRed = 0, costoComparado = 0, kwhAprovechado = 0;
-        int cargados = 0, comparados = 0;
-        for (PeriodoMarcha p : periodos) {
+        // Con diesel cargado: galones, costo, horas y rendimiento por generador.
+        double galones = 0, costoCargados = 0, horasCargados = 0;
+        int cargados = 0;
+        Map<String, double[]> rendimiento = new LinkedHashMap<>(); // generador -> {kWh generados, galones}
+        // Comparados: además, con costo en la red y algo aprovechado.
+        double costoDiesel = 0, costoRed = 0, kwhAprovechado = 0, kwhEntregado = 0, kwhGenerado = 0;
+        int comparados = 0;
+        List<String> categorias = new ArrayList<>();
+        List<Double[]> valores = new ArrayList<>();
+        for (int i = periodos.size() - 1; i >= 0; i--) { // del más viejo al más nuevo (orden del gráfico)
+            PeriodoMarcha p = periodos.get(i);
             CostoCombustible cc = c(p);
             if (cc == null) continue;
             cargados++;
             galones += cc.getGalones();
-            costo += cc.costo();
-            horasConCombustible += p.horas();
-            if (p.kwhGenerado() != null) kwhConCombustible += p.kwhGenerado();
-            Double red = costoRed(p);
-            if (red != null) {
-                comparados++;
-                costoRed += red;
-                costoComparado += cc.costo();
-                kwhAprovechado += aprovechado(p);
+            costoCargados += cc.costo();
+            horasCargados += p.horas();
+            if (p.kwhGenerado() != null) {
+                double[] r = rendimiento.computeIfAbsent(p.generador(), k -> new double[2]);
+                r[0] += p.kwhGenerado();
+                r[1] += cc.getGalones();
             }
+            Double aprovechado = p.generadorUsado();
+            if (p.costoRed() == null || aprovechado == null || aprovechado <= 0) continue;
+            comparados++;
+            costoDiesel += cc.costo();
+            costoRed += p.costoRed();
+            kwhAprovechado += aprovechado;
+            kwhGenerado += p.kwhGenerado();
+            kwhEntregado += p.kwhRedExportada() == null ? 0 : p.kwhRedExportada();
+            categorias.add(p.generador() + " " + p.inicio().format(DateTimeFormatter.ofPattern("dd-MM HH:mm")));
+            valores.add(new Double[]{cc.costo() / aprovechado, p.costoRed() / aprovechado});
         }
+
         tarjetasCostos.removeAll();
-        tarjetasCostos.add(tarjeta("Galones usados", cargados == 0 ? "-" : String.format(Locale.ROOT, "%,.1f gal", galones),
-                cargados + " de " + periodos.size() + " periodos cargados"));
-        tarjetasCostos.add(tarjeta("Costo de combustible", cargados == 0 ? "-" : dinero(costo),
-                cargados == 0 || galones <= 0 ? null : "precio medio " + dinero(costo / galones) + " por galon"));
-        tarjetasCostos.add(tarjeta("Generado", cargados == 0 ? "-" : kwh(kwhConCombustible), "en los periodos cargados"));
-        tarjetasCostos.add(tarjeta("Costo por kWh generado", cargados == 0 || kwhConCombustible <= 0 ? "-"
-                : String.format(Locale.ROOT, "$ %.3f", costo / kwhConCombustible), null));
-        tarjetasCostos.add(tarjeta("Rendimiento", cargados == 0 || galones <= 0 ? "-"
-                : String.format(Locale.ROOT, "%.1f kWh/gal", kwhConCombustible / galones), null));
-        tarjetasCostos.add(tarjeta("Consumo por hora", cargados == 0 || horasConCombustible <= 0 ? "-"
-                : String.format(Locale.ROOT, "%.1f gal/h", galones / horasConCombustible), null));
-        if (cargados > 0 && comparados == 0) {
-            tarjetasCostos.add(tarjeta("Comparacion con la red", "sin tarifa", "cargue la tarifa de la red (abajo)"));
+        if (cargados == 0) {
+            tarjetasCostos.add(tarjeta("Comparacion con la red", "-", "ningun arranque del periodo tiene el diesel cargado"
+                    + (lineaAccessService.esAdmin() ? " (boton Cargar en la tabla)" : "")));
+        } else if (comparados == 0) {
+            tarjetasCostos.add(tarjeta("Comparacion con la red", "sin tarifa", "cargar la tarifa en Consumo por franja horaria > Tarifas"));
+        } else {
+            tarjetasCostos.add(tarjeta("Costo de generar (diesel)", dinero(costoDiesel), precioKwh(costoDiesel / kwhAprovechado)
+                    + " por kWh aprovechado; " + comparados + " de " + periodos.size() + " arranques con diesel cargado"));
+            tarjetasCostos.add(tarjeta("La red habria costado", dinero(costoRed), precioKwh(costoRed / kwhAprovechado)
+                    + " por kWh, con el precio de la franja de cada hora"));
+            double diferencia = costoDiesel - costoRed;
+            tarjetasCostos.add(diferencia > 0
+                    ? tarjetaKpi(String.format(Locale.ROOT, "Generar sale %.1f veces la red", costoDiesel / costoRed),
+                    dinero(diferencia) + " de mas", String.format(Locale.ROOT, "%,.0f kWh aprovechados", kwhAprovechado), Estado.FUERA)
+                    : tarjetaKpi("Generar sale mas barato que la red", dinero(-diferencia) + " de ahorro",
+                    String.format(Locale.ROOT, "%,.0f kWh aprovechados", kwhAprovechado), Estado.OK));
+            double costoKwhGenerado = kwhGenerado > 0 ? costoDiesel / kwhGenerado : 0;
+            tarjetasCostos.add(tarjeta("Entregado a la red sin pago", kwh(kwhEntregado), kwhEntregado < 0.5 ? null
+                    : dinero(kwhEntregado * costoKwhGenerado) + " de diesel, a " + precioKwh(costoKwhGenerado) + " por kWh generado"));
+        }
+        if (cargados > 0) {
+            double kwhRend = 0, galRend = 0;
+            List<String> porGenerador = new ArrayList<>();
+            for (Map.Entry<String, double[]> e : rendimiento.entrySet()) {
+                kwhRend += e.getValue()[0];
+                galRend += e.getValue()[1];
+                if (e.getValue()[1] > 0) {
+                    porGenerador.add(e.getKey() + String.format(Locale.ROOT, " %.1f", e.getValue()[0] / e.getValue()[1]));
+                }
+            }
+            tarjetasCostos.add(tarjeta("Rendimiento", galRend <= 0 ? "-" : String.format(Locale.ROOT, "%.1f kWh/gal", kwhRend / galRend),
+                    porGenerador.size() > 1 ? String.join(" · ", porGenerador) + " kWh/gal" : null));
+            tarjetasCostos.add(tarjeta("Diesel usado", String.format(Locale.ROOT, "%,.1f gal", galones),
+                    (horasCargados > 0 ? String.format(Locale.ROOT, "%.1f gal/h; ", galones / horasCargados) : "")
+                            + (galones > 0 ? "precio medio " + dinero(costoCargados / galones) + " por galon" : "")));
+        }
+
+        if (comparados == 0) {
+            scriptCostos = null;
+            chartCostos.setVisible(false);
             return;
         }
-        if (comparados == 0) return;
-        tarjetasCostos.add(tarjeta("Costo en la red", dinero(costoRed), String.format(Locale.ROOT,
-                "%,.0f kWh aprovechados a %s/kWh medio", kwhAprovechado,
-                kwhAprovechado > 0 ? String.format(Locale.ROOT, "$ %.4f", costoRed / kwhAprovechado) : "-")));
-        double ahorro = costoRed - costoComparado;
-        Component t = tarjeta(ahorro >= 0 ? "Ahorro con el generador" : "Sobrecosto del generador", dinero(Math.abs(ahorro)),
-                comparados + " periodos comparados");
-        t.getElement().getStyle().set("border-color", ahorro >= 0 ? "#155724" : "#721c24")
-                .set("background-color", ahorro >= 0 ? "#d4edda" : "#f8d7da");
-        tarjetasCostos.add(t);
+        chartCostos.setVisible(true);
+        scriptCostos = GraficaModel.getBarrasAgrupadasScript(CHART_COSTOS, categorias,
+                new String[]{"Diesel $/kWh aprovechado", "Red $/kWh (franja de cada hora)"}, new String[]{NARANJA, AZUL},
+                valores, "$/kWh", "#.000");
+        if (tabs.getSelectedTab() == tabCostos) getElement().executeJs(scriptCostos);
     }
 
     private void abrirDialogoCosto(PeriodoMarcha p) {

@@ -8,8 +8,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /** Feriados cargados a mano (opcional): esos días cuentan como sábado o domingo en las franjas. */
@@ -32,6 +34,13 @@ public class FeriadoService {
         Map<LocalDate, String> m = new TreeMap<>();
         for (Feriado f : repository.findByFechaBetween(mes.atDay(1), mes.atEndOfMonth())) m.put(f.getFecha(), f.getNombre());
         return m;
+    }
+
+    /** Fechas de los feriados entre dos días (inclusive). */
+    public Set<LocalDate> fechasEntre(LocalDate desde, LocalDate hasta) {
+        Set<LocalDate> s = new HashSet<>();
+        for (Feriado f : repository.findByFechaBetween(desde, hasta)) s.add(f.getFecha());
+        return s;
     }
 
     /** Agrega el feriado, o le cambia el nombre si esa fecha ya estaba. */

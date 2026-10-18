@@ -1,8 +1,12 @@
 package com.example.franjahoraria.model;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Franjas horarias de la tarifa de la empresa eléctrica. Días especiales = sábado, domingo y feriados
@@ -40,6 +44,29 @@ public enum Franja {
 
     public static boolean finDeSemana(LocalDate dia) {
         return dia.getDayOfWeek() == DayOfWeek.SATURDAY || dia.getDayOfWeek() == DayOfWeek.SUNDAY;
+    }
+
+    /** Un pedazo de un tramo que cae entero en una franja: desde dónde, franja, segundos y la parte del total. */
+    public record Pedazo(LocalDateTime desde, Franja franja, double segundos, double fraccion) {
+    }
+
+    /**
+     * Parte [desde, hasta) en los pedazos de cada franja que cruza; fraccion = parte del tiempo total, para
+     * repartir en proporción lo que se midió en el tramo. diaEspecial: sábado, domingo o feriado.
+     */
+    public static List<Pedazo> partir(LocalDateTime desde, LocalDateTime hasta, Predicate<LocalDate> diaEspecial) {
+        List<Pedazo> lista = new ArrayList<>();
+        double total = Duration.between(desde, hasta).toMillis() / 1000.0;
+        if (total <= 0) return lista;
+        LocalDateTime t = desde;
+        while (t.isBefore(hasta)) {
+            LocalDateTime corte = siguienteCorte(t);
+            LocalDateTime fin = corte.isBefore(hasta) ? corte : hasta;
+            double s = Duration.between(t, fin).toMillis() / 1000.0;
+            lista.add(new Pedazo(t, de(t, diaEspecial.test(t.toLocalDate())), s, s / total));
+            t = fin;
+        }
+        return lista;
     }
 
     /** Próximo cambio posible de franja después de t: 08h00, 18h00, 22h00 o medianoche. */
