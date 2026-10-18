@@ -13,5 +13,10 @@
     "unitId" : 1,
     "redAsociada" : "Trafo1",
     "descripcion" : "Generador Caterpillar, controlador ComAp InteliGen 500 (junto a TR1). Solo lectura."
-  } ]
+  } ],
+  "metaImportacionRed" : {
+    "verdeHasta" : 2.0,
+    "amarilloHasta" : 10.0,
+    "descripcion" : "Semaforo de la meta consumo cero de la red (% del consumo importado de la red): verde hasta verdeHasta, amarillo hasta amarilloHasta, rojo por encima. Lo usan Analisis y el reporte de generadores."
+  }
 }

@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reporte de generadores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Reporte de generadores. Arriba se eligen los arranques (no se imprime). El reporte va al punto:
+   horas y energia, balance energetico del periodo, combustible y costo; despues la tabla por periodo
+   y el balance energetico diario. El perfil de potencia por arranque es un anexo opcional.
+   Pensado para imprimir o guardar como PDF desde el navegador. */
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --ink: #17212b;
+  --muted: #5a6572;
+  --line: #dce1e7;
+  --gen: #dd5f2a;
+  --cons: #4a525c;
+  --grid: #2a6fd0;
+  --out: #16956a;
+  --ok-bg: #d8f0e0; --ok-fg: #15602f;
+  --warn-bg: #fdf0d2; --warn-fg: #7a5208;
+  --bad-bg: #fadcdc; --bad-fg: #8a1f1f;
+  --info-bg: #e3ebf7; --info-fg: #23477a;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --f-data: "IBM Plex Mono", Consolas, "Courier New", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10161c; --surface: #172028; --ink: #e5eaef; --muted: #9ba6b2; --line: #2a3540;
+    --gen: #f07a45; --cons: #c3cad3; --grid: #6aa2f2; --out: #37c28f;
+    --ok-bg: #173826; --ok-fg: #8fe0ad; --warn-bg: #3d3014; --warn-fg: #f1cf7e;
+    --bad-bg: #3f1d1d; --bad-fg: #f3a5a5; --info-bg: #1b2b40; --info-fg: #a9c6ee;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10161c; --surface: #172028; --ink: #e5eaef; --muted: #9ba6b2; --line: #2a3540;
+  --gen: #f07a45; --cons: #c3cad3; --grid: #6aa2f2; --out: #37c28f;
+  --ok-bg: #173826; --ok-fg: #8fe0ad; --warn-bg: #3d3014; --warn-fg: #f1cf7e;
+  --bad-bg: #3f1d1d; --bad-fg: #f3a5a5; --info-bg: #1b2b40; --info-fg: #a9c6ee;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--f-body); }
+.hoja { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 48px; display: grid; gap: 22px; }
+.hoja > *, .panel > *, #reporte > *, #detalle > * { min-width: 0; }
+#reporte, #detalle { display: grid; gap: 20px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; line-height: 1.15; text-wrap: balance; }
+h1 { font-size: clamp(28px, 4.4vw, 40px); font-weight: 700; }
+h2 { font-size: 20px; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+p { margin: 0; }
+.etiqueta { font: 600 12px/1.3 var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.cabecera { display: grid; gap: 8px; border-bottom: 2px solid var(--ink); padding-bottom: 16px; }
+.cabecera .rango { font: 600 20px/1.3 var(--f-display); color: var(--muted); }
+.cabecera p#bajada { font-size: 18px; max-width: 70ch; }
+
+/* ---------- Selector de arranques (solo pantalla) ---------- */
+.selector { border-left: 4px solid var(--ink); }
+.sel-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+#selCuenta { font-size: 14px; color: var(--muted); }
+.filtros { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+.filtros label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 500; }
+select, input[type="date"] { font: 15px var(--f-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; min-height: 40px; }
+button { font: 600 14px var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 9px 14px; min-height: 40px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primario { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--grid); outline-offset: 2px; }
+.lista-scroll { max-height: 330px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+#tSel { min-width: 640px; font-size: 14px; }
+#tSel th, #tSel td { padding: 7px 10px; }
+#tSel thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+#tSel tbody tr { cursor: pointer; }
+#tSel tbody tr:hover { background: var(--bg); }
+#tSel tbody tr.apagada td { color: var(--muted); }
+#tSel th:nth-child(2), #tSel td:nth-child(2), #tSel th:nth-child(3), #tSel td:nth-child(3) { text-align: left; }
+input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--grid); cursor: pointer; vertical-align: middle; }
+.opcion { display: flex; gap: 8px; align-items: center; font-size: 15px; cursor: pointer; }
+.opcion small { color: var(--muted); font-size: 13px; }
+.acciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#aviso { font-size: 14px; color: var(--warn-fg); background: var(--warn-bg); padding: 4px 10px; border-radius: 4px; }
+#aviso:empty { display: none; }
+
+/* ---------- Reporte ---------- */
+.cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.cifras.cinco { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.cifras.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 860px) { .cifras, .cifras.cinco, .cifras.tres { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.lienzo.bajo { height: 150px; }
+.kpi { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 15px; color: var(--muted); }
+.kpi b { font: 600 34px/1 var(--f-data); color: var(--ink); }
+.lienzo.kpi-barra { height: 80px; }
+.cuadre { display: grid; gap: 4px; font-size: 14.5px; }
+.cuadre .fila { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.cuadre .fila b { font-family: var(--f-data); font-weight: 600; }
+.cuadre .fila i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+.cuadre .resultado { border-top: 1px solid var(--line); padding-top: 6px; margin-top: 2px; font-weight: 600; }
+@media (max-width: 420px) { .cifras, .cifras.cinco, .cifras.tres { grid-template-columns: minmax(0, 1fr); } }
+.cifra { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--ink); padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.cifra.gen { border-top-color: var(--gen); }
+.cifra.cons { border-top-color: var(--cons); }
+.cifra.red { border-top-color: var(--grid); }
+.cifra.out { border-top-color: var(--out); }
+.cifra.bien { background: var(--ok-bg); border-color: var(--ok-fg); }
+.cifra.mal { background: var(--bad-bg); border-color: var(--bad-fg); }
+.cifra .valor { font: 600 clamp(22px, 3vw, 30px)/1.05 var(--f-data); font-variant-numeric: tabular-nums; }
+.cifra .valor small { font-size: 14px; font-weight: 500; color: var(--muted); }
+.cifra .valor.texto { font: 600 20px/1.2 var(--f-display); color: var(--muted); }
+.cifra .det { font-size: 13.5px; color: var(--muted); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); padding: 18px; display: grid; gap: 12px; }
+.panel .intro { font-size: 14px; color: var(--muted); }
+.donas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 700px) { .donas { grid-template-columns: minmax(0, 1fr); } }
+.dona { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 18px; align-items: center; }
+@media (max-width: 420px) { .dona { grid-template-columns: minmax(0, 1fr); justify-items: center; } }
+.dona-caja { position: relative; width: 180px; height: 180px; }
+.dona-caja .centro { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
+.centro b { font: 600 28px/1 var(--f-data); }
+.centro span { display: block; font-size: 12px; line-height: 1.25; color: var(--muted); max-width: 100px; margin: 4px auto 0; }
+.dona-ley { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 14.5px; }
+.dona-ley li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 2px 10px; }
+.dona-ley i { width: 12px; height: 12px; border-radius: 3px; margin-top: 5px; }
+.dona-ley b { font-family: var(--f-data); font-weight: 600; }
+.dona-ley .sub { grid-column: 2; color: var(--muted); font-size: 13px; }
+.nota-datos { font-size: 13.5px; color: var(--muted); }
+
+.tabla-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14.5px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; }
+th:first-child, td:first-child { text-align: left; }
+#tArr th:nth-child(2), #tArr td:nth-child(2) { text-align: left; }
+thead th { font: 600 11.5px var(--f-body); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+td.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.sin { color: var(--muted); }
+tfoot td { font-weight: 600; border-top: 2px solid var(--ink); border-bottom: none; }
+.chip { display: inline-block; padding: 1px 9px; border-radius: 999px; font: 600 13px/1.6 var(--f-body); white-space: nowrap; }
+.chip.ok { background: var(--ok-bg); color: var(--ok-fg); }
+.chip.warn { background: var(--warn-bg); color: var(--warn-fg); }
+.chip.bad { background: var(--bad-bg); color: var(--bad-fg); }
+.chip.info { background: var(--info-bg); color: var(--info-fg); }
+
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 14px; color: var(--muted); }
+.leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+.leyenda i.linea { height: 3px; width: 14px; vertical-align: middle; border-radius: 0; }
+.lienzo { position: relative; height: 240px; min-width: 0; }
+.lienzo.mini { height: 150px; }
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 14px; }
+.tarjeta { border: 1px solid var(--line); border-top: 3px solid var(--gen); padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.tarjeta .titulo { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
+.tarjeta .cuando { font-size: 13.5px; color: var(--muted); }
+.vacio { font-size: 14px; color: var(--muted); padding: 24px 0; text-align: center; }
+.separador { border-top: 2px solid var(--ink); padding-top: 14px; display: grid; gap: 6px; }
+
+ul.notas { margin: 0; padding-left: 20px; display: grid; gap: 7px; font-size: 14.5px; max-width: 85ch; }
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 4px; }
+
+@page { size: A4; margin: 12mm; }
+@media print {
+  :root { --bg: #ffffff; --surface: #ffffff; --ink: #000000; --muted: #444444; --line: #cccccc; --cons: #4a525c; color-scheme: light; }
+  body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .no-imprimir { display: none !important; }
+  .hoja { padding: 0; }
+  /* Contenedores en bloque al imprimir: Chromium no agranda una fila de grilla cuando un hijo pasa entero a la pagina siguiente y encima lo que sigue. */
+  .hoja, #reporte, #detalle, .panel { display: block; }
+  #reporte > * + *, #detalle > * + *, .panel > * + * { margin-top: 10px; }
+  .cifras { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+  .cifras.cinco { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .cifras.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lienzo.bajo { height: 120px; }
+  .kpi { font-size: 12.5px; }
+  .kpi b { font-size: 26px; }
+  .lienzo.kpi-barra { height: 70px; }
+  .cuadre { font-size: 12px; }
+  .cifra { padding: 9px 11px; }
+  .cifra .valor { font-size: 19px; }
+  .cifra .valor.texto { font-size: 15px; }
+  .cifra .det { font-size: 11px; }
+  .cabecera p#bajada { font-size: 14px; }
+  .cabecera .rango { font-size: 16px; }
+  .panel { padding: 11px; }
+  .donas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .dona { grid-template-columns: 130px minmax(0, 1fr); gap: 10px; }
+  .dona-caja { width: 130px; height: 130px; }
+  .centro b { font-size: 20px; }
+  .centro span { font-size: 9.5px; max-width: 72px; }
+  .dona-ley { font-size: 12px; gap: 6px; }
+  .dona-ley .sub { font-size: 11px; }
+  .panel, .cifra, .tarjeta, tr, li, .donas { break-inside: avoid; }
+  h2 { break-after: avoid; }
+  #detalle { break-before: page; }
+  .panel-tarjetas { break-inside: auto; }
+  /* Tarjetas de cada arranque de a dos por fila: bloques en linea, que pasan enteros a la pagina siguiente. */
+  .tarjetas { display: block; font-size: 0; }
+  .tarjeta { display: inline-block; vertical-align: top; width: calc(50% - 5px); margin: 0 0 10px; font-size: 14px; }
+  .tarjeta:nth-child(odd) { margin-right: 10px; }
+  /* Cada grafico ocupa justo su caja (alto fijo); al imprimir se redibuja con el ancho de la hoja (ver ajustarImpresion). */
+  .lienzo canvas, .dona-caja canvas { width: 100% !important; height: 100% !important; }
+  .lienzo { height: 210px; }
+  .lienzo.mini { height: 120px; }
+  .tabla-scroll { overflow: visible; }
+  table { min-width: 0; font-size: 11px; }
+  th, td { padding: 5px 4px; }
+  thead th { font-size: 9px; letter-spacing: 0.02em; }
+  .chip { font-size: 10.5px; padding: 0 6px; }
+  ul.notas { font-size: 11.5px; gap: 3px; max-width: none; }
+  .nota-datos, .panel .intro { font-size: 11.5px; }
+  footer { font-size: 10.5px; }
+}
+</style>
+</head>
+<body>
+<main class="hoja">
+
+  <section class="panel selector no-imprimir" aria-labelledby="t-sel">
+    <div class="sel-cab">
+      <h2 id="t-sel">Elegir los arranques del reporte</h2>
+      <span id="selCuenta"></span>
+    </div>
+    <div class="filtros">
+      <label>Generador <select id="fGen"><option value="">Todos</option></select></label>
+      <label>Desde <input type="date" id="fDesde"></label>
+      <label>Hasta <input type="date" id="fHasta"></label>
+      <button type="button" id="bMarcar">Marcar todos</button>
+      <button type="button" id="bQuitar">Quitar todos</button>
+    </div>
+    <div class="lista-scroll"><table id="tSel"></table></div>
+    <label class="opcion"><input type="checkbox" id="chkCostoExp"> Incluir el costo estimado de la energía exportada <small>(diésel usado para generar lo que se exportó, al costo por kWh generado)</small></label>
+    <label class="opcion"><input type="checkbox" id="chkDetalle"> Incluir el detalle en el tiempo <small>(gráficos de potencia de cada arranque y energía por día; van en páginas aparte)</small></label>
+    <div class="acciones">
+      <button type="button" class="primario" id="bGenerar">Generar reporte</button>
+      <button type="button" id="bImprimir">Imprimir o guardar PDF</button>
+      <span id="aviso" role="status"></span>
+    </div>
+  </section>
+
+  <div id="reporte">
+    <header class="cabecera">
+      <span class="etiqueta">LineaBaseX &middot; grupo electrógeno</span>
+      <h1>Reporte de generadores</h1>
+      <span class="rango" id="rango"></span>
+      <p id="bajada"></p>
+    </header>
+
+    <section class="cifras cinco" id="energia" aria-label="Horas y energía"></section>
+
+    <section class="panel" aria-labelledby="tTotal">
+      <h2 id="tTotal">Balance energético del período</h2>
+      <p class="intro" id="textoTotal"></p>
+      <div class="lienzo bajo"><canvas id="gTotal" aria-label="Balance energético del período: entradas y salidas"></canvas></div>
+      <div class="cuadre" id="cuadre"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="tMeta">
+      <h2 id="tMeta">Meta: consumo cero de la red</h2>
+      <p class="kpi" id="kpiTexto"></p>
+      <div class="lienzo kpi-barra"><canvas id="gMetaTotal" aria-label="Importación de la red del período, en porcentaje del consumo, frente a la meta"></canvas></div>
+      <div class="leyenda"><span>Importación de la red, en % del consumo.</span><span><i style="background:var(--ok-bg);border:1px solid var(--ok-fg)"></i>hasta <span class="umbralVerde">2 %</span></span><span><i style="background:var(--warn-bg);border:1px solid var(--warn-fg)"></i>hasta <span class="umbralAmarillo">10 %</span></span><span><i style="background:var(--bad-bg);border:1px solid var(--bad-fg)"></i>más del <span class="umbralAmarillo">10 %</span></span><span>Meta: 0 %</span></div>
+    </section>
+
+    <section class="panel" aria-labelledby="t-comb">
+      <h2 id="t-comb">Combustible y costo</h2>
+      <div class="cifras" id="dinero"></div>
+      <p class="nota-datos" id="notaComb"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="t-arr">
+      <h2 id="t-arr">Por período</h2>
+      <div class="tabla-scroll"><table id="tArr"></table></div>
+    </section>
+
+    <section class="panel" aria-labelledby="tMetaPer">
+      <h2 id="tMetaPer">Importación de la red por período</h2>
+      <div class="lienzo" id="cajaMeta"><canvas id="gMeta" aria-label="Importación de la red por período, en porcentaje del consumo"></canvas></div>
+      <div class="leyenda"><span>% del consumo de cada período.</span><span><i style="background:var(--ok-bg);border:1px solid var(--ok-fg)"></i>hasta <span class="umbralVerde">2 %</span></span><span><i style="background:var(--warn-bg);border:1px solid var(--warn-fg)"></i>hasta <span class="umbralAmarillo">10 %</span></span><span><i style="background:var(--bad-bg);border:1px solid var(--bad-fg)"></i>más del <span class="umbralAmarillo">10 %</span></span><span>Meta: 0 %</span></div>
+    </section>
+
+    <section class="panel" aria-labelledby="tBarras">
+      <h2 id="tBarras">Balance energético diario</h2>
+      <p class="intro">Positivo: consumo de la planta (generación + importación). Negativo: exportación a la red.</p>
+      <div class="lienzo"><canvas id="gBarras" aria-label="Balance energético diario"></canvas></div>
+      <div class="leyenda"><span><i style="background:var(--gen)"></i>Generación consumida en planta</span><span><i style="background:var(--grid)"></i>Importación de la red</span><span><i style="background:var(--out)"></i>Exportación a la red</span></div>
+    </section>
+
+    <section class="panel" aria-labelledby="t-notas">
+      <h2 id="t-notas">Notas</h2>
+      <ul class="notas" id="notas"></ul>
+    </section>
+
+    <footer id="pie"></footer>
+
+    <div id="detalle" hidden>
+      <div class="separador">
+        <span class="etiqueta">Anexo</span>
+        <h2>Perfil de potencia por arranque</h2>
+        <p class="intro" style="font-size:14px;color:var(--muted)">Para el análisis del balance de carga (reducir la exportación a la red).</p>
+      </div>
+      <section class="panel panel-tarjetas" aria-labelledby="t-det">
+        <div class="leyenda" id="t-det"><span><i class="linea" style="background:var(--gen)"></i>Generador</span><span><i class="linea" style="background:var(--cons)"></i>Consumo del transformador</span><span><i style="background:var(--grid)"></i>Importación de la red</span><span><i style="background:var(--out)"></i>Exportación a la red</span><span>Promedios cada 15 minutos, en kW</span></div>
+        <div class="tarjetas" id="tarjetas"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script>/* Chart.js 4.4.1 (licencia MIT, https://www.chartjs.org), incluido para que el reporte funcione sin internet */
+/*CHARTJS*/
+</script>
+<script>
+const DATOS = /*DATOS*/;
+const GENERADO_EL = "/*GENERADO_EL*/";
+// Semaforo de la meta de consumo cero de la red (generador-config.json, metaImportacionRed): verde hasta VERDE_HASTA %,
+// amarillo hasta AMARILLO_HASTA %, rojo por encima. Sin reemplazar (abierto como plantilla) quedan 2 y 10.
+const VERDE_HASTA = Number("/*VERDE_HASTA*/") || 2, AMARILLO_HASTA = Number("/*AMARILLO_HASTA*/") || 10;
+
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const fmt = (v, d = 0) => Number(v ?? 0).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (v, d = 1) => fmt(v, d) + " %";
+const dinero = (v, d = 2) => "$" + fmt(v, d);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const el = (tag, attrs = {}, html = "") => { const e = document.createElement(tag); Object.assign(e, attrs); if (html) e.innerHTML = html; return e; };
+const fecha = s => new Date(s);
+const dosDig = n => String(n).padStart(2, "0");
+const hhmm = d => `${dosDig(d.getHours())}:${dosDig(d.getMinutes())}`;
+const diaCorto = d => `${d.getDate()} ${MES_CORTO[d.getMonth()]}`;
+const iso = d => `${d.getFullYear()}-${dosDig(d.getMonth() + 1)}-${dosDig(d.getDate())}`;
+const mismoDia = (a, b) => iso(a) === iso(b);
+const nombreRed = r => r ? r.replace(/^Trafo(\d+)$/, "Transformador $1") : "sin medidor de red";
+const sinCarga = a => (a.generado ?? 0) < 10;
+const usado = a => Math.max(0, (a.generado ?? 0) - (a.entregado ?? 0));
+const conComb = a => a.galones != null;
+// Semaforo de la importacion de la red (% del consumo), igual que en la pantalla de Analisis.
+const semaforo = p => p <= VERDE_HASTA ? "ok" : p <= AMARILLO_HASTA ? "warn" : "bad";
+const pctUmbral = v => fmt(v, v % 1 ? 1 : 0) + " %";
+document.querySelectorAll(".umbralVerde").forEach(e => e.textContent = pctUmbral(VERDE_HASTA));
+document.querySelectorAll(".umbralAmarillo").forEach(e => e.textContent = pctUmbral(AMARILLO_HASTA));
+const pctImportado = a => (a.consumo ?? 0) > 0 ? Math.min(100, (a.tomado ?? 0) / a.consumo * 100) : null;
+const chipPct = p => p == null ? "&ndash;" : `<span class="chip ${semaforo(p)}">${pct(p)}</span>`;
+
+function cuando(a) {
+  const i = fecha(a.inicio), f = fecha(a.fin);
+  const fin = mismoDia(i, f) ? hhmm(f) : `${diaCorto(f)} ${hhmm(f)}`;
+  return `${diaCorto(i)} ${hhmm(i)} &rarr; ${fin}${a.enCurso ? " (en marcha)" : ""}`;
+}
+
+function rangoTexto(desde, hasta) {
+  const d1 = desde.getDate(), d2 = hasta.getDate(), m1 = desde.getMonth(), m2 = hasta.getMonth(), y1 = desde.getFullYear(), y2 = hasta.getFullYear();
+  if (mismoDia(desde, hasta)) return `${d1} de ${MESES[m1]} de ${y1}`;
+  if (y1 === y2 && m1 === m2) return `Del ${d1} al ${d2} de ${MESES[m1]} de ${y1}`;
+  if (y1 === y2) return `Del ${d1} de ${MESES[m1]} al ${d2} de ${MESES[m2]} de ${y1}`;
+  return `Del ${d1} de ${MESES[m1]} de ${y1} al ${d2} de ${MESES[m2]} de ${y2}`;
+}
+
+// "Transformadores 1 y 2" en vez de "Transformador 2 y Transformador 1".
+function textoRedes(redes) {
+  const nums = redes.map(r => (r.match(/^Transformador (\d+)$/) || [])[1]);
+  if (redes.length > 1 && nums.every(Boolean)) {
+    const o = nums.map(Number).sort((a, b) => a - b);
+    return `Transformadores ${o.slice(0, -1).join(", ")} y ${o.at(-1)}`;
+  }
+  return redes.join(" y ");
+}
+
+const listaY = l => l.length <= 1 ? l.join("") : `${l.slice(0, -1).join(", ")} y ${l.at(-1)}`;
+
+// ================= Selector =================
+const todos = [...DATOS].sort((a, b) => b.inicio.localeCompare(a.inicio)); // el mas reciente arriba, como en la aplicacion
+const marcados = new Set(todos.map(a => a.id));
+let firmaGenerada = "";
+const fGen = document.getElementById("fGen"), fDesde = document.getElementById("fDesde"), fHasta = document.getElementById("fHasta");
+const chkDetalle = document.getElementById("chkDetalle"), chkCostoExp = document.getElementById("chkCostoExp");
+[...new Set(DATOS.map(a => a.generador))].forEach(g => fGen.append(el("option", { value: g, textContent: g })));
+const primerDia = DATOS.map(a => a.inicio.slice(0, 10)).sort()[0], ultimoDia = DATOS.map(a => a.fin.slice(0, 10)).sort().pop();
+fDesde.value = fDesde.min = fHasta.min = primerDia; fHasta.value = fDesde.max = fHasta.max = ultimoDia;
+
+const visible = a => (!fGen.value || a.generador === fGen.value) && a.fin.slice(0, 10) >= fDesde.value && a.inicio.slice(0, 10) <= fHasta.value;
+const firma = () => [...marcados].sort().join("|") + "|detalle=" + chkDetalle.checked + "|costoExp=" + chkCostoExp.checked;
+
+function pintarSelector() {
+  const lista = todos.filter(visible);
+  const t = document.getElementById("tSel");
+  t.innerHTML = `<thead><tr><th scope="col"><span class="etiqueta" style="font-size:11px">Usar</span></th><th scope="col">Generador</th><th scope="col">Período</th>
+    <th scope="col">Horas</th><th scope="col">Generada</th><th scope="col">Combustible</th><th scope="col">Estado</th></tr></thead>
+    <tbody>${lista.map(a => `<tr data-id="${a.id}" class="${marcados.has(a.id) ? "" : "apagada"}">
+      <td><input type="checkbox" aria-label="Usar el arranque del ${a.generador} del ${cuando(a).replace("&rarr;", "al")}" ${marcados.has(a.id) ? "checked" : ""}></td>
+      <td>${a.generador}</td><td>${cuando(a)}</td><td class="num">${fmt(a.horas, 1)}</td><td class="num">${fmt(a.generado)} kWh</td>
+      <td class="num ${conComb(a) ? "" : "sin"}">${conComb(a) ? fmt(a.galones) + " gal" : "sin cargar"}</td>
+      <td>${a.enCurso ? '<span class="chip info">En marcha</span> ' : ""}${sinCarga(a) ? '<span class="chip warn">Sin carga</span> ' : ""}${a.inicioEstimado ? '<span class="chip warn">Inicio estimado</span>' : ""}</td></tr>`).join("")
+      || `<tr><td colspan="7" class="vacio">Ningún arranque en ese período.</td></tr>`}</tbody>`;
+  const elegidos = DATOS.filter(a => marcados.has(a.id));
+  document.getElementById("selCuenta").textContent =
+    `${elegidos.length} de ${DATOS.length} arranques marcados · ${fmt(elegidos.reduce((s, a) => s + (a.generado ?? 0), 0))} kWh generados`;
+  document.getElementById("aviso").textContent = firma() !== firmaGenerada ? "Cambió la selección: pulse «Generar reporte» para actualizarlo." : "";
+}
+
+document.getElementById("tSel").addEventListener("click", e => {
+  const tr = e.target.closest("tr[data-id]"); if (!tr) return;
+  const id = tr.dataset.id;
+  if (marcados.has(id)) marcados.delete(id); else marcados.add(id);
+  pintarSelector();
+});
+// Al cambiar el filtro quedan marcados justo los arranques que se ven; despues se desmarcan los que no se quieran.
+const alFiltrar = () => { marcados.clear(); todos.filter(visible).forEach(a => marcados.add(a.id)); pintarSelector(); };
+[fGen, fDesde, fHasta].forEach(x => x.addEventListener("change", alFiltrar));
+[chkDetalle, chkCostoExp].forEach(c => c.addEventListener("change", pintarSelector));
+document.getElementById("bMarcar").addEventListener("click", () => { todos.filter(visible).forEach(a => marcados.add(a.id)); pintarSelector(); });
+document.getElementById("bQuitar").addEventListener("click", () => { marcados.clear(); pintarSelector(); });
+document.getElementById("bGenerar").addEventListener("click", () => { generar(); pintarSelector(); document.getElementById("reporte").scrollIntoView({ behavior: "smooth" }); });
+document.getElementById("bImprimir").addEventListener("click", () => {
+  if (firma() !== firmaGenerada) { generar(); pintarSelector(); }
+  setTimeout(() => print(), 100);
+});
+
+// ================= Reporte =================
+let graficos = [];
+let seleccion = [];
+let T = null;
+
+function generar() {
+  seleccion = DATOS.filter(a => marcados.has(a.id)).sort((a, b) => a.inicio.localeCompare(b.inicio));
+  firmaGenerada = firma();
+  const partes = [...document.getElementById("reporte").children].filter(x => !x.matches("header, #detalle"));
+  const detalle = document.getElementById("detalle");
+  if (!seleccion.length) {
+    partes.forEach(x => x.hidden = true); detalle.hidden = true;
+    document.getElementById("rango").textContent = "Sin arranques elegidos";
+    document.getElementById("bajada").textContent = "Marque al menos un arranque en la lista de arriba y pulse «Generar reporte».";
+    graficos.forEach(g => g.destroy()); graficos = [];
+    return;
+  }
+  partes.forEach(x => x.hidden = false);
+  detalle.hidden = !chkDetalle.checked;
+
+  const n = seleccion.length;
+  const suma = (l, k) => l.reduce((t, a) => t + (a[k] ?? 0), 0);
+  T = { generado: suma(seleccion, "generado"), tomado: suma(seleccion, "tomado"), entregado: suma(seleccion, "entregado"),
+    consumo: suma(seleccion, "consumo"), horas: suma(seleccion, "horas"), usado: seleccion.reduce((t, a) => t + usado(a), 0) };
+  T.pctRed = T.consumo > 0 ? Math.min(100, T.tomado / T.consumo * 100) : 0;
+  T.pctGen = 100 - T.pctRed;
+  T.pctEnt = T.generado > 0 ? T.entregado / T.generado * 100 : 0;
+  T.pctUsado = 100 - T.pctEnt;
+
+  const comb = seleccion.filter(conComb);
+  const C = { k: comb.length, galones: suma(comb, "galones"), costo: suma(comb, "costo"), kwh: suma(comb, "generado"), horas: suma(comb, "horas") };
+  const conTarifa = comb.filter(a => a.costoRed != null);
+  C.costoRed = suma(conTarifa, "costoRed"); C.costoComparado = suma(conTarifa, "costo"); C.ahorro = C.costoRed - C.costoComparado;
+
+  const desde = fecha(seleccion[0].inicio), hasta = new Date(Math.max(...seleccion.map(a => fecha(a.fin))));
+  const generadores = [...new Set(seleccion.map(a => a.generador))];
+  const redes = [...new Set(seleccion.map(a => nombreRed(a.red)))];
+  document.getElementById("rango").textContent = `${rangoTexto(desde, hasta)} · ${n === 1 ? "1 arranque" : n + " arranques"}`;
+  document.getElementById("bajada").innerHTML =
+    `${generadores.length === 1 ? "El generador cubrió" : "Los generadores cubrieron"} el <b>${pct(T.pctGen)}</b> del consumo de la planta. ` +
+    `La importación de la red fue el <b>${pct(T.pctRed)}</b> del consumo y la exportación a la red, el <b>${pct(T.pctEnt)}</b> de la generación.` +
+    (C.k ? ` Combustible: <b>${dinero(C.costo, 0)}</b> (${fmt(C.galones)} galones${C.k < n ? `, en ${C.k} de los ${n} arranques` : ""}).` : "");
+
+  // Horas y energia
+  const energia = document.getElementById("energia"); energia.innerHTML = "";
+  // Horas de funcionamiento: suma de la duracion de los arranques (si los dos generadores marchan a la vez, cuentan los dos).
+  const horasPorGen = generadores.map(g => `${g} ${fmt(suma(seleccion.filter(a => a.generador === g), "horas"), 1)} h`).join(" · ");
+  [
+    ["", "Horas de funcionamiento", `${fmt(T.horas, 1)}<small> h</small>`, generadores.length > 1 ? horasPorGen : `${n === 1 ? "1 arranque" : n + " arranques"}`],
+    ["gen", "Energía generada", `${fmt(T.generado)}<small> kWh</small>`, generadores.join(" y ")],
+    ["cons", "Energía consumida", `${fmt(T.consumo)}<small> kWh</small>`, `${textoRedes(redes)}, con los generadores en marcha`],
+    ["red", "Importada de la red", `${fmt(T.tomado)}<small> kWh</small>`, `<span class="chip ${semaforo(T.pctRed)}">${pct(T.pctRed)} del consumo</span> meta 0 %`],
+    ["out", "Exportada a la red", `${fmt(T.entregado)}<small> kWh</small>`, `${pct(T.pctEnt)} de la generación`]
+  ].forEach(([c, e, v, d]) => energia.append(el("div", { className: "cifra " + c }, `<span class="etiqueta">${e}</span><span class="valor">${v}</span><span class="det">${d}</span>`)));
+
+  // Balance energetico del periodo: entradas (generada + importada) = salidas (consumida + exportada).
+  // El grafico se dibuja en dibujar().
+  T.entradas = T.generado + T.tomado; T.salidas = T.consumo + T.entregado;
+  const diferencia = T.entradas - T.salidas;
+  document.getElementById("textoTotal").innerHTML =
+    `En el período seleccionado se generaron <b>${fmt(T.generado)} kWh</b>, la planta consumió <b>${fmt(T.consumo)} kWh</b>, ` +
+    `se importaron <b>${fmt(T.tomado)} kWh</b> de la red y se exportaron <b>${fmt(T.entregado)} kWh</b> a la red. ` +
+    `Generada + importada = consumida + exportada.`;
+  const sw = c => `<i style="background:var(${c})"></i>`;
+  document.getElementById("cuadre").innerHTML =
+    `<div class="fila"><span>Entradas:</span><span>${sw("--gen")}generada <b>${fmt(T.generado)}</b></span><span>+ ${sw("--grid")}importada <b>${fmt(T.tomado)}</b></span><span>= <b>${fmt(T.entradas)} kWh</b></span></div>` +
+    `<div class="fila"><span>Salidas:</span><span>${sw("--cons")}consumida <b>${fmt(T.consumo)}</b></span><span>+ ${sw("--out")}exportada <b>${fmt(T.entregado)}</b></span><span>= <b>${fmt(T.salidas)} kWh</b></span></div>` +
+    `<div class="fila resultado"><span>Entradas − salidas = <b>${fmt(diferencia)} kWh</b>${Math.abs(diferencia) <= n ? " (el balance cuadra)" : ""}</span></div>`;
+
+  // Meta de consumo cero de la red: que tan cerca estuvimos, en total y por periodo (semaforo de VERDE_HASTA y AMARILLO_HASTA).
+  const conConsumo = seleccion.filter(a => pctImportado(a) != null);
+  const enVerde = conConsumo.filter(a => pctImportado(a) <= VERDE_HASTA).length, enRojo = conConsumo.filter(a => pctImportado(a) > AMARILLO_HASTA).length;
+  document.getElementById("kpiTexto").innerHTML =
+    `<b>${pct(T.pctRed)}</b><span>del consumo se importó de la red (${fmt(T.tomado)} kWh) · meta 0 %</span>` +
+    `<span class="chip ok">${enVerde} de ${conConsumo.length} períodos hasta ${pctUmbral(VERDE_HASTA)}</span><span class="chip bad">${enRojo} con más del ${pctUmbral(AMARILLO_HASTA)}</span>`;
+  // Alto del grafico segun la cantidad de periodos (una barra horizontal por periodo).
+  document.getElementById("cajaMeta").style.height = `${Math.max(150, seleccion.length * 22 + 50)}px`;
+
+  // Combustible y costo
+  const dineroEl = document.getElementById("dinero"); dineroEl.innerHTML = "";
+  const sinDato = "Sin datos";
+  const tarjetasDinero = [
+    ["", "Diésel usado", C.k ? `${fmt(C.galones)}<small> gal</small>` : null, C.k && C.horas > 0 ? `${fmt(C.galones / C.horas, 1)} galones por hora de marcha` : ""],
+    ["", "Costo del combustible", C.k ? dinero(C.costo, 0) : null, C.k && C.galones > 0 ? `precio medio ${dinero(C.costo / C.galones)} por galón` : ""],
+    ["", "Costo por kWh generado", C.k && C.kwh > 0 ? dinero(C.costo / C.kwh, 3) : null, C.k && C.galones > 0 ? `${fmt(C.kwh / C.galones, 1)} kWh por galón` : ""]
+  ];
+  if (conTarifa.length) {
+    tarjetasDinero.push([C.ahorro >= 0 ? "bien" : "mal", C.ahorro >= 0 ? "Ahorro frente a la red" : "Sobrecosto frente a la red", dinero(Math.abs(C.ahorro), 0),
+      `esa energía importada de la red habría costado ${dinero(C.costoRed, 0)}`]);
+  } else {
+    tarjetasDinero.push(["", "Ahorro frente a la red", "", C.k ? "Falta cargar la tarifa de la red en LineaBaseX (Grupo electrógeno > Análisis > Costos)." : ""]);
+  }
+  // Opcional: lo que costo en diesel generar la energia que se exporto (exportada x costo por kWh generado).
+  if (chkCostoExp.checked) {
+    const costoKwh = C.k && C.kwh > 0 ? C.costo / C.kwh : null;
+    tarjetasDinero.push(["mal", "Costo estimado de la energía exportada", costoKwh != null ? dinero(T.entregado * costoKwh, 0) : null,
+      costoKwh != null ? `${fmt(T.entregado)} kWh × ${dinero(costoKwh, 3)} por kWh ≈ ${fmt(T.entregado / (C.kwh / C.galones))} galones` : "requiere combustible cargado"]);
+  }
+  dineroEl.classList.toggle("cinco", tarjetasDinero.length === 5);
+  tarjetasDinero.forEach(([c, e, v, d]) => dineroEl.append(el("div", { className: "cifra " + c },
+    `<span class="etiqueta">${e}</span><span class="valor${v ? "" : " texto"}">${v || (e.startsWith("Ahorro") && C.k ? "Sin tarifa" : sinDato)}</span><span class="det">${d}</span>`)));
+  document.getElementById("notaComb").innerHTML = !C.k
+    ? "Ningún arranque elegido tiene el combustible cargado. Los galones y el precio del galón se cargan en LineaBaseX: Grupo electrógeno &gt; Análisis &gt; Costos."
+    : C.k < n
+      ? `Combustible cargado en ${C.k} de los ${n} arranques (${listaY(comb.map(a => `${a.generador} del ${diaCorto(fecha(a.inicio))}`))}). Estas cifras cuentan solo esos arranques; en la tabla, «–» = combustible sin cargar.`
+      : "Combustible cargado en todos los arranques elegidos.";
+
+  // Por periodo
+  const celdaComb = (v, f) => v == null ? `<td class="num sin">&ndash;</td>` : `<td class="num">${f(v)}</td>`;
+  document.getElementById("tArr").innerHTML = `<thead><tr><th scope="col">Generador</th><th scope="col">Período</th><th scope="col">Horas</th><th scope="col">Generada (kWh)</th>
+    <th scope="col">Consumida (kWh)</th><th scope="col">Importada (kWh)</th><th scope="col">% del consumo</th><th scope="col">Exportada (kWh)</th><th scope="col">Galones</th><th scope="col">Costo</th></tr></thead>
+    <tbody>${seleccion.map(a => `<tr><td>${a.generador}${a.inicioEstimado ? "*" : ""}</td><td>${cuando(a)}</td><td class="num">${fmt(a.horas, 1)}</td>
+      <td class="num">${fmt(a.generado)}</td><td class="num">${fmt(a.consumo)}</td><td class="num">${fmt(a.tomado)}</td><td class="num">${chipPct(pctImportado(a))}</td><td class="num">${fmt(a.entregado)}</td>
+      ${celdaComb(a.galones, v => fmt(v))}${celdaComb(a.costo, v => dinero(v))}</tr>`).join("")}</tbody>
+    <tfoot><tr><td>Total</td><td>${n === 1 ? "1 arranque" : n + " arranques"}</td><td class="num">${fmt(T.horas, 1)}</td><td class="num">${fmt(T.generado)}</td>
+      <td class="num">${fmt(T.consumo)}</td><td class="num">${fmt(T.tomado)}</td><td class="num">${chipPct(T.pctRed)}</td><td class="num">${fmt(T.entregado)}</td>
+      <td class="num">${C.k ? fmt(C.galones) : "&ndash;"}</td><td class="num">${C.k ? dinero(C.costo) : "&ndash;"}</td></tr></tfoot>`;
+
+  // Notas
+  const notas = ["Energía consumida = generada + importada − exportada, en el transformador de cada generador y solo mientras ese generador estaba en marcha. Por eso el balance cuadra; comprobarlo con la suma de los medidores de las máquinas queda para un análisis aparte."];
+  if (chkCostoExp.checked && C.k) notas.push(`Costo estimado de la energía exportada: kWh exportados por el costo por kWh generado de los arranques con combustible cargado (${dinero(C.costo / C.kwh, 3)}). Es el diésel que se usó para generar energía que salió a la red.`);
+  seleccion.filter(a => a.inicioEstimado).forEach(a => notas.push(conComb(a)
+    ? `* ${a.generador} del ${diaCorto(fecha(a.inicio))}: el sistema lo registra desde las ${hhmm(fecha(a.inicio))}, pero pudo arrancar antes. Los galones cubren todo el arranque y la energía solo lo registrado, así que su costo por kWh sale más alto de lo real.`
+    : `* ${a.generador} del ${diaCorto(fecha(a.inicio))}: el sistema lo registra desde las ${hhmm(fecha(a.inicio))}; pudo arrancar antes y sus cifras cubren solo lo registrado.`));
+  seleccion.filter(a => a.enCurso).forEach(a =>
+    notas.push(`El ${a.generador} seguía en marcha al generar el reporte: sus cifras llegan hasta las ${hhmm(fecha(a.fin))} del ${diaCorto(fecha(a.fin))}.`));
+  seleccion.filter(sinCarga).forEach(a =>
+    notas.push(`El ${a.generador} del ${diaCorto(fecha(a.inicio))} a las ${hhmm(fecha(a.inicio))} estuvo ${fmt(a.horas * 60)} minutos en marcha sin carga: no generó, y la importación de la red en ese lapso (${fmt(a.tomado)} kWh) cuenta en el total.`));
+  notas.push(`Importada de la red: verde hasta el ${pctUmbral(VERDE_HASTA)} del consumo, amarillo hasta el ${pctUmbral(AMARILLO_HASTA)} y rojo por encima; la meta es 0 %.`);
+  notas.push("Fuente: contadores de energía del controlador de cada generador y del medidor de su transformador (igual que la pantalla «Períodos en marcha» de LineaBaseX); combustible y tarifa, cargados en LineaBaseX.");
+  document.getElementById("notas").innerHTML = notas.map(t => `<li>${t}</li>`).join("");
+
+  document.getElementById("pie").innerHTML = `<span>Reporte de generadores · LineaBaseX · generado el ${GENERADO_EL}.</span>`;
+
+  // Tarjetas del detalle (solo si se pidio)
+  const tarjetas = document.getElementById("tarjetas"); tarjetas.innerHTML = "";
+  if (chkDetalle.checked) seleccion.forEach((a, i) => {
+    const t = el("article", { className: "tarjeta" });
+    t.innerHTML = `<div class="titulo"><h3>${a.generador}${a.inicioEstimado ? "*" : ""} <span class="cuando" style="font-family:var(--f-body);font-weight:400">(${nombreRed(a.red)})</span></h3>
+        <span class="cuando">${cuando(a)} · ${fmt(a.horas, 1)} h · ${fmt(a.generado)} kWh</span></div>
+      ${a.perfil15.length >= 2 ? `<div class="lienzo mini"><canvas id="gArr${i}" aria-label="Potencia del ${a.generador} durante el arranque"></canvas></div>`
+        : `<p class="vacio" style="padding:12px 0">Arranque muy corto: sin gráfico.</p>`}`;
+    tarjetas.append(t);
+  });
+
+  dibujar();
+}
+
+function dibujar() {
+  if (!window.Chart || !seleccion.length || !T) return;
+  graficos.forEach(g => g.destroy()); graficos = [];
+  Chart.defaults.color = css("--muted"); Chart.defaults.borderColor = css("--line"); Chart.defaults.font.family = css("--f-body");
+  Chart.defaults.animation = false; // sin animacion: al imprimir o generar el PDF los graficos salen completos
+  const caja = { backgroundColor: css("--surface"), titleColor: css("--ink"), bodyColor: css("--ink"), footerColor: css("--ink"), borderColor: css("--line"), borderWidth: 1 };
+
+  const lineaCero = c => c.tick.value === 0 ? css("--ink") : css("--line");
+
+  // Balance energetico del periodo: dos barras del mismo largo, entradas (generada + importada) y salidas
+  // (consumida + exportada). Cada tramo lleva su valor escrito si entra.
+  const valoresEnTramos = { id: "valoresEnTramos", afterDatasetsDraw(chart) {
+    const { ctx } = chart; ctx.save();
+    ctx.font = `600 12px ${css("--f-data")}`; ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    chart.data.datasets.forEach((ds, i) => chart.getDatasetMeta(i).data.forEach((barra, j) => {
+      const v = ds.data[j]; if (!v) return;
+      const texto = fmt(v), ancho = Math.abs(barra.x - barra.base);
+      if (ctx.measureText(texto).width + 10 < ancho) ctx.fillText(texto, (barra.x + barra.base) / 2, barra.y);
+    }));
+    ctx.restore();
+  } };
+  graficos.push(new Chart(document.getElementById("gTotal"), {
+    type: "bar",
+    data: { labels: ["Entradas", "Salidas"], datasets: [
+      { label: "Energía generada", data: [T.generado, 0], backgroundColor: css("--gen"), stack: "b" },
+      { label: "Importada de la red", data: [T.tomado, 0], backgroundColor: css("--grid"), stack: "b" },
+      { label: "Energía consumida", data: [0, T.consumo], backgroundColor: css("--cons"), stack: "b" },
+      { label: "Exportada a la red", data: [0, T.entregado], backgroundColor: css("--out"), stack: "b" }] },
+    options: { indexAxis: "y", maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { ...caja, filter: c => c.parsed.x > 0, callbacks: { label: c => `${c.dataset.label}: ${fmt(c.parsed.x)} kWh` } } },
+      scales: { x: { stacked: true, ticks: { callback: v => fmt(v) + " kWh" } },
+        y: { stacked: true, grid: { display: false }, ticks: { color: css("--ink"), font: { size: 13, weight: "600" } } } } },
+    plugins: [valoresEnTramos]
+  }));
+
+  // KPI consumo cero de la red: % del consumo importado, en barras azules (importacion) sobre el fondo del semaforo
+  // (verde hasta VERDE_HASTA, amarillo hasta AMARILLO_HASTA, rojo mas). El eje se corta en "tope" y la barra que pasa lleva su valor
+  // real escrito. Arriba, el del periodo completo (grafico de bala); en el detalle, uno por periodo.
+  const graficoKpi = (lienzo, etiquetas, valores, tope, tooltip, anchoNombres) => {
+    const zonas = { id: "zonasSemaforo", beforeDatasetsDraw(chart) {
+      const { ctx, chartArea: z, scales: { x } } = chart; ctx.save();
+      [[0, VERDE_HASTA, "--ok-bg"], [VERDE_HASTA, AMARILLO_HASTA, "--warn-bg"], [AMARILLO_HASTA, tope, "--bad-bg"]].forEach(([a, b, c]) => {
+        ctx.fillStyle = css(c); ctx.fillRect(x.getPixelForValue(a), z.top, x.getPixelForValue(Math.min(b, tope)) - x.getPixelForValue(a), z.bottom - z.top);
+      });
+      ctx.restore();
+    }, afterDatasetsDraw(chart) {
+      const { ctx, chartArea: z } = chart; ctx.save();
+      ctx.font = `600 ${etiquetas.length === 1 ? 15 : 11.5}px ${css("--f-data")}`; ctx.fillStyle = css("--ink"); ctx.textBaseline = "middle";
+      chart.getDatasetMeta(0).data.forEach((barra, i) => {
+        const texto = pct(valores[i]), w = ctx.measureText(texto).width;
+        const afuera = barra.x + 6 + w <= z.right;
+        ctx.textAlign = afuera ? "left" : "right";
+        ctx.fillText(texto, afuera ? barra.x + 6 : barra.x - 6, barra.y);
+      });
+      ctx.restore();
+    } };
+    return new Chart(lienzo, {
+      type: "bar",
+      data: { labels: etiquetas, datasets: [{ data: valores.map(p => Math.min(p, tope)), backgroundColor: css("--grid"),
+        barPercentage: etiquetas.length === 1 ? 0.55 : 0.7, categoryPercentage: 0.9 }] },
+      options: { indexAxis: "y", maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { ...caja, callbacks: { label: tooltip } } },
+        scales: { x: { min: 0, max: tope, ticks: { callback: v => v + " %" }, grid: { color: css("--line") } },
+          // Ancho minimo del eje de nombres: si la letra todavia no cargo al medir, los nombres salian cortados.
+          y: { grid: { display: false }, ticks: { color: css("--ink"), font: { size: etiquetas.length === 1 ? 13 : 11.5, weight: etiquetas.length === 1 ? "600" : "400" } },
+            afterFit: s => { s.width = Math.max(s.width, anchoNombres); } } } },
+      plugins: [zonas]
+    });
+  };
+  graficos.push(graficoKpi(document.getElementById("gMetaTotal"), ["Período seleccionado"], [T.pctRed], Math.max(AMARILLO_HASTA * 2, Math.ceil(T.pctRed + 5)),
+    () => `Importación: ${pct(T.pctRed)} del consumo (${fmt(T.tomado)} de ${fmt(T.consumo)} kWh)`, 140));
+  const pcts = seleccion.map(a => pctImportado(a) ?? 0);
+  graficos.push(graficoKpi(document.getElementById("gMeta"), seleccion.map(a => `${a.generador} ${diaCorto(fecha(a.inicio))} ${hhmm(fecha(a.inicio))}`), pcts,
+    pcts.some(p => p > AMARILLO_HASTA * 3) ? AMARILLO_HASTA * 3 : Math.max(AMARILLO_HASTA + 2, Math.ceil(Math.max(...pcts) + 2)),
+    c => { const a = seleccion[c.dataIndex]; return `Importación: ${pct(pcts[c.dataIndex])} del consumo (${fmt(a.tomado)} de ${fmt(a.consumo)} kWh)`; }, 140));
+
+  // Balance energetico diario: suma de lo que cayo en cada dia calendario de los arranques elegidos. Sobre el cero el
+  // consumo de la planta (generacion consumida en planta + importacion); bajo el cero, la exportacion a la red.
+  const dias = new Map();
+  seleccion.forEach(a => a.porDia.forEach(([d, gen, tom, ent]) => {
+    const x = dias.get(d) ?? { gen: 0, tom: 0, ent: 0 };
+    x.gen += gen ?? 0; x.tom += tom ?? 0; x.ent += ent ?? 0; dias.set(d, x);
+  }));
+  const claves = [...dias.keys()].sort(), x = d => dias.get(d);
+  graficos.push(new Chart(document.getElementById("gBarras"), {
+    type: "bar",
+    data: { labels: claves.map(d => diaCorto(new Date(d + "T00:00"))), datasets: [
+      { label: "Generación consumida en planta", data: claves.map(d => Math.max(0, x(d).gen - x(d).ent)), backgroundColor: css("--gen"), stack: "dia" },
+      { label: "Importación de la red", data: claves.map(d => x(d).tom), backgroundColor: css("--grid"), stack: "dia" },
+      { label: "Exportación a la red", data: claves.map(d => -x(d).ent), backgroundColor: css("--out"), stack: "dia" }] },
+    options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: false },
+        tooltip: { ...caja, callbacks: {
+          label: c => `${c.dataset.label}: ${fmt(Math.abs(c.parsed.y))} kWh`,
+          footer: items => { const d = x(claves[items[0].dataIndex]);
+            return [`Consumo: ${fmt(Math.max(0, d.gen + d.tom - d.ent))} kWh`, `Generación: ${fmt(d.gen)} kWh`]; } } } },
+      scales: { x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, ticks: { callback: v => fmt(Math.abs(v)) + " kWh" }, grid: { color: lineaCero } } } }
+  }));
+
+  if (!chkDetalle.checked) return;
+
+  // Anexo, mismo formato que la grafica de la aplicacion: lineas para el generador y el consumo, barras para la red
+  // (azul sobre cero = importacion, verde bajo cero = exportacion).
+  const ejeY = unidad => ({ title: { display: true, text: unidad }, ticks: { maxTicksLimit: 6, callback: v => fmt(v) },
+    grid: { color: c => c.tick.value === 0 ? css("--muted") : css("--line") } });
+  const etiquetaRed = (v, unidad) => v >= 0 ? `Importación de la red: ${fmt(v)} ${unidad}` : `Exportación a la red: ${fmt(-v)} ${unidad}`;
+
+  // Potencia de cada arranque (promedios de 15 min).
+  seleccion.forEach((a, i) => {
+    const lienzo = document.getElementById("gArr" + i); if (!lienzo) return;
+    const unDia = mismoDia(fecha(a.inicio), fecha(a.fin));
+    const etiquetas = a.perfil15.map(([t]) => { const d = fecha(t); return unDia ? hhmm(d) : `${diaCorto(d)} ${hhmm(d)}`; });
+    const red = a.perfil15.map(p => p[3]);
+    graficos.push(new Chart(lienzo, {
+      data: { labels: etiquetas, datasets: [
+        { type: "line", label: "Generador", data: a.perfil15.map(p => p[1]), borderColor: css("--gen"), borderWidth: 1.6, pointRadius: 0, order: 0 },
+        { type: "line", label: `Consumo del ${nombreRed(a.red)}`, data: a.perfil15.map(p => p[2]), borderColor: css("--cons"), borderWidth: 1.4, pointRadius: 0, order: 0 },
+        { type: "bar", label: "Red", data: red, backgroundColor: red.map(v => v >= 0 ? css("--grid") : css("--out")), barPercentage: 1, categoryPercentage: 1, order: 1 }] },
+      options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: false }, tooltip: { ...caja, callbacks: { label: c => c.dataset.label === "Red" ? etiquetaRed(c.parsed.y, "kW") : `${c.dataset.label}: ${fmt(c.parsed.y)} kW` } } },
+        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 6, maxRotation: 0, autoSkipPadding: 10, font: { size: 11 } } },
+          y: { ...ejeY("kW"), ticks: { maxTicksLimit: 5, font: { size: 11 }, callback: v => fmt(v) } } } }
+    }));
+  });
+}
+
+pintarSelector();
+generar();
+pintarSelector();
+// Al imprimir (o guardar como PDF desde el navegador) los graficos se redibujan con el ancho de la hoja.
+const ajustarImpresion = () => { if (window.Chart) Object.values(Chart.instances).forEach(c => c.resize()); };
+addEventListener("beforeprint", ajustarImpresion);
+try { matchMedia("print").addEventListener("change", e => { if (e.matches) ajustarImpresion(); }); } catch (e) {}
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => setTimeout(dibujar, 50)); } catch (e) {}
+new MutationObserver(() => setTimeout(dibujar, 50)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+</body>
+</html>

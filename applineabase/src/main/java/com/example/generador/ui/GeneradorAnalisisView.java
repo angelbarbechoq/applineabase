@@ -6,6 +6,7 @@ import com.example.base.ui.MainLayout;
 import com.example.calidad.service.CalidadEnergiaService.Estado;
 import com.example.generador.model.CostoCombustible;
 import com.example.generador.model.Generador;
+import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.TarifaRed;
 import com.example.generador.service.ConsumoMedidoresService;
 import com.example.generador.service.ConsumoMedidoresService.ConsumoMedidor;
@@ -15,15 +16,19 @@ import com.example.generador.service.GeneradorAnalisisService.Agrupacion;
 import com.example.generador.service.GeneradorAnalisisService.Fila;
 import com.example.generador.service.GeneradorAnalisisService.PeriodoMarcha;
 import com.example.generador.service.GeneradorService;
+import com.example.generador.service.ReporteGeneradoresService;
 import com.example.generador.service.TarifaRedService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.html.Anchor;
+import com.vaadin.flow.component.html.AttachmentType;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H4;
@@ -44,6 +49,7 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
 
+import java.io.OutputStream;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -87,7 +93,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final ConsumoMedidoresService consumoMedidores;
     private final CostoCombustibleService costos;
     private final TarifaRedService tarifaService;
+    private final ReporteGeneradoresService reporte;
     private final LineaAccessService lineaAccessService;
+    /** Semáforo de la meta "consumo cero de la red" (generador-config.json); se relee en cada "Ver". */
+    private MetaImportacionRed meta;
     private List<TarifaRed> tarifas = List.of();
     private final Grid<TarifaRed> tarifasGrid = new Grid<>();
 
@@ -109,6 +118,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private Grid.Column<Fila> colConsumo;
     // Períodos en marcha
     private final HorizontalLayout tarjetasPeriodos = new HorizontalLayout();
+    private final Div kpiMeta = new Div();
     private final Grid<PeriodoMarcha> periodosGrid = new Grid<>();
     // Costos
     private final HorizontalLayout tarjetasCostos = new HorizontalLayout();
@@ -124,16 +134,21 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final Grid<ConsumoMedidor> maquinasGrid = new Grid<>();
 
     private LocalDate desde, hasta;
+    /** Generadores del último "Ver" (los que usa el reporte, junto con desde y hasta). */
+    private List<Generador> gensVistos = List.of();
 
     public GeneradorAnalisisView(GeneradorService generadorService, GeneradorAnalisisService analisis,
                                  ConsumoMedidoresService consumoMedidores, CostoCombustibleService costos,
-                                 TarifaRedService tarifaService, LineaAccessService lineaAccessService) {
+                                 TarifaRedService tarifaService, ReporteGeneradoresService reporte,
+                                 LineaAccessService lineaAccessService) {
         this.generadorService = generadorService;
         this.analisis = analisis;
         this.consumoMedidores = consumoMedidores;
         this.costos = costos;
         this.tarifaService = tarifaService;
+        this.reporte = reporte;
         this.lineaAccessService = lineaAccessService;
+        this.meta = generadorService.metaImportacionRed();
         setPadding(true);
         setSpacing(true);
         setWidthFull();
@@ -181,7 +196,25 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
         Button ver = new Button("Ver", VaadinIcon.CHART.create(), e -> ver());
         ver.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        HorizontalLayout filtros = new HorizontalLayout(generadorCombo, agrupacionCombo, mesCombo, semanasCombo, anioCombo, ver);
+        // Reporte de generadores del período del último "Ver": se arma al pedirlo (datos del momento) y se abre en una
+        // pestaña nueva; desde ahí se eligen los arranques y se imprime o se guarda como PDF. Mismo enlace fijo que
+        // la exportación de configuración (ver TraspasoConfiguracionView: cambiarlo en cada clic daba "f.txt").
+        Anchor reporteLink = new Anchor();
+        reporteLink.setText("Reporte de generadores");
+        reporteLink.getElement().getThemeList().add("button");
+        reporteLink.getElement().setAttribute("title", "Abre el reporte del periodo elegido en una pestana nueva. "
+                + "Ahi se eligen los arranques y se imprime o se guarda como PDF.");
+        reporteLink.setTarget("_blank");
+        reporteLink.setHref(event -> {
+            LocalDate d = desde, h = hasta;
+            List<Generador> gens = gensVistos;
+            event.setFileName(ReporteGeneradoresService.nombreArchivo(d, h));
+            event.setContentType("text/html; charset=utf-8");
+            try (OutputStream out = event.getOutputStream()) {
+                reporte.escribir(out, gens, d, h);
+            }
+        }, AttachmentType.INLINE);
+        HorizontalLayout filtros = new HorizontalLayout(generadorCombo, agrupacionCombo, mesCombo, semanasCombo, anioCombo, ver, reporteLink);
         filtros.setAlignItems(Alignment.END);
         filtros.getStyle().set("flex-wrap", "wrap");
         mensaje.getStyle().set("font-size", "12px").set("color", "#555");
@@ -247,6 +280,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
         long t0 = System.currentTimeMillis();
         List<Generador> gens = seleccionados();
+        gensVistos = gens;
+        meta = generadorService.metaImportacionRed();
         verEnergia(gens, a);
         periodos = analisis.periodosEnMarcha(gens, desde, hasta);
         verPeriodos();
@@ -289,8 +324,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         grid.setHeight("420px");
 
         Span nota = nota("De la red = parte del consumo del transformador que se tomo de la red (meta en estiaje: 0; verde hasta "
-                + (int) GeneradorAnalisisService.RED_VERDE_HASTA + "%, amarillo hasta " + (int) GeneradorAnalisisService.RED_AMARILLO_HASTA
-                + "%, rojo por encima). Del generador = el resto; las dos suman 100%. Balance neto = tomado - entregado a la red "
+                + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
+                + ", rojo por encima; se cambia en generador-config.json). Del generador = el resto; las dos suman 100%. Balance neto = tomado - entregado a la red "
                 + "(negativo = se entrego mas de lo que se tomo). Tomado y entregado = contadores de energia del medidor del "
                 + "transformador asociado (PLC). Lo tomado es de todo el dia; lo entregado solo cuenta mientras el generador estaba en "
                 + "marcha. Generado = contador del controlador del generador. Consumo del transformador = tomado + generado - entregado "
@@ -377,8 +412,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         periodosGrid.asSingleSelect().addValueChangeListener(e -> mostrarMaquinas(e.getValue()));
         Span nota = nota("Cada fila es una vez que el generador estuvo encendido. De la red = parte del consumo del transformador que se "
                 + "tomo de la red en los minutos en que el generador no alcanzaba (meta 0; verde hasta "
-                + (int) GeneradorAnalisisService.RED_VERDE_HASTA + "%, amarillo hasta " + (int) GeneradorAnalisisService.RED_AMARILLO_HASTA
-                + "%). Del generador = el resto (suman 100%). Entregado a la red = excedente en los minutos en que el generador daba mas "
+                + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
+                + "). Del generador = el resto (suman 100%). Entregado a la red = excedente en los minutos en que el generador daba mas "
                 + "de lo que consumia el transformador. Balance neto = tomado - entregado (negativo = se entrego mas de lo que se tomo). "
                 + "Tiempo tomando de la red y pico: cuanto tiempo y con cuanta potencia falto. Tomado y entregado salen de los contadores "
                 + "del medidor del transformador; el minuto que cruza el inicio o el fin se reparte en proporcion. Paralelo / isla / "
@@ -390,7 +425,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         VerticalLayout v = new VerticalLayout(descripcion("Solo los momentos en que el generador estuvo encendido. Lo importante en "
                 + "estiaje: cuanto se tomo de la red (lo mas cercano a cero) y si sobro para entregar. Haga clic en un arranque para "
                 + "ver abajo el detalle minuto a minuto y con que maquinas trabajo."),
-                tarjetasPeriodos, chart, periodosGrid, nota, crearDetalleMaquinas());
+                tarjetasPeriodos, kpiMeta, chart, periodosGrid, nota, crearDetalleMaquinas());
+        kpiMeta.setWidthFull();
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -416,6 +452,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Double balance = imp == null ? null : imp - (exp == null ? 0 : exp);
         tarjetasPeriodos.add(kpiTomadoDeRed(pctRed, imp, cons));
         tarjetasPeriodos.add(kpiBalance(balance, cons));
+        pintarMeta(pctRed, imp, cons);
         tarjetasPeriodos.add(tarjeta("Tiempo tomando de la red", lecturas == 0 ? "-" : String.format(Locale.ROOT, "%.0f %%", tomando * 100.0 / lecturas),
                 (lecturas == 0 ? "" : tomando + " de " + lecturas + " minutos") + (pico == null ? "" : String.format(Locale.ROOT, "; pico %.0f kW", pico))));
         tarjetasPeriodos.add(tarjeta("Entregado a la red", kwh(exp), "excedente mientras el generador estaba encendido"));
@@ -441,14 +478,60 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         if (tabs.getSelectedTab() == tabPeriodos) getElement().executeJs(scriptPeriodos);
     }
 
+    /**
+     * Meta "consumo cero de la red" del período elegido: el porcentaje importado, una barra sobre las zonas del
+     * semáforo (como en el reporte de generadores) y cuántos arranques quedaron en verde y en rojo.
+     */
+    private void pintarMeta(Double pct, Double imp, Double cons) {
+        kpiMeta.removeAll();
+        kpiMeta.setVisible(pct != null);
+        if (pct == null) return;
+        int verdes = 0, rojos = 0, n = 0;
+        for (PeriodoMarcha p : periodos) {
+            Double x = p.porcentajeDeRed();
+            if (x == null) continue;
+            n++;
+            if (meta.zona(x) == MetaImportacionRed.Zona.VERDE) verdes++;
+            else if (meta.zona(x) == MetaImportacionRed.Zona.ROJO) rojos++;
+        }
+        double tope = Math.max(meta.amarilloHasta() * 2, Math.ceil(pct + 5));
+        Function<Double, String> ancho = v -> String.format(Locale.ROOT, "%.2f%%", Math.min(v, tope) / tope * 100);
+        Function<Double, String> marca = v -> "<span style='position:absolute;left:" + ancho.apply(v) + ";transform:translateX("
+                + (v == 0 ? "0" : v >= tope ? "-100%" : "-50%") + ")'>" + pctUmbral(v) + "</span>";
+        String chip = "padding:2px 8px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;";
+        kpiMeta.add(new Html("<div style='display:grid;gap:6px;max-width:820px'>"
+                + "<div style='font-weight:600'>Meta: consumo cero de la red</div>"
+                + "<div style='display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px'>"
+                + "<span style='font-size:28px;font-weight:700'>" + String.format(Locale.ROOT, "%.1f %%", pct) + "</span>"
+                + "<span style='color:#555'>del consumo se importo de la red (" + kwh(imp) + " de " + kwh(cons) + "); meta 0 %</span>"
+                + "<span style='" + chip + "background:#d4edda;color:#155724'>" + verdes + " de " + n + " arranques hasta "
+                + pctUmbral(meta.verdeHasta()) + "</span>"
+                + "<span style='" + chip + "background:#f8d7da;color:#721c24'>" + rojos + " con mas de " + pctUmbral(meta.amarilloHasta()) + "</span></div>"
+                + "<div style='position:relative;height:30px;display:flex;border-radius:4px;overflow:hidden'>"
+                + "<div style='width:" + ancho.apply(meta.verdeHasta()) + ";background:#d4edda'></div>"
+                + "<div style='width:" + ancho.apply(meta.amarilloHasta() - meta.verdeHasta()) + ";background:#fff3cd'></div>"
+                + "<div style='flex:1;background:#f8d7da'></div>"
+                + "<div style='position:absolute;left:0;top:7px;height:16px;width:" + ancho.apply(pct) + ";background:#2a78d6'></div></div>"
+                + "<div style='position:relative;height:16px;font-size:12px;color:#555'>" + marca.apply(0.0) + marca.apply(meta.verdeHasta())
+                + marca.apply(meta.amarilloHasta()) + marca.apply(tope) + "</div>"
+                + "<div style='font-size:12px;color:#555'>Barra azul = importacion de la red del periodo, en % del consumo. Fondo: verde hasta "
+                + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
+                + ", rojo por encima (se cambia en generador-config.json). Cada arranque, en la columna \"De la red\".</div></div>"));
+    }
+
+    /** 2 -> "2 %", 2.5 -> "2.5 %". */
+    private static String pctUmbral(double v) {
+        return v == Math.rint(v) ? String.format(Locale.ROOT, "%.0f %%", v) : String.format(Locale.ROOT, "%.1f %%", v);
+    }
+
     /** Indicador principal de estiaje: parte del consumo tomada de la red, con semáforo (meta 0). */
-    private static Component kpiTomadoDeRed(Double pct, Double kwhRed, Double consumo) {
+    private Component kpiTomadoDeRed(Double pct, Double kwhRed, Double consumo) {
         String detalle = kwhRed == null ? "meta: 0" : kwh(kwhRed) + (consumo == null ? "" : " de " + kwh(consumo)) + " consumidos; meta 0";
         return tarjetaKpi("Tomado de la red", pct == null ? "-" : String.format(Locale.ROOT, "%.1f %%", pct), detalle, semaforoRed(pct));
     }
 
     /** Balance neto con la red (tomado - entregado): verde si se entregó más de lo que se tomó. */
-    private static Component kpiBalance(Double balance, Double consumo) {
+    private Component kpiBalance(Double balance, Double consumo) {
         if (balance == null) return tarjeta("Balance neto con la red", "-", null);
         Estado e = balance <= 0 ? Estado.OK : semaforoRed(consumo == null || consumo <= 0 ? null : balance / consumo * 100);
         String detalle = Math.abs(balance) < 0.5 ? "sin intercambio neto con la red"
@@ -456,13 +539,17 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         return tarjetaKpi("Balance neto con la red", String.format(Locale.ROOT, "%,.0f kWh", balance), detalle, e);
     }
 
-    private static Estado semaforoRed(Double pct) {
+    /** Semáforo de la meta "consumo cero de la red", con los porcentajes de generador-config.json. */
+    private Estado semaforoRed(Double pct) {
         if (pct == null) return Estado.SIN_DATO;
-        if (pct <= GeneradorAnalisisService.RED_VERDE_HASTA) return Estado.OK;
-        return pct <= GeneradorAnalisisService.RED_AMARILLO_HASTA ? Estado.AVISO : Estado.FUERA;
+        return switch (meta.zona(pct)) {
+            case VERDE -> Estado.OK;
+            case AMARILLO -> Estado.AVISO;
+            case ROJO -> Estado.FUERA;
+        };
     }
 
-    private static Span badgeRed(Double pct) {
+    private Span badgeRed(Double pct) {
         Span s = new Span();
         GeneradorView.badge(s, pct == null ? "-" : String.format(Locale.ROOT, "%.1f %%", pct), semaforoRed(pct));
         return s;

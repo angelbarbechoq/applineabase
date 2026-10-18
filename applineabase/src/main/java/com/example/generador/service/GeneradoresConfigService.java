@@ -2,6 +2,7 @@ package com.example.generador.service;
 
 import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.generador.model.Generador;
+import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.ParametroGenerador;
 import org.slf4j.Logger;
@@ -45,6 +46,23 @@ public class GeneradoresConfigService {
                     g.get("descripcion") == null ? "" : String.valueOf(g.get("descripcion"))));
         }
         return lista;
+    }
+
+    /**
+     * Semáforo de la meta "consumo cero de la red" (generador-config.json, "metaImportacionRed": verdeHasta y
+     * amarilloHasta en % del consumo). Si falta o no tiene sentido (no 0 &lt;= verde &lt; amarillo &lt;= 100), 2 % y 10 %.
+     */
+    public MetaImportacionRed metaImportacionRed() {
+        Map<String, Object> m = configLoaderService.loadGeneradorMetaImportacionRed();
+        if (m.isEmpty()) return MetaImportacionRed.POR_DEFECTO;
+        if (m.get("verdeHasta") instanceof Number v && m.get("amarilloHasta") instanceof Number a
+                && v.doubleValue() >= 0 && v.doubleValue() < a.doubleValue() && a.doubleValue() <= 100) {
+            return new MetaImportacionRed(v.doubleValue(), a.doubleValue());
+        }
+        if (avisados.add("metaImportacionRed|" + m)) {
+            logger.warn("generador-config.json: metaImportacionRed {} no es valida (verdeHasta < amarilloHasta, 0-100); se usa 2 y 10", m);
+        }
+        return MetaImportacionRed.POR_DEFECTO;
     }
 
     public Optional<Generador> generador(String nombre) {

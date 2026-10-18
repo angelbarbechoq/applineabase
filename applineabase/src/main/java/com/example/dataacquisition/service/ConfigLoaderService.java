@@ -67,6 +67,13 @@ public class ConfigLoaderService {
         return generadores != null ? (List<Map<String, Object>>) generadores : List.of();
     }
 
+    /** Semáforo de la meta de importación de la red (clave "metaImportacionRed" de generador-config.json); vacío si no está. */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> loadGeneradorMetaImportacionRed() {
+        Object meta = leerArchivo(GENERADOR_CONFIG_FILE).get("metaImportacionRed");
+        return meta instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+    }
+
     /** Modelos de controlador de generador con su mapa de registros. */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> loadGeneradorModelosConfig() {

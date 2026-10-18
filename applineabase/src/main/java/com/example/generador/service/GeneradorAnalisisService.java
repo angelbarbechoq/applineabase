@@ -109,9 +109,6 @@ public class GeneradorAnalisisService {
         }
     }
 
-    /** Semáforo del indicador "tomado de la red" (% del consumo): verde hasta 2%, amarillo hasta 10%. */
-    public static final double RED_VERDE_HASTA = 2.0, RED_AMARILLO_HASTA = 10.0;
-
     /** Un minuto en marcha: lo que dio el generador y lo que pasó por el transformador (+ tomado, - entregado). */
     public record MinutoMarcha(LocalDateTime fecha, Double generadorKw, Double redKw) {
         public Double consumoKw() {
@@ -352,6 +349,35 @@ public class GeneradorAnalisisService {
             Map.Entry<LocalDateTime, Double> red = potenciaRed.floorEntry(l.fecha());
             Double redKw = red != null && Duration.between(red.getKey(), l.fecha()).toSeconds() <= 90 ? red.getValue() : null;
             lista.add(new MinutoMarcha(l.fecha(), l.kw(), redKw));
+        }
+        return lista;
+    }
+
+    /** Lo de un período en marcha que cayó en un día calendario. null = sin lecturas que lo cubran. */
+    public record DiaMarcha(LocalDate dia, Double generado, Double redImportada, Double redExportada) {
+    }
+
+    /**
+     * Un período en marcha partido por día calendario, con los mismos contadores que el período (generador y
+     * medidor del transformador), para el balance diario del reporte.
+     */
+    public List<DiaMarcha> repartoPorDia(PeriodoMarcha p) {
+        List<DiaMarcha> lista = new ArrayList<>();
+        Generador g = generadorService.generadores().stream().filter(x -> x.nombre().equals(p.generador())).findFirst().orElse(null);
+        if (g == null) return lista;
+        LocalDate desde = p.inicio().toLocalDate(), hasta = p.fin().toLocalDate();
+        TreeMap<LocalDateTime, Double> kwhGen = new TreeMap<>();
+        lecturasGenerador(g, desde, hasta).values().forEach(l -> { if (l.kwh() != null && l.kwh() > 0) kwhGen.put(l.fecha(), l.kwh()); });
+        boolean redValida = p.red() != null && PLCDataQueryService.esNombreMaquinaValido(p.red());
+        TreeMap<LocalDateTime, Double> importada = redValida ? serieContador(p.red(), false, desde, hasta) : new TreeMap<>();
+        TreeMap<LocalDateTime, Double> exportada = redValida ? serieContador(p.red(), true, desde, hasta) : new TreeMap<>();
+        LocalDateTime ini = p.inicio();
+        while (ini.isBefore(p.fin())) {
+            LocalDateTime fin = ini.toLocalDate().plusDays(1).atStartOfDay();
+            if (fin.isAfter(p.fin())) fin = p.fin();
+            lista.add(new DiaMarcha(ini.toLocalDate(), deltaEnVentana(kwhGen, ini, fin, KW_MAX_GENERADOR),
+                    deltaEnVentana(importada, ini, fin, KW_MAX_RED), deltaEnVentana(exportada, ini, fin, KW_MAX_RED)));
+            ini = fin;
         }
         return lista;
     }

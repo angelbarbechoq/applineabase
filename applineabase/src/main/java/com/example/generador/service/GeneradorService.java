@@ -4,6 +4,7 @@ import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.generador.model.Generador;
 import com.example.generador.model.LecturaGenerador;
+import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.ModeloControlador.Registro;
 import org.slf4j.Logger;
@@ -67,6 +68,11 @@ public class GeneradorService {
 
     public Optional<ModeloControlador> modelo(Generador g) {
         return config.modelo(g.modelo());
+    }
+
+    /** Semáforo de la meta "consumo cero de la red" (generador-config.json). */
+    public MetaImportacionRed metaImportacionRed() {
+        return config.metaImportacionRed();
     }
 
     /** Lectura en vivo del controlador (función 03, nunca escribe). */
