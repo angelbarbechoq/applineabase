@@ -344,6 +344,8 @@ document.querySelectorAll(".umbralVerde").forEach(e => e.textContent = pctUmbral
 document.querySelectorAll(".umbralAmarillo").forEach(e => e.textContent = pctUmbral(AMARILLO_HASTA));
 const pctImportado = a => (a.consumo ?? 0) > 0 ? Math.min(100, (a.tomado ?? 0) / a.consumo * 100) : null;
 const chipPct = p => p == null ? "&ndash;" : `<span class="chip ${semaforo(p)}">${pct(p)}</span>`;
+// Costo del diésel / costo de esa energía en la red: rojo si generar salió más caro.
+const chipVeces = v => `<span class="chip ${v > 1 ? "bad" : "ok"}">${fmt(v, 1)}×</span>`;
 
 function cuando(a) {
   const i = fecha(a.inicio), f = fecha(a.fin);
@@ -507,11 +509,14 @@ function generar() {
     ["", "Costo por kWh generado", C.k && C.kwh > 0 ? dinero(C.costo / C.kwh, 3) : null, C.k && C.galones > 0 ? `${fmt(C.kwh / C.galones, 1)} kWh por galón` : ""]
   ];
   if (conTarifa.length) {
+    // Comparación por kWh aprovechado (generado − exportado): es la energía que reemplazó a la de la red.
     const veces = C.costoRed > 0 ? C.costoComparado / C.costoRed : null;
+    const dieselKwh = C.kwhApro > 0 ? C.costoComparado / C.kwhApro : null, redKwh = C.kwhApro > 0 ? C.costoRed / C.kwhApro : null;
+    tarjetasDinero.push([veces != null && veces > 1 ? "mal" : "bien", "Generar contra la red",
+      veces != null ? `${fmt(veces, 1)}<small> veces</small>` : null,
+      dieselKwh != null ? `diésel ${dinero(dieselKwh, 3)} contra red ${dinero(redKwh, 3)} por kWh aprovechado (${fmt(C.kwhApro)} kWh)` : ""]);
     tarjetasDinero.push([C.ahorro >= 0 ? "bien" : "mal", C.ahorro >= 0 ? "Ahorro frente a la red" : "Sobrecosto frente a la red", dinero(Math.abs(C.ahorro), 0),
-      `la misma energía comprada a la red habría costado ${dinero(C.costoRed, 0)}` +
-      (C.kwhApro > 0 ? ` (${dinero(C.costoRed / C.kwhApro, 3)} por kWh, según la franja horaria)` : "") +
-      (veces != null && C.ahorro < 0 ? `; generar costó ${fmt(veces, 1)} veces la red` : "")]);
+      `diésel ${dinero(C.costoComparado, 0)}; la misma energía comprada a la red habría costado ${dinero(C.costoRed, 0)}, al precio de la franja horaria de cada hora`]);
   } else {
     tarjetasDinero.push(["", "Ahorro frente a la red", "", C.k ? "Falta cargar la tarifa por franja horaria en LineaBaseX (Consumo por franja horaria > Tarifas)." : ""]);
   }
@@ -533,13 +538,16 @@ function generar() {
   // Por periodo
   const celdaComb = (v, f) => v == null ? `<td class="num sin">&ndash;</td>` : `<td class="num">${f(v)}</td>`;
   document.getElementById("tArr").innerHTML = `<thead><tr><th scope="col">Generador</th><th scope="col">Período</th><th scope="col">Horas</th><th scope="col">Generada (kWh)</th>
-    <th scope="col">Consumida (kWh)</th><th scope="col">Importada (kWh)</th><th scope="col">% del consumo</th><th scope="col">Exportada (kWh)</th><th scope="col">Galones</th><th scope="col">Costo</th></tr></thead>
+    <th scope="col">Consumida (kWh)</th><th scope="col">Importada (kWh)</th><th scope="col">% del consumo</th><th scope="col">Exportada (kWh)</th><th scope="col">Galones</th><th scope="col">Costo</th>
+    <th scope="col">Costo en la red</th><th scope="col">Vs. red</th></tr></thead>
     <tbody>${seleccion.map(a => `<tr><td>${a.generador}${a.inicioEstimado ? "*" : ""}</td><td>${cuando(a)}</td><td class="num">${fmt(a.horas, 1)}</td>
       <td class="num">${fmt(a.generado)}</td><td class="num">${fmt(a.consumo)}</td><td class="num">${fmt(a.tomado)}</td><td class="num">${chipPct(pctImportado(a))}</td><td class="num">${fmt(a.entregado)}</td>
-      ${celdaComb(a.galones, v => fmt(v))}${celdaComb(a.costo, v => dinero(v))}</tr>`).join("")}</tbody>
+      ${celdaComb(a.galones, v => fmt(v))}${celdaComb(a.costo, v => dinero(v))}
+      ${celdaComb(a.costo != null ? a.costoRed : null, v => dinero(v))}${celdaComb(a.costo != null && a.costoRed > 0 ? a.costo / a.costoRed : null, chipVeces)}</tr>`).join("")}</tbody>
     <tfoot><tr><td>Total</td><td>${n === 1 ? "1 arranque" : n + " arranques"}</td><td class="num">${fmt(T.horas, 1)}</td><td class="num">${fmt(T.generado)}</td>
       <td class="num">${fmt(T.consumo)}</td><td class="num">${fmt(T.tomado)}</td><td class="num">${chipPct(T.pctRed)}</td><td class="num">${fmt(T.entregado)}</td>
-      <td class="num">${C.k ? fmt(C.galones) : "&ndash;"}</td><td class="num">${C.k ? dinero(C.costo) : "&ndash;"}</td></tr></tfoot>`;
+      <td class="num">${C.k ? fmt(C.galones) : "&ndash;"}</td><td class="num">${C.k ? dinero(C.costo) : "&ndash;"}</td>
+      <td class="num">${conTarifa.length ? dinero(C.costoRed) : "&ndash;"}</td><td class="num">${conTarifa.length && C.costoRed > 0 ? chipVeces(C.costoComparado / C.costoRed) : "&ndash;"}</td></tr></tfoot>`;
 
   // Notas
   const notas = ["Energía consumida = generada + importada − exportada, en el transformador de cada generador y solo mientras ese generador estaba en marcha. Por eso el balance cuadra; comprobarlo con la suma de los medidores de las máquinas queda para un análisis aparte."];
