@@ -1,16 +1,24 @@
 package com.example.generador.service;
 
+import com.example.alarmas.model.AlarmaConfig;
+import com.example.alarmas.model.TipoAlarma;
+import com.example.alarmas.repository.AlarmaConfigRepository;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.generador.model.Generador;
 import com.example.generador.model.LecturaGenerador;
+import com.example.horometro.service.HorometroService;
+import com.example.medidores.TipoMedidor;
+import com.example.medidores.service.TopologiaMedidores;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * La planta en este momento: cuánto consume, cuánto de ese consumo pone cada generador y cuánto viene de la red.
@@ -73,8 +81,22 @@ public class PlantaEnVivoService {
         }
     }
 
+    /**
+     * Una máquina ahora: trabajando o parada con el mismo criterio que el horómetro (umbral y lecturas seguidas
+     * bajo el umbral). trabajando null = sin dato.
+     */
+    public record EstadoMaquina(String grupo, String nombre, Boolean trabajando, Double kw) {
+    }
+
+    /**
+     * Consumo de la planta antes del arranque de los generadores: promedio de los medidores de los transformadores
+     * en los {@link #MINUTOS_ANTES} minutos previos. enCurso = del arranque en curso; si no hay ninguno, del último.
+     */
+    public record AntesDelArranque(LocalDateTime inicio, boolean enCurso, boolean inicioEstimado, Double kw) {
+    }
+
     /** La planta ahora: solo cuenta los generadores con lectura completa (los demás se avisan en pantalla). */
-    public record Planta(LocalDateTime leido, List<FilaGenerador> filas) {
+    public record Planta(LocalDateTime leido, List<FilaGenerador> filas, AntesDelArranque antes, List<EstadoMaquina> maquinas) {
 
         private List<FilaGenerador> completas() {
             return filas.stream().filter(FilaGenerador::completa).toList();
@@ -111,10 +133,27 @@ public class PlantaEnVivoService {
         }
     }
 
-    private final GeneradorService generadorService;
+    /** Minutos antes del arranque que se promedian para el consumo previo. */
+    public static final int MINUTOS_ANTES = 10;
+    /** Máquina con submedidores que se muestra neta (sin ellos): Inyección menos OrientadoraL2, GA752 y HornoL3. */
+    public static final String INYECCION = "Inyeccion";
+    public static final String GRUPO_EXTRUSION = "Extrusion", GRUPO_MEZCLA = "Mezcla", GRUPO_INYECCION = "Inyeccion";
 
-    public PlantaEnVivoService(GeneradorService generadorService) {
+    private final GeneradorService generadorService;
+    private final GeneradorAnalisisService analisis;
+    private final HorometroService horometro;
+    private final TopologiaMedidores topologia;
+    private final AlarmaConfigRepository alarmaConfigRepository;
+    /** Consumo previo ya calculado por inicio de arranque (no cambia; evita leer el archivo del mes cada 15 s). */
+    private final Map<LocalDateTime, Double> antesCalculado = new ConcurrentHashMap<>();
+
+    public PlantaEnVivoService(GeneradorService generadorService, GeneradorAnalisisService analisis, HorometroService horometro,
+                               TopologiaMedidores topologia, AlarmaConfigRepository alarmaConfigRepository) {
         this.generadorService = generadorService;
+        this.analisis = analisis;
+        this.horometro = horometro;
+        this.topologia = topologia;
+        this.alarmaConfigRepository = alarmaConfigRepository;
     }
 
     public Planta leer() {
@@ -148,7 +187,72 @@ public class PlantaEnVivoService {
             }
             filas.add(new FilaGenerador(g.nombre(), g.redAsociada(), estado, kw, kwRed, fechaRed, error));
         }
-        return new Planta(ahora, filas);
+        return new Planta(ahora, filas, antesDelArranque(), maquinas());
+    }
+
+    /** Arranque de referencia: el más viejo de los que siguen en marcha; si no hay ninguno, el último. */
+    private AntesDelArranque antesDelArranque() {
+        GeneradorService.Arranque enCurso = null, ultimo = null;
+        for (Generador g : generadorService.generadores()) {
+            for (GeneradorService.Arranque a : generadorService.arranques(g)) {
+                if (a.fin() == null && (enCurso == null || a.inicio().isBefore(enCurso.inicio()))) enCurso = a;
+                if (ultimo == null || a.inicio().isAfter(ultimo.inicio())) ultimo = a;
+            }
+        }
+        GeneradorService.Arranque ref = enCurso != null ? enCurso : ultimo;
+        if (ref == null) return null;
+        LocalDateTime inicio = ref.inicio();
+        Double kw = antesCalculado.get(inicio);
+        if (kw == null) {
+            double suma = 0;
+            boolean completo = !topologia.transformadores().isEmpty();
+            for (String t : topologia.transformadores()) {
+                Double media = analisis.potenciaMedia(t, inicio.minusMinutes(MINUTOS_ANTES), inicio);
+                if (media == null) {
+                    completo = false;
+                    break;
+                }
+                suma += media;
+            }
+            // Solo se guarda si se pudo calcular: si faltaban lecturas, se vuelve a intentar en la próxima lectura.
+            if (completo) antesCalculado.put(inicio, kw = suma);
+        }
+        return new AntesDelArranque(inicio, enCurso != null, ref.inicioEstimado(), kw);
+    }
+
+    /**
+     * Líneas de extrusión y máquinas de mezcla (zona de linea-id-config.json) con su estado del horómetro, e
+     * Inyección neta: su medidor menos los submedidores que tiene adentro, contra el umbral de Inyección.
+     */
+    private List<EstadoMaquina> maquinas() {
+        List<EstadoMaquina> lista = new ArrayList<>();
+        List<TopologiaMedidores.Medidor> medidores = topologia.medidores();
+        for (TopologiaMedidores.Medidor m : medidores) {
+            if (m.tipo() != TipoMedidor.MAQUINA || m.zona() == null) continue;
+            String grupo = m.zona().startsWith("Extrusi") ? GRUPO_EXTRUSION : m.zona().startsWith("Mezcla") ? GRUPO_MEZCLA : null;
+            if (grupo == null) continue;
+            Double kw = horometro.getUltimoPw(m.nombre());
+            lista.add(new EstadoMaquina(grupo, m.nombre(), kw == null ? null : horometro.estaEncendida(m.nombre()), kw));
+        }
+        if (medidores.stream().anyMatch(m -> INYECCION.equals(m.nombre()))) {
+            Double neto = horometro.getUltimoPw(INYECCION);
+            for (TopologiaMedidores.Medidor sub : medidores) {
+                if (!INYECCION.equals(sub.dentroDe()) || neto == null) continue;
+                Double kwSub = horometro.getUltimoPw(sub.nombre());
+                neto = kwSub == null ? null : neto - kwSub;
+            }
+            double umbral = alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(INYECCION, TipoAlarma.DETENCION)
+                    .map(AlarmaConfig::getUmbralMinimoKw).filter(Objects::nonNull).orElse(ConsumoMedidoresService.UMBRAL_DEFECTO);
+            lista.add(new EstadoMaquina(GRUPO_INYECCION, "Inyeccion (neta)", neto == null ? null : neto >= umbral,
+                    neto == null ? null : Math.max(0, neto)));
+        }
+        lista.sort(Comparator.comparing(EstadoMaquina::nombre));
+        return lista;
+    }
+
+    /** Submedidores que se restan de Inyección (para explicarlo en pantalla). */
+    public List<String> submedidoresInyeccion() {
+        return topologia.medidores().stream().filter(m -> INYECCION.equals(m.dentroDe())).map(TopologiaMedidores.Medidor::nombre).sorted().toList();
     }
 
     private static LocalDateTime fecha(Object o) {

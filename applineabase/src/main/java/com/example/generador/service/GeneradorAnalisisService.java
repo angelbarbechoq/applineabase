@@ -402,6 +402,13 @@ public class GeneradorAnalisisService {
         return lista;
     }
 
+    /** Potencia media de un medidor entre desde (incluido) y hasta (excluido), del archivo VIP; null sin lecturas. */
+    public Double potenciaMedia(String maquina, LocalDateTime desde, LocalDateTime hasta) {
+        if (!PLCDataQueryService.esNombreMaquinaValido(maquina)) return null;
+        var lecturas = seriePotencia(maquina, desde.toLocalDate(), hasta.toLocalDate()).subMap(desde, true, hasta, false);
+        return lecturas.isEmpty() ? null : lecturas.values().stream().mapToDouble(Double::doubleValue).average().orElse(0);
+    }
+
     /** Lo de un período en marcha que cayó en un día calendario. null = sin lecturas que lo cubran. */
     public record DiaMarcha(LocalDate dia, Double generado, Double redImportada, Double redExportada) {
     }

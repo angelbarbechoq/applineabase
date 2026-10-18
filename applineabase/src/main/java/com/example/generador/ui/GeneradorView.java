@@ -456,7 +456,16 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             case ROJO -> Estado.FUERA;
         });
         h.append("<div style='display:flex;flex-wrap:wrap;gap:12px'>")
-                .append(tarjetaPlanta("Consumo de la planta", kw(consumo), "generadores + red", "#4a525c"))
+                .append(tarjetaPlanta("Consumo de la planta", kw(consumo), "generadores + red", "#4a525c"));
+        PlantaEnVivoService.AntesDelArranque antes = p.antes();
+        if (antes != null) {
+            String cuando = antes.inicio().format(CORTA) + (antes.inicioEstimado() ? " (aprox.)" : "");
+            String detalle = antes.kw() == null ? "sin lecturas de los transformadores antes del arranque del " + cuando
+                    : "promedio de " + PlantaEnVivoService.MINUTOS_ANTES + " min antes del " + (antes.enCurso() ? "arranque" : "ultimo arranque")
+                    + " (" + cuando + ")" + (consumo > 0 ? String.format(Locale.ROOT, "; ahora %+,.0f kW", consumo - antes.kw()) : "");
+            h.append(tarjetaPlanta("Antes del arranque", antes.kw() == null ? "-" : kw(antes.kw()), detalle, "#9aa3ad"));
+        }
+        h.append("")
                 .append(tarjetaPlanta("Aporte de los generadores", kw(p.consumidaDeGeneradores()),
                         pctTexto(pctGen) + " del consumo" + (p.generada() > p.consumidaDeGeneradores() + 0.5
                                 ? " (generan " + kw(p.generada()) + ")" : ""), "#dd5f2a"))
@@ -532,6 +541,38 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 .append(tdTotal).append(num0(p.importada())).append("</td>")
                 .append(tdTotal).append(num0(p.exportada())).append("</td>")
                 .append(tdTotal).append(num0(consumo)).append("</td></tr></tfoot></table></div>");
+
+        // Máquinas: trabajando o paradas (criterio del horómetro), por grupo.
+        List<PlantaEnVivoService.EstadoMaquina> maquinas = p.maquinas();
+        if (!maquinas.isEmpty()) {
+            long trabajando = maquinas.stream().filter(m -> Boolean.TRUE.equals(m.trabajando())).count();
+            h.append("<div style='display:grid;gap:8px'><div style='font-weight:600'>Maquinas: ").append(trabajando).append(" de ")
+                    .append(maquinas.size()).append(" trabajando</div>");
+            String[][] grupos = {{PlantaEnVivoService.GRUPO_EXTRUSION, "Extrusion"},
+                    {PlantaEnVivoService.GRUPO_MEZCLA, "Mezcla (mezcladores, molino y pulverizador)"},
+                    {PlantaEnVivoService.GRUPO_INYECCION, "Inyeccion"}};
+            for (String[] g : grupos) {
+                List<PlantaEnVivoService.EstadoMaquina> delGrupo = maquinas.stream().filter(m -> g[0].equals(m.grupo())).toList();
+                if (delGrupo.isEmpty()) continue;
+                h.append("<div style='display:flex;flex-wrap:wrap;align-items:center;gap:6px'><span style='width:100%;font-size:13px;color:#555'>")
+                        .append(g[1]).append("</span>");
+                for (PlantaEnVivoService.EstadoMaquina m : delGrupo) {
+                    String[] c = m.trabajando() == null ? new String[]{"#fff3cd", "#856404"}
+                            : m.trabajando() ? colores(Estado.OK) : colores(Estado.SIN_DATO);
+                    h.append("<span style='").append(CHIP).append("background:").append(c[0]).append(";color:").append(c[1]).append("'>")
+                            .append(esc(m.nombre())).append(": ")
+                            .append(m.trabajando() == null ? "sin dato" : (m.trabajando() ? "trabajando" : "parada"))
+                            .append(m.kw() == null ? "" : String.format(Locale.ROOT, " (%,.0f kW)", m.kw())).append("</span>");
+                }
+                h.append("</div>");
+            }
+            List<String> subs = plantaService.submedidoresInyeccion();
+            h.append("<div style='font-size:12px;color:#555'>Trabajando o parada con el criterio del horometro (umbral de encendido y "
+                    + "lecturas seguidas por debajo del umbral). ")
+                    .append(subs.isEmpty() ? "" : "Inyeccion (neta) = Inyeccion − " + esc(String.join(" − ", subs))
+                            + ", contra el umbral de Inyeccion.")
+                    .append("</div></div>");
+        }
         h.append("</div>");
         plantaContenido.removeAll();
         plantaContenido.add(new Html(h.toString()));

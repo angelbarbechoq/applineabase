@@ -95,6 +95,11 @@ public class HorometroService {
         }
     }
 
+    /** Si la máquina está encendida ahora (tramo ON en curso, mismo criterio que el horómetro), sin consultar la base. */
+    public boolean estaEncendida(String linea) {
+        return inicioEncendidoActual.containsKey(linea);
+    }
+
     /** Último PW conocido de la línea, o null si todavía no se ha recibido ninguno. */
     public Double getUltimoPw(String linea) {
         return ultimoPwPorLinea.get(linea);
