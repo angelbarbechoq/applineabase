@@ -60,8 +60,8 @@ import java.util.function.Function;
 /**
  * Consumo de la planta por franja horaria (A, B, C, D) y su costo con la tarifa de cada mes:
  * - Detalle del mes: tarjetas por franja, dona de kWh, barras por día y tabla por día.
- * - Meses anteriores: tabla por mes con el mismo formato que la planilla de la empresa (kWh, precio
- *   facturado y $/kWh por franja); clic en un mes = su detalle.
+ * - Histórico: tabla por mes del año elegido con el mismo formato que la planilla de la empresa (kWh, precio
+ *   facturado y $/kWh por franja). Solo consulta: el clic en un mes no lleva al detalle (pedido del usuario).
  * - Tarifas: los 4 precios de cada mes (cargar/editar solo ADMIN). Un mes sin tarifa propia usa la del
  *   último mes cargado antes, marcado en amarillo.
  * - Feriados (opcional, cargar solo ADMIN): esos días cuentan como sábado o domingo.
@@ -107,7 +107,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
     private TarifaDelMes tarifaMes;
     private String scriptGrafico;
 
-    // Meses anteriores
+    // Histórico
     private final ComboBox<Integer> anioCombo = new ComboBox<>("Anio");
     private final Grid<FilaMes> mesesGrid = new Grid<>();
     private final Map<Franja, Grid.Column<FilaMes>[]> colMesFranja = new EnumMap<>(Franja.class);
@@ -155,7 +155,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
 
         tabs.setWidthFull();
         tabDetalle = tabs.add("Detalle del mes", crearDetalle());
-        tabAnual = tabs.add("Meses anteriores", crearAnual());
+        tabAnual = tabs.add("Historico", crearAnual());
         tabs.add("Tarifas", crearTarifas());
         tabs.add("Feriados", crearFeriados());
         // El gráfico se arma con la pestaña visible (con display:none amCharts lo dibuja sin tamaño). La tabla
@@ -411,7 +411,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         return List.of(anillo, leyenda);
     }
 
-    // ================= Meses anteriores =================
+    // ================= Histórico =================
 
     @SuppressWarnings("unchecked")
     private VerticalLayout crearAnual() {
@@ -467,14 +467,10 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         pieMeses = mesesGrid.appendFooterRow();
         mesesGrid.setWidthFull();
         mesesGrid.setAllRowsVisible(true);
-        mesesGrid.addItemClickListener(e -> {
-            mesCombo.setValue(e.getItem().datos().mes());
-            tabs.setSelectedTab(tabDetalle);
-        });
 
         Span nota = nota("Mismo formato que la planilla de la empresa electrica. Precio facturado = kWh x costo kWh de la franja; "
                 + "cada mes con su tarifa (en amarillo, los meses que no tienen tarifa propia y usan la del ultimo mes cargado). "
-                + "Clic en un mes para ver su detalle por dia. Lecturas: horas estimadas o sin datos del medidor general en el mes "
+                + "El detalle por dia de un mes se ve en la pestana Detalle del mes. Lecturas: horas estimadas o sin datos del medidor general en el mes "
                 + "(por ejemplo, el medidor general tiene datos desde el 08-01-2026). Los feriados cargados cambian los kWh de A/B a C/D. "
                 + "Los meses cerrados se guardan en memoria para no releerlos; Recalcular los vuelve a leer de los archivos.");
         VerticalLayout v = new VerticalLayout(descripcion("Consumo y costo por franja horaria de cada mes del anio elegido."),
