@@ -199,8 +199,14 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         mesCombo.addValueChangeListener(e -> {
             if (e.getValue() != null) verDetalle();
         });
-        Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> verDetalle());
-        HorizontalLayout filtros = new HorizontalLayout(mesCombo, actualizar, tarifaInfo);
+        Button recalcular = new Button("Recalcular", VaadinIcon.REFRESH.create(), e -> {
+            YearMonth mes = mesCombo.getValue() == null ? YearMonth.now() : mesCombo.getValue();
+            consumo.olvidar(mes);
+            verDetalle();
+            anualAlDia = false;
+        });
+        recalcular.setTooltipText("Vuelve a leer los archivos de energia del mes (por ejemplo, despues de copiar datos historicos)");
+        HorizontalLayout filtros = new HorizontalLayout(mesCombo, recalcular, tarifaInfo);
         filtros.setAlignItems(Alignment.END);
         filtros.getStyle().set("flex-wrap", "wrap");
         mensaje.getStyle().set("font-size", "12px").set("color", "#555");
@@ -427,7 +433,17 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
                 out.write(csvAnual(filasAnio).getBytes(StandardCharsets.UTF_8));
             }
         }, AttachmentType.DOWNLOAD);
-        HorizontalLayout filtros = new HorizontalLayout(anioCombo, descarga);
+        Button recalcular = new Button("Recalcular", VaadinIcon.REFRESH.create(), e -> {
+            int anio = anioCombo.getValue() == null ? LocalDate.now().getYear() : anioCombo.getValue();
+            for (int i = 1; i <= 12; i++) consumo.olvidar(YearMonth.of(anio, i));
+            verAnual();
+            if (mesCombo.getValue() != null && mesCombo.getValue().getYear() == anio) verDetalle();
+            Notification.show("Meses de " + anio + " recalculados", 2500, Notification.Position.BOTTOM_START)
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+        });
+        recalcular.setTooltipText("Vuelve a leer los archivos de energia de todos los meses del anio (por ejemplo, despues de "
+                + "copiar datos historicos)");
+        HorizontalLayout filtros = new HorizontalLayout(anioCombo, recalcular, descarga);
         filtros.setAlignItems(Alignment.END);
 
         colMes = mesesGrid.addColumn(f -> nombreMes(f.datos().mes()) + (f.datos().enCurso() ? " (en curso)" : ""))
@@ -459,7 +475,8 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         Span nota = nota("Mismo formato que la planilla de la empresa electrica. Precio facturado = kWh x costo kWh de la franja; "
                 + "cada mes con su tarifa (en amarillo, los meses que no tienen tarifa propia y usan la del ultimo mes cargado). "
                 + "Clic en un mes para ver su detalle por dia. Lecturas: horas estimadas o sin datos del medidor general en el mes "
-                + "(por ejemplo, el medidor general tiene datos desde el 08-01-2026). Los feriados cargados cambian los kWh de A/B a C/D.");
+                + "(por ejemplo, el medidor general tiene datos desde el 08-01-2026). Los feriados cargados cambian los kWh de A/B a C/D. "
+                + "Los meses cerrados se guardan en memoria para no releerlos; Recalcular los vuelve a leer de los archivos.");
         VerticalLayout v = new VerticalLayout(descripcion("Consumo y costo por franja horaria de cada mes del anio elegido."),
                 filtros, mesesGrid, nota);
         v.setPadding(false);

@@ -95,6 +95,14 @@ public class ConsumoFranjaService {
         return m;
     }
 
+    /**
+     * Descarta lo guardado en memoria de un mes cerrado, para releer sus archivos (por ejemplo, después de copiar
+     * archivos históricos con la app abierta).
+     */
+    public void olvidar(YearMonth mes) {
+        cache.remove(mes);
+    }
+
     /** Los meses del año hasta el actual. */
     public List<Mes> anio(int anio) {
         List<Mes> lista = new ArrayList<>();
