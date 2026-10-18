@@ -1133,6 +1133,77 @@ public class GraficaModel {
                 + "chart.appear(800, 100);";
     }
 
+    /**
+     * Consumo de la planta en el tiempo: áreas apiladas con lo que puso cada generador y lo importado de la red
+     * (arriba de cero; suman el consumo), lo exportado a la red por debajo de cero y la línea del consumo total.
+     * {@code valores.get(i)} = {aporte del generador 1, ..., del generador n, importada, exportada (positiva)}.
+     * Los colores van como "0xRRGGBB". Sin lecturas en un punto = hueco (no se une la línea).
+     * soloDatos: si el gráfico ya está dibujado en ese contenedor, solo le cambia los datos (no pierde el zoom); si no,
+     * lo arma.
+     */
+    public static String getConsumoPlantaScript(String containerId, List<Long> tiempos, String[] generadores, String[] coloresGen,
+                                                String colorRed, String colorExportada, List<double[]> valores, int minutosPorPunto,
+                                                boolean soloDatos) {
+        int n = generadores.length;
+        StringBuilder datos = new StringBuilder("[");
+        for (int i = 0; i < tiempos.size(); i++) {
+            double[] v = valores.get(i);
+            double consumo = v[n];
+            if (i > 0) datos.append(",");
+            datos.append("{t:").append(tiempos.get(i));
+            for (int g = 0; g < n; g++) {
+                datos.append(",g").append(g).append(":").append(numeroJs(v[g]));
+                consumo += v[g];
+            }
+            datos.append(",r:").append(numeroJs(v[n])).append(",e:").append(numeroJs(-v[n + 1]))
+                    .append(",c:").append(numeroJs(consumo)).append("}");
+        }
+        datos.append("]");
+        StringBuilder js = new StringBuilder("(function() {")
+                .append("var datos = ").append(datos).append(";");
+        if (soloDatos) {
+            js.append("var previo = window.am5Charts && window.am5Charts[").append(jsString(containerId)).append("];")
+                    .append("if (previo && previo.chart && previo.root && !previo.root.isDisposed()) {")
+                    .append("  previo.chart.series.each(function(s) { s.data.setAll(datos); }); return;")
+                    .append("}");
+        }
+        js.append(scriptInicializarRoot(containerId))
+                .append("var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: true, panY: false, wheelX: 'panX', wheelY: 'zoomX', layout: root.verticalLayout, paddingTop: 10 }));")
+                .append("var xAxis = chart.xAxes.push(am5xy.DateAxis.new(root, { baseInterval: { timeUnit: 'minute', count: ")
+                .append(Math.max(1, minutosPorPunto)).append(" }, renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 70 }), tooltip: am5.Tooltip.new(root, {}) }));")
+                .append("xAxis.get('renderer').labels.template.setAll({ fontSize: '11px', fill: am5.color(0x52514e) });")
+                .append("xAxis.get('renderer').grid.template.setAll({ strokeOpacity: 0 });")
+                .append("var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));")
+                .append("yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x52514e), fontSize: '11px' });")
+                .append("yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });")
+                .append("yAxis.children.unshift(am5.Label.new(root, { rotation: -90, text: 'kW', y: am5.p50, centerX: am5.p50, fontSize: '11px', fill: am5.color(0x52514e) }));")
+                .append("var series = [];")
+                .append("function area(nombre, campo, color, apilada) {")
+                .append("  var s = chart.series.push(am5xy.LineSeries.new(root, { name: nombre, xAxis: xAxis, yAxis: yAxis, valueYField: campo, valueXField: 't', stacked: apilada, connect: false, stroke: am5.color(color), fill: am5.color(color), tooltip: am5.Tooltip.new(root, { labelText: nombre.replace(/'/g, '') + ': {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));")
+                .append("  s.strokes.template.setAll({ strokeWidth: 1 });")
+                .append("  s.fills.template.setAll({ visible: true, fillOpacity: 0.75 });")
+                .append("  s.data.setAll(datos); series.push(s); return s;")
+                .append("}");
+        for (int g = 0; g < n; g++) {
+            js.append("area(").append(jsString(generadores[g])).append(", 'g").append(g).append("', ").append(coloresGen[g % coloresGen.length]).append(", true);");
+        }
+        js.append("area('Importada de la red', 'r', ").append(colorRed).append(", true);")
+                .append("area('Exportada a la red', 'e', ").append(colorExportada).append(", false);")
+                .append("var cons = chart.series.push(am5xy.LineSeries.new(root, { name: 'Consumo de la planta', xAxis: xAxis, yAxis: yAxis, valueYField: 'c', valueXField: 't', connect: false, stroke: am5.color(0x0b0b0b), fill: am5.color(0x0b0b0b), tooltip: am5.Tooltip.new(root, { labelText: 'Consumo de la planta: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));")
+                .append("cons.strokes.template.setAll({ strokeWidth: 2 });")
+                .append("cons.data.setAll(datos); series.push(cons);")
+                .append("var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));")
+                .append("legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x0b0b0b) });")
+                .append("legend.data.setAll(series);")
+                .append("chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'zoomX', xAxis: xAxis }));")
+                .append("chart.get('cursor').lineY.set('visible', false);")
+                .append("chart.set('scrollbarX', am5.Scrollbar.new(root, { orientation: 'horizontal' }));")
+                .append("window.am5Charts[id] = { root: root, chart: chart };")
+                .append("chart.appear(800, 100);")
+                .append("})();");
+        return js.toString();
+    }
+
     private static String numeroJs(Double v) {
         return v == null || v.isNaN() ? "null" : String.valueOf(Math.round(v * 10) / 10.0);
     }

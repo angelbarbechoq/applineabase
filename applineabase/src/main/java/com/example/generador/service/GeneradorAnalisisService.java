@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -407,6 +408,103 @@ public class GeneradorAnalisisService {
         if (!PLCDataQueryService.esNombreMaquinaValido(maquina)) return null;
         var lecturas = seriePotencia(maquina, desde.toLocalDate(), hasta.toLocalDate()).subMap(desde, true, hasta, false);
         return lecturas.isEmpty() ? null : lecturas.values().stream().mapToDouble(Double::doubleValue).average().orElse(0);
+    }
+
+    /**
+     * Consumo de la planta en un intervalo (potencia media, kW): lo que puso en la planta cada generador (en el orden
+     * de la lista pedida), lo importado de la red y lo exportado, sumando los transformadores de esos generadores.
+     */
+    public record PuntoPlanta(LocalDateTime fecha, double[] aporteGeneradores, double importada, double exportada) {
+        public double consumo() {
+            return Arrays.stream(aporteGeneradores).sum() + importada;
+        }
+    }
+
+    /** Lectura del generador más vieja que esto = sin dato (parado guarda una cada 15 min). */
+    private static final long GENERADOR_VIGENTE_MIN = 16;
+    /** En marcha, la potencia se usa si la lectura tiene hasta esta edad (guarda una por minuto). */
+    private static final long MARCHA_VIGENTE_MIN = 5;
+
+    /**
+     * Consumo de la planta entre dos instantes, en puntos de {@code minutosPorPunto} minutos. Por cada lectura del
+     * medidor de un transformador (una por minuto, + importa / - exporta) se toma la potencia de su generador en ese
+     * minuto (0 si estaba parado): el generador pone en la planta lo que genera menos lo que sale a la red; consumo del
+     * transformador = generador + red. Cada transformador se cuenta una vez (si dos generadores comparten uno, lo
+     * exportado se reparte entre ellos según lo que genera cada uno). Un punto sin lecturas de alguno de los
+     * transformadores no se devuelve (hueco en el gráfico).
+     */
+    public List<PuntoPlanta> consumoPlanta(List<Generador> generadores, LocalDateTime desde, LocalDateTime hasta, int minutosPorPunto) {
+        Map<String, List<Integer>> porRed = new LinkedHashMap<>();
+        List<TreeMap<LocalDateTime, LecturaGuardada>> lecturas = new ArrayList<>();
+        for (int i = 0; i < generadores.size(); i++) {
+            Generador g = generadores.get(i);
+            lecturas.add(lecturasGenerador(g, desde.toLocalDate(), hasta.toLocalDate()));
+            if (g.redAsociada() != null && PLCDataQueryService.esNombreMaquinaValido(g.redAsociada())) {
+                porRed.computeIfAbsent(g.redAsociada(), k -> new ArrayList<>()).add(i);
+            }
+        }
+        int n = generadores.size();
+        // Por transformador y punto: {lecturas, importada, exportada, aporte de cada generador...} sumados.
+        List<TreeMap<LocalDateTime, double[]>> acumulado = new ArrayList<>();
+        for (Map.Entry<String, List<Integer>> red : porRed.entrySet()) {
+            TreeMap<LocalDateTime, double[]> puntos = new TreeMap<>();
+            for (Map.Entry<LocalDateTime, Double> l : seriePotencia(red.getKey(), desde.toLocalDate(), hasta.toLocalDate())
+                    .subMap(desde, true, hasta, false).entrySet()) {
+                double pw = l.getValue();
+                double exportada = Math.max(0, -pw);
+                double[] kwGen = new double[n];
+                double totalGen = 0;
+                for (int i : red.getValue()) {
+                    kwGen[i] = kwGenerador(lecturas.get(i), l.getKey());
+                    totalGen += kwGen[i];
+                }
+                double[] p = puntos.computeIfAbsent(inicioPunto(l.getKey(), minutosPorPunto), k -> new double[3 + n]);
+                p[0]++;
+                p[1] += Math.max(0, pw);
+                p[2] += exportada;
+                for (int i : red.getValue()) {
+                    if (totalGen > 0) p[3 + i] += Math.max(0, kwGen[i] - exportada * kwGen[i] / totalGen);
+                }
+            }
+            acumulado.add(puntos);
+        }
+        List<PuntoPlanta> lista = new ArrayList<>();
+        if (acumulado.isEmpty()) return lista;
+        for (LocalDateTime t : acumulado.get(0).keySet()) {
+            double imp = 0, exp = 0;
+            double[] aporte = new double[n];
+            boolean completo = true;
+            for (TreeMap<LocalDateTime, double[]> puntos : acumulado) {
+                double[] p = puntos.get(t);
+                if (p == null || p[0] == 0) {
+                    completo = false;
+                    break;
+                }
+                imp += p[1] / p[0];
+                exp += p[2] / p[0];
+                for (int i = 0; i < n; i++) aporte[i] += p[3 + i] / p[0];
+            }
+            if (completo) lista.add(new PuntoPlanta(t, aporte, imp, exp));
+        }
+        return lista;
+    }
+
+    /** Potencia del generador en un instante: la de su última lectura si estaba en marcha; 0 parado o sin dato. */
+    private static double kwGenerador(TreeMap<LocalDateTime, LecturaGuardada> lecturas, LocalDateTime t) {
+        Map.Entry<LocalDateTime, LecturaGuardada> e = lecturas.floorEntry(t);
+        if (e == null) return 0;
+        long edad = Duration.between(e.getKey(), t).toMinutes();
+        LecturaGuardada l = e.getValue();
+        if (edad > GENERADOR_VIGENTE_MIN || !l.marcha() || edad > MARCHA_VIGENTE_MIN || l.kw() == null) return 0;
+        return Math.max(0, l.kw());
+    }
+
+    /** Comienzo del punto de {@code minutos} minutos que contiene a t (contados desde la medianoche). */
+    private static LocalDateTime inicioPunto(LocalDateTime t, int minutos) {
+        LocalDateTime m = t.withSecond(0).withNano(0);
+        if (minutos <= 1) return m;
+        int delDia = m.getHour() * 60 + m.getMinute();
+        return m.minusMinutes(delDia % minutos);
     }
 
     /** Lo de un período en marcha que cayó en un día calendario. null = sin lecturas que lo cubran. */

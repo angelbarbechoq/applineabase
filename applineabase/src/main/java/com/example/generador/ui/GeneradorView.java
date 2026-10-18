@@ -15,6 +15,7 @@ import com.example.generador.model.LecturaGenerador;
 import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.TipoEventoGenerador;
 import com.example.generador.service.AlarmaComap;
+import com.example.generador.service.GeneradorAnalisisService;
 import com.example.generador.service.HistorialEventosService;
 import com.example.generador.service.PlantaEnVivoService;
 import com.example.generador.model.ModeloControlador;
@@ -56,6 +57,7 @@ import com.vaadin.flow.shared.Registration;
 import jakarta.annotation.security.PermitAll;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -96,11 +98,19 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final CalidadEnergiaService calidad;
     private final LineaAccessService lineaAccessService;
     private final PlantaEnVivoService plantaService;
+    private final GeneradorAnalisisService analisisService;
     private Generador generador;
     private final TabSheet tabs = new TabSheet();
     private Tab tabPlanta;
     private final Div plantaContenido = new Div();
+    private final Div plantaDetalle = new Div();
     private final Span plantaHora = new Span();
+    private static final String CHART_PLANTA = "chartdiv_consumo_planta";
+    private final Div chartPlanta = new Div();
+    private final ComboBox<Integer> plantaVentana = new ComboBox<>("Periodo");
+    private final Span plantaResumen = new Span();
+    private String scriptPlanta;
+    private LocalDateTime graficoPlantaLeido;
 
     private final Span descripcion = new Span();
     private final Span avisoMapa = new Span();
@@ -147,12 +157,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     }
 
     public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService,
-                         HistorialEventosService historial, PlantaEnVivoService plantaService) {
+                         HistorialEventosService historial, PlantaEnVivoService plantaService,
+                         GeneradorAnalisisService analisisService) {
         this.service = service;
         this.calidad = calidad;
         this.lineaAccessService = lineaAccessService;
         this.historial = historial;
         this.plantaService = plantaService;
+        this.analisisService = analisisService;
         List<Generador> lista = service.generadores();
         this.generador = lista.isEmpty() ? null : lista.get(0);
 
@@ -194,7 +206,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             tabs.add("Registros", crearRegistros());
         }
         tabs.addSelectedChangeListener(e -> {
-            if (e.getSelectedTab() == tabPlanta) refrescarPlanta();
+            if (e.getSelectedTab() == tabPlanta) refrescarPlanta(true);
         });
         alertaAlarmas.setWidthFull();
         alertaAlarmas.setVisible(false);
@@ -417,23 +429,109 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private static final String CHIP = "padding:2px 8px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;";
 
     private VerticalLayout crearPlanta() {
-        Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> refrescarPlanta());
+        Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> {
+            graficoPlantaLeido = null;
+            refrescarPlanta(false);
+        });
         plantaHora.getStyle().set("font-size", "12px").set("color", "#555");
         HorizontalLayout barra = new HorizontalLayout(plantaHora, actualizar);
         barra.setAlignItems(Alignment.CENTER);
         plantaContenido.setWidthFull();
+        plantaDetalle.setWidthFull();
+
+        // Gráfico del consumo de la planta en el tiempo (generadores + red).
+        H4 tituloGrafico = new H4("Consumo de la planta");
+        tituloGrafico.getStyle().set("margin", "0");
+        plantaVentana.setItems(0, 24, 168);
+        plantaVentana.setItemLabelGenerator(h -> h == 0 ? "Hoy" : h == 24 ? "Ultimas 24 h" : "Ultimos 7 dias");
+        plantaVentana.setValue(0);
+        plantaVentana.setWidth("170px");
+        plantaVentana.addValueChangeListener(e -> {
+            if (e.getValue() != null) actualizarGraficoPlanta(false);
+        });
+        HorizontalLayout cabeceraGrafico = new HorizontalLayout(tituloGrafico, plantaVentana);
+        cabeceraGrafico.setAlignItems(Alignment.CENTER);
+        plantaResumen.getStyle().set("font-size", "13px").set("color", "#333");
+        chartPlanta.setId(CHART_PLANTA);
+        chartPlanta.setWidthFull();
+        chartPlanta.setHeight("380px");
+
         Span nota = new Span("Cada generador se lee en vivo de su controlador (solo lectura); la red es el medidor de su "
                 + "transformador (PLC, ultimo minuto guardado), asi que entre uno y otro puede haber hasta un minuto. Consumo de la "
                 + "planta = lo que los generadores pusieron en la planta + lo importado de la red (suman 100 %); lo exportado a la "
-                + "red es el excedente de los generadores y va aparte. Se actualiza cada 15 s.");
+                + "red es el excedente de los generadores y va aparte. Se actualiza cada 15 s. El grafico sale de lo guardado: "
+                + "el medidor de cada transformador (una lectura por minuto) y el generador (una por minuto en marcha); en Hoy y "
+                + "Ultimas 24 h cada punto es un minuto, en Ultimos 7 dias el promedio de 15 minutos. Se actualiza cada minuto.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
-        VerticalLayout v = new VerticalLayout(barra, plantaContenido, nota);
+        VerticalLayout v = new VerticalLayout(barra, plantaContenido, cabeceraGrafico, plantaResumen, chartPlanta, plantaDetalle, nota);
         v.setPadding(false);
         return v;
     }
 
-    /** La planta ahora: primero el total (consumo, generadores, red), después una fila por generador. */
+    /**
+     * Gráfico del consumo de la planta en la ventana elegida. soloDatos: si ya está dibujado, solo cambia los datos
+     * (la actualización de cada minuto no pierde el zoom); al cambiar la ventana o al volver a la pestaña se rearma.
+     */
+    private void actualizarGraficoPlanta(boolean soloDatos) {
+        int horas = plantaVentana.getValue() == null ? 0 : plantaVentana.getValue();
+        LocalDateTime hasta = LocalDateTime.now().withNano(0);
+        LocalDateTime desde = horas == 0 ? hasta.toLocalDate().atStartOfDay() : hasta.minusHours(horas);
+        int minutos = horas <= 24 ? 1 : 15;
+        List<Generador> gens = service.generadores();
+        List<GeneradorAnalisisService.PuntoPlanta> puntos = analisisService.consumoPlanta(gens, desde, hasta, minutos);
+        graficoPlantaLeido = hasta;
+
+        String[] nombres = gens.stream().map(Generador::nombre).toArray(String[]::new);
+        String[] colores = new String[nombres.length];
+        for (int i = 0; i < colores.length; i++) colores[i] = "0x" + NARANJAS[i % NARANJAS.length].substring(1);
+        List<Long> tiempos = new ArrayList<>();
+        List<double[]> valores = new ArrayList<>();
+        double[] energia = new double[nombres.length + 2]; // kWh: cada generador, importada, exportada
+        for (GeneradorAnalisisService.PuntoPlanta p : puntos) {
+            tiempos.add(p.fecha().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+            double[] v = new double[nombres.length + 2];
+            System.arraycopy(p.aporteGeneradores(), 0, v, 0, nombres.length);
+            v[nombres.length] = p.importada();
+            v[nombres.length + 1] = p.exportada();
+            valores.add(v);
+            for (int i = 0; i < v.length; i++) energia[i] += v[i] * minutos / 60.0;
+        }
+        double consumo = 0;
+        for (int i = 0; i <= nombres.length; i++) consumo += energia[i];
+        if (puntos.isEmpty()) {
+            plantaResumen.setText("Sin lecturas de los transformadores en " + plantaVentana.getItemLabelGenerator().apply(horas).toLowerCase(Locale.ROOT) + ".");
+        } else {
+            StringBuilder r = new StringBuilder(String.format(Locale.ROOT, "Del %s al %s, aprox. (de la potencia): consumo de la planta %,.0f kWh",
+                    puntos.get(0).fecha().format(CORTA), hasta.format(CORTA), consumo));
+            for (int i = 0; i < nombres.length; i++) {
+                r.append(String.format(Locale.ROOT, "; %s %,.0f kWh (%.1f %%)", nombres[i], energia[i], consumo > 0 ? energia[i] / consumo * 100 : 0));
+            }
+            r.append(String.format(Locale.ROOT, "; red %,.0f kWh (%.1f %%); exportada %,.0f kWh.", energia[nombres.length],
+                    consumo > 0 ? energia[nombres.length] / consumo * 100 : 0, energia[nombres.length + 1]));
+            plantaResumen.setText(r.toString());
+        }
+        scriptPlanta = GraficaModel.getConsumoPlantaScript(CHART_PLANTA, tiempos, nombres, colores, "0x2a6fd0", "0x16956a",
+                valores, minutos, false);
+        if (tabs.getSelectedTab() == tabPlanta) {
+            getElement().executeJs(soloDatos ? GraficaModel.getConsumoPlantaScript(CHART_PLANTA, tiempos, nombres, colores,
+                    "0x2a6fd0", "0x16956a", valores, minutos, true) : scriptPlanta);
+        }
+    }
+
     private void refrescarPlanta() {
+        refrescarPlanta(false);
+    }
+
+    /**
+     * La planta ahora: primero el total (consumo, generadores, red), el gráfico y después una fila por generador.
+     * El gráfico se recalcula cada minuto; redibujar = la pestaña se acaba de mostrar (amCharts necesita verla).
+     */
+    private void refrescarPlanta(boolean redibujar) {
+        if (graficoPlantaLeido == null || Duration.between(graficoPlantaLeido, LocalDateTime.now()).getSeconds() >= 60) {
+            actualizarGraficoPlanta(!redibujar);
+        } else if (redibujar && scriptPlanta != null && tabs.getSelectedTab() == tabPlanta) {
+            getElement().executeJs(scriptPlanta);
+        }
         PlantaEnVivoService.Planta p = plantaService.leer();
         MetaImportacionRed meta = service.metaImportacionRed();
         plantaHora.setText("Leido " + p.leido().format(HORA));
@@ -504,7 +602,13 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             h.append("</div></div>");
         }
 
-        // Detalle: una fila por generador.
+        h.append("</div>");
+        plantaContenido.removeAll();
+        plantaContenido.add(new Html(h.toString()));
+
+        // Detalle: una fila por generador (debajo del gráfico).
+        h.setLength(0);
+        h.append("<div style='display:grid;gap:14px;width:100%;max-width:1150px'>");
         String th = "<th style='text-align:right;padding:6px 10px;font-size:12px;color:#555;border-bottom:1px solid #ccc'>";
         String thIzq = "<th style='text-align:left;padding:6px 10px;font-size:12px;color:#555;border-bottom:1px solid #ccc'>";
         String td = "<td style='text-align:right;padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap'>";
@@ -574,8 +678,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                     .append("</div></div>");
         }
         h.append("</div>");
-        plantaContenido.removeAll();
-        plantaContenido.add(new Html(h.toString()));
+        plantaDetalle.removeAll();
+        plantaDetalle.add(new Html(h.toString()));
     }
 
     private static String tarjetaPlanta(String titulo, String valor, String detalle, String color) {
