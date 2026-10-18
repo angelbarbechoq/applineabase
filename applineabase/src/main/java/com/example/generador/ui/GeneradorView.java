@@ -425,7 +425,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     // ================= Balance energético P1 (planta 1 en vivo) =================
 
-    private static final String[] NARANJAS = {"#dd5f2a", "#f29b6b", "#a8441b", "#f6c09f"};
+    /**
+     * Color de cada generador (en el orden de generador-config.json), el mismo en la barra y en el gráfico: naranja y
+     * violeta de la paleta de referencia, validados para daltonismo junto al azul de la red y el verde agua de lo entregado.
+     */
+    static final String[] COLORES_GEN = {"#eb6834", "#6250d6", "#e87ba4", "#eda100"};
     private static final String CHIP = "padding:2px 8px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;";
 
     private VerticalLayout crearPlanta() {
@@ -483,18 +487,21 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
         String[] nombres = gens.stream().map(Generador::nombre).toArray(String[]::new);
         String[] colores = new String[nombres.length];
-        for (int i = 0; i < colores.length; i++) colores[i] = "0x" + NARANJAS[i % NARANJAS.length].substring(1);
+        for (int i = 0; i < colores.length; i++) colores[i] = "0x" + COLORES_GEN[i % COLORES_GEN.length].substring(1);
         List<Long> tiempos = new ArrayList<>();
         List<double[]> valores = new ArrayList<>();
-        double[] energia = new double[nombres.length + 2]; // kWh: cada generador, importada, exportada
+        double[] energia = new double[nombres.length + 2]; // kWh: lo que puso cada generador, importada, exportada
         for (GeneradorAnalisisService.PuntoPlanta p : puntos) {
             tiempos.add(p.fecha().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-            double[] v = new double[nombres.length + 2];
-            System.arraycopy(p.aporteGeneradores(), 0, v, 0, nombres.length);
-            v[nombres.length] = p.importada();
-            v[nombres.length + 1] = p.exportada();
+            double[] v = new double[nombres.length + 3];
+            System.arraycopy(p.generado(), 0, v, 0, nombres.length);
+            v[nombres.length] = p.consumo();
+            v[nombres.length + 1] = p.importada();
+            v[nombres.length + 2] = p.exportada();
             valores.add(v);
-            for (int i = 0; i < v.length; i++) energia[i] += v[i] * minutos / 60.0;
+            for (int i = 0; i < nombres.length; i++) energia[i] += p.aporteGeneradores()[i] * minutos / 60.0;
+            energia[nombres.length] += p.importada() * minutos / 60.0;
+            energia[nombres.length + 1] += p.exportada() * minutos / 60.0;
         }
         double consumo = 0;
         for (int i = 0; i <= nombres.length; i++) consumo += energia[i];
@@ -510,11 +517,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                     consumo > 0 ? energia[nombres.length] / consumo * 100 : 0, energia[nombres.length + 1]));
             plantaResumen.setText(r.toString());
         }
-        scriptPlanta = GraficaModel.getConsumoPlantaScript(CHART_PLANTA, tiempos, nombres, colores, "0x2a6fd0", "0x16956a",
-                valores, minutos, false);
+        scriptPlanta = GraficaModel.getConsumoPlantaScript(CHART_PLANTA, tiempos, nombres, colores, valores, minutos, false);
         if (tabs.getSelectedTab() == tabPlanta) {
-            getElement().executeJs(soloDatos ? GraficaModel.getConsumoPlantaScript(CHART_PLANTA, tiempos, nombres, colores,
-                    "0x2a6fd0", "0x16956a", valores, minutos, true) : scriptPlanta);
+            getElement().executeJs(soloDatos
+                    ? GraficaModel.getConsumoPlantaScript(CHART_PLANTA, tiempos, nombres, colores, valores, minutos, true)
+                    : scriptPlanta);
         }
     }
 
@@ -566,21 +573,21 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         h.append("")
                 .append(tarjetaPlanta("Aporte de los generadores", kw(p.consumidaDeGeneradores()),
                         pctTexto(pctGen) + " del consumo" + (p.generada() > p.consumidaDeGeneradores() + 0.5
-                                ? " (generan " + kw(p.generada()) + ")" : ""), "#dd5f2a"))
+                                ? " (generan " + kw(p.generada()) + ")" : ""), "#eb6834"))
                 .append(tarjetaPlanta("Importada de la red", kw(p.importada()),
                         "<span style='" + CHIP + "background:" + semaforo[0] + ";color:" + semaforo[1] + "'>" + pctTexto(pctRed)
-                                + " del consumo</span> meta 0 %", "#2a6fd0"))
-                .append(tarjetaPlanta("Exportada a la red", kw(p.exportada()), "excedente de los generadores", "#16956a"))
+                                + " del consumo</span> meta 0 %", "#2a78d6"))
+                .append(tarjetaPlanta("Exportada a la red", kw(p.exportada()), "excedente de los generadores", "#1baf7a"))
                 .append("</div>");
 
         // Barra del consumo de la planta: lo que puso cada generador y lo importado de la red (100 %).
         List<String[]> tramos = new ArrayList<>(); // nombre, kW, color
         int i = 0;
         for (PlantaEnVivoService.FilaGenerador f : p.filas()) {
-            if (f.completa()) tramos.add(new String[]{f.generador(), String.valueOf(f.consumidaEnPlanta()), NARANJAS[i % NARANJAS.length]});
+            if (f.completa()) tramos.add(new String[]{f.generador(), String.valueOf(f.consumidaEnPlanta()), COLORES_GEN[i % COLORES_GEN.length]});
             i++;
         }
-        tramos.add(new String[]{"Red", String.valueOf(p.importada()), "#2a6fd0"});
+        tramos.add(new String[]{"Red", String.valueOf(p.importada()), "#2a78d6"});
         if (consumo > 0) {
             h.append("<div style='display:grid;gap:6px'><div style='font-weight:600'>Consumo de la planta: ").append(kw(consumo)).append("</div>")
                     .append("<div style='display:flex;height:34px;border-radius:4px;overflow:hidden;background:#e2e3e5'>");

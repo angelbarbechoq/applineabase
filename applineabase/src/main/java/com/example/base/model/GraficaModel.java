@@ -1134,29 +1134,25 @@ public class GraficaModel {
     }
 
     /**
-     * Consumo de la planta en el tiempo: áreas apiladas con lo que puso cada generador y lo importado de la red
-     * (arriba de cero; suman el consumo), lo exportado a la red por debajo de cero y la línea del consumo total.
-     * {@code valores.get(i)} = {aporte del generador 1, ..., del generador n, importada, exportada (positiva)}.
-     * Los colores van como "0xRRGGBB". Sin lecturas en un punto = hueco (no se une la línea).
-     * soloDatos: si el gráfico ya está dibujado en ese contenedor, solo le cambia los datos (no pierde el zoom); si no,
-     * lo arma.
+     * Consumo de la planta en el tiempo, con el mismo estilo que el minuto a minuto de un arranque
+     * (getMarchaMinutoScript): una línea por generador con lo que genera, la línea del consumo de la planta y
+     * columnas de la red (hacia arriba lo tomado, en azul; hacia abajo lo entregado, en verde agua).
+     * {@code valores.get(i)} = {generado del generador 1, ..., del generador n, consumo, importada, exportada (positiva)}.
+     * Los colores van como "0xRRGGBB". soloDatos: si el gráfico ya está dibujado en ese contenedor, solo le cambia
+     * los datos (no pierde el zoom); si no, lo arma.
      */
     public static String getConsumoPlantaScript(String containerId, List<Long> tiempos, String[] generadores, String[] coloresGen,
-                                                String colorRed, String colorExportada, List<double[]> valores, int minutosPorPunto,
-                                                boolean soloDatos) {
+                                                List<double[]> valores, int minutosPorPunto, boolean soloDatos) {
         int n = generadores.length;
         StringBuilder datos = new StringBuilder("[");
         for (int i = 0; i < tiempos.size(); i++) {
             double[] v = valores.get(i);
-            double consumo = v[n];
             if (i > 0) datos.append(",");
             datos.append("{t:").append(tiempos.get(i));
-            for (int g = 0; g < n; g++) {
-                datos.append(",g").append(g).append(":").append(numeroJs(v[g]));
-                consumo += v[g];
-            }
-            datos.append(",r:").append(numeroJs(v[n])).append(",e:").append(numeroJs(-v[n + 1]))
-                    .append(",c:").append(numeroJs(consumo)).append("}");
+            for (int g = 0; g < n; g++) datos.append(",g").append(g).append(":").append(numeroJs(v[g]));
+            datos.append(",c:").append(numeroJs(v[n]))
+                    .append(",ri:").append(v[n + 1] > 0 ? numeroJs(v[n + 1]) : "null")
+                    .append(",re:").append(v[n + 2] > 0 ? numeroJs(-v[n + 2]) : "null").append("}");
         }
         datos.append("]");
         StringBuilder js = new StringBuilder("(function() {")
@@ -1177,24 +1173,29 @@ public class GraficaModel {
                 .append("yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x52514e), fontSize: '11px' });")
                 .append("yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });")
                 .append("yAxis.children.unshift(am5.Label.new(root, { rotation: -90, text: 'kW', y: am5.p50, centerX: am5.p50, fontSize: '11px', fill: am5.color(0x52514e) }));")
-                .append("var series = [];")
-                .append("function area(nombre, campo, color, apilada) {")
-                .append("  var s = chart.series.push(am5xy.LineSeries.new(root, { name: nombre, xAxis: xAxis, yAxis: yAxis, valueYField: campo, valueXField: 't', stacked: apilada, connect: false, stroke: am5.color(color), fill: am5.color(color), tooltip: am5.Tooltip.new(root, { labelText: nombre.replace(/'/g, '') + ': {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));")
-                .append("  s.strokes.template.setAll({ strokeWidth: 1 });")
-                .append("  s.fills.template.setAll({ visible: true, fillOpacity: 0.75 });")
-                .append("  s.data.setAll(datos); series.push(s); return s;")
-                .append("}");
+                // Columnas de la red: tomado (+) y entregado (-) en el mismo lugar (no se agrupan una al lado de la otra).
+                .append("function columnas(nombre, campo, color, agrupada) {")
+                .append("  var s = chart.series.push(am5xy.ColumnSeries.new(root, { name: nombre, xAxis: xAxis, yAxis: yAxis, valueYField: campo, valueXField: 't', clustered: agrupada, fill: am5.color(color), stroke: am5.color(color), tooltip: am5.Tooltip.new(root, { labelText: nombre + ': {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));")
+                .append("  s.columns.template.setAll({ width: am5.percent(100), strokeOpacity: 0 });")
+                .append("  s.data.setAll(datos); return s;")
+                .append("}")
+                .append("function linea(nombre, campo, color) {")
+                .append("  var s = chart.series.push(am5xy.LineSeries.new(root, { name: nombre, xAxis: xAxis, yAxis: yAxis, valueYField: campo, valueXField: 't', stroke: am5.color(color), fill: am5.color(color), tooltip: am5.Tooltip.new(root, { labelText: nombre + ': {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));")
+                .append("  s.strokes.template.setAll({ strokeWidth: 2 });")
+                .append("  s.data.setAll(datos); return s;")
+                .append("}")
+                .append("var leyenda = [];")
+                .append("var tomado = columnas('Red: tomado', 'ri', 0x2a78d6, true);")
+                .append("var entregado = columnas('Red: entregado', 're', 0x1baf7a, false);");
         for (int g = 0; g < n; g++) {
-            js.append("area(").append(jsString(generadores[g])).append(", 'g").append(g).append("', ").append(coloresGen[g % coloresGen.length]).append(", true);");
+            js.append("leyenda.push(linea(").append(jsString(generadores[g])).append(", 'g").append(g).append("', ")
+                    .append(coloresGen[g % coloresGen.length]).append("));");
         }
-        js.append("area('Importada de la red', 'r', ").append(colorRed).append(", true);")
-                .append("area('Exportada a la red', 'e', ").append(colorExportada).append(", false);")
-                .append("var cons = chart.series.push(am5xy.LineSeries.new(root, { name: 'Consumo de la planta', xAxis: xAxis, yAxis: yAxis, valueYField: 'c', valueXField: 't', connect: false, stroke: am5.color(0x0b0b0b), fill: am5.color(0x0b0b0b), tooltip: am5.Tooltip.new(root, { labelText: 'Consumo de la planta: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));")
-                .append("cons.strokes.template.setAll({ strokeWidth: 2 });")
-                .append("cons.data.setAll(datos); series.push(cons);")
+        js.append("leyenda.push(linea('Consumo de la planta', 'c', 0x52514e));")
+                .append("leyenda.push(tomado); leyenda.push(entregado);")
                 .append("var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));")
                 .append("legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x0b0b0b) });")
-                .append("legend.data.setAll(series);")
+                .append("legend.data.setAll(leyenda);")
                 .append("chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'zoomX', xAxis: xAxis }));")
                 .append("chart.get('cursor').lineY.set('visible', false);")
                 .append("chart.set('scrollbarX', am5.Scrollbar.new(root, { orientation: 'horizontal' }));")

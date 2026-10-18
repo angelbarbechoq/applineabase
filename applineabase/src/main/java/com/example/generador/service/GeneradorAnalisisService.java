@@ -411,10 +411,11 @@ public class GeneradorAnalisisService {
     }
 
     /**
-     * Consumo de la planta en un intervalo (potencia media, kW): lo que puso en la planta cada generador (en el orden
-     * de la lista pedida), lo importado de la red y lo exportado, sumando los transformadores de esos generadores.
+     * Consumo de la planta en un intervalo (potencia media, kW): lo que generó y lo que puso en la planta cada
+     * generador (en el orden de la lista pedida), lo importado de la red y lo exportado, sumando los transformadores
+     * de esos generadores.
      */
-    public record PuntoPlanta(LocalDateTime fecha, double[] aporteGeneradores, double importada, double exportada) {
+    public record PuntoPlanta(LocalDateTime fecha, double[] generado, double[] aporteGeneradores, double importada, double exportada) {
         public double consumo() {
             return Arrays.stream(aporteGeneradores).sum() + importada;
         }
@@ -444,7 +445,7 @@ public class GeneradorAnalisisService {
             }
         }
         int n = generadores.size();
-        // Por transformador y punto: {lecturas, importada, exportada, aporte de cada generador...} sumados.
+        // Por transformador y punto: {lecturas, importada, exportada, aporte de cada generador..., generado de cada uno...}.
         List<TreeMap<LocalDateTime, double[]>> acumulado = new ArrayList<>();
         for (Map.Entry<String, List<Integer>> red : porRed.entrySet()) {
             TreeMap<LocalDateTime, double[]> puntos = new TreeMap<>();
@@ -458,12 +459,13 @@ public class GeneradorAnalisisService {
                     kwGen[i] = kwGenerador(lecturas.get(i), l.getKey());
                     totalGen += kwGen[i];
                 }
-                double[] p = puntos.computeIfAbsent(inicioPunto(l.getKey(), minutosPorPunto), k -> new double[3 + n]);
+                double[] p = puntos.computeIfAbsent(inicioPunto(l.getKey(), minutosPorPunto), k -> new double[3 + 2 * n]);
                 p[0]++;
                 p[1] += Math.max(0, pw);
                 p[2] += exportada;
                 for (int i : red.getValue()) {
                     if (totalGen > 0) p[3 + i] += Math.max(0, kwGen[i] - exportada * kwGen[i] / totalGen);
+                    p[3 + n + i] += kwGen[i];
                 }
             }
             acumulado.add(puntos);
@@ -472,7 +474,7 @@ public class GeneradorAnalisisService {
         if (acumulado.isEmpty()) return lista;
         for (LocalDateTime t : acumulado.get(0).keySet()) {
             double imp = 0, exp = 0;
-            double[] aporte = new double[n];
+            double[] aporte = new double[n], generado = new double[n];
             boolean completo = true;
             for (TreeMap<LocalDateTime, double[]> puntos : acumulado) {
                 double[] p = puntos.get(t);
@@ -482,9 +484,12 @@ public class GeneradorAnalisisService {
                 }
                 imp += p[1] / p[0];
                 exp += p[2] / p[0];
-                for (int i = 0; i < n; i++) aporte[i] += p[3 + i] / p[0];
+                for (int i = 0; i < n; i++) {
+                    aporte[i] += p[3 + i] / p[0];
+                    generado[i] += p[3 + n + i] / p[0];
+                }
             }
-            if (completo) lista.add(new PuntoPlanta(t, aporte, imp, exp));
+            if (completo) lista.add(new PuntoPlanta(t, generado, aporte, imp, exp));
         }
         return lista;
     }
