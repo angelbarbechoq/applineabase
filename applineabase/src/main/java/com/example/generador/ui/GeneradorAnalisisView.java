@@ -350,7 +350,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + "Datos del generador: GenPower desde el 08-10-2026, Caterpillar desde el 09-10-2026 09:19. "
                 + "La separacion paralelo / isla existe desde el 09-10-2026. El retorno se dibuja por debajo de cero. \"-\" = sin datos. "
                 + "Con Todos: lo que puso cada generador (su generado - lo que entrego a la red por su transformador) y, abajo, el "
-                + "consumo de toda la planta en el tiempo, de la potencia guardada (aprox.).");
+                + "consumo de toda la planta en el tiempo, calculado con la potencia (kW) tomada de la base de datos (aprox.).");
         tituloPlanta.getStyle().set("margin", "8px 0 0 0");
         resumenPlanta.getStyle().set("font-size", "13px").set("color", "#333");
         chartPlanta.setId(CHART_PLANTA);

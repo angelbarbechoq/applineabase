@@ -291,7 +291,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         ultimaExploracion = List.of();
         exploracionAnterior = Map.of();
         registrosMensaje.setText("");
-        tendenciaMensaje.setText("Lo guardado: cada minuto en marcha, cada 15 min parado. La bateria y la temperatura parado "
+        tendenciaMensaje.setText("Datos tomados de la base de datos: una lectura por minuto en marcha y una cada 15 min parado. La bateria y la temperatura parado "
                 + "muestran si el generador esta listo para arrancar.");
         cargarEventos();
         refrescar();
@@ -520,10 +520,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         chartPlanta.setHeight("380px");
 
         Span nota = new Span("Cada generador se lee en vivo de su controlador (solo lectura); la red es el medidor de su "
-                + "transformador (PLC, ultimo minuto guardado), asi que entre uno y otro puede haber hasta un minuto. Consumo de la "
+                + "transformador (PLC, ultima lectura de la base de datos), asi que entre uno y otro puede haber hasta un minuto. Consumo de la "
                 + "planta = lo que los generadores pusieron en la planta + lo importado de la red (suman 100 %); lo exportado a la "
-                + "red es el excedente de los generadores y va aparte. Se actualiza cada 15 s. El grafico sale de lo guardado: "
-                + "el medidor de cada transformador (una lectura por minuto) y el generador (una por minuto en marcha); en Hoy y "
+                + "red es el excedente de los generadores y va aparte. Se actualiza cada 15 s. El grafico usa la potencia (kW) tomada "
+                + "de la base de datos: una lectura por minuto del medidor de cada transformador y del generador en marcha; en Hoy y "
                 + "Ultimas 24 h cada punto es un minuto, en Ultimos 7 dias el promedio de 15 minutos. Se actualiza cada minuto.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
         VerticalLayout v = new VerticalLayout(barra, plantaContenido, cabeceraGrafico, plantaResumen, chartPlanta, plantaDetalle, nota);
@@ -567,7 +567,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         if (puntos.isEmpty()) {
             plantaResumen.setText("Sin lecturas de los transformadores en " + plantaVentana.getItemLabelGenerator().apply(horas).toLowerCase(Locale.ROOT) + ".");
         } else {
-            StringBuilder r = new StringBuilder(String.format(Locale.ROOT, "Del %s al %s, aprox. (de la potencia): consumo de la planta %,.0f kWh",
+            StringBuilder r = new StringBuilder(String.format(Locale.ROOT, "Del %s al %s (aprox., con la potencia tomada de la base de datos): consumo de la planta %,.0f kWh",
                     puntos.get(0).fecha().format(CORTA), hasta.format(CORTA), consumo));
             for (int i = 0; i < nombres.length; i++) {
                 r.append(String.format(Locale.ROOT, "; %s %,.0f kWh (%.1f %%)", nombres[i], energia[i], consumo > 0 ? energia[i] / consumo * 100 : 0));
