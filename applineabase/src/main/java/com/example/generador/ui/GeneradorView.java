@@ -63,6 +63,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -117,12 +118,16 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     /** Aviso de alarmas del controlador, arriba de las pestañas (se ve en todas). */
     private final Div alertaAlarmas = new Div();
     private final ComboBox<Generador> selector = new ComboBox<>();
-    private final Span estadoBadge = new Span();
-    private final Span estadoHora = new Span();
-    private final Span erroresLectura = new Span();
-    private final VerticalLayout panelRed = panel();
-    private final VerticalLayout panelGen = panel();
-    private final VerticalLayout panelMotor = panel();
+    /** Opción "Todos" del selector: los generadores juntos (no es un generador real). */
+    private static final Generador TODOS = new Generador("Todos", "", "", 0, null, "");
+    private Tab tabRegistros;
+    /** Estado actual: un bloque por generador elegido (los dos con "Todos"). */
+    private final Div estadoContenido = new Div();
+    /** Generador de cada fila de Arranques y del Historial de eventos (sus registros no lo traen); se ve con "Todos". */
+    private final Map<Arranque, String> generadorDeArranque = new IdentityHashMap<>();
+    private final Map<EventoGenerador, String> generadorDeEvento = new IdentityHashMap<>();
+    private Grid.Column<Arranque> colArranqueGenerador;
+    private Grid.Column<EventoGenerador> colEventoGenerador;
     private final Grid<Arranque> arranquesGrid = new Grid<>();
     private final Span tendenciaMensaje = new Span();
     private final Grid<FilaRegistro> registrosGrid = new Grid<>();
@@ -176,9 +181,15 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             return;
         }
 
-        selector.setItems(lista);
+        // Con más de un generador, primero "Todos": Estado actual, Arranques, Historial y Tendencias de todos juntos.
+        List<Generador> opciones = new ArrayList<>();
+        if (lista.size() > 1) opciones.add(TODOS);
+        opciones.addAll(lista);
+        selector.setItems(opciones);
         // El que tiene alarmas en el controlador se marca en la lista, para verlo desde la pantalla de otro.
-        selector.setItemLabelGenerator(g -> historial.alarmasActivas(g.nombre()).isEmpty() ? g.nombre() : g.nombre() + " (ALARMA)");
+        selector.setItemLabelGenerator(g -> g == TODOS
+                ? (lista.stream().anyMatch(x -> !historial.alarmasActivas(x.nombre()).isEmpty()) ? "Todos (ALARMA)" : "Todos")
+                : historial.alarmasActivas(g.nombre()).isEmpty() ? g.nombre() : g.nombre() + " (ALARMA)");
         selector.setValue(generador);
         selector.setWidth("220px");
         selector.addValueChangeListener(e -> {
@@ -203,7 +214,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         tabs.add("Historial de eventos", crearEventos());
         tabs.add("Tendencias", crearTendencias());
         if (lineaAccessService.esAdmin()) {
-            tabs.add("Registros", crearRegistros());
+            tabRegistros = tabs.add("Registros", crearRegistros());
         }
         tabs.addSelectedChangeListener(e -> {
             if (e.getSelectedTab() == tabPlanta) refrescarPlanta(true);
@@ -239,20 +250,43 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         e.getUI().setPollInterval(POLL_MS_APP);
     }
 
+    private boolean todos() {
+        return generador == TODOS;
+    }
+
+    /** El generador elegido, o todos con "Todos". */
+    private List<Generador> elegidos() {
+        return todos() ? service.generadores() : List.of(generador);
+    }
+
     private void cambiarGenerador() {
-        descripcion.setText(generador.descripcion() + " IP " + generador.ip() + ", modelo " + generador.modelo()
-                + (generador.redAsociada() == null ? "" : ", red " + generador.redAsociada()) + ".");
-        ModeloControlador m = service.modelo(generador).orElse(null);
-        if (m == null) {
-            avisoMapa.setText("El modelo " + generador.modelo() + " no esta en C:\\LineaBaseX\\config\\generador-modelos.json: no se lee.");
-            avisoMapa.setVisible(true);
-        } else if (!m.confirmado()) {
-            avisoMapa.setText("Mapa de registros de " + m.modelo() + " sin confirmar: los valores pueden no corresponder. "
-                    + "No se guarda historial ni arranques hasta confirmarlo comparando con la pantalla del controlador.");
-            avisoMapa.setVisible(true);
+        if (todos()) {
+            descripcion.setText("Todos los generadores: " + service.generadores().stream().map(g -> g.nombre() + " (" + g.modelo()
+                    + (g.redAsociada() == null ? "" : ", red " + g.redAsociada()) + ")").collect(Collectors.joining(", ")) + ".");
         } else {
-            avisoMapa.setVisible(false);
+            descripcion.setText(generador.descripcion() + " IP " + generador.ip() + ", modelo " + generador.modelo()
+                    + (generador.redAsociada() == null ? "" : ", red " + generador.redAsociada()) + ".");
         }
+        List<String> avisos = new ArrayList<>();
+        for (Generador g : elegidos()) {
+            ModeloControlador m = service.modelo(g).orElse(null);
+            String de = todos() ? g.nombre() + ": " : "";
+            if (m == null) {
+                avisos.add(de + "el modelo " + g.modelo() + " no esta en C:\\LineaBaseX\\config\\generador-modelos.json: no se lee.");
+            } else if (!m.confirmado()) {
+                avisos.add(de + "mapa de registros de " + m.modelo() + " sin confirmar: los valores pueden no corresponder. "
+                        + "No se guarda historial ni arranques hasta confirmarlo comparando con la pantalla del controlador.");
+            }
+        }
+        avisoMapa.setText(String.join("   |   ", avisos));
+        avisoMapa.setVisible(!avisos.isEmpty());
+        // Registros (exploración del mapa) es de a un controlador: con "Todos" se oculta.
+        if (tabRegistros != null) {
+            if (todos() && tabs.getSelectedTab() == tabRegistros) tabs.setSelectedTab(tabPlanta);
+            tabRegistros.setVisible(!todos());
+        }
+        colArranqueGenerador.setVisible(todos());
+        colEventoGenerador.setVisible(todos());
         registrosGrid.setItems(List.of());
         ultimaExploracion = List.of();
         exploracionAnterior = Map.of();
@@ -282,6 +316,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         filtros.setAlignItems(Alignment.END);
         filtros.getStyle().set("flex-wrap", "wrap");
 
+        colEventoGenerador = eventosGrid.addColumn(ev -> generadorDeEvento.getOrDefault(ev, "")).setHeader("Generador")
+                .setAutoWidth(true).setFlexGrow(0);
+        colEventoGenerador.setVisible(false);
         eventosGrid.addColumn(ev -> ev.id() == null ? "" : String.valueOf(ev.id())).setHeader("Nro").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> ev.fecha().format(HORA)).setHeader("Fecha y hora").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addComponentColumn(ev -> badgeNuevo(ev.tipo().etiqueta(), estadoDe(ev.tipo()))).setHeader("Evento").setAutoWidth(true).setFlexGrow(0);
@@ -318,21 +355,39 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         return v;
     }
 
+    /** Último evento guardado de los generadores elegidos (si cambia, hay eventos nuevos y se recarga la grilla). */
+    private long ultimoIdEventos() {
+        long suma = 0;
+        for (Generador g : elegidos()) suma += historial.ultimoId(g.nombre());
+        return suma;
+    }
+
     private void cargarEventos() {
         if (generador == null) return;
         int dias = eventosPeriodo.getValue() == null ? 30 : eventosPeriodo.getValue();
         LocalDateTime hasta = LocalDateTime.now();
-        ultimoEventoMostrado = historial.ultimoId(generador.nombre());
-        eventos = historial.listar(generador.nombre(), hasta.minusDays(dias), hasta, eventosTipo.getValue());
+        ultimoEventoMostrado = ultimoIdEventos();
+        generadorDeEvento.clear();
+        List<EventoGenerador> lista = new ArrayList<>();
+        for (Generador g : elegidos()) {
+            for (EventoGenerador ev : historial.listar(g.nombre(), hasta.minusDays(dias), hasta, eventosTipo.getValue())) {
+                lista.add(ev);
+                generadorDeEvento.put(ev, g.nombre());
+            }
+        }
+        // Con "Todos", los de todos los generadores juntos, del más nuevo al más viejo.
+        if (todos()) lista.sort(java.util.Comparator.comparing(EventoGenerador::fecha).reversed());
+        eventos = lista;
         eventosGrid.setItems(eventos);
-        eventosMensaje.setText(eventos.size() + " eventos de " + generador.nombre() + (eventos.isEmpty()
-                ? ". El historial empieza a llenarse desde que se activo esta version." : "."));
+        eventosMensaje.setText(eventos.size() + " eventos de " + (todos() ? "todos los generadores" : generador.nombre())
+                + (eventos.isEmpty() ? ". El historial empieza a llenarse desde que se activo esta version." : "."));
     }
 
     private java.io.InputStream csvEventos() {
-        StringBuilder sb = new StringBuilder("﻿Nro;Fecha y hora;Evento;Descripcion;RPM;kW;PF;Hz gen;V gen;I gen;Hz red;V red;Bateria;Temp;Horas;kWh;Arranques\n");
+        StringBuilder sb = new StringBuilder("﻿Generador;Nro;Fecha y hora;Evento;Descripcion;RPM;kW;PF;Hz gen;V gen;I gen;Hz red;V red;Bateria;Temp;Horas;kWh;Arranques\n");
         for (EventoGenerador ev : eventos) {
-            sb.append(ev.id()).append(';').append(ev.fecha().format(HORA)).append(';')
+            sb.append(com.example.base.ui.CsvUtil.escape(generadorDeEvento.getOrDefault(ev, ""))).append(';')
+                    .append(ev.id()).append(';').append(ev.fecha().format(HORA)).append(';')
                     .append(com.example.base.ui.CsvUtil.escape(ev.tipo().etiqueta())).append(';')
                     .append(com.example.base.ui.CsvUtil.escape(ev.descripcion() == null ? "" : ev.descripcion())).append(';')
                     .append(csv(ev.rpm())).append(';').append(csv(ev.kw())).append(';').append(csv(ev.pf())).append(';')
@@ -360,67 +415,71 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     // ================= Alarmas del controlador =================
 
     /**
-     * Aviso rojo con las alarmas de la lista del controlador del generador elegido (texto tal como lo
-     * envía, desde cuándo y qué significa), y una línea con los otros generadores que tengan alarmas.
+     * Aviso rojo con las alarmas de la lista del controlador de cada generador elegido (texto tal como lo envía, desde
+     * cuándo y qué significa) y, con un solo generador elegido, una línea con los otros que tengan alarmas.
      *
-     * @param ultimaConocida true = no hubo comunicación y se muestra la última lectura de fondo
+     * @param alarmas por generador; ultimaConocida = los que no tuvieron comunicación (se muestra la última lectura de fondo)
      */
-    private void mostrarAlarmas(List<String> alarmas, boolean ultimaConocida) {
+    private void mostrarAlarmas(Map<Generador, List<String>> alarmas, java.util.Set<Generador> ultimaConocida) {
         alertaAlarmas.removeAll();
         selector.getDataProvider().refreshAll();
-        List<String> otros = service.generadores().stream()
+        boolean hay = false;
+        for (Map.Entry<Generador, List<String>> e : alarmas.entrySet()) {
+            hay |= agregarAlarmas(e.getKey(), e.getValue(), ultimaConocida.contains(e.getKey()));
+        }
+        List<String> otros = todos() ? List.of() : service.generadores().stream()
                 .filter(g -> !g.nombre().equals(generador.nombre()) && !historial.alarmasActivas(g.nombre()).isEmpty())
                 .map(g -> g.nombre() + ": " + historial.alarmasActivas(g.nombre()).stream()
                         .map(AlarmaComap::nombre).collect(Collectors.joining(", "))).toList();
-        boolean propias = alarmas != null && !alarmas.isEmpty();
-        if (!propias && otros.isEmpty()) {
-            alertaAlarmas.setVisible(false);
-            return;
-        }
-        if (propias) {
-            Div caja = new Div();
-            caja.getStyle().set("background-color", "#f8d7da").set("color", "#721c24").set("border", "2px solid #721c24")
-                    .set("border-radius", "6px").set("padding", "8px 12px");
-            var icono = VaadinIcon.WARNING.create();
-            icono.getStyle().set("margin-right", "6px");
-            Span titulo = new Span("ALARMA EN EL CONTROLADOR DE " + generador.nombre().toUpperCase(Locale.ROOT) + " (" + alarmas.size() + ")"
-                    + (ultimaConocida ? " - ultima lectura conocida, sin comunicacion ahora" : ""));
-            titulo.getStyle().set("font-weight", "700").set("font-size", "15px");
-            Div cabeza = new Div(icono, titulo);
-            cabeza.getStyle().set("display", "flex").set("align-items", "center");
-            caja.add(cabeza);
-            for (String a : alarmas) {
-                HistorialEventosService.Aparicion ap = historial.aparicion(generador.nombre(), a);
-                String desde = ap == null ? "" : ap.inicioLectura()
-                        ? ", desde antes del " + ap.fecha().format(CORTA) + " (cuando la app empezo a leer)"
-                        : ", desde el " + ap.fecha().format(CORTA);
-                Span nombre = new Span(AlarmaComap.nombre(a));
-                nombre.getStyle().set("font-weight", "700");
-                boolean activa = AlarmaComap.activa(a);
-                Span estado = badgeNuevo(AlarmaComap.estado(a), activa ? Estado.FUERA : Estado.AVISO);
-                Span cuando = new Span(desde.isEmpty() ? "" : desde.substring(2));
-                cuando.getStyle().set("font-size", "13px");
-                Div linea = new Div(nombre, estado, cuando);
-                linea.getStyle().set("display", "flex").set("align-items", "center").set("gap", "8px").set("flex-wrap", "wrap")
-                        .set("margin-top", "6px");
-                Span explicacion = new Span(AlarmaComap.explicacion(a));
-                explicacion.getStyle().set("font-size", "13px").set("display", "block");
-                caja.add(linea, explicacion);
-            }
-            Span nota = new Span("Lista de alarmas del controlador (solo lectura). El controlador marca con \"!\" la alarma activa y con "
-                    + "\"*\" la que todavia no tiene reset. Todo queda en el Historial de eventos: cuando aparece, se activa de nuevo, deja "
-                    + "de estar activa, se confirma o sale de la lista (reseteada).");
-            nota.getStyle().set("font-size", "11px").set("display", "block").set("margin-top", "4px");
-            caja.add(nota);
-            alertaAlarmas.add(caja);
-        }
         if (!otros.isEmpty()) {
             Span s = new Span("Otro generador con alarma: " + String.join("   |   ", otros) + " (elijalo en la lista para ver el detalle).");
             s.getStyle().set("background-color", "#fff3cd").set("color", "#856404").set("padding", "6px 10px").set("border-radius", "6px")
-                    .set("font-size", "13px").set("display", "block").set("margin-top", propias ? "6px" : "0");
+                    .set("font-size", "13px").set("display", "block").set("margin-top", hay ? "6px" : "0");
             alertaAlarmas.add(s);
         }
-        alertaAlarmas.setVisible(true);
+        alertaAlarmas.setVisible(hay || !otros.isEmpty());
+    }
+
+    /** Agrega la caja roja con las alarmas de un generador; false si no tiene ninguna. */
+    private boolean agregarAlarmas(Generador g, List<String> alarmas, boolean ultimaConocida) {
+        if (alarmas == null || alarmas.isEmpty()) return false;
+        Div caja = new Div();
+        caja.getStyle().set("background-color", "#f8d7da").set("color", "#721c24").set("border", "2px solid #721c24")
+                .set("border-radius", "6px").set("padding", "8px 12px");
+        var icono = VaadinIcon.WARNING.create();
+        icono.getStyle().set("margin-right", "6px");
+        Span titulo = new Span("ALARMA EN EL CONTROLADOR DE " + g.nombre().toUpperCase(Locale.ROOT) + " (" + alarmas.size() + ")"
+                + (ultimaConocida ? " - ultima lectura conocida, sin comunicacion ahora" : ""));
+        titulo.getStyle().set("font-weight", "700").set("font-size", "15px");
+        Div cabeza = new Div(icono, titulo);
+        cabeza.getStyle().set("display", "flex").set("align-items", "center");
+        caja.add(cabeza);
+        for (String a : alarmas) {
+            HistorialEventosService.Aparicion ap = historial.aparicion(g.nombre(), a);
+            String desde = ap == null ? "" : ap.inicioLectura()
+                    ? ", desde antes del " + ap.fecha().format(CORTA) + " (cuando la app empezo a leer)"
+                    : ", desde el " + ap.fecha().format(CORTA);
+            Span nombre = new Span(AlarmaComap.nombre(a));
+            nombre.getStyle().set("font-weight", "700");
+            boolean activa = AlarmaComap.activa(a);
+            Span estado = badgeNuevo(AlarmaComap.estado(a), activa ? Estado.FUERA : Estado.AVISO);
+            Span cuando = new Span(desde.isEmpty() ? "" : desde.substring(2));
+            cuando.getStyle().set("font-size", "13px");
+            Div linea = new Div(nombre, estado, cuando);
+            linea.getStyle().set("display", "flex").set("align-items", "center").set("gap", "8px").set("flex-wrap", "wrap")
+                    .set("margin-top", "6px");
+            Span explicacion = new Span(AlarmaComap.explicacion(a));
+            explicacion.getStyle().set("font-size", "13px").set("display", "block");
+            caja.add(linea, explicacion);
+        }
+        Span nota = new Span("Lista de alarmas del controlador (solo lectura). El controlador marca con \"!\" la alarma activa y con "
+                + "\"*\" la que todavia no tiene reset. Todo queda en el Historial de eventos: cuando aparece, se activa de nuevo, deja "
+                + "de estar activa, se confirma o sale de la lista (reseteada).");
+        nota.getStyle().set("font-size", "11px").set("display", "block").set("margin-top", "4px");
+        caja.add(nota);
+        if (alertaAlarmas.getComponentCount() > 0) caja.getStyle().set("margin-top", "6px");
+        alertaAlarmas.add(caja);
+        return true;
     }
 
     // ================= Balance energético P1 (planta 1 en vivo) =================
@@ -726,44 +785,83 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     private VerticalLayout crearEstado() {
         Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> refrescar());
-        estadoHora.getStyle().set("font-size", "12px").set("color", "#555");
-        HorizontalLayout barra = new HorizontalLayout(estadoBadge, estadoHora, actualizar);
-        barra.setAlignItems(Alignment.CENTER);
-
-        HorizontalLayout paneles = new HorizontalLayout(panelRed, panelGen, panelMotor);
-        paneles.setWidthFull();
-        paneles.getStyle().set("flex-wrap", "wrap");
-
-        erroresLectura.getStyle().set("font-size", "12px").set("color", "#721c24");
+        estadoContenido.setWidthFull();
         Span nota = new Span("Leido en vivo del controlador cada 15 s (solo lectura). La red es el medidor del transformador "
                 + "asociado (PLC, ultimo minuto); potencia negativa = retorno de energia a la red. "
                 + "Tension, frecuencia y PF usan los limites de Calidad de Energia; bateria, aceite y temperatura tienen "
-                + "limites provisorios (sistema de 24 V) hasta configurar las alarmas.");
+                + "limites provisorios (sistema de 24 V) hasta configurar las alarmas. Con Todos, un bloque por generador.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
-        VerticalLayout v = new VerticalLayout(barra, paneles, erroresLectura, nota);
+        VerticalLayout v = new VerticalLayout(actualizar, estadoContenido, nota);
         v.setPadding(false);
         return v;
     }
 
     private void refrescar() {
         if (generador == null) return;
-        arranquesGrid.setItems(service.arranques(generador));
-        // El historial se recarga solo cuando la lectura de fondo (cada minuto) guardó un evento nuevo.
-        if (historial.ultimoId(generador.nombre()) != ultimoEventoMostrado) cargarEventos();
-        LecturaGenerador l;
-        try {
-            l = service.leerEnVivo(generador);
-        } catch (Exception ex) {
-            badge(estadoBadge, "SIN COMUNICACION", Estado.FUERA);
-            estadoHora.setText(ex.getMessage());
-            erroresLectura.setText("");
-            panelRed.removeAll();
-            panelGen.removeAll();
-            panelMotor.removeAll();
-            mostrarAlarmas(historial.alarmasActivas(generador.nombre()), true);
-            return;
+        List<Generador> gens = elegidos();
+        generadorDeArranque.clear();
+        List<Arranque> arranques = new ArrayList<>();
+        for (Generador g : gens) {
+            for (Arranque a : service.arranques(g)) {
+                arranques.add(a);
+                generadorDeArranque.put(a, g.nombre());
+            }
         }
-        mostrarAlarmas(l.alarmas(), false);
+        // Con "Todos", los de todos los generadores juntos, del más nuevo al más viejo.
+        if (todos()) arranques.sort(java.util.Comparator.comparing(Arranque::inicio).reversed());
+        arranquesGrid.setItems(arranques);
+        // El historial se recarga solo cuando la lectura de fondo (cada minuto) guardó un evento nuevo.
+        if (ultimoIdEventos() != ultimoEventoMostrado) cargarEventos();
+        estadoContenido.removeAll();
+        Map<Generador, List<String>> alarmas = new LinkedHashMap<>();
+        java.util.Set<Generador> sinComunicacion = new java.util.HashSet<>();
+        for (Generador g : gens) {
+            LecturaGenerador l = null;
+            String error = null;
+            try {
+                l = service.leerEnVivo(g);
+            } catch (Exception ex) {
+                error = ex.getMessage();
+                sinComunicacion.add(g);
+            }
+            alarmas.put(g, l == null ? historial.alarmasActivas(g.nombre()) : l.alarmas());
+            estadoContenido.add(estadoDe(g, l, error));
+        }
+        mostrarAlarmas(alarmas, sinComunicacion);
+    }
+
+    /**
+     * Estado actual de un generador: estado y hora de lectura (con su nombre si se ven todos) y los paneles de red,
+     * generador y motor. l == null = sin comunicación (error = el motivo).
+     */
+    private VerticalLayout estadoDe(Generador gen, LecturaGenerador l, String error) {
+        Span estadoBadge = new Span();
+        Span estadoHora = new Span();
+        estadoHora.getStyle().set("font-size", "12px").set("color", "#555");
+        Span erroresLectura = new Span();
+        erroresLectura.getStyle().set("font-size", "12px").set("color", "#721c24");
+        HorizontalLayout barra = new HorizontalLayout();
+        if (todos()) {
+            H4 nombre = titulo(gen.nombre());
+            nombre.getStyle().set("margin", "0");
+            barra.add(nombre);
+        }
+        barra.add(estadoBadge, estadoHora);
+        barra.setAlignItems(Alignment.CENTER);
+        VerticalLayout panelRed = panel(), panelGen = panel(), panelMotor = panel();
+        HorizontalLayout paneles = new HorizontalLayout(panelRed, panelGen, panelMotor);
+        paneles.setWidthFull();
+        paneles.getStyle().set("flex-wrap", "wrap");
+        VerticalLayout v = new VerticalLayout(barra, paneles, erroresLectura);
+        v.setPadding(false);
+        v.setSpacing(false);
+        v.getStyle().set("gap", "6px").set("margin-bottom", "14px");
+        if (l == null) {
+            badge(estadoBadge, "SIN COMUNICACION", Estado.FUERA);
+            estadoHora.setText(error);
+            paneles.setVisible(false);
+            return v;
+        }
         boolean marcha = l.enMarcha();
         badge(estadoBadge, l.rpm() == null ? "SIN RPM" : marcha ? "EN MARCHA" : "PARADO",
                 l.rpm() == null ? Estado.AVISO : marcha ? Estado.OK : Estado.SIN_DATO);
@@ -774,7 +872,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         ConfiguracionCalidad cfg = calidad.configuracion();
 
         // Red: tensiones y frecuencia del controlador; potencia/corrientes/PF del medidor del transformador (PLC).
-        String red = generador.redAsociada();
+        String red = gen.redAsociada();
         panelRed.removeAll();
         panelRed.add(titulo("Red (" + nombreRed(red) + ")"));
         double nomRed = calidad.tensionNominal(red == null ? "" : red);
@@ -791,7 +889,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         if (l.cargaKw() != null) {
             panelRed.add(fila("Consumo " + deRed(red) + " (controlador)", texto(String.format(Locale.ROOT, "%.0f kW", l.cargaKw()))));
         }
-        Map<String, Object> medidor = service.ultimaRed(generador);
+        Map<String, Object> medidor = service.ultimaRed(gen);
         if (!medidor.isEmpty()) {
             Double pw = num(medidor.get("PW"));
             Double pf = num(medidor.get("PF")) == null ? null : FactorPotenciaUtil.normalizarAbs(Math.abs(num(medidor.get("PF"))));
@@ -813,7 +911,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         // Generador.
         panelGen.removeAll();
         panelGen.add(titulo("Generador"));
-        double nomGen = calidad.tensionNominal(generador.nombre());
+        double nomGen = calidad.tensionNominal(gen.nombre());
         panelGen.add(fila("Potencia", grande(l.kw() == null ? "-" : String.format(Locale.ROOT, "%.0f kW", l.kw()))));
         panelGen.add(fila("kVAr / kVA", texto(fmt(l.kvar(), "%.0f") + " kVAr / " + fmt(l.kva(), "%.0f") + " kVA")));
         panelGen.add(fila("PF", marcha ? valor(l.pf(), "%.2f", calidad.evaluar(Indicador.FACTOR_POTENCIA, l.pf() == null ? null : Math.abs(l.pf()), nomGen, cfg))
@@ -837,7 +935,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         // Motor.
         panelMotor.removeAll();
         panelMotor.add(titulo("Motor"));
-        ModeloControlador modelo = service.modelo(generador).orElse(null);
+        ModeloControlador modelo = service.modelo(gen).orElse(null);
         panelMotor.add(fila("Bateria", valor(l.bateria(), "%.1f V", estadoBateria(l.bateria(), marcha))));
         if (modelo != null && modelo.registro(ParametroGenerador.PRESION_ACEITE).isEmpty()) {
             panelMotor.add(fila("Presion de aceite", nota("no lo mide este controlador")));
@@ -866,6 +964,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             p.setAlignItems(Alignment.CENTER);
             panelMotor.add(fila("Reloj del controlador", p));
         }
+        return v;
     }
 
     private static Estado estadoBateria(Double v, boolean marcha) {
@@ -887,6 +986,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     // ================= Arranques =================
 
     private VerticalLayout crearArranques() {
+        colArranqueGenerador = arranquesGrid.addColumn(a -> generadorDeArranque.getOrDefault(a, "")).setHeader("Generador").setAutoWidth(true);
+        colArranqueGenerador.setVisible(false);
         arranquesGrid.addColumn(a -> a.arranqueNro() == null ? "-" : String.valueOf(a.arranqueNro())).setHeader("Nro").setAutoWidth(true);
         arranquesGrid.addColumn(a -> a.inicio().format(CORTA) + (a.inicioEstimado() ? " (aprox.)" : "")).setHeader("Inicio").setAutoWidth(true);
         arranquesGrid.addComponentColumn(a -> a.fin() == null ? badgeNuevo("En marcha", Estado.OK) : new Span(a.fin().format(CORTA)))
@@ -937,22 +1038,44 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         String[] columnas = VARIABLES.get(variable);
         LocalDateTime hasta = LocalDateTime.now();
         LocalDateTime desde = hasta.minusDays(dias);
+        // Una serie por columna; con "Todos", por cada generador (mismo color de generador si es una sola columna;
+        // si son varias, el segundo generador en línea punteada).
+        List<Generador> gens = elegidos();
         List<List<Punto>> series = new ArrayList<>();
-        for (String col : columnas) series.add(service.serie(generador, col, desde, hasta));
+        List<String> nombres = new ArrayList<>();
+        List<String> colores = new ArrayList<>();
+        List<Boolean> punteadas = new ArrayList<>();
+        for (int gi = 0; gi < gens.size(); gi++) {
+            Generador gen = gens.get(gi);
+            for (String col : columnas) {
+                series.add(service.serie(gen, col, desde, hasta));
+                nombres.add(!todos() ? (columnas.length == 1 ? variable : col) : columnas.length == 1 ? gen.nombre() : gen.nombre() + " " + col);
+                colores.add("0x" + COLORES_GEN[service.generadores().indexOf(gen) % COLORES_GEN.length].substring(1));
+                punteadas.add(gi > 0);
+            }
+        }
+        int n = series.size();
 
         java.util.TreeMap<LocalDateTime, Float[]> filas = new java.util.TreeMap<>();
         double min = Double.MAX_VALUE, max = -Double.MAX_VALUE;
-        for (int s = 0; s < series.size(); s++) {
+        for (int s = 0; s < n; s++) {
             for (Punto p : series.get(s)) {
                 if (p.valor() == null) continue;
-                filas.computeIfAbsent(p.fecha(), k -> new Float[columnas.length])[s] = p.valor().floatValue();
+                filas.computeIfAbsent(p.fecha(), k -> new Float[n])[s] = p.valor().floatValue();
                 min = Math.min(min, p.valor());
                 max = Math.max(max, p.valor());
             }
         }
-        GraficaModel g = new GraficaModel(columnas.length);
-        g.setSeriesNames(columnas.length == 1 ? new String[]{variable} : columnas);
-        g.setMostrarLeyenda(columnas.length > 1);
+        GraficaModel g = new GraficaModel(n);
+        g.setSeriesNames(nombres.toArray(new String[0]));
+        g.setMostrarLeyenda(n > 1);
+        if (todos() && columnas.length == 1) {
+            g.setColoresPersonalizados(colores.toArray(new String[0]));
+        } else if (todos()) {
+            boolean[] d = new boolean[n];
+            for (int i = 0; i < n; i++) d[i] = punteadas.get(i);
+            g.setSeriesDiscontinuas(d);
+        }
         if (filas.isEmpty()) {
             tendenciaMensaje.setText("Sin datos de " + variable + " en el periodo.");
             getElement().executeJs(g.getInitScript2(CHART_ID));
@@ -967,7 +1090,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             t.add(f.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
             v.add(val);
         });
-        tendenciaMensaje.setText(variable + ": " + filas.size() + " lecturas.");
+        tendenciaMensaje.setText(variable + ": " + filas.size() + " lecturas" + (todos() ? ", una linea por generador." : "."));
         getElement().executeJs(g.getInitScript2(CHART_ID) + g.getSetAllDataScript(CHART_ID, t, v)
                 + g.getAplicarZoomInicialScript(CHART_ID));
     }
