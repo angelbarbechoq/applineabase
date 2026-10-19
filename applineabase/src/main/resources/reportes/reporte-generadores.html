@@ -258,6 +258,14 @@ footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line)
       <div class="cuadre" id="cuadre"></div>
     </section>
 
+    <section class="panel" aria-labelledby="tPlanta" id="seccionPlanta" hidden>
+      <h2 id="tPlanta">Balance energético de la planta</h2>
+      <p class="intro" id="textoPlanta"></p>
+      <div class="cifras" id="cifrasPlanta"></div>
+      <div class="lienzo"><canvas id="gPlanta" aria-label="Consumo de la planta en el tiempo: lo que generó cada generador, el consumo y la red"></canvas></div>
+      <div class="leyenda" id="leyendaPlanta"></div>
+    </section>
+
     <section class="panel" aria-labelledby="tMeta">
       <h2 id="tMeta">Meta: consumo cero de la red</h2>
       <p class="kpi" id="kpiTexto"></p>
@@ -315,6 +323,11 @@ footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line)
 </script>
 <script>
 const DATOS = /*DATOS*/;
+// Consumo de toda la planta (promedios de 15 min) en los tramos con algún generador en marcha; null con un solo generador.
+// Cada punto: [fecha, generó cada generador..., puso en planta cada uno..., importada, exportada] en kW.
+const PLANTA = /*PLANTA*/null;
+// Color de cada generador, el mismo que en LineaBaseX (Balance energético P1): naranja, violeta, ...
+const COLORES_GEN = ["#eb6834", "#6250d6", "#e87ba4", "#eda100"];
 const GENERADO_EL = "/*GENERADO_EL*/";
 // Semaforo de la meta de consumo cero de la red (generador-config.json, metaImportacionRed): verde hasta VERDE_HASTA %,
 // amarillo hasta AMARILLO_HASTA %, rojo por encima. Sin reemplazar (abierto como plantilla) quedan 2 y 10.
@@ -425,6 +438,7 @@ document.getElementById("bImprimir").addEventListener("click", () => {
 let graficos = [];
 let seleccion = [];
 let T = null;
+let P = null; // balance de toda la planta (solo con más de un generador elegido)
 
 function generar() {
   seleccion = DATOS.filter(a => marcados.has(a.id)).sort((a, b) => a.inicio.localeCompare(b.inicio));
@@ -490,6 +504,45 @@ function generar() {
     `<div class="fila"><span>Entradas:</span><span>${sw("--gen")}generada <b>${fmt(T.generado)}</b></span><span>+ ${sw("--grid")}importada <b>${fmt(T.tomado)}</b></span><span>= <b>${fmt(T.entradas)} kWh</b></span></div>` +
     `<div class="fila"><span>Salidas:</span><span>${sw("--cons")}consumida <b>${fmt(T.consumo)}</b></span><span>+ ${sw("--out")}exportada <b>${fmt(T.entregado)}</b></span><span>= <b>${fmt(T.salidas)} kWh</b></span></div>` +
     `<div class="fila resultado"><span>Entradas − salidas = <b>${fmt(diferencia)} kWh</b>${Math.abs(diferencia) <= n ? " (el balance cuadra)" : ""}</span></div>`;
+
+  // Balance energetico de la planta (con mas de un generador elegido): toda la planta mientras alguno de los arranques
+  // elegidos estaba en marcha, de los puntos de 15 min.
+  P = null;
+  const seccionPlanta = document.getElementById("seccionPlanta");
+  if (PLANTA && generadores.length > 1) {
+    const ng = PLANTA.generadores.length, mins = PLANTA.minutos;
+    const tramos = seleccion.map(a => [fecha(a.inicio).getTime(), fecha(a.fin).getTime()]);
+    const puntos = PLANTA.puntos.filter(p => { const t = fecha(p[0]).getTime(); return tramos.some(([i, f]) => i < t + mins * 60000 && f > t); });
+    if (puntos.length) {
+      const kwh = k => puntos.reduce((s, p) => s + (p[k] ?? 0), 0) * mins / 60;
+      P = { puntos, ng, mins, puso: PLANTA.generadores.map((g, i) => kwh(1 + ng + i)), imp: kwh(1 + 2 * ng), exp: kwh(2 + 2 * ng) };
+      P.consumo = P.puso.reduce((s, v) => s + v, 0) + P.imp;
+    }
+  }
+  seccionPlanta.hidden = !P;
+  if (P) {
+    const pctDe = v => P.consumo > 0 ? pct(v / P.consumo * 100) : "–";
+    document.getElementById("textoPlanta").innerHTML =
+      `Toda la planta (${textoRedes(redes)}) mientras alguno de los generadores elegidos estaba en marcha: consumió <b>${fmt(P.consumo)} kWh</b>; ` +
+      PLANTA.generadores.map((g, i) => `${g} puso <b>${fmt(P.puso[i])} kWh</b> (${pctDe(P.puso[i])})`).join(", ") +
+      ` y la red <b>${fmt(P.imp)} kWh</b> (${pctDe(P.imp)}). Se exportaron ${fmt(P.exp)} kWh. Cifras aproximadas, de la potencia guardada en promedios de ${P.mins} minutos.`;
+    const cifrasPlanta = document.getElementById("cifrasPlanta"); cifrasPlanta.innerHTML = "";
+    const tarjetas = [["cons", "Consumo de la planta", P.consumo, "generadores + red", null]];
+    PLANTA.generadores.forEach((g, i) => tarjetas.push(["", `Puso ${g}`, P.puso[i], `${pctDe(P.puso[i])} del consumo`, COLORES_GEN[i % COLORES_GEN.length]]));
+    tarjetas.push(["red", "Importada de la red", P.imp, `${pctDe(P.imp)} del consumo`, null]);
+    tarjetas.push(["out", "Exportada a la red", P.exp, "excedente de los generadores", null]);
+    cifrasPlanta.classList.toggle("cinco", tarjetas.length === 5);
+    tarjetas.forEach(([c, e, v, d, color]) => {
+      const t = el("div", { className: "cifra " + c }, `<span class="etiqueta">${e}</span><span class="valor">${fmt(v)}<small> kWh</small></span><span class="det">${d}</span>`);
+      if (color) t.style.borderTopColor = color;
+      cifrasPlanta.append(t);
+    });
+    const sw = c => `<i style="background:${c}"></i>`, swLinea = c => `<i class="linea" style="background:${c}"></i>`;
+    document.getElementById("leyendaPlanta").innerHTML =
+      PLANTA.generadores.map((g, i) => `<span>${swLinea(COLORES_GEN[i % COLORES_GEN.length])}${g} (lo que genera)</span>`).join("") +
+      `<span>${swLinea(css("--cons"))}Consumo de la planta</span><span>${sw(css("--grid"))}Importación de la red</span>` +
+      `<span>${sw(css("--out"))}Exportación a la red</span><span>Promedios de ${P.mins} minutos, en kW</span>`;
+  }
 
   // Meta de consumo cero de la red: que tan cerca estuvimos, en total y por periodo (semaforo de VERDE_HASTA y AMARILLO_HASTA).
   const conConsumo = seleccion.filter(a => pctImportado(a) != null);
@@ -560,6 +613,7 @@ function generar() {
   seleccion.filter(sinCarga).forEach(a =>
     notas.push(`El ${a.generador} del ${diaCorto(fecha(a.inicio))} a las ${hhmm(fecha(a.inicio))} estuvo ${fmt(a.horas * 60)} minutos en marcha sin carga: no generó, y la importación de la red en ese lapso (${fmt(a.tomado)} kWh) cuenta en el total.`));
   notas.push(`Importada de la red: verde hasta el ${pctUmbral(VERDE_HASTA)} del consumo, amarillo hasta el ${pctUmbral(AMARILLO_HASTA)} y rojo por encima; la meta es 0 %.`);
+  if (P) notas.push(`Balance energético de la planta: potencia guardada de los medidores de los transformadores y de cada generador, en promedios de ${P.mins} minutos, solo mientras alguno de los generadores elegidos estaba en marcha. Incluye el transformador del generador que no estaba en marcha. Por eso difiere de las cifras de arriba, que suman cada arranque con su transformador y salen de los contadores.`);
   if (conTarifa.length) notas.push("Ahorro o sobrecosto frente a la red: cada kWh aprovechado (generado − exportado) valorizado al precio de la franja horaria (A, B, C o D) de la hora en que se generó, con la tarifa de su mes, contra el costo del diésel. Solo energía contra combustible: no incluye el mantenimiento del generador ni los demás cargos de la factura de la red.");
   notas.push("Fuente: contadores de energía del controlador de cada generador y del medidor de su transformador (igual que la pantalla «Períodos en marcha» de LineaBaseX); combustible, tarifa por franja horaria y feriados, cargados en LineaBaseX.");
   document.getElementById("notas").innerHTML = notas.map(t => `<li>${t}</li>`).join("");
@@ -615,6 +669,34 @@ function dibujar() {
         y: { stacked: true, grid: { display: false }, ticks: { color: css("--ink"), font: { size: 13, weight: "600" } } } } },
     plugins: [valoresEnTramos]
   }));
+
+  // Balance energetico de la planta: mismo formato que la grafica de la aplicacion (Balance energetico P1): una linea
+  // por generador con lo que genera, la linea del consumo de la planta y barras de la red (azul sobre cero = importacion,
+  // verde bajo cero = exportacion). Entre arranques que no se tocan se corta la linea (punto vacio).
+  if (P) {
+    const ng = P.ng, filas = [];
+    P.puntos.forEach((p, i) => {
+      if (i > 0 && fecha(p[0]) - fecha(P.puntos[i - 1][0]) > P.mins * 60000) filas.push(null);
+      filas.push(p);
+    });
+    const variosDias = !mismoDia(fecha(P.puntos[0][0]), fecha(P.puntos[P.puntos.length - 1][0]));
+    const etiquetas = filas.map(p => { if (!p) return ""; const d = fecha(p[0]); return variosDias ? `${diaCorto(d)} ${hhmm(d)}` : hhmm(d); });
+    const serie = f => filas.map(p => p ? f(p) : null);
+    const consumo = p => { let s = p[1 + 2 * ng]; for (let i = 0; i < ng; i++) s += p[1 + ng + i]; return s; };
+    graficos.push(new Chart(document.getElementById("gPlanta"), {
+      data: { labels: etiquetas, datasets: [
+        ...PLANTA.generadores.map((g, i) => ({ type: "line", label: g, data: serie(p => p[1 + i]), borderColor: COLORES_GEN[i % COLORES_GEN.length], borderWidth: 1.6, pointRadius: 0, order: 0 })),
+        { type: "line", label: "Consumo de la planta", data: serie(consumo), borderColor: css("--cons"), borderWidth: 1.4, pointRadius: 0, order: 0 },
+        { type: "bar", label: "Importación de la red", data: serie(p => p[1 + 2 * ng] || null), backgroundColor: css("--grid"), barPercentage: 1, categoryPercentage: 1, stack: "red", order: 1 },
+        { type: "bar", label: "Exportación a la red", data: serie(p => p[2 + 2 * ng] ? -p[2 + 2 * ng] : null), backgroundColor: css("--out"), barPercentage: 1, categoryPercentage: 1, stack: "red", order: 1 }] },
+      options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: false }, tooltip: { ...caja, filter: c => c.parsed.y != null,
+          callbacks: { label: c => `${c.dataset.label}: ${fmt(Math.abs(c.parsed.y))} kW` } } },
+        // x apilado (y no): importación y exportación ocupan el mismo lugar, una hacia arriba y otra hacia abajo.
+        scales: { x: { stacked: true, grid: { display: false }, ticks: { maxTicksLimit: 8, maxRotation: 0, autoSkipPadding: 10, font: { size: 11 } } },
+          y: { title: { display: true, text: "kW" }, ticks: { maxTicksLimit: 6, callback: v => fmt(v) }, grid: { color: lineaCero } } } }
+    }));
+  }
 
   // KPI consumo cero de la red: % del consumo importado, en barras azules (importacion) sobre el fondo del semaforo
   // (verde hasta VERDE_HASTA, amarillo hasta AMARILLO_HASTA, rojo mas). El eje se corta en "tope" y la barra que pasa lleva su valor

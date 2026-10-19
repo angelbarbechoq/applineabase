@@ -68,13 +68,51 @@ public class ReporteGeneradoresService {
         MetaImportacionRed meta = generadorService.metaImportacionRed();
         // "</" dentro del <script> cerraría la etiqueta: se escribe "<\/" (mismo texto para JavaScript).
         String json = objectMapper.writeValueAsString(datos).replace("</", "<\\/");
+        String planta = objectMapper.writeValueAsString(consumoPlanta(generadores, periodos)).replace("</", "<\\/");
         String html = recurso(PLANTILLA)
                 .replace("/*DATOS*/", json)
+                .replace("/*PLANTA*/null", planta)
                 .replace("/*GENERADO_EL*/", LocalDateTime.now().format(GENERADO))
                 .replace("/*VERDE_HASTA*/", numero(meta.verdeHasta()))
                 .replace("/*AMARILLO_HASTA*/", numero(meta.amarilloHasta()))
                 .replace("/*CHARTJS*/", recurso(CHART_JS));
         out.write(html.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Puntos de 15 minutos del consumo de toda la planta para la sección "Balance energético de la planta". */
+    private static final int MINUTOS_PLANTA = 15;
+
+    /**
+     * Con más de un generador: consumo de toda la planta (sus transformadores) en promedios de 15 minutos, solo en los
+     * tramos en que alguno de los arranques del período estaba en marcha (el reporte después se queda con los de los
+     * arranques elegidos). Cada punto: fecha, lo que generó cada generador, lo que puso en la planta cada uno,
+     * importada y exportada (kW). null con un solo generador.
+     */
+    private Map<String, Object> consumoPlanta(List<Generador> generadores, List<PeriodoMarcha> periodos) {
+        if (generadores.size() < 2 || periodos.isEmpty()) return null;
+        LocalDateTime ini = periodos.stream().map(PeriodoMarcha::inicio).min(LocalDateTime::compareTo).orElseThrow()
+                .minusMinutes(MINUTOS_PLANTA);
+        LocalDateTime fin = periodos.stream().map(PeriodoMarcha::fin).max(LocalDateTime::compareTo).orElseThrow();
+        int n = generadores.size();
+        List<Object[]> puntos = new ArrayList<>();
+        for (GeneradorAnalisisService.PuntoPlanta p : analisis.consumoPlanta(generadores, ini, fin, MINUTOS_PLANTA)) {
+            LocalDateTime desde = p.fecha(), hasta = p.fecha().plusMinutes(MINUTOS_PLANTA);
+            if (periodos.stream().noneMatch(a -> a.inicio().isBefore(hasta) && a.fin().isAfter(desde))) continue;
+            Object[] fila = new Object[1 + 2 * n + 2];
+            fila[0] = desde.format(MINUTO);
+            for (int i = 0; i < n; i++) {
+                fila[1 + i] = Math.round(p.generado()[i]);
+                fila[1 + n + i] = Math.round(p.aporteGeneradores()[i]);
+            }
+            fila[1 + 2 * n] = Math.round(p.importada());
+            fila[2 + 2 * n] = Math.round(p.exportada());
+            puntos.add(fila);
+        }
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("generadores", generadores.stream().map(Generador::nombre).toList());
+        m.put("minutos", MINUTOS_PLANTA);
+        m.put("puntos", puntos);
+        return m;
     }
 
     private Map<String, Object> datosPeriodo(PeriodoMarcha p, CostoCombustible c) {
