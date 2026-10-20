@@ -87,6 +87,10 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--grid); c
 .acciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 #aviso { font-size: 14px; color: var(--warn-fg); background: var(--warn-bg); padding: 4px 10px; border-radius: 4px; }
 #aviso:empty { display: none; }
+/* Lo que falta cargar para un reporte completo: solo en pantalla, no se imprime (está dentro del selector). */
+.faltantes { background: var(--warn-bg); color: var(--warn-fg); border-radius: 6px; padding: 10px 14px; font-size: 14px; }
+.faltantes ul { margin: 6px 0 0 18px; padding: 0; }
+.faltantes li { margin: 3px 0; }
 
 /* ---------- Reporte ---------- */
 .cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -232,6 +236,7 @@ footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line)
       <button type="button" id="bQuitar">Quitar todos</button>
     </div>
     <div class="lista-scroll"><table id="tSel"></table></div>
+    <div class="faltantes" id="faltantes" role="status" hidden></div>
     <label class="opcion"><input type="checkbox" id="chkCostoExp"> Incluir el costo estimado de la energía exportada <small>(diésel usado para generar lo que se exportó, al costo por kWh generado)</small></label>
     <label class="opcion"><input type="checkbox" id="chkDetalle"> Incluir el anexo: gráficos de potencia de cada arranque <small>(van en páginas aparte)</small></label>
     <div class="acciones">
@@ -273,10 +278,9 @@ footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line)
       <div class="leyenda"><span>Importación de la red, en % del consumo.</span><span><i style="background:var(--ok-bg);border:1px solid var(--ok-fg)"></i>hasta <span class="umbralVerde">2 %</span></span><span><i style="background:var(--warn-bg);border:1px solid var(--warn-fg)"></i>hasta <span class="umbralAmarillo">10 %</span></span><span><i style="background:var(--bad-bg);border:1px solid var(--bad-fg)"></i>más del <span class="umbralAmarillo">10 %</span></span><span>Meta: 0 %</span></div>
     </section>
 
-    <section class="panel" aria-labelledby="t-comb">
+    <section class="panel" aria-labelledby="t-comb" id="seccionComb">
       <h2 id="t-comb">Combustible y costo</h2>
       <div class="cifras" id="dinero"></div>
-      <p class="nota-datos" id="notaComb"></p>
     </section>
 
     <section class="panel" aria-labelledby="t-arr">
@@ -350,6 +354,8 @@ const nombreRed = r => r ? r.replace(/^Trafo(\d+)$/, "Transformador $1") : "sin 
 const sinCarga = a => (a.generado ?? 0) < 10;
 const usado = a => Math.max(0, (a.generado ?? 0) - (a.entregado ?? 0));
 const conComb = a => a.galones != null;
+// Primer arranque registrado de un generador, ya en marcha cuando empezó su lectura en LineaBaseX (va en las notas).
+const esInicioDeLectura = a => a.inicioEstimado && a.primero;
 // Semaforo de la importacion de la red (% del consumo), igual que en la pantalla de Analisis.
 const semaforo = p => p <= VERDE_HASTA ? "ok" : p <= AMARILLO_HASTA ? "warn" : "bad";
 const pctUmbral = v => fmt(v, v % 1 ? 1 : 0) + " %";
@@ -413,6 +419,25 @@ function pintarSelector() {
   const elegidos = DATOS.filter(a => marcados.has(a.id));
   document.getElementById("selCuenta").textContent =
     `${elegidos.length} de ${DATOS.length} arranques marcados · ${fmt(elegidos.reduce((s, a) => s + (a.generado ?? 0), 0))} kWh generados`;
+
+  // Lo que falta para que el reporte quede completo: se avisa aquí, antes de imprimir; no va en el reporte.
+  const faltan = [];
+  const porGenerador = l => [...new Set(l.map(a => a.generador))]
+    .map(g => `${g}: ${listaY(l.filter(a => a.generador === g).map(a => `${diaCorto(fecha(a.inicio))} ${hhmm(fecha(a.inicio))}`))}`).join("; ");
+  const sinComb = elegidos.filter(a => !conComb(a));
+  if (sinComb.length) faltan.push(`Cargar los galones de ${sinComb.length === 1 ? "1 arranque" : sinComb.length + " arranques"} `
+    + `(LineaBaseX: Grupo electrógeno &gt; Análisis &gt; Costos). ${porGenerador(sinComb)}.`);
+  if (elegidos.some(a => conComb(a) && a.costoRed == null && (a.generado ?? 0) >= 10))
+    faltan.push("Cargar la tarifa por franja horaria de los meses del reporte (LineaBaseX: Consumo por franja horaria &gt; Tarifas).");
+  const cortados = elegidos.filter(a => a.inicioEstimado && !esInicioDeLectura(a));
+  if (cortados.length) faltan.push(`Arranques sin su comienzo (la aplicación no estaba leyendo cuando arrancó el generador; `
+    + `sus cifras empiezan cuando volvió a leer). ${porGenerador(cortados)}.`);
+  const enCurso = elegidos.filter(a => a.enCurso);
+  if (enCurso.length) faltan.push(`Sigue en marcha (sus cifras llegan hasta que se generó el reporte). ${porGenerador(enCurso)}.`);
+  const caja = document.getElementById("faltantes");
+  caja.hidden = !faltan.length;
+  caja.innerHTML = faltan.length
+    ? `<b>Antes de imprimir o enviar, para que el reporte quede completo:</b><ul>${faltan.map(f => `<li>${f}</li>`).join("")}</ul>` : "";
   document.getElementById("aviso").textContent = firma() !== firmaGenerada ? "Cambió la selección: pulse «Generar reporte» para actualizarlo." : "";
 }
 
@@ -477,7 +502,7 @@ function generar() {
   document.getElementById("bajada").innerHTML =
     `${generadores.length === 1 ? "El generador cubrió" : "Los generadores cubrieron"} el <b>${pct(T.pctGen)}</b> del consumo ${generadores.length === 1 ? "de su transformador mientras estuvo en marcha" : "de sus transformadores mientras estuvieron en marcha"}. ` +
     `La importación de la red fue el <b>${pct(T.pctRed)}</b> del consumo y la exportación a la red, el <b>${pct(T.pctEnt)}</b> de la generación.` +
-    (C.k ? ` Combustible: <b>${dinero(C.costo, 0)}</b> (${fmt(C.galones)} galones${C.k < n ? `, en ${C.k} de los ${n} arranques` : ""}).` : "");
+    (C.k ? ` Combustible: <b>${dinero(C.costo, 0)}</b> (${fmt(C.galones)} galones).` : "");
 
   // Horas y energia
   const energia = document.getElementById("energia"); energia.innerHTML = "";
@@ -574,9 +599,8 @@ function generar() {
       dieselKwh != null ? `diésel ${dinero(dieselKwh, 3)} contra red ${dinero(redKwh, 3)} por kWh consumido en planta (${fmt(C.kwhApro)} kWh)` : ""]);
     tarjetasDinero.push([C.ahorro >= 0 ? "bien" : "mal", C.ahorro >= 0 ? "Ahorro frente a la red" : "Sobrecosto frente a la red", dinero(Math.abs(C.ahorro), 0),
       `diésel ${dinero(C.costoComparado, 0)}; la misma energía comprada a la red habría costado ${dinero(C.costoRed, 0)}, al precio de la franja horaria de cada hora`]);
-  } else {
-    tarjetasDinero.push(["", "Ahorro frente a la red", "", C.k ? "Falta cargar la tarifa por franja horaria en LineaBaseX (Consumo por franja horaria > Tarifas)." : ""]);
   }
+  // Sin tarifa o sin combustible no se compara: lo que falta cargar se avisa arriba, antes de imprimir (no va en el reporte).
   // Opcional: lo que costo en diesel generar la energia que se exporto (exportada x costo por kWh generado).
   if (chkCostoExp.checked) {
     const costoKwh = C.k && C.kwh > 0 ? C.costo / C.kwh : null;
@@ -585,19 +609,16 @@ function generar() {
   }
   dineroEl.classList.toggle("cinco", tarjetasDinero.length === 5);
   tarjetasDinero.forEach(([c, e, v, d]) => dineroEl.append(el("div", { className: "cifra " + c },
-    `<span class="etiqueta">${e}</span><span class="valor${v ? "" : " texto"}">${v || (e.startsWith("Ahorro") && C.k ? "Sin tarifa" : sinDato)}</span><span class="det">${d}</span>`)));
-  document.getElementById("notaComb").innerHTML = !C.k
-    ? "Ninguno de los arranques del reporte tiene el combustible cargado. Los galones y el precio del galón se cargan en LineaBaseX: Grupo electrógeno &gt; Análisis &gt; Costos."
-    : C.k < n
-      ? `Combustible cargado en ${C.k} de los ${n} arranques (${listaY(comb.map(a => `${a.generador} del ${diaCorto(fecha(a.inicio))}`))}). Estas cifras cuentan solo esos arranques; en la tabla, «–» = combustible sin cargar.`
-      : "Combustible cargado en todos los arranques del reporte.";
+    `<span class="etiqueta">${e}</span><span class="valor${v ? "" : " texto"}">${v || sinDato}</span><span class="det">${d}</span>`)));
+  // Sin ningún arranque con combustible, la sección no sale (sería una hoja de "Sin datos").
+  document.getElementById("seccionComb").hidden = !C.k;
 
   // Por periodo
   const celdaComb = (v, f) => v == null ? `<td class="num sin">&ndash;</td>` : `<td class="num">${f(v)}</td>`;
   document.getElementById("tArr").innerHTML = `<thead><tr><th scope="col">Generador</th><th scope="col">Inicio → fin</th><th scope="col">Horas</th><th scope="col">Generada (kWh)</th>
     <th scope="col">Consumida (kWh)</th><th scope="col">Importada (kWh)</th><th scope="col">% del consumo</th><th scope="col">Exportada (kWh)</th><th scope="col">Galones</th><th scope="col">Costo</th>
     <th scope="col">Costo equivalente en la red</th><th scope="col">Relación diésel / red</th></tr></thead>
-    <tbody>${seleccion.map(a => `<tr><td>${a.generador}${a.inicioEstimado ? "*" : ""}</td><td>${cuando(a)}</td><td class="num">${fmt(a.horas, 1)}</td>
+    <tbody>${seleccion.map(a => `<tr><td>${a.generador}${esInicioDeLectura(a) ? "*" : ""}</td><td>${cuando(a)}</td><td class="num">${fmt(a.horas, 1)}</td>
       <td class="num">${fmt(a.generado)}</td><td class="num">${fmt(a.consumo)}</td><td class="num">${fmt(a.tomado)}</td><td class="num">${chipPct(pctImportado(a))}</td><td class="num">${fmt(a.entregado)}</td>
       ${celdaComb(a.galones, v => fmt(v))}${celdaComb(a.costo, v => dinero(v))}
       ${celdaComb(a.costo != null ? a.costoRed : null, v => dinero(v))}${celdaComb(a.costo != null && a.costoRed > 0 ? a.costo / a.costoRed : null, chipVeces)}</tr>`).join("")}</tbody>
@@ -608,12 +629,11 @@ function generar() {
 
   // Notas
   const notas = ["Energía consumida = generada + importada − exportada, en el transformador de cada generador y solo mientras ese generador estaba en marcha. Por eso el balance cuadra; comprobarlo con la suma de los medidores de las máquinas queda para un análisis aparte."];
-  if (chkCostoExp.checked && C.k) notas.push(`Costo estimado de la energía exportada: kWh exportados por el costo por kWh generado de los arranques con combustible cargado (${dinero(C.costo / C.kwh, 3)}). Es el diésel que se usó para generar energía que salió a la red.`);
-  seleccion.filter(a => a.inicioEstimado).forEach(a => notas.push(conComb(a)
-    ? `* ${a.generador} del ${diaCorto(fecha(a.inicio))}: el sistema lo registra desde las ${hhmm(fecha(a.inicio))}, pero pudo arrancar antes. Los galones cubren todo el arranque y la energía solo lo registrado, así que su costo por kWh sale más alto de lo real.`
-    : `* ${a.generador} del ${diaCorto(fecha(a.inicio))}: el sistema lo registra desde las ${hhmm(fecha(a.inicio))}; pudo arrancar antes y sus cifras cubren solo lo registrado.`));
-  seleccion.filter(a => a.enCurso).forEach(a =>
-    notas.push(`El ${a.generador} seguía en marcha al generar el reporte: sus cifras llegan hasta las ${hhmm(fecha(a.fin))} del ${diaCorto(fecha(a.fin))}.`));
+  if (chkCostoExp.checked && C.k) notas.push(`Costo estimado de la energía exportada: kWh exportados por el costo por kWh generado (${dinero(C.costo / C.kwh, 3)}). Es el diésel que se usó para generar energía que salió a la red.`);
+  // Solo el comienzo de la lectura de cada generador en LineaBaseX (ej. el Caterpillar se configuró después que el GenPower).
+  // Lo demás que falta (combustible, tarifa, lecturas cortadas, arranques en curso) se avisa arriba antes de imprimir.
+  seleccion.filter(esInicioDeLectura).forEach(a => notas.push(
+    `* ${a.generador}: sus datos se registran desde el ${diaCorto(fecha(a.inicio))} a las ${hhmm(fecha(a.inicio))}, cuando empezó su lectura en LineaBaseX; el generador ya estaba en marcha y las cifras de ese arranque empiezan a esa hora.`));
   seleccion.filter(sinCarga).forEach(a =>
     notas.push(`El ${a.generador} del ${diaCorto(fecha(a.inicio))} a las ${hhmm(fecha(a.inicio))} estuvo ${fmt(a.horas * 60)} minutos en marcha sin carga: no generó, y la importación de la red en ese lapso (${fmt(a.tomado)} kWh) cuenta en el total.`));
   notas.push(`Importada de la red: verde hasta el ${pctUmbral(VERDE_HASTA)} del consumo, amarillo hasta el ${pctUmbral(AMARILLO_HASTA)} y rojo por encima; la meta es 0 %.`);
@@ -628,7 +648,7 @@ function generar() {
   const tarjetas = document.getElementById("tarjetas"); tarjetas.innerHTML = "";
   if (chkDetalle.checked) seleccion.forEach((a, i) => {
     const t = el("article", { className: "tarjeta" });
-    t.innerHTML = `<div class="titulo"><h3>${a.generador}${a.inicioEstimado ? "*" : ""} <span class="cuando" style="font-family:var(--f-body);font-weight:400">(${nombreRed(a.red)})</span></h3>
+    t.innerHTML = `<div class="titulo"><h3>${a.generador}${esInicioDeLectura(a) ? "*" : ""} <span class="cuando" style="font-family:var(--f-body);font-weight:400">(${nombreRed(a.red)})</span></h3>
         <span class="cuando">${cuando(a)} · ${fmt(a.horas, 1)} h · ${fmt(a.generado)} kWh</span></div>
       ${a.perfil15.length >= 2 ? `<div class="lienzo mini"><canvas id="gArr${i}" aria-label="Potencia del ${a.generador} durante el arranque"></canvas></div>`
         : `<p class="vacio" style="padding:12px 0">Arranque muy corto: sin gráfico.</p>`}`;

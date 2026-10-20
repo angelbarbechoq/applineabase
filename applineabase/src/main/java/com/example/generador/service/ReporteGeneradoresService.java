@@ -125,6 +125,9 @@ public class ReporteGeneradoresService {
         m.put("fin", p.fin().format(MINUTO));
         m.put("enCurso", p.enCurso());
         m.put("inicioEstimado", p.inicioEstimado());
+        // El primer arranque registrado de cada generador: con inicio estimado, es cuando empezó su lectura en LineaBaseX
+        // (va en las notas del reporte); en los demás, la app no estaba leyendo (se avisa antes de imprimir).
+        m.put("primero", p.arranqueId() == 1);
         m.put("horas", Math.round(p.horas() * 10) / 10.0);
         m.put("generado", redondo(p.kwhGenerado()));
         m.put("tomado", redondo(p.kwhRedImportada()));
