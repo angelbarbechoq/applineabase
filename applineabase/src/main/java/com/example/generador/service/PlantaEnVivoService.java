@@ -3,7 +3,9 @@ package com.example.generador.service;
 import com.example.alarmas.model.AlarmaConfig;
 import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
+import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.RutaArchivosEnergia;
+import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.generador.model.Generador;
 import com.example.generador.model.LecturaGenerador;
 import com.example.horometro.service.HorometroService;
@@ -95,8 +97,16 @@ public class PlantaEnVivoService {
     public record AntesDelArranque(LocalDateTime inicio, boolean enCurso, boolean inicioEstimado, Double kw) {
     }
 
+    /**
+     * Medidor principal (KWhPlanta1, el punto que factura la empresa eléctrica): kw + toma de la red, - entrega
+     * (null sin lectura reciente). Ve la suma de los transformadores: lo que sale por uno y entra por el otro no pasa por él.
+     */
+    public record MedidorPrincipal(Double kw, LocalDateTime fecha) {
+    }
+
     /** La planta ahora: solo cuenta los generadores con lectura completa (los demás se avisan en pantalla). */
-    public record Planta(LocalDateTime leido, List<FilaGenerador> filas, AntesDelArranque antes, List<EstadoMaquina> maquinas) {
+    public record Planta(LocalDateTime leido, List<FilaGenerador> filas, AntesDelArranque antes, List<EstadoMaquina> maquinas,
+                         MedidorPrincipal principal) {
 
         private List<FilaGenerador> completas() {
             return filas.stream().filter(FilaGenerador::completa).toList();
@@ -126,6 +136,16 @@ public class PlantaEnVivoService {
             return completas().stream().mapToDouble(FilaGenerador::exportada).sum();
         }
 
+        /** Los transformadores juntos por la red (+ toma, - entrega): lo que debería marcar el medidor principal. */
+        public double redNeta() {
+            return completas().stream().mapToDouble(FilaGenerador::kwRed).sum();
+        }
+
+        /** Lo que sale a la red por un transformador y entra por el otro (el medidor principal no lo ve). */
+        public double entreTransformadores() {
+            return Math.min(importada(), exportada());
+        }
+
         /** Parte del consumo de la planta (%), o null si no hay consumo. */
         public Double porcentaje(double kw) {
             double c = consumo();
@@ -144,16 +164,19 @@ public class PlantaEnVivoService {
     private final HorometroService horometro;
     private final TopologiaMedidores topologia;
     private final AlarmaConfigRepository alarmaConfigRepository;
+    private final PLCDataQueryService plcDataQueryService;
     /** Consumo previo ya calculado por inicio de arranque (no cambia; evita leer el archivo del mes cada 15 s). */
     private final Map<LocalDateTime, Double> antesCalculado = new ConcurrentHashMap<>();
 
     public PlantaEnVivoService(GeneradorService generadorService, GeneradorAnalisisService analisis, HorometroService horometro,
-                               TopologiaMedidores topologia, AlarmaConfigRepository alarmaConfigRepository) {
+                               TopologiaMedidores topologia, AlarmaConfigRepository alarmaConfigRepository,
+                               PLCDataQueryService plcDataQueryService) {
         this.generadorService = generadorService;
         this.analisis = analisis;
         this.horometro = horometro;
         this.topologia = topologia;
         this.alarmaConfigRepository = alarmaConfigRepository;
+        this.plcDataQueryService = plcDataQueryService;
     }
 
     public Planta leer() {
@@ -187,7 +210,19 @@ public class PlantaEnVivoService {
             }
             filas.add(new FilaGenerador(g.nombre(), g.redAsociada(), estado, kw, kwRed, fechaRed, error));
         }
-        return new Planta(ahora, filas, antesDelArranque(), maquinas());
+        return new Planta(ahora, filas, antesDelArranque(), maquinas(), principal(ahora));
+    }
+
+    /** Última lectura del medidor principal; el PLC guarda su potencia en W (la de los transformadores, en kW). */
+    private MedidorPrincipal principal(LocalDateTime ahora) {
+        try {
+            Map<String, Object> m = plcDataQueryService.getLatestVIPDataByMaquina(MaquinasVirtuales.KWH_PLANTA_1);
+            LocalDateTime f = fecha(m.get("fecha"));
+            if (m.containsKey("error") || f == null || !(m.get("PW") instanceof Number pw)) return new MedidorPrincipal(null, null);
+            return new MedidorPrincipal(f.isBefore(ahora.minusSeconds(RED_VIGENTE_SEGUNDOS)) ? null : pw.doubleValue() / 1000, f);
+        } catch (Exception e) {
+            return new MedidorPrincipal(null, null);
+        }
     }
 
     /** Arranque de referencia: el más viejo de los que siguen en marcha; si no hay ninguno, el último. */
