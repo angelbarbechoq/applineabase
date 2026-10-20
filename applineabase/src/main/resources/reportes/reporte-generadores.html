@@ -518,9 +518,6 @@ function generar() {
       P = { puntos, ng, mins, puso: PLANTA.generadores.map((g, i) => kwh(1 + ng + i)), imp: kwh(1 + 2 * ng), exp: kwh(2 + 2 * ng) };
       P.consumo = P.puso.reduce((s, v) => s + v, 0) + P.imp;
       P.horas = puntos.length * mins / 60; // horas con al menos un generador en marcha (no se cuentan dos veces)
-      // Con nombre, para que se entienda solo: "GenPower, Caterpillar o ambos".
-      P.quienes = ng === 2 ? `${PLANTA.generadores[0]}, ${PLANTA.generadores[1]} o ambos`
-        : `al menos uno de los generadores (${listaY(PLANTA.generadores)})`;
     }
   }
   seccionPlanta.hidden = !P;
@@ -530,7 +527,7 @@ function generar() {
     const aportes = PLANTA.generadores.map((g, i) => `${i === 0 ? `${g} aportó` : g} <b>${fmt(P.puso[i])} kWh</b> (${pctDe(P.puso[i])})`);
     aportes.push(`la red <b>${fmt(P.imp)} kWh</b> (${pctDe(P.imp)})`);
     document.getElementById("textoPlanta").innerHTML =
-      `Funcionó ${P.quienes} durante unas <b>${fmt(P.horas)} horas</b>. En ese tiempo la planta 1 consumió <b>${fmt(P.consumo)} kWh</b>: ` +
+      `Se trabajó con generación <b>${fmt(P.horas)} horas</b>. En ese tiempo la planta 1 consumió <b>${fmt(P.consumo)} kWh</b>: ` +
       `${listaY(aportes)}. Además se exportaron ${fmt(P.exp)} kWh a la red. ` +
       `Cifras aproximadas: calculadas con la potencia (kW) tomada de la base de datos de LineaBaseX, en promedios de ${P.mins} minutos.`;
     const cifrasPlanta = document.getElementById("cifrasPlanta"); cifrasPlanta.innerHTML = "";
@@ -620,7 +617,7 @@ function generar() {
   seleccion.filter(sinCarga).forEach(a =>
     notas.push(`El ${a.generador} del ${diaCorto(fecha(a.inicio))} a las ${hhmm(fecha(a.inicio))} estuvo ${fmt(a.horas * 60)} minutos en marcha sin carga: no generó, y la importación de la red en ese lapso (${fmt(a.tomado)} kWh) cuenta en el total.`));
   notas.push(`Importada de la red: verde hasta el ${pctUmbral(VERDE_HASTA)} del consumo, amarillo hasta el ${pctUmbral(AMARILLO_HASTA)} y rojo por encima; la meta es 0 %.`);
-  if (P) notas.push(`Balance planta 1 (Transformadores 1 y 2): calculado con la potencia (kW) de los dos transformadores y de cada generador, tomada de la base de datos de LineaBaseX (una lectura por minuto) y promediada cada ${P.mins} minutos, en las horas en que funcionó ${P.quienes}. Cuando funcionaba un solo generador, incluye también el consumo del otro transformador, que vino de la red. Por eso no coincide con el Balance de los arranques, que cuenta cada generador solo con su propio transformador y sale de los contadores de energía.`);
+  if (P) notas.push(`Balance planta 1 (Transformadores 1 y 2): calculado con la potencia (kW) de los dos transformadores y de cada generador, tomada de la base de datos de LineaBaseX (una lectura por minuto) y promediada cada ${P.mins} minutos, en las horas en que se trabajó con generación. Cuando funcionaba un solo generador, incluye también el consumo del otro transformador, que vino de la red. Por eso no coincide con el Balance de los arranques, que cuenta cada generador solo con su propio transformador y sale de los contadores de energía.`);
   if (conTarifa.length) notas.push("Ahorro o sobrecosto frente a la red: cada kWh consumido en planta (generado − exportado) valorizado al precio de la franja horaria (A, B, C o D) de la hora en que se generó, con la tarifa de su mes, contra el costo del diésel. Solo energía contra combustible: no incluye el mantenimiento del generador ni los demás cargos de la factura de la red.");
   notas.push("Fuente: contadores de energía del controlador de cada generador y del medidor de su transformador (igual que la pantalla «Períodos en marcha» de LineaBaseX); combustible, tarifa por franja horaria y feriados, cargados en LineaBaseX.");
   document.getElementById("notas").innerHTML = notas.map(t => `<li>${t}</li>`).join("");
