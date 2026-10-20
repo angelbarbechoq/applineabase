@@ -131,8 +131,12 @@ public class GeneradorAlmacen {
         }
     }
 
-    /** Abre un arranque (fin vacío). inicioEstimado = la app arrancó con el generador ya en marcha. */
+    /**
+     * Abre un arranque (fin vacío). inicioEstimado = la app arrancó con el generador ya en marcha: en ese caso se
+     * intenta recuperar el comienzo real con el horómetro y el contador de energía ({@link #corregirInicioEstimado}).
+     */
     public void abrirArranque(String generador, LecturaGenerador l, boolean inicioEstimado) {
+        Long id = null;
         try (Connection c = abrirArranques(generador);
              PreparedStatement ps = c.prepareStatement("INSERT INTO \"" + generador + "\" (inicio, kwh_inicio, "
                      + "horas_inicio, arranques_contador, inicio_estimado) VALUES (?,?,?,?,?)")) {
@@ -142,10 +146,92 @@ public class GeneradorAlmacen {
             ps.setObject(4, l.arranques());
             ps.setInt(5, inicioEstimado ? 1 : 0);
             ps.executeUpdate();
+            try (ResultSet r = c.createStatement().executeQuery("SELECT last_insert_rowid()")) {
+                if (r.next()) id = r.getLong(1);
+            }
             logger.info("Generador {}: arranque registrado ({}{})", generador, l.fecha().format(FECHA),
                     inicioEstimado ? ", inicio estimado" : "");
         } catch (SQLException e) {
             logger.error("Error registrando arranque de {}: {}", generador, e.getMessage());
+        }
+        if (inicioEstimado && id != null) corregirInicioEstimado(generador, id);
+    }
+
+    /** Horas máximas entre la parada anterior y el arranque encontrado en marcha para corregir su inicio. */
+    private static final double MAX_HORAS_CORRECCION = 24;
+
+    /**
+     * Arranque que la app encontró ya en marcha (no estaba leyendo cuando arrancó el generador): se recupera su
+     * comienzo con el horómetro y el contador de energía del controlador guardados al cerrar el arranque anterior.
+     * Con el generador parado ninguno de los dos avanza, así que inicio = primera lectura - (horómetro ahora -
+     * horómetro al parar) y energía al inicio = contador al parar (exacta). Solo si en el medio hubo un único arranque
+     * (contador de arranques del controlador). El horómetro va de a 0,1 h: el inicio queda con unos ±6 min; la energía
+     * generada, exacta. Sirve para un arranque abierto o ya cerrado (recalcula duración y kWh generados).
+     *
+     * @return true si se corrigió
+     */
+    public boolean corregirInicioEstimado(String generador, long id) {
+        try (Connection c = abrirArranques(generador)) {
+            String inicioTxt, finTxt;
+            Long kwhFin;
+            Double horasInicio;
+            Long contador;
+            try (PreparedStatement ps = c.prepareStatement("SELECT inicio, fin, kwh_fin, horas_inicio, arranques_contador, "
+                    + "inicio_estimado FROM \"" + generador + "\" WHERE id = ?")) {
+                ps.setLong(1, id);
+                try (ResultSet r = ps.executeQuery()) {
+                    if (!r.next() || r.getInt(6) != 1) return false;
+                    inicioTxt = r.getString(1);
+                    finTxt = r.getString(2);
+                    kwhFin = r.getObject(3) == null ? null : r.getLong(3);
+                    horasInicio = r.getObject(4) == null ? null : r.getDouble(4);
+                    contador = r.getObject(5) == null ? null : r.getLong(5);
+                }
+            }
+            String finPrevio;
+            Long kwhPrevio, contadorPrevio;
+            Double horasPrevio;
+            try (PreparedStatement ps = c.prepareStatement("SELECT fin, kwh_fin, horas_fin, arranques_contador FROM \"" + generador
+                    + "\" WHERE id < ? AND fin IS NOT NULL ORDER BY id DESC LIMIT 1")) {
+                ps.setLong(1, id);
+                try (ResultSet r = ps.executeQuery()) {
+                    if (!r.next()) return false; // el primer arranque registrado: no hay parada anterior con qué comparar
+                    finPrevio = r.getString(1);
+                    kwhPrevio = r.getObject(2) == null ? null : r.getLong(2);
+                    horasPrevio = r.getObject(3) == null ? null : r.getDouble(3);
+                    contadorPrevio = r.getObject(4) == null ? null : r.getLong(4);
+                }
+            }
+            if (horasInicio == null || horasPrevio == null || kwhPrevio == null) return false;
+            if (contador != null && contadorPrevio != null && contador != contadorPrevio + 1) {
+                logger.info("Generador {}: no se corrige el inicio del arranque {}: hubo {} arranques desde la ultima parada registrada",
+                        generador, id, contador - contadorPrevio);
+                return false;
+            }
+            double horas = horasInicio - horasPrevio;
+            if (horas < 0 || horas > MAX_HORAS_CORRECCION) return false;
+            LocalDateTime primeraLectura = LocalDateTime.parse(inicioTxt, FECHA);
+            LocalDateTime inicio = primeraLectura.minusSeconds(Math.round(horas * 3600));
+            LocalDateTime paradaAnterior = LocalDateTime.parse(finPrevio, FECHA);
+            if (inicio.isBefore(paradaAnterior)) inicio = paradaAnterior;
+            try (PreparedStatement ps = c.prepareStatement("UPDATE \"" + generador + "\" SET inicio = ?, kwh_inicio = ?, "
+                    + "horas_inicio = ?, inicio_estimado = 0, inicio_corregido = 1, duracion_min = ?, kwh_generados = ? WHERE id = ?")) {
+                ps.setString(1, inicio.format(FECHA));
+                ps.setLong(2, kwhPrevio);
+                ps.setDouble(3, horasPrevio);
+                if (finTxt != null) ps.setDouble(4, Duration.between(inicio, LocalDateTime.parse(finTxt, FECHA)).toSeconds() / 60.0);
+                else ps.setNull(4, Types.REAL);
+                if (finTxt != null && kwhFin != null) ps.setLong(5, kwhFin - kwhPrevio);
+                else ps.setNull(5, Types.INTEGER);
+                ps.setLong(6, id);
+                ps.executeUpdate();
+            }
+            logger.info("Generador {}: inicio del arranque {} corregido con el horometro: {} (primera lectura {}), energia desde {} kWh",
+                    generador, id, inicio.format(FECHA), primeraLectura.format(FECHA), kwhPrevio);
+            return true;
+        } catch (Exception e) {
+            logger.error("Error corrigiendo el inicio del arranque {} de {}: {}", id, generador, e.getMessage());
+            return false;
         }
     }
 
@@ -206,9 +292,10 @@ public class GeneradorAlmacen {
             st.executeUpdate("CREATE TABLE IF NOT EXISTS \"" + generador + "\" (id INTEGER PRIMARY KEY AUTOINCREMENT, "
                     + "inicio TEXT NOT NULL, fin TEXT, duracion_min REAL, kwh_inicio INTEGER, kwh_fin INTEGER, "
                     + "kwh_generados INTEGER, horas_inicio REAL, horas_fin REAL, arranques_contador INTEGER, "
-                    + "inicio_estimado INTEGER, kw_max REAL)");
+                    + "inicio_estimado INTEGER, kw_max REAL, inicio_corregido INTEGER)");
         }
-        agregarColumnasSiFaltan(c, generador, new String[]{"kw_max"});
+        // inicio_corregido = 1: el comienzo se recuperó con el horómetro (ver corregirInicioEstimado).
+        agregarColumnasSiFaltan(c, generador, new String[]{"kw_max", "inicio_corregido"}, new boolean[]{false, true});
         return c;
     }
 
