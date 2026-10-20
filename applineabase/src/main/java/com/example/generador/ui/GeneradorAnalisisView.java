@@ -314,12 +314,12 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         chart.setHeight("380px");
 
         grid.addColumn(Fila::periodo).setHeader("Periodo").setAutoWidth(true).setFlexGrow(0).setFrozen(true);
-        columna(grid, "Importado red (kWh)", f -> kwhNum(f.redImportada()));
-        columna(grid, "Retornado en marcha (kWh)", f -> kwhNum(f.redExportada()));
+        columna(grid, "Importada de la red (kWh)", f -> kwhNum(f.redImportada()));
+        columna(grid, "Exportada a la red en marcha (kWh)", f -> kwhNum(f.redExportada()));
         columna(grid, "Generado (kWh)", f -> kwhNum(f.generado()));
         // Con "Todos": lo que puso cada generador en la planta (generado - entregado por su transformador).
         for (Generador g : generadorService.generadores()) {
-            Grid.Column<Fila> c = columna(grid, "Puso " + g.nombre() + " (kWh)",
+            Grid.Column<Fila> c = columna(grid, "Aporte de " + g.nombre() + " (kWh)",
                     f -> kwhNum(usadoPorGenerador.getOrDefault(g.nombre(), Map.of()).get(f.periodo())));
             c.setVisible(false);
             colPorGenerador.put(g.nombre(), c);
@@ -327,8 +327,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         columna(grid, "En paralelo (kWh)", f -> kwhNum(f.generadoParalelo()));
         columna(grid, "En isla (kWh)", f -> kwhNum(f.generadoIsla()));
         colConsumo = columna(grid, "Consumo del transformador (kWh)", f -> kwhNum(f.consumo()));
-        grid.addComponentColumn(f -> badgeRed(f.porcentajeDeRed())).setHeader("De la red (meta 0)").setAutoWidth(true).setFlexGrow(0);
-        columna(grid, "Del generador", f -> porcentaje(f.aporteGenerador()));
+        grid.addComponentColumn(f -> badgeRed(f.porcentajeDeRed())).setHeader("% importado de la red (meta 0)").setAutoWidth(true).setFlexGrow(0);
+        columna(grid, "% aportado por el generador", f -> porcentaje(f.aporteGenerador()));
         columna(grid, "Balance neto red (kWh)", f -> kwhNum(f.balanceNeto()));
         columna(grid, "Horas marcha", f -> horas(f.horasMarcha()));
         columna(grid, "En paralelo (h)", f -> horas(f.horasParalelo()));
@@ -339,17 +339,18 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         grid.setWidthFull();
         grid.setHeight("420px");
 
-        Span nota = nota("De la red = parte del consumo del transformador que se tomo de la red (meta en estiaje: 0; verde hasta "
+        Span nota = nota("% importado de la red = parte del consumo del transformador que vino de la red (meta en estiaje: 0; verde hasta "
                 + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
-                + ", rojo por encima; se cambia en generador-config.json). Del generador = el resto; las dos suman 100%. Balance neto = tomado - entregado a la red "
-                + "(negativo = se entrego mas de lo que se tomo). Tomado y entregado = contadores de energia del medidor del "
-                + "transformador asociado (PLC). Lo tomado es de todo el dia; lo entregado solo cuenta mientras el generador estaba en "
-                + "marcha. Generado = contador del controlador del generador. Consumo del transformador = tomado + generado - entregado "
-                + "(lo que consumieron las cargas de ese transformador, sea de la red o del generador). En paralelo = el generador tenia carga y habia tension de red; en isla = con carga y "
+                + ", rojo por encima; se cambia en generador-config.json). % aportado por el generador = el resto; los dos suman 100%. "
+                + "Balance neto = importada - exportada (negativo = se exporto mas de lo que se importo). Importada y exportada = "
+                + "contadores de energia del medidor del transformador asociado (PLC). La importada es de todo el dia; la exportada solo "
+                + "cuenta mientras el generador estaba en marcha. Generado = contador del controlador del generador. Consumo del "
+                + "transformador = importada + generado - exportada (lo que consumieron las cargas de ese transformador, sea de la red o "
+                + "del generador). En paralelo = el generador tenia carga y habia tension de red; en isla = con carga y "
                 + "sin tension de red; en vacio = en marcha con menos de " + (int) GeneradorAnalisisService.KW_VACIO + " kW. "
                 + "Datos del generador: GenPower desde el 08-10-2026, Caterpillar desde el 09-10-2026 09:19. "
-                + "La separacion paralelo / isla existe desde el 09-10-2026. El retorno se dibuja por debajo de cero. \"-\" = sin datos. "
-                + "Con Todos: lo que puso cada generador (su generado - lo que entrego a la red por su transformador) y, abajo, el "
+                + "La separacion paralelo / isla existe desde el 09-10-2026. Lo exportado se dibuja por debajo de cero. \"-\" = sin datos. "
+                + "Con Todos: el aporte de cada generador (su generado - lo que exporto por su transformador) y, abajo, el "
                 + "consumo de toda la planta en el tiempo, calculado con la potencia (kW) tomada de la base de datos (aprox.).");
         tituloPlanta.getStyle().set("margin", "8px 0 0 0");
         resumenPlanta.getStyle().set("font-size", "13px").set("color", "#333");
@@ -360,8 +361,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         resumenPlanta.setVisible(false);
         chartPlanta.setVisible(false);
         VerticalLayout v = new VerticalLayout(descripcion("Todo el periodo elegido: por cada dia, semana o mes, cuanta energia se "
-                + "tomo de la red, cuanta puso el generador, cuanta volvio a la red mientras el generador estaba en marcha, y cuanto "
-                + "consumio el transformador en total."), tarjetasEnergia, chart, grid, tituloPlanta, resumenPlanta, chartPlanta, nota);
+                + "importo de la red, cuanta aporto el generador, cuanta se exporto a la red mientras el generador estaba en marcha, "
+                + "y cuanto consumio el transformador en total."), tarjetasEnergia, chart, grid, tituloPlanta, resumenPlanta, chartPlanta, nota);
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -395,14 +396,14 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         else origen.append("generador ").append(kwh(t.generadorUsado())).append(" + ");
         tarjetasEnergia.add(tarjeta("Consumo " + deRedes, kwh(t.consumo()), origen + "red " + kwh(t.redImportada())));
         if (todos) {
-            totalPorGenerador.forEach((nombre, usado) -> tarjetasEnergia.add(tarjeta("Puso " + nombre, kwh(usado),
+            totalPorGenerador.forEach((nombre, usado) -> tarjetasEnergia.add(tarjeta("Aporte de " + nombre, kwh(usado),
                     usado == null || t.consumo() == null || t.consumo() <= 0 ? null
                             : String.format(Locale.ROOT, "%.1f %% del consumo", usado / t.consumo() * 100))));
         }
         tarjetasEnergia.add(tarjeta("Generado", kwh(t.generado()),
                 t.generadoParalelo() == null && t.generadoIsla() == null ? null
                         : "en paralelo " + kwh(t.generadoParalelo()) + " / en isla " + kwh(t.generadoIsla())));
-        tarjetasEnergia.add(tarjeta("Entregado a la red", kwh(t.redExportada()), "excedente, con el generador en marcha"));
+        tarjetasEnergia.add(tarjeta("Exportada a la red", kwh(t.redExportada()), "excedente, con el generador en marcha"));
         tarjetasEnergia.add(tarjeta("Horas de marcha", horas(t.horasMarcha()),
                 "paralelo " + horas(t.horasParalelo()) + " / isla " + horas(t.horasIsla()) + " / vacio " + horas(t.horasVacio())));
         tarjetasEnergia.add(tarjeta("Arranques", t.arranques() == null ? "-" : String.valueOf(t.arranques()), null));
@@ -414,15 +415,15 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         List<String> colores = new ArrayList<>();
         if (todos) {
             for (String nombre : usadoPorGenerador.keySet()) {
-                series.add("Puso " + nombre);
+                series.add("Aporte de " + nombre);
                 colores.add(colorGenerador(nombre));
             }
         } else {
-            series.add("Puso el generador");
+            series.add("Aporte del generador");
             colores.add(NARANJA);
         }
-        series.add("Tomado de la red");
-        series.add("Entregado a la red (excedente)");
+        series.add("Importada de la red");
+        series.add("Exportada a la red (excedente)");
         colores.add(AZUL);
         colores.add(AQUA);
         for (Fila f : filas) {
@@ -509,14 +510,14 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }).setHeader("Fin").setAutoWidth(true).setFlexGrow(0);
         columna(periodosGrid, "Duracion", p -> duracion(p.horas()));
         columna(periodosGrid, "Consumo del transformador (kWh)", p -> kwhNum(p.consumo()));
-        periodosGrid.addComponentColumn(p -> badgeRed(p.porcentajeDeRed())).setHeader("De la red (meta 0)").setAutoWidth(true).setFlexGrow(0);
-        columna(periodosGrid, "Tomado de la red (kWh)", p -> kwhNum(p.kwhRedImportada()));
-        columna(periodosGrid, "Del generador", p -> porcentaje(p.aporteGenerador()));
-        columna(periodosGrid, "Entregado a la red (kWh)", p -> kwhNum(p.kwhRedExportada()));
+        periodosGrid.addComponentColumn(p -> badgeRed(p.porcentajeDeRed())).setHeader("% importado de la red (meta 0)").setAutoWidth(true).setFlexGrow(0);
+        columna(periodosGrid, "Importada de la red (kWh)", p -> kwhNum(p.kwhRedImportada()));
+        columna(periodosGrid, "% aportado por el generador", p -> porcentaje(p.aporteGenerador()));
+        columna(periodosGrid, "Exportada a la red (kWh)", p -> kwhNum(p.kwhRedExportada()));
         columna(periodosGrid, "Balance neto red (kWh)", p -> kwhNum(p.balanceNeto()));
-        columna(periodosGrid, "Tiempo tomando de la red", p -> p.porcentajeTiempoTomando() == null ? "-"
+        columna(periodosGrid, "Tiempo importando de la red", p -> p.porcentajeTiempoTomando() == null ? "-"
                 : String.format(Locale.ROOT, "%.0f %%", p.porcentajeTiempoTomando()));
-        columna(periodosGrid, "Pico tomado (kW)", p -> p.picoTomadoKw() == null ? "-" : String.format(Locale.ROOT, "%.0f", p.picoTomadoKw()));
+        columna(periodosGrid, "Pico importado (kW)", p -> p.picoTomadoKw() == null ? "-" : String.format(Locale.ROOT, "%.0f", p.picoTomadoKw()));
         columna(periodosGrid, "Generado (kWh)", p -> kwhNum(p.kwhGenerado()));
         columna(periodosGrid, "Carga media (kW)", p -> p.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%.0f", p.kwMedio()));
         columna(periodosGrid, "Carga max (kW)", p -> p.kwMax() == null ? "-" : String.format(Locale.ROOT, "%.0f", p.kwMax()));
@@ -528,20 +529,20 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         periodosGrid.setHeight("360px");
         periodosGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
         periodosGrid.asSingleSelect().addValueChangeListener(e -> mostrarMaquinas(e.getValue()));
-        Span nota = nota("Cada fila es una vez que el generador estuvo encendido. De la red = parte del consumo del transformador que se "
-                + "tomo de la red en los minutos en que el generador no alcanzaba (meta 0; verde hasta "
+        Span nota = nota("Cada fila es un arranque: una vez que el generador estuvo encendido. % importado de la red = parte del consumo "
+                + "del transformador que vino de la red en los minutos en que el generador no alcanzaba (meta 0; verde hasta "
                 + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
-                + "). Del generador = el resto (suman 100%). Entregado a la red = excedente en los minutos en que el generador daba mas "
-                + "de lo que consumia el transformador. Balance neto = tomado - entregado (negativo = se entrego mas de lo que se tomo). "
-                + "Tiempo tomando de la red y pico: cuanto tiempo y con cuanta potencia falto. Tomado y entregado salen de los contadores "
-                + "del medidor del transformador; el minuto que cruza el inicio o el fin se reparte en proporcion. Paralelo / isla / "
-                + "vacio: minutos segun la tension de red y la carga (desde el 09-10-2026).");
+                + "). % aportado por el generador = el resto (suman 100%). Exportada a la red = excedente en los minutos en que el "
+                + "generador daba mas de lo que consumia el transformador. Balance neto = importada - exportada (negativo = se exporto "
+                + "mas de lo que se importo). Tiempo importando de la red y pico importado: cuanto tiempo y con cuanta potencia falto. "
+                + "Importada y exportada salen de los contadores del medidor del transformador; el minuto que cruza el inicio o el fin "
+                + "se reparte en proporcion. Paralelo / isla / vacio: minutos segun la tension de red y la carga (desde el 09-10-2026).");
         Div chart = new Div();
         chart.setId(CHART_PERIODOS);
         chart.setWidthFull();
         chart.setHeight("320px");
         VerticalLayout v = new VerticalLayout(descripcion("Solo los momentos en que el generador estuvo encendido. Lo importante en "
-                + "estiaje: cuanto se tomo de la red (lo mas cercano a cero) y si sobro para entregar. Haga clic en un arranque para "
+                + "estiaje: cuanto se importo de la red (lo mas cercano a cero) y si sobro para exportar. Haga clic en un arranque para "
                 + "ver abajo el detalle minuto a minuto y con que maquinas trabajo."),
                 tarjetasPeriodos, kpiMeta, chart, periodosGrid, nota, crearDetalleMaquinas());
         kpiMeta.setWidthFull();
@@ -571,9 +572,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         tarjetasPeriodos.add(kpiTomadoDeRed(pctRed, imp, cons));
         tarjetasPeriodos.add(kpiBalance(balance, cons));
         pintarMeta(pctRed, imp, cons);
-        tarjetasPeriodos.add(tarjeta("Tiempo tomando de la red", lecturas == 0 ? "-" : String.format(Locale.ROOT, "%.0f %%", tomando * 100.0 / lecturas),
+        tarjetasPeriodos.add(tarjeta("Tiempo importando de la red", lecturas == 0 ? "-" : String.format(Locale.ROOT, "%.0f %%", tomando * 100.0 / lecturas),
                 (lecturas == 0 ? "" : tomando + " de " + lecturas + " minutos") + (pico == null ? "" : String.format(Locale.ROOT, "; pico %.0f kW", pico))));
-        tarjetasPeriodos.add(tarjeta("Entregado a la red", kwh(exp), "excedente mientras el generador estaba encendido"));
+        tarjetasPeriodos.add(tarjeta("Exportada a la red", kwh(exp), "excedente mientras el generador estaba encendido"));
         tarjetasPeriodos.add(tarjeta("Consumo " + GeneradorView.deRedes(seleccionados().stream().map(Generador::redAsociada).toList()),
                 kwh(cons), cons == null ? null
                 : "generador " + kwh(gen == null ? null : Math.max(0, gen - (exp == null ? 0 : exp))) + " + red " + kwh(imp)));
@@ -591,7 +592,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                     p.kwhRedExportada() == null || p.kwhRedExportada() < 0.5 ? null : -p.kwhRedExportada()});
         }
         scriptPeriodos = GraficaModel.getBarrasApiladasScript(CHART_PERIODOS, categorias,
-                new String[]{"Puso el generador", "Tomado de la red", "Entregado a la red (excedente)"},
+                new String[]{"Aporte del generador", "Importada de la red", "Exportada a la red (excedente)"},
                 new String[]{NARANJA, AZUL, AQUA}, valores, "kWh");
         if (tabs.getSelectedTab() == tabPeriodos) getElement().executeJs(scriptPeriodos);
     }
@@ -618,7 +619,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + (v == 0 ? "0" : v >= tope ? "-100%" : "-50%") + ")'>" + pctUmbral(v) + "</span>";
         String chip = "padding:2px 8px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;";
         kpiMeta.add(new Html("<div style='display:grid;gap:6px;max-width:820px'>"
-                + "<div style='font-weight:600'>Meta: consumo cero de la red</div>"
+                + "<div style='font-weight:600'>Meta: cero importacion de la red</div>"
                 + "<div style='display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px'>"
                 + "<span style='font-size:28px;font-weight:700'>" + String.format(Locale.ROOT, "%.1f %%", pct) + "</span>"
                 + "<span style='color:#555'>del consumo se importo de la red (" + kwh(imp) + " de " + kwh(cons) + "); meta 0 %</span>"
@@ -634,7 +635,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + marca.apply(meta.amarilloHasta()) + marca.apply(tope) + "</div>"
                 + "<div style='font-size:12px;color:#555'>Barra azul = importacion de la red del periodo, en % del consumo. Fondo: verde hasta "
                 + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
-                + ", rojo por encima (se cambia en generador-config.json). Cada arranque, en la columna \"De la red\".</div></div>"));
+                + ", rojo por encima (se cambia en generador-config.json). Cada arranque, en la columna \"% importado de la red\".</div></div>"));
     }
 
     /** 2 -> "2 %", 2.5 -> "2.5 %". */
@@ -645,7 +646,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     /** Indicador principal de estiaje: parte del consumo tomada de la red, con semáforo (meta 0). */
     private Component kpiTomadoDeRed(Double pct, Double kwhRed, Double consumo) {
         String detalle = kwhRed == null ? "meta: 0" : kwh(kwhRed) + (consumo == null ? "" : " de " + kwh(consumo)) + " consumidos; meta 0";
-        return tarjetaKpi("Tomado de la red", pct == null ? "-" : String.format(Locale.ROOT, "%.1f %%", pct), detalle, semaforoRed(pct));
+        return tarjetaKpi("Importada de la red", pct == null ? "-" : String.format(Locale.ROOT, "%.1f %%", pct), detalle, semaforoRed(pct));
     }
 
     /** Balance neto con la red (tomado - entregado): verde si se entregó más de lo que se tomó. */
@@ -653,7 +654,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         if (balance == null) return tarjeta("Balance neto con la red", "-", null);
         Estado e = balance <= 0 ? Estado.OK : semaforoRed(consumo == null || consumo <= 0 ? null : balance / consumo * 100);
         String detalle = Math.abs(balance) < 0.5 ? "sin intercambio neto con la red"
-                : balance < 0 ? "se entrego a la red mas de lo que se tomo" : "se tomo de la red mas de lo que se entrego";
+                : balance < 0 ? "se exporto a la red mas de lo que se importo" : "se importo de la red mas de lo que se exporto";
         return tarjetaKpi("Balance neto con la red", String.format(Locale.ROOT, "%,.0f kWh", balance), detalle, e);
     }
 
@@ -686,18 +687,18 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         costosGrid.addColumn(p -> p.inicio().format(CORTA)).setHeader("Inicio").setAutoWidth(true).setFlexGrow(0);
         columna(costosGrid, "Duracion", p -> duracion(p.horas()) + (p.enCurso() ? " (en marcha)" : ""));
         columna(costosGrid, "Generado (kWh)", p -> kwhNum(p.kwhGenerado()));
-        columna(costosGrid, "Entregado a la red (kWh)", p -> kwhNum(p.kwhRedExportada()));
-        columna(costosGrid, "Aprovechado (kWh)", p -> kwhNum(p.generadorUsado()));
-        costosGrid.addColumn(GeneradorAnalisisView::franjas).setHeader("Aprovechado por franja (kWh)").setAutoWidth(true).setFlexGrow(0);
+        columna(costosGrid, "Exportada a la red (kWh)", p -> kwhNum(p.kwhRedExportada()));
+        columna(costosGrid, "Consumida en planta (kWh)", p -> kwhNum(p.generadorUsado()));
+        costosGrid.addColumn(GeneradorAnalisisView::franjas).setHeader("Consumida en planta por franja (kWh)").setAutoWidth(true).setFlexGrow(0);
         columna(costosGrid, "Galones", p -> c(p) == null ? "-" : String.format(Locale.ROOT, "%,.2f", c(p).getGalones()));
         columna(costosGrid, "Precio galon", p -> c(p) == null ? "-" : dinero(c(p).getPrecioGalon()));
         columna(costosGrid, "Costo diesel", p -> c(p) == null ? "-" : dinero(c(p).costo()));
-        columna(costosGrid, "Costo en la red", p -> p.costoRed() == null ? "-" : dinero(p.costoRed()));
+        columna(costosGrid, "Costo equivalente en la red", p -> p.costoRed() == null ? "-" : dinero(p.costoRed()));
         columna(costosGrid, "Diesel $/kWh", p -> precioKwh(precioDiesel(p)));
         columna(costosGrid, "Red $/kWh", p -> precioKwh(p.precioRedMedio()));
-        costosGrid.addComponentColumn(this::vecesSpan).setHeader("Generar vs red").setAutoWidth(true).setFlexGrow(0)
+        costosGrid.addComponentColumn(this::vecesSpan).setHeader("Relacion diesel / red").setAutoWidth(true).setFlexGrow(0)
                 .setTextAlign(ColumnTextAlign.END);
-        costosGrid.addComponentColumn(p -> diferenciaSpan(diferencia(p))).setHeader("Diferencia").setAutoWidth(true).setFlexGrow(0)
+        costosGrid.addComponentColumn(p -> diferenciaSpan(diferencia(p))).setHeader("Costo de mas (o ahorro)").setAutoWidth(true).setFlexGrow(0)
                 .setTextAlign(ColumnTextAlign.END);
         columna(costosGrid, "kWh por galon", p -> c(p) == null || c(p).getGalones() <= 0 || p.kwhGenerado() == null ? "-"
                 : String.format(Locale.ROOT, "%.1f", p.kwhGenerado() / c(p).getGalones()));
@@ -717,14 +718,14 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         costosGrid.setHeight("520px");
         Span nota = nota("Por cada arranque se cargan a mano los galones de diesel usados y el precio del galon"
                 + (lineaAccessService.esAdmin() ? " (boton Cargar / Editar)" : " (solo el administrador)")
-                + "; al guardarlos aparece su comparacion. Aprovechado = generado - entregado a la red: lo que volvio a la red "
-                + "no reemplazo energia de la red ni se paga. Costo en la red = cada kWh aprovechado al precio de la franja "
-                + "horaria (A, B, C o D) de la hora en que se genero, con la tarifa de su mes y los feriados de Consumo por franja "
-                + "horaria. Diesel $/kWh = costo del diesel / kWh aprovechados. Generar vs red = costo del diesel / costo en la red: "
-                + "2.0 veces = generar costo el doble. Solo se compara energia contra combustible: no entran el mantenimiento del "
-                + "generador ni los otros cargos de la factura de la red (demanda, comercializacion). Las tarjetas de arriba suman "
-                + "solo los arranques con diesel cargado. Entregado a la red sin pago = kWh entregados x costo del diesel por kWh "
-                + "generado.");
+                + "; al guardarlos aparece su comparacion. Consumida en planta = generado - exportado a la red: lo que salio a la red "
+                + "no reemplazo energia de la red ni se paga. Costo equivalente en la red = cada kWh consumido en planta al precio de "
+                + "la franja horaria (A, B, C o D) de la hora en que se genero, con la tarifa de su mes y los feriados de Consumo por "
+                + "franja horaria. Diesel $/kWh = costo del diesel / kWh consumidos en planta. Relacion diesel / red = costo del diesel "
+                + "/ costo equivalente en la red: 2.0 veces = generar costo el doble. Solo se compara energia contra combustible: no "
+                + "entran el mantenimiento del generador ni los otros cargos de la factura de la red (demanda, comercializacion). Las "
+                + "tarjetas de arriba suman solo los arranques con diesel cargado. Exportada a la red sin pago = kWh exportados x "
+                + "costo del diesel por kWh generado.");
 
         VerticalLayout v = new VerticalLayout(descripcion("Cuanto cuesta generar con diesel contra comprar la misma energia a la red, "
                 + "arranque por arranque. El precio de la red es el de la franja horaria de la hora en que se genero cada kWh."),
@@ -827,17 +828,17 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             tarjetasCostos.add(tarjeta("Comparacion con la red", "sin tarifa", "cargar la tarifa en Consumo por franja horaria > Tarifas"));
         } else {
             tarjetasCostos.add(tarjeta("Costo de generar (diesel)", dinero(costoDiesel), precioKwh(costoDiesel / kwhAprovechado)
-                    + " por kWh aprovechado; " + comparados + " de " + periodos.size() + " arranques con diesel cargado"));
-            tarjetasCostos.add(tarjeta("La red habria costado", dinero(costoRed), precioKwh(costoRed / kwhAprovechado)
+                    + " por kWh consumido en planta; " + comparados + " de " + periodos.size() + " arranques con diesel cargado"));
+            tarjetasCostos.add(tarjeta("Costo equivalente en la red", dinero(costoRed), precioKwh(costoRed / kwhAprovechado)
                     + " por kWh, con el precio de la franja de cada hora"));
             double diferencia = costoDiesel - costoRed;
             tarjetasCostos.add(diferencia > 0
                     ? tarjetaKpi(String.format(Locale.ROOT, "Generar sale %.1f veces la red", costoDiesel / costoRed),
-                    dinero(diferencia) + " de mas", String.format(Locale.ROOT, "%,.0f kWh aprovechados", kwhAprovechado), Estado.FUERA)
+                    dinero(diferencia) + " de mas", String.format(Locale.ROOT, "%,.0f kWh consumidos en planta", kwhAprovechado), Estado.FUERA)
                     : tarjetaKpi("Generar sale mas barato que la red", dinero(-diferencia) + " de ahorro",
-                    String.format(Locale.ROOT, "%,.0f kWh aprovechados", kwhAprovechado), Estado.OK));
+                    String.format(Locale.ROOT, "%,.0f kWh consumidos en planta", kwhAprovechado), Estado.OK));
             double costoKwhGenerado = kwhGenerado > 0 ? costoDiesel / kwhGenerado : 0;
-            tarjetasCostos.add(tarjeta("Entregado a la red sin pago", kwh(kwhEntregado), kwhEntregado < 0.5 ? null
+            tarjetasCostos.add(tarjeta("Exportada a la red sin pago", kwh(kwhEntregado), kwhEntregado < 0.5 ? null
                     : dinero(kwhEntregado * costoKwhGenerado) + " de diesel, a " + precioKwh(costoKwhGenerado) + " por kWh generado"));
         }
         if (cargados > 0) {
@@ -864,7 +865,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         chartCostos.setVisible(true);
         scriptCostos = GraficaModel.getBarrasAgrupadasScript(CHART_COSTOS, categorias,
-                new String[]{"Diesel $/kWh aprovechado", "Red $/kWh (franja de cada hora)"}, new String[]{NARANJA, AZUL},
+                new String[]{"Diesel $/kWh consumido en planta", "Red $/kWh (franja de cada hora)"}, new String[]{NARANJA, AZUL},
                 valores, "$/kWh", "#.000");
         if (tabs.getSelectedTab() == tabCostos) getElement().executeJs(scriptCostos);
     }
@@ -1016,13 +1017,13 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 .set("margin", "4px 0");
         filaBalance(filas, "Generado por " + p.generador(), generado, max, "#eb6834");
         filaBalance(filas, "Consumido por las maquinas " + GeneradorView.deRed(p.red()), consumido, max, "#52514e");
-        filaBalance(filas, "Entregado a la red", entregado, max, "#1baf7a");
+        filaBalance(filas, "Exportada a la red", entregado, max, "#1baf7a");
         balance.add(titulo, filas);
         if (consumido != null) {
             double diferencia = generado - consumido - entregado;
-            Span nota = new Span(String.format(Locale.ROOT, "Generado - consumido - entregado = %,.0f kWh: consumo que ningun medidor de "
+            Span nota = new Span(String.format(Locale.ROOT, "Generado - consumido - exportado = %,.0f kWh: consumo que ningun medidor de "
                     + "maquina registra (alumbrado, cargas sin medidor) y perdidas%s.", diferencia,
-                    red >= 0.5 ? String.format(Locale.ROOT, ", menos lo tomado de la red (%,.0f kWh)", red) : ""));
+                    red >= 0.5 ? String.format(Locale.ROOT, ", menos lo importado de la red (%,.0f kWh)", red) : ""));
             nota.getStyle().set("font-size", "12px").set("color", "#52514e");
             balance.add(nota);
         }
@@ -1038,7 +1039,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         barra.add(segmento(pctGen, "#eb6834", String.format(Locale.ROOT, "Generador %.1f%%", pctGen)),
                 segmento(pctRed, "#2a78d6", String.format(Locale.ROOT, "Red %.1f%%", pctRed)));
         Span leyenda = new Span(String.format(Locale.ROOT, "Generador %.1f%% (%,.0f kWh)   |   Red %.1f%% (%,.0f kWh), meta 0%%"
-                + "   |   Entregado a la red: %,.0f kWh (excedente, no es parte del consumo)", pctGen, gen, pctRed, red, entregado));
+                + "   |   Exportada a la red: %,.0f kWh (excedente, no es parte del consumo)", pctGen, gen, pctRed, red, entregado));
         leyenda.getStyle().set("font-size", "12px").set("color", "#52514e");
         balance.add(subtitulo, barra, leyenda);
         balance.setVisible(true);
@@ -1102,11 +1103,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         kpisDetalle.removeAll();
         kpisDetalle.add(kpiTomadoDeRed(p.porcentajeDeRed(), p.kwhRedImportada(), p.consumo()));
         kpisDetalle.add(kpiBalance(p.balanceNeto(), p.consumo()));
-        kpisDetalle.add(tarjeta("Tiempo tomando de la red", p.porcentajeTiempoTomando() == null ? "-"
+        kpisDetalle.add(tarjeta("Tiempo importando de la red", p.porcentajeTiempoTomando() == null ? "-"
                         : String.format(Locale.ROOT, "%.0f %%", p.porcentajeTiempoTomando()),
                 p.lecturasTomando() + " de " + p.lecturasRed() + " minutos"
                         + (p.picoTomadoKw() == null ? "" : String.format(Locale.ROOT, "; pico %.0f kW", p.picoTomadoKw()))));
-        kpisDetalle.add(tarjeta("Entregado a la red", kwh(p.kwhRedExportada()), "excedente"));
+        kpisDetalle.add(tarjeta("Exportada a la red", kwh(p.kwhRedExportada()), "excedente"));
         kpisDetalle.add(tarjeta("Generado", kwh(p.kwhGenerado()), p.kwMedio() == null ? null
                 : String.format(Locale.ROOT, "%.0f kW medio", p.kwMedio())));
         mostrarBalance(p, lista);
@@ -1116,18 +1117,18 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         StringBuilder r = new StringBuilder();
         if (consumo != null && p.porcentajeDeRed() != null) {
             String nombre = GeneradorView.nombreRed(p.red());
-            r.append(String.format(Locale.ROOT, "%s consumio %,.0f kWh: el generador puso el %.1f%% y de la red se tomo el %.1f%% "
+            r.append(String.format(Locale.ROOT, "%s consumio %,.0f kWh: el generador aporto el %.1f%% y de la red se importo el %.1f%% "
                     + "(%,.0f kWh)", nombre.startsWith("la ") ? "La planta" : "El " + nombre, consumo, p.aporteGenerador(),
                     p.porcentajeDeRed(), p.kwhRedImportada()));
             if (p.porcentajeTiempoTomando() != null && p.kwhRedImportada() >= 0.5) {
                 r.append(String.format(Locale.ROOT, ", en el %.0f%% del tiempo", p.porcentajeTiempoTomando()));
             }
             if (p.kwhRedExportada() != null && p.kwhRedExportada() >= 0.5) {
-                r.append(String.format(Locale.ROOT, ". Ademas se entregaron %,.0f kWh de excedente a la red", p.kwhRedExportada()));
+                r.append(String.format(Locale.ROOT, ". Ademas se exportaron %,.0f kWh de excedente a la red", p.kwhRedExportada()));
                 if (p.balanceNeto() != null) {
                     r.append(p.balanceNeto() <= 0
-                            ? String.format(Locale.ROOT, ": en neto se entregaron %,.0f kWh mas de los que se tomaron", -p.balanceNeto())
-                            : String.format(Locale.ROOT, "; en neto se tomaron %,.0f kWh de la red", p.balanceNeto()));
+                            ? String.format(Locale.ROOT, ": en neto se exportaron %,.0f kWh mas de los que se importaron", -p.balanceNeto())
+                            : String.format(Locale.ROOT, "; en neto se importaron %,.0f kWh de la red", p.balanceNeto()));
                 }
             }
             r.append(". ");
@@ -1143,7 +1144,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                     .sorted((x, y) -> Double.compare(y.kwhEnEspera(), x.kwhEnEspera()))
                     .map(c -> String.format(Locale.ROOT, "%s %,.1f", c.medidor(), c.kwhEnEspera())).toList();
             r.append(String.format(Locale.ROOT, "Desperdicio: las maquinas sin produccion consumieron %,.1f kWh mientras el generador "
-                    + "estaba en marcha, energia que entrego el generador o la red sin producir%s.", desperdicio,
+                    + "estaba en marcha, energia que aporto el generador o la red sin producir%s.", desperdicio,
                     detalle.isEmpty() ? "" : " (" + String.join(", ", detalle) + " kWh)"));
         }
         maquinasResumen.setText(r.toString().trim());

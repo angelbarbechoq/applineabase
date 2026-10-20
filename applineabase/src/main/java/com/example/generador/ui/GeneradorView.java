@@ -627,7 +627,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             String detalle = antes.kw() == null ? "sin lecturas de los transformadores antes del arranque del " + cuando
                     : "promedio de " + PlantaEnVivoService.MINUTOS_ANTES + " min antes del " + (antes.enCurso() ? "arranque" : "ultimo arranque")
                     + " (" + cuando + ")" + (consumo > 0 ? String.format(Locale.ROOT, "; ahora %+,.0f kW", consumo - antes.kw()) : "");
-            h.append(tarjetaPlanta("Antes del arranque", antes.kw() == null ? "-" : kw(antes.kw()), detalle, "#9aa3ad"));
+            h.append(tarjetaPlanta("Consumo antes del arranque", antes.kw() == null ? "-" : kw(antes.kw()), detalle, "#9aa3ad"));
         }
         h.append("")
                 .append(tarjetaPlanta("Aporte de los generadores", kw(p.consumidaDeGeneradores()),
@@ -787,7 +787,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> refrescar());
         estadoContenido.setWidthFull();
         Span nota = new Span("Leido en vivo del controlador cada 15 s (solo lectura). La red es el medidor del transformador "
-                + "asociado (PLC, ultimo minuto); potencia negativa = retorno de energia a la red. "
+                + "asociado (PLC, ultimo minuto); potencia negativa = exportacion a la red. "
                 + "Tension, frecuencia y PF usan los limites de Calidad de Energia; bateria, aceite y temperatura tienen "
                 + "limites provisorios (sistema de 24 V) hasta configurar las alarmas. Con Todos, un bloque por generador.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
@@ -882,9 +882,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 calidad.evaluar(Indicador.TENSION, prom(l.redVL1L2(), l.redVL2L3(), l.redVL3L1()), nomRed, cfg))));
         if (l.redKw() != null) {
             HorizontalLayout p = new HorizontalLayout(texto(String.format(Locale.ROOT, "%.0f kW", l.redKw())));
-            if (l.redKw() < 0) p.add(badgeNuevo("Retorno a la red", Estado.AVISO));
+            if (l.redKw() < 0) p.add(badgeNuevo("Exportando a la red", Estado.AVISO));
             p.setAlignItems(Alignment.CENTER);
-            panelRed.add(fila("Importado de la red (controlador)", p));
+            panelRed.add(fila("Importada de la red (controlador)", p));
         }
         if (l.cargaKw() != null) {
             panelRed.add(fila("Consumo " + deRed(red) + " (controlador)", texto(String.format(Locale.ROOT, "%.0f kW", l.cargaKw()))));
@@ -895,7 +895,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             Double pf = num(medidor.get("PF")) == null ? null : FactorPotenciaUtil.normalizarAbs(Math.abs(num(medidor.get("PF"))));
             if (pw != null && pw < 0) {
                 HorizontalLayout p = new HorizontalLayout(grande(String.format(Locale.ROOT, "%.0f kW", pw)),
-                        badgeNuevo("Retorno a la red", Estado.AVISO));
+                        badgeNuevo("Exportando a la red", Estado.AVISO));
                 p.setAlignItems(Alignment.CENTER);
                 panelRed.add(fila("Potencia", p));
             } else {

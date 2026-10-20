@@ -1113,7 +1113,7 @@ public class GraficaModel {
                 + "yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x52514e), fontSize: '11px' });"
                 + "yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });"
                 + "yAxis.children.unshift(am5.Label.new(root, { rotation: -90, text: 'kW', y: am5.p50, centerX: am5.p50, fontSize: '11px', fill: am5.color(0x52514e) }));"
-                + "var red = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Red (azul = tomado, verde = entregado)', xAxis: xAxis, yAxis: yAxis, valueYField: 'r', valueXField: 't', fill: am5.color(" + colorRed + "), tooltip: am5.Tooltip.new(root, { labelText: 'Red: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
+                + "var red = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Red (azul = importada, verde = exportada)', xAxis: xAxis, yAxis: yAxis, valueYField: 'r', valueXField: 't', fill: am5.color(" + colorRed + "), tooltip: am5.Tooltip.new(root, { labelText: 'Red: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
                 + "red.columns.template.setAll({ width: am5.percent(100), strokeOpacity: 0 });"
                 + "red.columns.template.adapters.add('fill', function(fill, target) { var v = target.dataItem && target.dataItem.get('valueY'); return v < 0 ? am5.color(" + colorEntregado + ") : am5.color(" + colorRed + "); });"
                 + "red.data.setAll(datos);"
@@ -1185,8 +1185,8 @@ public class GraficaModel {
                 .append("  s.data.setAll(datos); return s;")
                 .append("}")
                 .append("var leyenda = [];")
-                .append("var tomado = columnas('Red: tomado', 'ri', 0x2a78d6, true);")
-                .append("var entregado = columnas('Red: entregado', 're', 0x1baf7a, false);");
+                .append("var tomado = columnas('Importada de la red', 'ri', 0x2a78d6, true);")
+                .append("var entregado = columnas('Exportada a la red', 're', 0x1baf7a, false);");
         for (int g = 0; g < n; g++) {
             js.append("leyenda.push(linea(").append(jsString(generadores[g])).append(", 'g").append(g).append("', ")
                     .append(coloresGen[g % coloresGen.length]).append("));");
