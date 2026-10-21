@@ -1,5 +1,6 @@
 package com.example.generador.service;
 
+import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.franjahoraria.model.Franja;
@@ -29,7 +30,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,8 +41,13 @@ import java.util.function.Predicate;
 /**
  * Análisis del grupo electrógeno por día, semana o mes: energía generada (contador del
  * controlador), energía importada de la red y exportada a la red (contadores kWh y KWhR del
- * medidor del transformador asociado, leído por PLC), consumo del tablero, horas de marcha en
+ * medidor principal de la planta 1, leído por PLC), consumo de la planta 1, horas de marcha en
  * paralelo con la red / en isla / en vacío y arranques.
+ *
+ * La red es siempre la del medidor principal (KWhPlanta1, ION8600 clase 0,2, propio de la fábrica y en paralelo con
+ * el de la empresa eléctrica, con el que coincide a menos de 0,3 %): ve los dos transformadores juntos, así que lo que
+ * sale por uno y entra por el otro no cuenta como exportado ni importado. Los medidores de los transformadores
+ * (PM5110, marcan 1 a 3 % de más contra el principal) quedan solo como referencia de cada arranque.
  *
  * Toda energía sale de diferencias de contadores (no de integrar potencias): las lecturas
  * faltantes no pierden energía, solo la corren a la lectura siguiente. Se descartan valores en
@@ -62,6 +67,10 @@ public class GeneradorAnalisisService {
     private static final double MAX_MIN_POR_LECTURA = 2.0;
     /** Plausibilidad de los contadores: potencia máxima creíble (kW). */
     private static final double KW_MAX_RED = 20000, KW_MAX_GENERADOR = 5000;
+    /** Medidor principal: la red de toda la planta 1 (transformadores 1 y 2 juntos). */
+    public static final String PRINCIPAL = MaquinasVirtuales.KWH_PLANTA_1;
+    /** El PLC guarda la potencia del medidor principal en W (la de los transformadores, en kW). */
+    public static final double KW_POR_UNIDAD_PRINCIPAL = 0.001;
 
     private static final String[] MESES = {"enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
             "agosto", "septiembre", "octubre", "noviembre", "diciembre"};
@@ -82,29 +91,38 @@ public class GeneradorAnalisisService {
         }
     }
 
-    /** Un período. null = sin datos (distinto de 0). */
+    /**
+     * Un período. null = sin datos (distinto de 0). Red = medidor principal (toda la planta 1): redImportada de todo el
+     * día; lo exportado se reparte entre los generadores en marcha según lo que generaba cada uno: redExportada = la parte
+     * de los generadores elegidos, redExportadaOtros = la de los demás. generadoOtros = lo que generaron los demás.
+     */
     public record Fila(String periodo, LocalDate desde, LocalDate hasta,
                        Double redImportada, Double redExportada, Double generado,
                        Double generadoParalelo, Double generadoIsla,
                        Double horasMarcha, Double horasParalelo, Double horasIsla, Double horasVacio,
-                       Integer arranques, Double kwMax) {
+                       Integer arranques, Double kwMax, Double generadoOtros, Double redExportadaOtros) {
 
-        /** Lo que consumió el tablero: lo que entró de la red + lo generado - lo que volvió a la red. */
+        /** Consumo de la planta 1: lo importado + lo que pusieron en la planta los generadores elegidos y los demás. */
         public Double consumo() {
             if (redImportada == null && generado == null) return null;
-            return Math.max(0, nz(redImportada) + nz(generado) - nz(redExportada));
+            return nz(redImportada) + nz(generadorUsado()) + nz(aporteOtros());
         }
 
-        /** Parte del consumo cubierta por el generador (%), descontando lo que se exportó. */
+        /** Parte del consumo cubierta por los generadores elegidos (%), descontando lo que exportaron. */
         public Double aporteGenerador() {
             Double c = consumo();
             if (c == null || c <= 0 || generado == null) return null;
-            return Math.max(0, Math.min(100, (generado - nz(redExportada)) / c * 100));
+            return Math.max(0, Math.min(100, generadorUsado() / c * 100));
         }
 
-        /** Lo que puso el generador en el consumo del tablero: generado - retornado. */
+        /** Lo que pusieron en la planta los generadores elegidos: generado - su parte de lo exportado. */
         public Double generadorUsado() {
             return generado == null ? null : Math.max(0, generado - nz(redExportada));
+        }
+
+        /** Lo que pusieron en la planta los demás generadores (null si no hay otros). */
+        public Double aporteOtros() {
+            return generadoOtros == null ? null : Math.max(0, generadoOtros - nz(redExportadaOtros));
         }
 
         /** Parte del consumo que se tomó de la red (%): el indicador de estiaje, meta 0. */
@@ -113,28 +131,34 @@ public class GeneradorAnalisisService {
             return c == null || c <= 0 || redImportada == null ? null : Math.min(100, redImportada / c * 100);
         }
 
-        /** Tomado - entregado a la red: negativo = se entregó más de lo que se tomó. */
+        /** Tomado - entregado a la red por toda la planta: negativo = se entregó más de lo que se tomó. */
         public Double balanceNeto() {
-            return redImportada == null ? null : redImportada - nz(redExportada);
+            return redImportada == null ? null : redImportada - nz(redExportada) - nz(redExportadaOtros);
         }
     }
 
-    /** Un minuto en marcha: lo que dio el generador y lo que pasó por el transformador (+ tomado, - entregado). */
-    public record MinutoMarcha(LocalDateTime fecha, Double generadorKw, Double redKw) {
+    /**
+     * Un minuto en marcha: lo que dio el generador, lo que daban los demás generadores y la red de la planta 1
+     * (medidor principal, + tomado, - entregado).
+     */
+    public record MinutoMarcha(LocalDateTime fecha, Double generadorKw, double otrosKw, Double redKw) {
+        /** Consumo de la planta 1: los generadores + la red. */
         public Double consumoKw() {
-            return generadorKw == null || redKw == null ? null : generadorKw + redKw;
+            return generadorKw == null || redKw == null ? null : generadorKw + otrosKw + redKw;
         }
     }
 
     /** Acumulado de un día (campos null hasta que llega un dato). */
     private static final class Acum {
-        Double redImportada, redExportada, generado, generadoParalelo, generadoIsla;
+        Double redImportada, redExportada, redExportadaOtros, generado, generadoOtros, generadoParalelo, generadoIsla;
         Double horasMarcha, horasParalelo, horasIsla, horasVacio, kwMax;
         Integer arranques;
 
         void sumar(Acum o) {
             redImportada = suma(redImportada, o.redImportada);
             redExportada = suma(redExportada, o.redExportada);
+            redExportadaOtros = suma(redExportadaOtros, o.redExportadaOtros);
+            generadoOtros = suma(generadoOtros, o.generadoOtros);
             generado = suma(generado, o.generado);
             generadoParalelo = suma(generadoParalelo, o.generadoParalelo);
             generadoIsla = suma(generadoIsla, o.generadoIsla);
@@ -164,22 +188,30 @@ public class GeneradorAnalisisService {
     }
 
     /**
-     * Filas por período entre dos fechas (inclusive) para uno o varios generadores. Con varios, la
-     * red es la suma de sus transformadores asociados (cada uno una vez).
+     * Filas por período entre dos fechas (inclusive) para uno o varios generadores. La red es siempre la de toda la
+     * planta 1 (medidor principal); los generadores no elegidos entran como "otros" para que el consumo sea el de la planta.
      */
     public List<Fila> analizar(List<Generador> generadores, Agrupacion agrupacion, LocalDate desde, LocalDate hasta) {
-        TreeMap<LocalDate, Acum> dias = new TreeMap<>();
-        for (LocalDate d = desde; !d.isAfter(hasta); d = d.plusDays(1)) dias.put(d, new Acum());
+        TreeMap<LocalDate, Acum> dias = new TreeMap<>(), diasOtros = new TreeMap<>();
+        for (LocalDate d = desde; !d.isAfter(hasta); d = d.plusDays(1)) {
+            dias.put(d, new Acum());
+            diasOtros.put(d, new Acum());
+        }
 
-        Set<String> redes = new LinkedHashSet<>();
+        List<Generador> todos = generadorService.generadores();
+        Set<String> elegidos = new HashSet<>();
         for (Generador g : generadores) {
-            if (g.redAsociada() != null) redes.add(g.redAsociada());
+            elegidos.add(g.nombre());
             acumularGenerador(g, desde, hasta, dias);
         }
-        for (String red : redes) {
-            List<Generador> deEstaRed = generadores.stream().filter(g -> red.equals(g.redAsociada())).toList();
-            acumularRed(red, tramosEnMarcha(deEstaRed), desde, hasta, dias);
+        boolean hayOtros = false;
+        for (Generador g : todos) {
+            if (elegidos.contains(g.nombre())) continue;
+            hayOtros = true;
+            acumularGenerador(g, desde, hasta, diasOtros);
         }
+        if (hayOtros) dias.forEach((d, a) -> a.generadoOtros = diasOtros.get(d).generado);
+        acumularRed(elegidos, todos, desde, hasta, dias);
 
         List<Fila> filas = new ArrayList<>();
         LocalDate inicio = desde;
@@ -194,7 +226,7 @@ public class GeneradorAnalisisService {
             for (Acum d : dias.subMap(inicio, true, fin, true).values()) a.sumar(d);
             filas.add(new Fila(etiqueta(agrupacion, inicio, fin), inicio, fin, a.redImportada, a.redExportada, a.generado,
                     a.generadoParalelo, a.generadoIsla, a.horasMarcha, a.horasParalelo, a.horasIsla, a.horasVacio,
-                    a.arranques, a.kwMax));
+                    a.arranques, a.kwMax, a.generadoOtros, a.redExportadaOtros));
             inicio = fin.plusDays(1);
         }
         return filas;
@@ -216,12 +248,15 @@ public class GeneradorAnalisisService {
             x.horasVacio = f.horasVacio();
             x.arranques = f.arranques();
             x.kwMax = f.kwMax();
+            x.generadoOtros = f.generadoOtros();
+            x.redExportadaOtros = f.redExportadaOtros();
             a.sumar(x);
         }
         LocalDate desde = filas.isEmpty() ? null : filas.get(0).desde();
         LocalDate hasta = filas.isEmpty() ? null : filas.get(filas.size() - 1).hasta();
         return new Fila("Total", desde, hasta, a.redImportada, a.redExportada, a.generado, a.generadoParalelo,
-                a.generadoIsla, a.horasMarcha, a.horasParalelo, a.horasIsla, a.horasVacio, a.arranques, a.kwMax);
+                a.generadoIsla, a.horasMarcha, a.horasParalelo, a.horasIsla, a.horasVacio, a.arranques, a.kwMax,
+                a.generadoOtros, a.redExportadaOtros);
     }
 
     private static String etiqueta(Agrupacion agrupacion, LocalDate desde, LocalDate hasta) {
@@ -235,24 +270,40 @@ public class GeneradorAnalisisService {
     // ================= Períodos en marcha =================
 
     /**
-     * Un período en marcha (un arranque): lo que trabajó el generador y lo que pasó con la red en ese
-     * mismo intervalo. fin = ahora si sigue en marcha.
-     */
-    /**
-     * @param lecturasTomando lecturas del medidor del trafo con potencia positiva: en ese minuto se tomaba de la red
-     * @param lecturasRed     lecturas del medidor del trafo en el período
-     * @param picoTomadoKw    máxima potencia tomada de la red en el período (null si nunca se tomó)
-     * @param aprovechadoFranja kWh aprovechados (generado - entregado a la red) por franja horaria A..D, según la hora
-     *                        en que se generaron; null si las lecturas del generador no alcanzan para repartirlos
-     * @param costoRed        lo que habría costado lo aprovechado comprado a la red, con el precio de la franja de cada
-     *                        hora y la tarifa de su mes (Consumo por franja horaria); null sin reparto o sin tarifa
+     * Un período en marcha (un arranque): lo que trabajó el generador y lo que pasó con la red de la planta 1 (medidor
+     * principal) en ese mismo intervalo. fin = ahora si sigue en marcha. Si otro generador estaba en marcha a la vez, lo
+     * importado y lo exportado por la planta se reparten entre los dos según lo que generaba cada uno: sumar los arranques
+     * da lo de la planta, sin contar dos veces.
+     *
+     * @param kwhRedImportada  parte de lo importado por la planta 1 que le toca a este arranque
+     * @param kwhRedExportada  parte de lo exportado por la planta 1 que le toca a este arranque
+     * @param lecturasTomando  lecturas del medidor principal con potencia positiva: en ese minuto la planta tomaba de la red
+     * @param lecturasRed      lecturas del medidor principal en el período
+     * @param picoTomadoKw     máxima potencia que tomó la planta de la red en el período (null si nunca tomó)
+     * @param aprovechadoFranja kWh aprovechados (generado - su parte de lo exportado) por franja horaria A..D, según la
+     *                         hora en que se generaron; null si las lecturas del generador no alcanzan para repartirlos
+     * @param costoRed         lo que habría costado lo aprovechado comprado a la red, con el precio de la franja de cada
+     *                         hora y la tarifa de su mes (Consumo por franja horaria); null sin reparto o sin tarifa
+     * @param kwhTrafoImportada referencia: importado por el medidor del transformador del generador (no por el principal)
+     * @param kwhTrafoExportada referencia: exportado por el medidor del transformador del generador
      */
     public record PeriodoMarcha(String generador, String red, long arranqueId, Integer nro, LocalDateTime inicio,
                                 LocalDateTime fin, boolean enCurso, boolean inicioEstimado,
                                 Double kwhGenerado, Double kwhRedImportada, Double kwhRedExportada, Double kwMax,
                                 double minParalelo, double minIsla, double minVacio,
                                 int lecturasTomando, int lecturasRed, Double picoTomadoKw,
-                                double[] aprovechadoFranja, Double costoRed) {
+                                double[] aprovechadoFranja, Double costoRed,
+                                Double kwhTrafoImportada, Double kwhTrafoExportada) {
+
+        /**
+         * Referencia: % importado según el medidor de su transformador (cuánto del consumo de ese transformador no
+         * cubrió el generador); null sin lecturas del transformador.
+         */
+        public Double porcentajeDeRedTransformador() {
+            if (kwhTrafoImportada == null || kwhGenerado == null) return null;
+            double c = kwhTrafoImportada + kwhGenerado - nz(kwhTrafoExportada);
+            return c <= 0 ? null : Math.min(100, kwhTrafoImportada / c * 100);
+        }
 
         /** $/kWh medio de la red en las horas en que trabajó el generador. */
         public Double precioRedMedio() {
@@ -260,12 +311,12 @@ public class GeneradorAnalisisService {
             return costoRed == null || a == null || a <= 0 ? null : costoRed / a;
         }
 
-        /** Lo que puso el generador en el consumo del tablero: generado - retornado. */
+        /** Lo que puso el generador en el consumo de la planta: generado - su parte de lo exportado. */
         public Double generadorUsado() {
             return kwhGenerado == null ? null : Math.max(0, kwhGenerado - nz(kwhRedExportada));
         }
 
-        /** Parte del consumo que se tomó de la red (%): el indicador de estiaje, meta 0. */
+        /** Parte del consumo de la planta que se tomó de la red (%): el indicador de estiaje, meta 0. */
         public Double porcentajeDeRed() {
             Double c = consumo();
             return c == null || c <= 0 || kwhRedImportada == null ? null : Math.min(100, kwhRedImportada / c * 100);
@@ -309,24 +360,37 @@ public class GeneradorAnalisisService {
         List<TarifaFranja> tarifas = tarifaFranjaService.listar();
         Map<YearMonth, TarifaDelMes> tarifaPorMes = new HashMap<>();
         Function<YearMonth, TarifaDelMes> tarifaDe = m -> tarifaPorMes.computeIfAbsent(m, k -> TarifaFranjaService.delMes(tarifas, k));
+        Map<Generador, List<GeneradorService.Arranque>> porGenerador = new LinkedHashMap<>();
         for (Generador g : generadores) {
             List<GeneradorService.Arranque> arranques = generadorService.arranques(g).stream()
                     .filter(a -> !a.inicio().isAfter(fin) && (a.fin() == null || !a.fin().isBefore(ini))).toList();
-            if (arranques.isEmpty()) continue;
-            LocalDate primero = arranques.stream().map(a -> a.inicio().toLocalDate()).min(LocalDate::compareTo).orElse(desde);
-            LocalDate ultimo = arranques.stream().map(a -> a.fin() == null ? LocalDate.now() : a.fin().toLocalDate())
-                    .max(LocalDate::compareTo).orElse(hasta);
-            TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, primero, ultimo);
+            if (!arranques.isEmpty()) porGenerador.put(g, arranques);
+        }
+        if (porGenerador.isEmpty()) return lista;
+        LocalDate primero = porGenerador.values().stream().flatMap(List::stream).map(a -> a.inicio().toLocalDate())
+                .min(LocalDate::compareTo).orElse(desde);
+        LocalDate ultimo = porGenerador.values().stream().flatMap(List::stream)
+                .map(a -> a.fin() == null ? LocalDate.now() : a.fin().toLocalDate()).max(LocalDate::compareTo).orElse(hasta);
+        List<Generador> todos = generadorService.generadores();
+        Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe = lecturasDe(todos, primero, ultimo);
+        RedPrincipal red = redPrincipal(todos, lecturasDe, primero, ultimo);
+        TreeMap<LocalDateTime, Double> potenciaRed = seriePotenciaPrincipal(primero, ultimo);
+        Set<LocalDate> feriados = feriadoService.fechasEntre(primero, ultimo);
+        Predicate<LocalDate> especial = d -> Franja.finDeSemana(d) || feriados.contains(d);
+
+        for (Map.Entry<Generador, List<GeneradorService.Arranque>> e : porGenerador.entrySet()) {
+            Generador g = e.getKey();
+            TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasDe.computeIfAbsent(g.nombre(), k -> lecturasGenerador(g, primero, ultimo));
             TreeMap<LocalDateTime, Double> kwhGen = new TreeMap<>();
             lecturas.values().forEach(l -> { if (l.kwh() != null && l.kwh() > 0) kwhGen.put(l.fecha(), l.kwh()); });
-            boolean redValida = g.redAsociada() != null && PLCDataQueryService.esNombreMaquinaValido(g.redAsociada());
-            TreeMap<LocalDateTime, Double> importada = redValida ? serieContador(g.redAsociada(), false, primero, ultimo) : new TreeMap<>();
-            TreeMap<LocalDateTime, Double> exportada = redValida ? serieContador(g.redAsociada(), true, primero, ultimo) : new TreeMap<>();
-            TreeMap<LocalDateTime, Double> potenciaRed = redValida ? seriePotencia(g.redAsociada(), primero, ultimo) : new TreeMap<>();
-            Set<LocalDate> feriados = feriadoService.fechasEntre(primero, ultimo);
-            Predicate<LocalDate> especial = d -> Franja.finDeSemana(d) || feriados.contains(d);
+            TreeMap<LocalDateTime, Double> importada = red.importadaDe().getOrDefault(g.nombre(), new TreeMap<>());
+            TreeMap<LocalDateTime, Double> exportada = red.exportadaDe().getOrDefault(g.nombre(), new TreeMap<>());
+            // Referencia: el medidor de su transformador.
+            boolean trafoValido = g.redAsociada() != null && PLCDataQueryService.esNombreMaquinaValido(g.redAsociada());
+            TreeMap<LocalDateTime, Double> importadaTrafo = trafoValido ? serieContador(g.redAsociada(), false, primero, ultimo) : new TreeMap<>();
+            TreeMap<LocalDateTime, Double> exportadaTrafo = trafoValido ? serieContador(g.redAsociada(), true, primero, ultimo) : new TreeMap<>();
 
-            for (GeneradorService.Arranque a : arranques) {
+            for (GeneradorService.Arranque a : e.getValue()) {
                 LocalDateTime f = a.fin() == null ? LocalDateTime.now().withNano(0) : a.fin();
                 Double generado = a.kwhGenerados() != null ? Double.valueOf(a.kwhGenerados())
                         : deltaEnVentana(kwhGen, a.inicio(), f, KW_MAX_GENERADOR);
@@ -374,7 +438,9 @@ public class GeneradorAnalisisService {
                 }
                 lista.add(new PeriodoMarcha(g.nombre(), g.redAsociada(), a.id(), a.arranqueNro(), a.inicio(), f, a.fin() == null,
                         a.inicioEstimado(), generado, deltaEnVentana(importada, a.inicio(), f, KW_MAX_RED),
-                        exportado, kwMax, min[0], min[1], min[2], tomando, lecturasRed, pico, aprovechadoFranja, costoRed));
+                        exportado, kwMax, min[0], min[1], min[2], tomando, lecturasRed, pico, aprovechadoFranja, costoRed,
+                        trafoValido ? deltaEnVentana(importadaTrafo, a.inicio(), f, KW_MAX_RED) : null,
+                        trafoValido ? deltaEnVentana(exportadaTrafo, a.inicio(), f, KW_MAX_RED) : null));
             }
         }
         lista.sort((x, y) -> y.inicio().compareTo(x.inicio()));
@@ -382,9 +448,9 @@ public class GeneradorAnalisisService {
     }
 
     /**
-     * Minuto a minuto de un período en marcha: potencia del generador (lo guardado del controlador) y
-     * potencia del medidor del transformador en la lectura más cercana anterior (hasta 90 s), para graficar
-     * cuándo se tomó de la red y cuándo se le entregó.
+     * Minuto a minuto de un período en marcha: potencia del generador (lo guardado del controlador), la de los demás
+     * generadores y la del medidor principal en la lectura más cercana anterior (hasta 90 s), para graficar cuándo
+     * la planta tomó de la red y cuándo le entregó.
      */
     public List<MinutoMarcha> minutosMarcha(PeriodoMarcha p) {
         List<MinutoMarcha> lista = new ArrayList<>();
@@ -392,13 +458,15 @@ public class GeneradorAnalisisService {
         if (g == null) return lista;
         LocalDate desde = p.inicio().toLocalDate(), hasta = p.fin().toLocalDate();
         TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, desde, hasta);
-        boolean redValida = p.red() != null && PLCDataQueryService.esNombreMaquinaValido(p.red());
-        TreeMap<LocalDateTime, Double> potenciaRed = redValida ? seriePotencia(p.red(), desde, hasta) : new TreeMap<>();
+        List<TreeMap<LocalDateTime, LecturaGuardada>> otros = generadorService.generadores().stream()
+                .filter(x -> !x.nombre().equals(g.nombre())).map(x -> lecturasGenerador(x, desde, hasta)).toList();
+        TreeMap<LocalDateTime, Double> potenciaRed = seriePotenciaPrincipal(desde, hasta);
         for (LecturaGuardada l : lecturas.subMap(p.inicio(), true, p.fin(), true).values()) {
             if (!l.marcha()) continue;
             Map.Entry<LocalDateTime, Double> red = potenciaRed.floorEntry(l.fecha());
             Double redKw = red != null && Duration.between(red.getKey(), l.fecha()).toSeconds() <= 90 ? red.getValue() : null;
-            lista.add(new MinutoMarcha(l.fecha(), l.kw(), redKw));
+            double otrosKw = otros.stream().mapToDouble(o -> kwGenerador(o, l.fecha())).sum();
+            lista.add(new MinutoMarcha(l.fecha(), l.kw(), otrosKw, redKw));
         }
         return lista;
     }
@@ -410,14 +478,21 @@ public class GeneradorAnalisisService {
         return lecturas.isEmpty() ? null : lecturas.values().stream().mapToDouble(Double::doubleValue).average().orElse(0);
     }
 
+    /** Potencia media del medidor principal (kW, + toma de la red) entre desde (incluido) y hasta (excluido); null sin lecturas. */
+    public Double potenciaMediaPrincipal(LocalDateTime desde, LocalDateTime hasta) {
+        Double v = potenciaMedia(PRINCIPAL, desde, hasta);
+        return v == null ? null : v * KW_POR_UNIDAD_PRINCIPAL;
+    }
+
     /**
-     * Consumo de la planta en un intervalo (potencia media, kW): lo que generó y lo que puso en la planta cada
-     * generador (en el orden de la lista pedida), lo importado de la red y lo exportado, sumando los transformadores
-     * de esos generadores.
+     * Consumo de la planta 1 en un intervalo (potencia media, kW): lo que generó y lo que puso en la planta cada
+     * generador pedido (en el orden de la lista), lo que pusieron los demás generadores, y lo importado y lo exportado
+     * por el medidor principal.
      */
-    public record PuntoPlanta(LocalDateTime fecha, double[] generado, double[] aporteGeneradores, double importada, double exportada) {
+    public record PuntoPlanta(LocalDateTime fecha, double[] generado, double[] aporteGeneradores, double aporteOtros,
+                              double importada, double exportada) {
         public double consumo() {
-            return Arrays.stream(aporteGeneradores).sum() + importada;
+            return Arrays.stream(aporteGeneradores).sum() + aporteOtros + importada;
         }
     }
 
@@ -427,70 +502,58 @@ public class GeneradorAnalisisService {
     private static final long MARCHA_VIGENTE_MIN = 5;
 
     /**
-     * Consumo de la planta entre dos instantes, en puntos de {@code minutosPorPunto} minutos. Por cada lectura del
-     * medidor de un transformador (una por minuto, + importa / - exporta) se toma la potencia de su generador en ese
-     * minuto (0 si estaba parado): el generador pone en la planta lo que genera menos lo que sale a la red; consumo del
-     * transformador = generador + red. Cada transformador se cuenta una vez (si dos generadores comparten uno, lo
-     * exportado se reparte entre ellos según lo que genera cada uno). Un punto sin lecturas de alguno de los
-     * transformadores no se devuelve (hueco en el gráfico).
+     * Consumo de la planta 1 entre dos instantes, en puntos de {@code minutosPorPunto} minutos. Por cada lectura del
+     * medidor principal (una por minuto, + importa / - exporta) se toma la potencia de cada generador en ese minuto (0 si
+     * estaba parado); lo exportado se reparte entre los generadores según lo que genera cada uno, y cada uno pone en la
+     * planta lo que genera menos su parte. Consumo = generadores + importada. Sin lecturas del principal no hay punto
+     * (hueco en el gráfico).
      */
     public List<PuntoPlanta> consumoPlanta(List<Generador> generadores, LocalDateTime desde, LocalDateTime hasta, int minutosPorPunto) {
-        Map<String, List<Integer>> porRed = new LinkedHashMap<>();
+        List<Generador> todos = generadorService.generadores();
+        int n = generadores.size(), m = todos.size();
+        int[] indice = new int[m]; // lugar de cada generador en la lista pedida; -1 = uno de los "otros"
         List<TreeMap<LocalDateTime, LecturaGuardada>> lecturas = new ArrayList<>();
-        for (int i = 0; i < generadores.size(); i++) {
-            Generador g = generadores.get(i);
-            lecturas.add(lecturasGenerador(g, desde.toLocalDate(), hasta.toLocalDate()));
-            if (g.redAsociada() != null && PLCDataQueryService.esNombreMaquinaValido(g.redAsociada())) {
-                porRed.computeIfAbsent(g.redAsociada(), k -> new ArrayList<>()).add(i);
-            }
+        for (int j = 0; j < m; j++) {
+            String nombre = todos.get(j).nombre();
+            indice[j] = -1;
+            for (int i = 0; i < n; i++) if (generadores.get(i).nombre().equals(nombre)) indice[j] = i;
+            lecturas.add(lecturasGenerador(todos.get(j), desde.toLocalDate(), hasta.toLocalDate()));
         }
-        int n = generadores.size();
-        // Por transformador y punto: {lecturas, importada, exportada, aporte de cada generador..., generado de cada uno...}.
-        List<TreeMap<LocalDateTime, double[]>> acumulado = new ArrayList<>();
-        for (Map.Entry<String, List<Integer>> red : porRed.entrySet()) {
-            TreeMap<LocalDateTime, double[]> puntos = new TreeMap<>();
-            for (Map.Entry<LocalDateTime, Double> l : seriePotencia(red.getKey(), desde.toLocalDate(), hasta.toLocalDate())
-                    .subMap(desde, true, hasta, false).entrySet()) {
-                double pw = l.getValue();
-                double exportada = Math.max(0, -pw);
-                double[] kwGen = new double[n];
-                double totalGen = 0;
-                for (int i : red.getValue()) {
-                    kwGen[i] = kwGenerador(lecturas.get(i), l.getKey());
-                    totalGen += kwGen[i];
-                }
-                double[] p = puntos.computeIfAbsent(inicioPunto(l.getKey(), minutosPorPunto), k -> new double[3 + 2 * n]);
-                p[0]++;
-                p[1] += Math.max(0, pw);
-                p[2] += exportada;
-                for (int i : red.getValue()) {
-                    if (totalGen > 0) p[3 + i] += Math.max(0, kwGen[i] - exportada * kwGen[i] / totalGen);
-                    p[3 + n + i] += kwGen[i];
+        // Por punto: {lecturas, importada, exportada, aporte de los otros, aporte de cada pedido..., generado de cada pedido...}.
+        TreeMap<LocalDateTime, double[]> puntos = new TreeMap<>();
+        for (Map.Entry<LocalDateTime, Double> l : seriePotenciaPrincipal(desde.toLocalDate(), hasta.toLocalDate())
+                .subMap(desde, true, hasta, false).entrySet()) {
+            double kw = l.getValue();
+            double exportada = Math.max(0, -kw);
+            double[] kwGen = new double[m];
+            double totalGen = 0;
+            for (int j = 0; j < m; j++) {
+                kwGen[j] = kwGenerador(lecturas.get(j), l.getKey());
+                totalGen += kwGen[j];
+            }
+            double[] p = puntos.computeIfAbsent(inicioPunto(l.getKey(), minutosPorPunto), k -> new double[4 + 2 * n]);
+            p[0]++;
+            p[1] += Math.max(0, kw);
+            p[2] += exportada;
+            for (int j = 0; j < m; j++) {
+                double aporte = totalGen > 0 ? Math.max(0, kwGen[j] - exportada * kwGen[j] / totalGen) : 0;
+                if (indice[j] < 0) {
+                    p[3] += aporte;
+                } else {
+                    p[4 + indice[j]] += aporte;
+                    p[4 + n + indice[j]] += kwGen[j];
                 }
             }
-            acumulado.add(puntos);
         }
         List<PuntoPlanta> lista = new ArrayList<>();
-        if (acumulado.isEmpty()) return lista;
-        for (LocalDateTime t : acumulado.get(0).keySet()) {
-            double imp = 0, exp = 0;
+        puntos.forEach((t, p) -> {
             double[] aporte = new double[n], generado = new double[n];
-            boolean completo = true;
-            for (TreeMap<LocalDateTime, double[]> puntos : acumulado) {
-                double[] p = puntos.get(t);
-                if (p == null || p[0] == 0) {
-                    completo = false;
-                    break;
-                }
-                imp += p[1] / p[0];
-                exp += p[2] / p[0];
-                for (int i = 0; i < n; i++) {
-                    aporte[i] += p[3 + i] / p[0];
-                    generado[i] += p[3 + n + i] / p[0];
-                }
+            for (int i = 0; i < n; i++) {
+                aporte[i] = p[4 + i] / p[0];
+                generado[i] = p[4 + n + i] / p[0];
             }
-            if (completo) lista.add(new PuntoPlanta(t, generado, aporte, imp, exp));
-        }
+            lista.add(new PuntoPlanta(t, generado, aporte, p[3] / p[0], p[1] / p[0], p[2] / p[0]));
+        });
         return lista;
     }
 
@@ -517,19 +580,20 @@ public class GeneradorAnalisisService {
     }
 
     /**
-     * Un período en marcha partido por día calendario, con los mismos contadores que el período (generador y
-     * medidor del transformador), para el balance diario del reporte.
+     * Un período en marcha partido por día calendario, con los mismos contadores que el período (generador y su parte
+     * del medidor principal), para el balance diario del reporte.
      */
     public List<DiaMarcha> repartoPorDia(PeriodoMarcha p) {
         List<DiaMarcha> lista = new ArrayList<>();
-        Generador g = generadorService.generadores().stream().filter(x -> x.nombre().equals(p.generador())).findFirst().orElse(null);
-        if (g == null) return lista;
+        List<Generador> todos = generadorService.generadores();
+        if (todos.stream().noneMatch(x -> x.nombre().equals(p.generador()))) return lista;
         LocalDate desde = p.inicio().toLocalDate(), hasta = p.fin().toLocalDate();
+        Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe = lecturasDe(todos, desde, hasta);
         TreeMap<LocalDateTime, Double> kwhGen = new TreeMap<>();
-        lecturasGenerador(g, desde, hasta).values().forEach(l -> { if (l.kwh() != null && l.kwh() > 0) kwhGen.put(l.fecha(), l.kwh()); });
-        boolean redValida = p.red() != null && PLCDataQueryService.esNombreMaquinaValido(p.red());
-        TreeMap<LocalDateTime, Double> importada = redValida ? serieContador(p.red(), false, desde, hasta) : new TreeMap<>();
-        TreeMap<LocalDateTime, Double> exportada = redValida ? serieContador(p.red(), true, desde, hasta) : new TreeMap<>();
+        lecturasDe.get(p.generador()).values().forEach(l -> { if (l.kwh() != null && l.kwh() > 0) kwhGen.put(l.fecha(), l.kwh()); });
+        RedPrincipal red = redPrincipal(todos, lecturasDe, desde, hasta);
+        TreeMap<LocalDateTime, Double> importada = red.importadaDe().get(p.generador());
+        TreeMap<LocalDateTime, Double> exportada = red.exportadaDe().get(p.generador());
         LocalDateTime ini = p.inicio();
         while (ini.isBefore(p.fin())) {
             LocalDateTime fin = ini.toLocalDate().plusDays(1).atStartOfDay();
@@ -678,63 +742,109 @@ public class GeneradorAnalisisService {
         return lecturas;
     }
 
-    // ================= Red (medidor del transformador, leído por PLC) =================
+    // ================= Red (medidor principal de la planta 1, leído por PLC) =================
 
     /**
-     * Importado: todo el día (la red alimenta el tablero siempre). Retorno a la red: solo mientras el
-     * generador estaba en marcha (de cada arranque a su parada), repartido por día. Contar el retorno de
-     * todo el día daba inconsistencias: retorno en días o en horas en que el generador no estaba
-     * registrado (ej. Caterpillar el 09-10: 505 kWh "exportados" contra 194 generados desde las 09:19).
+     * Importado: todo el día (la red alimenta la planta siempre). Exportado: la parte de los generadores elegidos y la de
+     * los demás, por día; lo exportado sin ningún generador en marcha no se cuenta (ej. Caterpillar el 09-10: antes de
+     * que se registrara su arranque, el transformador marcaba 505 kWh "exportados" contra 194 generados desde las 09:19).
      */
-    private void acumularRed(String maquina, List<Tramo> enMarcha, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
-        if (!PLCDataQueryService.esNombreMaquinaValido(maquina)) {
-            logger.warn("Analisis: nombre de red invalido {}", maquina);
-            return;
-        }
-        sumarDeltas(serieContador(maquina, false, desde, hasta), dias, true);
-        for (Acum a : dias.values()) {
+    private void acumularRed(Set<String> elegidos, List<Generador> todos, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
+        RedPrincipal red = redPrincipal(todos, lecturasDe(todos, desde, hasta), desde, hasta);
+        sumarDeltas(red.importada(), dias, true);
+        for (Map.Entry<LocalDate, Acum> e : dias.entrySet()) {
+            Acum a = e.getValue();
+            LocalDateTime ini = e.getKey().atStartOfDay(), fin = ini.plusDays(1);
+            for (Generador g : todos) {
+                Double d = deltaEnVentana(red.exportadaDe().get(g.nombre()), ini, fin, KW_MAX_RED);
+                if (d == null) continue;
+                if (elegidos.contains(g.nombre())) a.redExportada = suma(a.redExportada, d);
+                else a.redExportadaOtros = suma(a.redExportadaOtros, d);
+            }
             if (a.redImportada != null && a.redExportada == null) a.redExportada = 0.0;
         }
-        TreeMap<LocalDateTime, Double> exportada = serieContador(maquina, true, desde, hasta);
-        LocalDateTime inicioPeriodo = desde.atStartOfDay();
-        LocalDateTime finPeriodo = hasta.plusDays(1).atStartOfDay();
-        for (Tramo t : enMarcha) {
-            LocalDateTime a = t.desde().isBefore(inicioPeriodo) ? inicioPeriodo : t.desde();
-            LocalDateTime fin = t.hasta().isAfter(finPeriodo) ? finPeriodo : t.hasta();
-            while (a.isBefore(fin)) {
-                LocalDateTime finDia = a.toLocalDate().plusDays(1).atStartOfDay();
-                if (finDia.isAfter(fin)) finDia = fin;
-                Double d = deltaEnVentana(exportada, a, finDia, KW_MAX_RED);
-                Acum acum = dias.get(a.toLocalDate());
-                if (d != null && acum != null) acum.redExportada = suma(acum.redExportada, d);
-                a = finDia;
-            }
-        }
     }
 
-    private record Tramo(LocalDateTime desde, LocalDateTime hasta) {
+    /**
+     * Contadores del medidor principal (importado y exportado por toda la planta 1) y, por generador, la parte que le
+     * toca de cada uno, como series acumuladas con las mismas fechas que el contador (sirven para deltaEnVentana y
+     * repartir).
+     */
+    private record RedPrincipal(TreeMap<LocalDateTime, Double> importada, TreeMap<LocalDateTime, Double> exportada,
+                                Map<String, TreeMap<LocalDateTime, Double>> importadaDe,
+                                Map<String, TreeMap<LocalDateTime, Double>> exportadaDe) {
     }
 
-    /** Intervalos en marcha (arranques registrados) de los generadores, unidos si se pisan. */
-    private List<Tramo> tramosEnMarcha(List<Generador> generadores) {
-        List<Tramo> lista = new ArrayList<>();
-        for (Generador g : generadores) {
-            for (GeneradorService.Arranque a : generadorService.arranques(g)) {
-                LocalDateTime fin = a.fin() == null ? LocalDateTime.now().withNano(0) : a.fin();
-                if (fin.isAfter(a.inicio())) lista.add(new Tramo(a.inicio(), fin));
-            }
+    private RedPrincipal redPrincipal(List<Generador> todos, Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe,
+                                      LocalDate desde, LocalDate hasta) {
+        LocalDateTime ahora = LocalDateTime.now().withNano(0);
+        Map<String, TreeMap<LocalDateTime, LocalDateTime>> marchas = new HashMap<>();
+        for (Generador g : todos) {
+            TreeMap<LocalDateTime, LocalDateTime> m = new TreeMap<>();
+            for (GeneradorService.Arranque a : generadorService.arranques(g)) m.put(a.inicio(), a.fin() == null ? ahora : a.fin());
+            marchas.put(g.nombre(), m);
         }
-        lista.sort((x, y) -> x.desde().compareTo(y.desde()));
-        List<Tramo> unidos = new ArrayList<>();
-        for (Tramo t : lista) {
-            Tramo ult = unidos.isEmpty() ? null : unidos.get(unidos.size() - 1);
-            if (ult != null && !t.desde().isAfter(ult.hasta())) {
-                unidos.set(unidos.size() - 1, new Tramo(ult.desde(), t.hasta().isAfter(ult.hasta()) ? t.hasta() : ult.hasta()));
-            } else {
-                unidos.add(t);
+        TreeMap<LocalDateTime, Double> importada = serieContador(PRINCIPAL, false, desde, hasta);
+        TreeMap<LocalDateTime, Double> exportada = serieContador(PRINCIPAL, true, desde, hasta);
+        return new RedPrincipal(importada, exportada, repartirEntreGeneradores(importada, todos, lecturasDe, marchas),
+                repartirEntreGeneradores(exportada, todos, lecturasDe, marchas));
+    }
+
+    /**
+     * Reparte cada tramo de un contador del medidor principal entre los generadores que estaban en un arranque al final
+     * del tramo, según lo que generaba cada uno (en partes iguales si ninguno tenía carga). Lo de los tramos sin ningún
+     * generador en marcha no le toca a ninguno.
+     */
+    private static Map<String, TreeMap<LocalDateTime, Double>> repartirEntreGeneradores(TreeMap<LocalDateTime, Double> contador,
+            List<Generador> todos, Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe,
+            Map<String, TreeMap<LocalDateTime, LocalDateTime>> marchas) {
+        int n = todos.size();
+        double[] acumulado = new double[n];
+        Map<String, TreeMap<LocalDateTime, Double>> partes = new LinkedHashMap<>();
+        for (Generador g : todos) partes.put(g.nombre(), new TreeMap<>());
+        Map.Entry<LocalDateTime, Double> a = null;
+        for (Map.Entry<LocalDateTime, Double> b : contador.entrySet()) {
+            if (a != null) {
+                double horas = Duration.between(a.getKey(), b.getKey()).toSeconds() / 3600.0;
+                Double d = delta(a.getValue(), b.getValue(), KW_MAX_RED * horas + 1);
+                if (d != null && d > 0) {
+                    boolean[] enMarcha = new boolean[n];
+                    double[] kw = new double[n];
+                    double totalKw = 0;
+                    int cuantos = 0;
+                    for (int i = 0; i < n; i++) {
+                        String nombre = todos.get(i).nombre();
+                        Map.Entry<LocalDateTime, LocalDateTime> arranque = marchas.get(nombre).floorEntry(b.getKey());
+                        if (arranque == null || arranque.getValue().isBefore(b.getKey())) continue;
+                        enMarcha[i] = true;
+                        cuantos++;
+                        kw[i] = kwGenerador(lecturasDe.getOrDefault(nombre, new TreeMap<>()), b.getKey());
+                        totalKw += kw[i];
+                    }
+                    for (int i = 0; i < n; i++) {
+                        if (totalKw > 0) acumulado[i] += d * kw[i] / totalKw;
+                        else if (enMarcha[i]) acumulado[i] += d / cuantos;
+                    }
+                }
             }
+            for (int i = 0; i < n; i++) partes.get(todos.get(i).nombre()).put(b.getKey(), acumulado[i]);
+            a = b;
         }
-        return unidos;
+        return partes;
+    }
+
+    /** Lecturas guardadas de cada generador (por nombre). */
+    private Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe(List<Generador> generadores, LocalDate desde, LocalDate hasta) {
+        Map<String, TreeMap<LocalDateTime, LecturaGuardada>> m = new HashMap<>();
+        for (Generador g : generadores) m.put(g.nombre(), lecturasGenerador(g, desde, hasta));
+        return m;
+    }
+
+    /** Potencia del medidor principal minuto a minuto, en kW (+ toma de la red, - entrega). */
+    private TreeMap<LocalDateTime, Double> seriePotenciaPrincipal(LocalDate desde, LocalDate hasta) {
+        TreeMap<LocalDateTime, Double> serie = seriePotencia(PRINCIPAL, desde, hasta);
+        serie.replaceAll((t, v) -> v * KW_POR_UNIDAD_PRINCIPAL);
+        return serie;
     }
 
     /** Potencia del medidor de la red minuto a minuto (archivo VIP); negativa = entregando a la red. */

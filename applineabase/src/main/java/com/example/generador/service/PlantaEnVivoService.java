@@ -3,7 +3,6 @@ package com.example.generador.service;
 import com.example.alarmas.model.AlarmaConfig;
 import com.example.alarmas.model.TipoAlarma;
 import com.example.alarmas.repository.AlarmaConfigRepository;
-import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.generador.model.Generador;
@@ -26,10 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * La planta en este momento: cuánto consume, cuánto de ese consumo pone cada generador y cuánto viene de la red.
  *
  * Por cada generador: su potencia leída en vivo del controlador (SOLO LECTURA, función 03) y la potencia del medidor
- * de su transformador (último minuto guardado del PLC; positiva = importa de la red, negativa = exporta).
- * Consumo del transformador = generador + red. Lo que el generador pone en la planta = lo que genera menos lo que
- * sale a la red por su transformador. Consumo de la planta = suma de los transformadores; así la parte de los
- * generadores más la importada de la red da el 100 %, y lo exportado va aparte.
+ * de su transformador (último minuto guardado del PLC; positiva = importa de la red, negativa = exporta), para el
+ * detalle por transformador. La red de la planta es el medidor principal (KWhPlanta1, transformadores 1 y 2 juntos):
+ * lo que sale por un transformador y entra por el otro no es importado ni exportado. Lo que cada generador pone en la
+ * planta = lo que genera menos su parte de lo exportado; consumo de la planta = generadores + importada (100 %), y lo
+ * exportado va aparte.
  */
 @Service
 public class PlantaEnVivoService {
@@ -104,36 +104,70 @@ public class PlantaEnVivoService {
     public record MedidorPrincipal(Double kw, LocalDateTime fecha) {
     }
 
-    /** La planta ahora: solo cuenta los generadores con lectura completa (los demás se avisan en pantalla). */
+    /**
+     * La planta ahora. Importada y exportada salen del medidor principal (toda la planta 1); cada generador pone en la
+     * planta lo que genera menos su parte de lo exportado (repartido según lo que genera cada uno). Si el principal no
+     * tiene lectura reciente, se usan los medidores de los transformadores (conPrincipal() = false, se avisa en pantalla).
+     * Solo cuentan los generadores con lectura (los demás se avisan).
+     */
     public record Planta(LocalDateTime leido, List<FilaGenerador> filas, AntesDelArranque antes, List<EstadoMaquina> maquinas,
                          MedidorPrincipal principal) {
 
+        public boolean conPrincipal() {
+            return principal != null && principal.kw() != null;
+        }
+
+        /** Generadores con lectura del transformador (para el detalle por transformador y la comparación). */
         private List<FilaGenerador> completas() {
             return filas.stream().filter(FilaGenerador::completa).toList();
         }
 
+        private boolean cuenta(FilaGenerador f) {
+            return conPrincipal() ? f.kwGenerador() != null : f.completa();
+        }
+
+        private List<FilaGenerador> contadas() {
+            return filas.stream().filter(this::cuenta).toList();
+        }
+
         public boolean completa() {
-            return filas.stream().allMatch(FilaGenerador::completa);
+            return filas.stream().allMatch(this::cuenta);
+        }
+
+        /** Si el generador entra en el total (tiene las lecturas que hacen falta). */
+        public boolean contado(FilaGenerador f) {
+            return cuenta(f);
         }
 
         public double consumo() {
-            return completas().stream().mapToDouble(FilaGenerador::consumoTransformador).sum();
+            return consumidaDeGeneradores() + importada();
         }
 
         public double generada() {
-            return completas().stream().mapToDouble(FilaGenerador::kwGenerador).sum();
+            return contadas().stream().mapToDouble(FilaGenerador::kwGenerador).sum();
         }
 
         public double consumidaDeGeneradores() {
-            return completas().stream().mapToDouble(FilaGenerador::consumidaEnPlanta).sum();
+            if (!conPrincipal()) return contadas().stream().mapToDouble(FilaGenerador::consumidaEnPlanta).sum();
+            return Math.max(0, generada() - exportada());
         }
 
         public double importada() {
-            return completas().stream().mapToDouble(FilaGenerador::importada).sum();
+            if (conPrincipal()) return Math.max(0, principal.kw());
+            return contadas().stream().mapToDouble(FilaGenerador::importada).sum();
         }
 
         public double exportada() {
-            return completas().stream().mapToDouble(FilaGenerador::exportada).sum();
+            if (conPrincipal()) return Math.max(0, -principal.kw());
+            return contadas().stream().mapToDouble(FilaGenerador::exportada).sum();
+        }
+
+        /** Lo que pone un generador en la planta: lo que genera menos su parte de lo exportado; null si no cuenta. */
+        public Double aporte(FilaGenerador f) {
+            if (!cuenta(f)) return null;
+            if (!conPrincipal()) return f.consumidaEnPlanta();
+            double g = generada();
+            return g <= 0 ? 0.0 : Math.max(0, f.kwGenerador() - exportada() * f.kwGenerador() / g);
         }
 
         /** Los transformadores juntos por la red (+ toma, - entrega): lo que debería marcar el medidor principal. */
@@ -216,10 +250,11 @@ public class PlantaEnVivoService {
     /** Última lectura del medidor principal; el PLC guarda su potencia en W (la de los transformadores, en kW). */
     private MedidorPrincipal principal(LocalDateTime ahora) {
         try {
-            Map<String, Object> m = plcDataQueryService.getLatestVIPDataByMaquina(MaquinasVirtuales.KWH_PLANTA_1);
+            Map<String, Object> m = plcDataQueryService.getLatestVIPDataByMaquina(GeneradorAnalisisService.PRINCIPAL);
             LocalDateTime f = fecha(m.get("fecha"));
             if (m.containsKey("error") || f == null || !(m.get("PW") instanceof Number pw)) return new MedidorPrincipal(null, null);
-            return new MedidorPrincipal(f.isBefore(ahora.minusSeconds(RED_VIGENTE_SEGUNDOS)) ? null : pw.doubleValue() / 1000, f);
+            return new MedidorPrincipal(f.isBefore(ahora.minusSeconds(RED_VIGENTE_SEGUNDOS)) ? null
+                    : pw.doubleValue() * GeneradorAnalisisService.KW_POR_UNIDAD_PRINCIPAL, f);
         } catch (Exception e) {
             return new MedidorPrincipal(null, null);
         }
@@ -239,18 +274,23 @@ public class PlantaEnVivoService {
         LocalDateTime inicio = ref.inicio();
         Double kw = antesCalculado.get(inicio);
         if (kw == null) {
-            double suma = 0;
-            boolean completo = !topologia.transformadores().isEmpty();
-            for (String t : topologia.transformadores()) {
-                Double media = analisis.potenciaMedia(t, inicio.minusMinutes(MINUTOS_ANTES), inicio);
-                if (media == null) {
-                    completo = false;
-                    break;
+            // Medidor principal (toda la planta 1); sin sus lecturas, la suma de los transformadores.
+            kw = analisis.potenciaMediaPrincipal(inicio.minusMinutes(MINUTOS_ANTES), inicio);
+            if (kw == null) {
+                double suma = 0;
+                boolean completo = !topologia.transformadores().isEmpty();
+                for (String t : topologia.transformadores()) {
+                    Double media = analisis.potenciaMedia(t, inicio.minusMinutes(MINUTOS_ANTES), inicio);
+                    if (media == null) {
+                        completo = false;
+                        break;
+                    }
+                    suma += media;
                 }
-                suma += media;
+                if (completo) kw = suma;
             }
             // Solo se guarda si se pudo calcular: si faltaban lecturas, se vuelve a intentar en la próxima lectura.
-            if (completo) antesCalculado.put(inicio, kw = suma);
+            if (kw != null) antesCalculado.put(inicio, kw);
         }
         return new AntesDelArranque(inicio, enCurso != null, ref.inicioEstimado(), kw);
     }

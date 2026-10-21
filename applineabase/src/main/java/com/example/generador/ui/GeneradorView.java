@@ -488,12 +488,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         plantaContenido.setWidthFull();
         plantaDetalle.setWidthFull();
 
-        Span nota = new Span("Cada generador se lee en vivo de su controlador (solo lectura); la red es el medidor de su "
-                + "transformador (PLC, ultima lectura de la base de datos), asi que entre uno y otro puede haber hasta un minuto. Consumo de la "
-                + "planta = lo que los generadores pusieron en la planta + lo importado de la red (suman 100 %); lo exportado a la "
-                + "red es el excedente de los generadores y va aparte. El medidor principal esta en media tension, antes de los "
-                + "transformadores: deberia marcar algo mas que los transformadores juntos (las perdidas de los transformadores). "
-                + "Todo en kW. Se actualiza cada 15 s.");
+        Span nota = new Span("Cada generador se lee en vivo de su controlador (solo lectura); la red es el medidor principal de la "
+                + "planta 1 (de la fabrica, mide en paralelo con el de la empresa electrica; PLC, ultima lectura de la base de datos), "
+                + "asi que entre uno y otro puede haber hasta un minuto. Consumo de la planta = lo que los generadores pusieron en la "
+                + "planta + lo importado de la red (suman 100 %); lo exportado a la red es el excedente de los generadores y va aparte, "
+                + "repartido entre los generadores segun lo que genera cada uno. Los medidores de los transformadores se usan solo "
+                + "para el detalle por transformador. El medidor principal esta en media tension, antes de los transformadores: "
+                + "deberia marcar algo mas que los transformadores juntos (las perdidas de los transformadores). Todo en kW. "
+                + "Se actualiza cada 15 s.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
         VerticalLayout v = new VerticalLayout(barra, plantaContenido, plantaDetalle, nota);
         v.setPadding(false);
@@ -507,10 +509,15 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         plantaHora.setText("Leido " + p.leido().format(HORA));
         StringBuilder h = new StringBuilder("<div style='display:grid;gap:14px;width:100%;max-width:1150px'>");
 
+        String aviso = "<div style='background:#fff3cd;color:#856404;padding:8px 12px;border-radius:6px;font-size:13px'>";
+        if (!p.conPrincipal()) {
+            h.append(aviso).append("Medidor principal sin lectura reciente")
+                    .append(p.principal() == null || p.principal().fecha() == null ? "" : " (ultima: " + p.principal().fecha().format(CORTA) + ")")
+                    .append(": importada y exportada con los medidores de los transformadores.</div>");
+        }
         if (!p.completa()) {
-            h.append("<div style='background:#fff3cd;color:#856404;padding:8px 12px;border-radius:6px;font-size:13px'>")
-                    .append("Cifras parciales: ");
-            p.filas().stream().filter(f -> !f.completa()).forEach(f -> h.append(esc(f.generador())).append(" (")
+            h.append(aviso).append("Cifras parciales: ");
+            p.filas().stream().filter(f -> !p.contado(f)).forEach(f -> h.append(esc(f.generador())).append(" (")
                     .append(esc(f.error() == null ? "sin dato" : f.error())).append("). "));
             h.append("El total de arriba no lo incluye.</div>");
         }
@@ -524,11 +531,12 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             case ROJO -> Estado.FUERA;
         });
         h.append("<div style='display:flex;flex-wrap:wrap;gap:12px'>")
-                .append(tarjetaPlanta("Consumo de la planta", kw(consumo), "generadores + red", "#4a525c"));
+                .append(tarjetaPlanta("Consumo de la planta", kw(consumo),
+                        p.conPrincipal() ? "generadores + red (medidor principal)" : "generadores + red (transformadores)", "#4a525c"));
         PlantaEnVivoService.AntesDelArranque antes = p.antes();
         if (antes != null) {
             String cuando = antes.inicio().format(CORTA) + (antes.inicioEstimado() ? " (aprox.)" : "");
-            String detalle = antes.kw() == null ? "sin lecturas de los transformadores antes del arranque del " + cuando
+            String detalle = antes.kw() == null ? "sin lecturas del medidor principal antes del arranque del " + cuando
                     : "promedio de " + PlantaEnVivoService.MINUTOS_ANTES + " min antes del " + (antes.enCurso() ? "arranque" : "ultimo arranque")
                     + " (" + cuando + ")" + (consumo > 0 ? String.format(Locale.ROOT, "; ahora %+,.0f kW", consumo - antes.kw()) : "");
             h.append(tarjetaPlanta("Consumo antes del arranque", antes.kw() == null ? "-" : kw(antes.kw()), detalle, "#9aa3ad"));
@@ -547,7 +555,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         List<String[]> tramos = new ArrayList<>(); // nombre, kW, color
         int i = 0;
         for (PlantaEnVivoService.FilaGenerador f : p.filas()) {
-            if (f.completa()) tramos.add(new String[]{f.generador(), String.valueOf(f.consumidaEnPlanta()), COLORES_GEN[i % COLORES_GEN.length]});
+            if (p.contado(f)) tramos.add(new String[]{f.generador(), String.valueOf(p.aporte(f)), COLORES_GEN[i % COLORES_GEN.length]});
             i++;
         }
         tramos.add(new String[]{"Red", String.valueOf(p.importada()), "#2a78d6"});
@@ -572,16 +580,18 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             h.append("</div></div>");
         }
 
-        // Por transformador: cuánto del consumo pasa por cada uno y si juntos cuadran con el medidor principal.
+        // Por transformador (sus medidores): cuánto del consumo pasa por cada uno y si juntos cuadran con el medidor principal.
         List<PlantaEnVivoService.FilaGenerador> porTrafo = p.filas().stream().filter(PlantaEnVivoService.FilaGenerador::completa)
                 .sorted(java.util.Comparator.comparing(f -> nombreRed(f.red()))).toList();
-        if (consumo > 0 && !porTrafo.isEmpty()) {
+        double consumoTrafos = porTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::consumoTransformador).sum();
+        if (consumoTrafos > 0) {
             String[] coloresTrafo = {"#4a525c", "#9aa3ad"};
-            h.append("<div style='display:grid;gap:6px'><div style='font-weight:600'>Consumo por transformador</div>")
+            h.append("<div style='display:grid;gap:6px'><div style='font-weight:600'>Consumo por transformador "
+                            + "<span style='font-weight:400;font-size:13px;color:#555'>(medidores de los transformadores)</span></div>")
                     .append("<div style='display:flex;height:34px;border-radius:4px;overflow:hidden;background:#e2e3e5'>");
             for (int k = 0; k < porTrafo.size(); k++) {
                 PlantaEnVivoService.FilaGenerador f = porTrafo.get(k);
-                double pct = f.consumoTransformador() / consumo * 100;
+                double pct = f.consumoTransformador() / consumoTrafos * 100;
                 if (pct <= 0) continue;
                 h.append("<div style='width:").append(String.format(Locale.ROOT, "%.2f%%", pct)).append(";background:")
                         .append(coloresTrafo[k % coloresTrafo.length])
@@ -597,7 +607,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                         : esc(f.generador()) + " " + kw(f.kwGenerador()) + ", entrega " + kw(-f.kwRed()) + " a la red";
                 h.append("<span><i style='display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:")
                         .append(coloresTrafo[k % coloresTrafo.length]).append("'></i><b>").append(esc(nombreRed(f.red()))).append("</b>: ")
-                        .append(kw(f.consumoTransformador())).append(" (").append(pctTexto(f.consumoTransformador() / consumo * 100))
+                        .append(kw(f.consumoTransformador())).append(" (").append(pctTexto(f.consumoTransformador() / consumoTrafos * 100))
                         .append(") = ").append(origen).append("</span>");
             }
             h.append("</div>");
@@ -608,12 +618,13 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             if (mp.kw() == null) {
                 h.append("Medidor principal sin lectura reciente")
                         .append(mp.fecha() == null ? "." : " (ultima: " + mp.fecha().format(CORTA) + ").");
-            } else if (!p.completa()) {
+            } else if (porTrafo.size() < p.filas().size()) {
                 h.append("Medidor principal: ").append(sentidoRed(mp.kw()))
                         .append(". No se compara con los transformadores porque falta la lectura de alguno.");
             } else {
                 double neta = p.redNeta(), dif = neta - mp.kw();
-                h.append("<span><b>Medidor principal</b> (el que factura la empresa electrica): ").append(sentidoRed(mp.kw())).append("</span>")
+                h.append("<span><b>Medidor principal</b> (de la fabrica, mide en paralelo con el de la empresa electrica): ")
+                        .append(sentidoRed(mp.kw())).append("</span>")
                         .append("<span><b>").append(esc(String.join(" + ", porTrafo.stream().map(f -> nombreRed(f.red())).toList())))
                         .append("</b> por la red: ").append(sentidoRed(neta)).append("</span>")
                         .append("<span><b>Diferencia</b>: ").append(String.format(Locale.ROOT, "%+,.0f kW", dif))
@@ -643,8 +654,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         String tdIzq = "<td style='text-align:left;padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap'>";
         h.append("<div style='overflow-x:auto'><table style='border-collapse:collapse;width:100%;font-size:14px'><thead><tr>")
                 .append(thIzq).append("Generador</th>").append(thIzq).append("Estado</th>").append(th).append("Generada (kW)</th>")
-                .append(th).append("Consumida en planta (kW)</th>").append(th).append("% del consumo de la planta</th>")
-                .append(thIzq).append("Transformador</th>").append(th).append("Importada (kW)</th>").append(th).append("Exportada (kW)</th>")
+                .append(th).append("Aporte en planta (kW)</th>").append(th).append("% del consumo de la planta</th>")
+                .append(thIzq).append("Transformador</th>").append(th).append("Importada por su transformador (kW)</th>")
+                .append(th).append("Exportada por su transformador (kW)</th>")
                 .append(th).append("Consumo del transformador (kW)</th></tr></thead><tbody>");
         for (PlantaEnVivoService.FilaGenerador f : p.filas()) {
             String[] c = colores(switch (f.estado()) {
@@ -656,8 +668,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                     .append(tdIzq).append("<span style='").append(CHIP).append("background:").append(c[0]).append(";color:").append(c[1])
                     .append("'>").append(f.estado().etiqueta()).append("</span></td>")
                     .append(td).append(num0(f.kwGenerador())).append("</td>")
-                    .append(td).append(num0(f.consumidaEnPlanta())).append("</td>")
-                    .append(td).append(f.consumidaEnPlanta() == null ? "-" : pctTexto(p.porcentaje(f.consumidaEnPlanta()))).append("</td>")
+                    .append(td).append(num0(p.aporte(f))).append("</td>")
+                    .append(td).append(p.aporte(f) == null ? "-" : pctTexto(p.porcentaje(p.aporte(f)))).append("</td>")
                     .append(tdIzq).append(esc(nombreRed(f.red()))).append("</td>")
                     .append(td).append(num0(f.importada())).append("</td>")
                     .append(td).append(num0(f.exportada())).append("</td>")
@@ -670,9 +682,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 .append(tdTotal).append(num0(p.consumidaDeGeneradores())).append("</td>")
                 .append(tdTotal).append(pctTexto(pctGen)).append("</td>")
                 .append("<td style='border-top:2px solid #333'></td>")
-                .append(tdTotal).append(num0(p.importada())).append("</td>")
-                .append(tdTotal).append(num0(p.exportada())).append("</td>")
-                .append(tdTotal).append(num0(consumo)).append("</td></tr></tfoot></table></div>");
+                .append(tdTotal).append(num0(porTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::importada).sum())).append("</td>")
+                .append(tdTotal).append(num0(porTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::exportada).sum())).append("</td>")
+                .append(tdTotal).append(num0(consumoTrafos)).append("</td></tr></tfoot></table></div>");
 
         // Máquinas: trabajando o paradas (criterio del horómetro), por grupo.
         List<PlantaEnVivoService.EstadoMaquina> maquinas = p.maquinas();

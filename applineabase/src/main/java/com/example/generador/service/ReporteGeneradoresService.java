@@ -83,7 +83,7 @@ public class ReporteGeneradoresService {
     private static final int MINUTOS_PLANTA = 15;
 
     /**
-     * Con más de un generador: consumo de toda la planta (sus transformadores) en promedios de 15 minutos, solo en los
+     * Con más de un generador: consumo de toda la planta 1 (medidor principal) en promedios de 15 minutos, solo en los
      * tramos en que alguno de los arranques del período estaba en marcha (el reporte después se queda con los de los
      * arranques elegidos). Cada punto: fecha, lo que generó cada generador, lo que puso en la planta cada uno,
      * importada y exportada (kW). null con un solo generador.
@@ -133,6 +133,9 @@ public class ReporteGeneradoresService {
         m.put("tomado", redondo(p.kwhRedImportada()));
         m.put("entregado", redondo(p.kwhRedExportada()));
         m.put("consumo", redondo(p.consumo()));
+        // Referencia: el medidor del transformador del generador (columna "% por su transformador").
+        m.put("tomadoTrafo", redondo(p.kwhTrafoImportada()));
+        m.put("entregadoTrafo", redondo(p.kwhTrafoExportada()));
 
         List<Object[]> porDia = new ArrayList<>();
         for (DiaMarcha d : analisis.repartoPorDia(p)) {

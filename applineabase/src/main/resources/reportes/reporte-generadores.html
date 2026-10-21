@@ -315,7 +315,7 @@ footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line)
         <p class="intro" style="font-size:14px;color:var(--muted)">Para el análisis del balance de carga (reducir la exportación a la red).</p>
       </div>
       <section class="panel panel-tarjetas" aria-labelledby="t-det">
-        <div class="leyenda" id="t-det"><span><i class="linea" style="background:var(--gen)"></i>Generador</span><span><i class="linea" style="background:var(--cons)"></i>Consumo del transformador</span><span><i style="background:var(--grid)"></i>Importación de la red</span><span><i style="background:var(--out)"></i>Exportación a la red</span><span>Promedios cada 15 minutos, en kW</span></div>
+        <div class="leyenda" id="t-det"><span><i class="linea" style="background:var(--gen)"></i>Generador</span><span><i class="linea" style="background:var(--cons)"></i>Consumo de la planta 1</span><span><i style="background:var(--grid)"></i>Importación de la red</span><span><i style="background:var(--out)"></i>Exportación a la red</span><span>Promedios cada 15 minutos, en kW</span></div>
         <div class="tarjetas" id="tarjetas"></div>
       </section>
     </div>
@@ -362,6 +362,10 @@ const pctUmbral = v => fmt(v, v % 1 ? 1 : 0) + " %";
 document.querySelectorAll(".umbralVerde").forEach(e => e.textContent = pctUmbral(VERDE_HASTA));
 document.querySelectorAll(".umbralAmarillo").forEach(e => e.textContent = pctUmbral(AMARILLO_HASTA));
 const pctImportado = a => (a.consumo ?? 0) > 0 ? Math.min(100, (a.tomado ?? 0) / a.consumo * 100) : null;
+// Referencia: el mismo % con el medidor del transformador del generador (cuánto de ese transformador no cubrió).
+const consumoTrafo = a => a.tomadoTrafo == null ? null : (a.generado ?? 0) + a.tomadoTrafo - (a.entregadoTrafo ?? 0);
+const pctTrafo = a => { const c = consumoTrafo(a); return c > 0 ? Math.min(100, a.tomadoTrafo / c * 100) : null; };
+const celdaPct = p => p == null ? "&ndash;" : pct(p);
 const chipPct = p => p == null ? "&ndash;" : `<span class="chip ${semaforo(p)}">${pct(p)}</span>`;
 // Costo del diésel / costo de esa energía en la red: rojo si generar salió más caro.
 const chipVeces = v => `<span class="chip ${v > 1 ? "bad" : "ok"}">${fmt(v, 1)}×</span>`;
@@ -378,16 +382,6 @@ function rangoTexto(desde, hasta) {
   if (y1 === y2 && m1 === m2) return `Del ${d1} al ${d2} de ${MESES[m1]} de ${y1}`;
   if (y1 === y2) return `Del ${d1} de ${MESES[m1]} al ${d2} de ${MESES[m2]} de ${y1}`;
   return `Del ${d1} de ${MESES[m1]} de ${y1} al ${d2} de ${MESES[m2]} de ${y2}`;
-}
-
-// "Transformadores 1 y 2" en vez de "Transformador 2 y Transformador 1".
-function textoRedes(redes) {
-  const nums = redes.map(r => (r.match(/^Transformador (\d+)$/) || [])[1]);
-  if (redes.length > 1 && nums.every(Boolean)) {
-    const o = nums.map(Number).sort((a, b) => a - b);
-    return `Transformadores ${o.slice(0, -1).join(", ")} y ${o.at(-1)}`;
-  }
-  return redes.join(" y ");
 }
 
 const listaY = l => l.length <= 1 ? l.join("") : `${l.slice(0, -1).join(", ")} y ${l.at(-1)}`;
@@ -497,10 +491,9 @@ function generar() {
 
   const desde = fecha(seleccion[0].inicio), hasta = new Date(Math.max(...seleccion.map(a => fecha(a.fin))));
   const generadores = [...new Set(seleccion.map(a => a.generador))];
-  const redes = [...new Set(seleccion.map(a => nombreRed(a.red)))];
   document.getElementById("rango").textContent = `${rangoTexto(desde, hasta)} · ${n === 1 ? "1 arranque" : n + " arranques"}`;
   document.getElementById("bajada").innerHTML =
-    `${generadores.length === 1 ? "El generador cubrió" : "Los generadores cubrieron"} el <b>${pct(T.pctGen)}</b> del consumo ${generadores.length === 1 ? "de su transformador mientras estuvo en marcha" : "de sus transformadores mientras estuvieron en marcha"}. ` +
+    `${generadores.length === 1 ? "El generador cubrió" : "Los generadores cubrieron"} el <b>${pct(T.pctGen)}</b> del consumo de la planta 1 ${generadores.length === 1 ? "mientras estuvo en marcha" : "mientras estuvieron en marcha"}. ` +
     `La importación de la red fue el <b>${pct(T.pctRed)}</b> del consumo y la exportación a la red, el <b>${pct(T.pctEnt)}</b> de la generación.` +
     (C.k ? ` Combustible: <b>${dinero(C.costo, 0)}</b> (${fmt(C.galones)} galones).` : "");
 
@@ -511,7 +504,7 @@ function generar() {
   [
     ["", "Horas de funcionamiento", `${fmt(T.horas, 1)}<small> h</small>`, generadores.length > 1 ? horasPorGen : `${n === 1 ? "1 arranque" : n + " arranques"}`],
     ["gen", "Energía generada", `${fmt(T.generado)}<small> kWh</small>`, generadores.join(" y ")],
-    ["cons", "Energía consumida (transformadores de los generadores)", `${fmt(T.consumo)}<small> kWh</small>`, `${textoRedes(redes)}, mientras cada generador estuvo en marcha`],
+    ["cons", "Energía consumida (planta 1)", `${fmt(T.consumo)}<small> kWh</small>`, "Transformadores 1 y 2, mientras cada generador estuvo en marcha"],
     ["red", "Importada de la red", `${fmt(T.tomado)}<small> kWh</small>`, `<span class="chip ${semaforo(T.pctRed)}">${pct(T.pctRed)} del consumo</span> meta 0 %`],
     ["out", "Exportada a la red", `${fmt(T.entregado)}<small> kWh</small>`, `${pct(T.pctEnt)} de la generación`]
   ].forEach(([c, e, v, d]) => energia.append(el("div", { className: "cifra " + c }, `<span class="etiqueta">${e}</span><span class="valor">${v}</span><span class="det">${d}</span>`)));
@@ -521,7 +514,7 @@ function generar() {
   T.entradas = T.generado + T.tomado; T.salidas = T.consumo + T.entregado;
   const diferencia = T.entradas - T.salidas;
   document.getElementById("textoTotal").innerHTML =
-    `En el período seleccionado se generaron <b>${fmt(T.generado)} kWh</b>, los transformadores de los generadores consumieron <b>${fmt(T.consumo)} kWh</b>, ` +
+    `En el período seleccionado se generaron <b>${fmt(T.generado)} kWh</b>, la planta 1 consumió <b>${fmt(T.consumo)} kWh</b>, ` +
     `se importaron <b>${fmt(T.tomado)} kWh</b> de la red y se exportaron <b>${fmt(T.entregado)} kWh</b> a la red. ` +
     `Generada + importada = consumida + exportada.`;
   const sw = c => `<i style="background:var(${c})"></i>`;
@@ -536,13 +529,19 @@ function generar() {
   const seccionPlanta = document.getElementById("seccionPlanta");
   if (PLANTA && generadores.length > 1) {
     const ng = PLANTA.generadores.length, mins = PLANTA.minutos;
-    const tramos = seleccion.map(a => [fecha(a.inicio).getTime(), fecha(a.fin).getTime()]);
-    const puntos = PLANTA.puntos.filter(p => { const t = fecha(p[0]).getTime(); return tramos.some(([i, f]) => i < t + mins * 60000 && f > t); });
-    if (puntos.length) {
-      const kwh = k => puntos.reduce((s, p) => s + (p[k] ?? 0), 0) * mins / 60;
-      P = { puntos, ng, mins, puso: PLANTA.generadores.map((g, i) => kwh(1 + ng + i)), imp: kwh(1 + 2 * ng), exp: kwh(2 + 2 * ng) };
+    // Unión de los arranques elegidos (con los dos generadores a la vez, ese tiempo cuenta una vez).
+    const union = [];
+    seleccion.map(a => [fecha(a.inicio).getTime(), fecha(a.fin).getTime()]).sort((x, y) => x[0] - y[0])
+      .forEach(([i, f]) => { const u = union.at(-1); if (u && i <= u[1]) u[1] = Math.max(u[1], f); else union.push([i, f]); });
+    // Parte de cada punto de 15 min que cae dentro de los arranques: el que arranca o para a mitad cuenta en proporción.
+    const largo = mins * 60000;
+    const dentro = t => union.reduce((s, [i, f]) => s + Math.max(0, Math.min(f, t + largo) - Math.max(i, t)), 0) / largo;
+    const conParte = PLANTA.puntos.map(p => [p, dentro(fecha(p[0]).getTime())]).filter(([, d]) => d > 0);
+    if (conParte.length) {
+      const kwh = k => conParte.reduce((s, [p, d]) => s + (p[k] ?? 0) * d, 0) * mins / 60;
+      P = { puntos: conParte.map(([p]) => p), ng, mins, puso: PLANTA.generadores.map((g, i) => kwh(1 + ng + i)), imp: kwh(1 + 2 * ng), exp: kwh(2 + 2 * ng) };
       P.consumo = P.puso.reduce((s, v) => s + v, 0) + P.imp;
-      P.horas = puntos.length * mins / 60; // horas con al menos un generador en marcha (no se cuentan dos veces)
+      P.horas = conParte.reduce((s, [, d]) => s + d, 0) * mins / 60; // horas con al menos un generador en marcha
     }
   }
   seccionPlanta.hidden = !P;
@@ -615,20 +614,24 @@ function generar() {
 
   // Por periodo
   const celdaComb = (v, f) => v == null ? `<td class="num sin">&ndash;</td>` : `<td class="num">${f(v)}</td>`;
+  const conTrafo = seleccion.filter(a => consumoTrafo(a) > 0);
+  const totalTrafo = conTrafo.reduce((s, a) => s + consumoTrafo(a), 0);
+  T.pctTrafo = totalTrafo > 0 ? Math.min(100, suma(conTrafo, "tomadoTrafo") / totalTrafo * 100) : null;
   document.getElementById("tArr").innerHTML = `<thead><tr><th scope="col">Generador</th><th scope="col">Inicio → fin</th><th scope="col">Horas</th><th scope="col">Generada (kWh)</th>
-    <th scope="col">Consumida (kWh)</th><th scope="col">Importada (kWh)</th><th scope="col">% del consumo</th><th scope="col">Exportada (kWh)</th><th scope="col">Galones</th><th scope="col">Costo</th>
+    <th scope="col">Consumida (kWh)</th><th scope="col">Importada (kWh)</th><th scope="col">% del consumo</th><th scope="col">% por su transformador (referencia)</th><th scope="col">Exportada (kWh)</th><th scope="col">Galones</th><th scope="col">Costo</th>
     <th scope="col">Costo equivalente en la red</th><th scope="col">Relación diésel / red</th></tr></thead>
     <tbody>${seleccion.map(a => `<tr><td>${a.generador}${esInicioDeLectura(a) ? "*" : ""}</td><td>${cuando(a)}</td><td class="num">${fmt(a.horas, 1)}</td>
-      <td class="num">${fmt(a.generado)}</td><td class="num">${fmt(a.consumo)}</td><td class="num">${fmt(a.tomado)}</td><td class="num">${chipPct(pctImportado(a))}</td><td class="num">${fmt(a.entregado)}</td>
+      <td class="num">${fmt(a.generado)}</td><td class="num">${fmt(a.consumo)}</td><td class="num">${fmt(a.tomado)}</td><td class="num">${chipPct(pctImportado(a))}</td><td class="num">${celdaPct(pctTrafo(a))}</td><td class="num">${fmt(a.entregado)}</td>
       ${celdaComb(a.galones, v => fmt(v))}${celdaComb(a.costo, v => dinero(v))}
       ${celdaComb(a.costo != null ? a.costoRed : null, v => dinero(v))}${celdaComb(a.costo != null && a.costoRed > 0 ? a.costo / a.costoRed : null, chipVeces)}</tr>`).join("")}</tbody>
     <tfoot><tr><td>Total</td><td>${n === 1 ? "1 arranque" : n + " arranques"}</td><td class="num">${fmt(T.horas, 1)}</td><td class="num">${fmt(T.generado)}</td>
-      <td class="num">${fmt(T.consumo)}</td><td class="num">${fmt(T.tomado)}</td><td class="num">${chipPct(T.pctRed)}</td><td class="num">${fmt(T.entregado)}</td>
+      <td class="num">${fmt(T.consumo)}</td><td class="num">${fmt(T.tomado)}</td><td class="num">${chipPct(T.pctRed)}</td><td class="num">${celdaPct(T.pctTrafo)}</td><td class="num">${fmt(T.entregado)}</td>
       <td class="num">${C.k ? fmt(C.galones) : "&ndash;"}</td><td class="num">${C.k ? dinero(C.costo) : "&ndash;"}</td>
       <td class="num">${conTarifa.length ? dinero(C.costoRed) : "&ndash;"}</td><td class="num">${conTarifa.length && C.costoRed > 0 ? chipVeces(C.costoComparado / C.costoRed) : "&ndash;"}</td></tr></tfoot>`;
 
   // Notas
-  const notas = ["Energía consumida = generada + importada − exportada, en el transformador de cada generador y solo mientras ese generador estaba en marcha. Por eso el balance cuadra; comprobarlo con la suma de los medidores de las máquinas queda para un análisis aparte."];
+  const notas = ["Energía consumida = generada + importada − exportada, de toda la planta 1 (transformadores 1 y 2), mientras cada generador estaba en marcha. Importada y exportada son las del medidor principal de la planta; si los dos generadores estaban en marcha a la vez, se reparten entre los dos según lo que generaba cada uno, para no contarlas dos veces. Por eso el balance cuadra.",
+    "% por su transformador (referencia): el mismo cálculo con el medidor del transformador de cada generador; dice cuánto del consumo de ese transformador no cubrió el generador."];
   if (chkCostoExp.checked && C.k) notas.push(`Costo estimado de la energía exportada: kWh exportados por el costo por kWh generado (${dinero(C.costo / C.kwh, 3)}). Es el diésel que se usó para generar energía que salió a la red.`);
   // Solo el comienzo de la lectura de cada generador en LineaBaseX (ej. el Caterpillar se configuró después que el GenPower).
   // Lo demás que falta (combustible, tarifa, lecturas cortadas, arranques en curso) se avisa arriba antes de imprimir.
@@ -637,9 +640,9 @@ function generar() {
   seleccion.filter(sinCarga).forEach(a =>
     notas.push(`El ${a.generador} del ${diaCorto(fecha(a.inicio))} a las ${hhmm(fecha(a.inicio))} estuvo ${fmt(a.horas * 60)} minutos en marcha sin carga: no generó, y la importación de la red en ese lapso (${fmt(a.tomado)} kWh) cuenta en el total.`));
   notas.push(`Importada de la red: verde hasta el ${pctUmbral(VERDE_HASTA)} del consumo, amarillo hasta el ${pctUmbral(AMARILLO_HASTA)} y rojo por encima; la meta es 0 %.`);
-  if (P) notas.push(`Balance planta 1 (Transformadores 1 y 2): calculado con la potencia (kW) de los dos transformadores y de cada generador, tomada de la base de datos de LineaBaseX (una lectura por minuto) y promediada cada ${P.mins} minutos, en las horas en que se trabajó con generación. Cuando funcionaba un solo generador, incluye también el consumo del otro transformador, que vino de la red. Por eso no coincide con el Balance de los arranques, que cuenta cada generador solo con su propio transformador y sale de los contadores de energía.`);
+  if (P) notas.push(`Balance planta 1 (Transformadores 1 y 2): calculado con la potencia (kW) del medidor principal y de cada generador, tomada de la base de datos de LineaBaseX (una lectura por minuto) y promediada cada ${P.mins} minutos, en las horas en que se trabajó con generación. Sale de la potencia y no de los contadores de energía, por eso puede diferir un poco del Balance de los arranques.`);
   if (conTarifa.length) notas.push("Ahorro o sobrecosto frente a la red: cada kWh consumido en planta (generado − exportado) valorizado al precio de la franja horaria (A, B, C o D) de la hora en que se generó, con la tarifa de su mes, contra el costo del diésel. Solo energía contra combustible: no incluye el mantenimiento del generador ni los demás cargos de la factura de la red.");
-  notas.push("Fuente: contadores de energía del controlador de cada generador y del medidor de su transformador (igual que la pantalla «Períodos en marcha» de LineaBaseX); combustible, tarifa por franja horaria y feriados, cargados en LineaBaseX.");
+  notas.push("Fuente: contadores de energía del controlador de cada generador y del medidor principal de la planta 1 (igual que la pantalla «Períodos en marcha» de LineaBaseX); combustible, tarifa por franja horaria y feriados, cargados en LineaBaseX.");
   document.getElementById("notas").innerHTML = notas.map(t => `<li>${t}</li>`).join("");
 
   document.getElementById("pie").innerHTML = `<span>Reporte de generadores · LineaBaseX · generado el ${GENERADO_EL}.</span>`;
@@ -804,7 +807,7 @@ function dibujar() {
     graficos.push(new Chart(lienzo, {
       data: { labels: etiquetas, datasets: [
         { type: "line", label: "Generador", data: a.perfil15.map(p => p[1]), borderColor: css("--gen"), borderWidth: 1.6, pointRadius: 0, order: 0 },
-        { type: "line", label: `Consumo del ${nombreRed(a.red)}`, data: a.perfil15.map(p => p[2]), borderColor: css("--cons"), borderWidth: 1.4, pointRadius: 0, order: 0 },
+        { type: "line", label: "Consumo de la planta 1", data: a.perfil15.map(p => p[2]), borderColor: css("--cons"), borderWidth: 1.4, pointRadius: 0, order: 0 },
         { type: "bar", label: "Red", data: red, backgroundColor: red.map(v => v >= 0 ? css("--grid") : css("--out")), barPercentage: 1, categoryPercentage: 1, order: 1 }] },
       options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
         plugins: { legend: { display: false }, tooltip: { ...caja, callbacks: { label: c => c.dataset.label === "Red" ? etiquetaRed(c.parsed.y, "kW") : `${c.dataset.label}: ${fmt(c.parsed.y)} kW` } } },
