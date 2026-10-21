@@ -170,15 +170,6 @@ public class PlantaEnVivoService {
             return g <= 0 ? 0.0 : Math.max(0, f.kwGenerador() - exportada() * f.kwGenerador() / g);
         }
 
-        /** Los transformadores juntos por la red (+ toma, - entrega): lo que debería marcar el medidor principal. */
-        public double redNeta() {
-            return completas().stream().mapToDouble(FilaGenerador::kwRed).sum();
-        }
-
-        /** Lo que sale a la red por un transformador y entra por el otro (el medidor principal no lo ve). */
-        public double entreTransformadores() {
-            return Math.min(importada(), exportada());
-        }
 
         /** Parte del consumo de la planta (%), o null si no hay consumo. */
         public Double porcentaje(double kw) {

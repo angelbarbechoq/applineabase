@@ -492,10 +492,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 + "planta 1 (de la fabrica, mide en paralelo con el de la empresa electrica; PLC, ultima lectura de la base de datos), "
                 + "asi que entre uno y otro puede haber hasta un minuto. Consumo de la planta = lo que los generadores pusieron en la "
                 + "planta + lo importado de la red (suman 100 %); lo exportado a la red es el excedente de los generadores y va aparte, "
-                + "repartido entre los generadores segun lo que genera cada uno. Los medidores de los transformadores se usan solo "
-                + "para el detalle por transformador. El medidor principal esta en media tension, antes de los transformadores: "
-                + "deberia marcar algo mas que los transformadores juntos (las perdidas de los transformadores). Todo en kW. "
-                + "Se actualiza cada 15 s.");
+                + "repartido entre los generadores segun lo que genera cada uno. En la tabla, aporte y % del consumo de la planta "
+                + "(con la fila Red) suman el 100 %; las columnas de cada transformador son de su propio medidor (referencia: cuanto "
+                + "de ese transformador no cubrio su generador). Todo en kW. Se actualiza cada 15 s.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
         VerticalLayout v = new VerticalLayout(barra, plantaContenido, plantaDetalle, nota);
         v.setPadding(false);
@@ -580,82 +579,28 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             h.append("</div></div>");
         }
 
-        // Por transformador (sus medidores): cuánto del consumo pasa por cada uno y si juntos cuadran con el medidor principal.
-        List<PlantaEnVivoService.FilaGenerador> porTrafo = p.filas().stream().filter(PlantaEnVivoService.FilaGenerador::completa)
-                .sorted(java.util.Comparator.comparing(f -> nombreRed(f.red()))).toList();
-        double consumoTrafos = porTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::consumoTransformador).sum();
-        if (consumoTrafos > 0) {
-            String[] coloresTrafo = {"#4a525c", "#9aa3ad"};
-            h.append("<div style='display:grid;gap:6px'><div style='font-weight:600'>Consumo por transformador "
-                            + "<span style='font-weight:400;font-size:13px;color:#555'>(medidores de los transformadores)</span></div>")
-                    .append("<div style='display:flex;height:34px;border-radius:4px;overflow:hidden;background:#e2e3e5'>");
-            for (int k = 0; k < porTrafo.size(); k++) {
-                PlantaEnVivoService.FilaGenerador f = porTrafo.get(k);
-                double pct = f.consumoTransformador() / consumoTrafos * 100;
-                if (pct <= 0) continue;
-                h.append("<div style='width:").append(String.format(Locale.ROOT, "%.2f%%", pct)).append(";background:")
-                        .append(coloresTrafo[k % coloresTrafo.length])
-                        .append(";color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;"
-                                + "white-space:nowrap;overflow:hidden'>")
-                        .append(pct >= 12 ? esc(nombreRed(f.red())) + " " + pctTexto(pct) : "").append("</div>");
-            }
-            h.append("</div><div style='display:grid;gap:2px;font-size:13px;color:#555'>");
-            for (int k = 0; k < porTrafo.size(); k++) {
-                PlantaEnVivoService.FilaGenerador f = porTrafo.get(k);
-                String origen = f.kwGenerador() <= 0 ? "todo de la red"
-                        : f.kwRed() >= 0 ? esc(f.generador()) + " " + kw(f.kwGenerador()) + " + red " + kw(f.kwRed())
-                        : esc(f.generador()) + " " + kw(f.kwGenerador()) + ", entrega " + kw(-f.kwRed()) + " a la red";
-                h.append("<span><i style='display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:")
-                        .append(coloresTrafo[k % coloresTrafo.length]).append("'></i><b>").append(esc(nombreRed(f.red()))).append("</b>: ")
-                        .append(kw(f.consumoTransformador())).append(" (").append(pctTexto(f.consumoTransformador() / consumoTrafos * 100))
-                        .append(") = ").append(origen).append("</span>");
-            }
-            h.append("</div>");
-
-            // Comparación con el medidor principal.
-            PlantaEnVivoService.MedidorPrincipal mp = p.principal();
-            h.append("<div style='border:1px solid #dce1e7;border-radius:4px;padding:8px 12px;font-size:13px;display:grid;gap:4px'>");
-            if (mp.kw() == null) {
-                h.append("Medidor principal sin lectura reciente")
-                        .append(mp.fecha() == null ? "." : " (ultima: " + mp.fecha().format(CORTA) + ").");
-            } else if (porTrafo.size() < p.filas().size()) {
-                h.append("Medidor principal: ").append(sentidoRed(mp.kw()))
-                        .append(". No se compara con los transformadores porque falta la lectura de alguno.");
-            } else {
-                double neta = p.redNeta(), dif = neta - mp.kw();
-                h.append("<span><b>Medidor principal</b> (de la fabrica, mide en paralelo con el de la empresa electrica): ")
-                        .append(sentidoRed(mp.kw())).append("</span>")
-                        .append("<span><b>").append(esc(String.join(" + ", porTrafo.stream().map(f -> nombreRed(f.red())).toList())))
-                        .append("</b> por la red: ").append(sentidoRed(neta)).append("</span>")
-                        .append("<span><b>Diferencia</b>: ").append(String.format(Locale.ROOT, "%+,.0f kW", dif))
-                        .append(Math.abs(mp.kw()) >= 50 ? String.format(Locale.ROOT, " (%+.1f %%)", dif / Math.abs(mp.kw()) * 100) : "")
-                        .append("</span>");
-                if (p.entreTransformadores() >= 1) {
-                    String salen = porTrafo.stream().filter(f -> f.kwRed() < 0).map(f -> nombreRed(f.red())).collect(Collectors.joining(" y "));
-                    String entran = porTrafo.stream().filter(f -> f.kwRed() > 0).map(f -> nombreRed(f.red())).collect(Collectors.joining(" y "));
-                    h.append("<span>Ahora ").append(kw(p.entreTransformadores())).append(" salen a la red por el ").append(esc(salen))
-                            .append(" y entran por el ").append(esc(entran))
-                            .append(": no pasan por el medidor principal, que solo ve la diferencia.</span>");
-                }
-            }
-            h.append("</div></div>");
-        }
-
         h.append("</div>");
         plantaContenido.removeAll();
         plantaContenido.add(new Html(h.toString()));
 
-        // Detalle: una fila por generador.
+        // Detalle: una fila por generador y una de la red; las columnas de la planta suman el 100 % del consumo. Las de
+        // cada transformador salen de su medidor (referencia).
+        List<PlantaEnVivoService.FilaGenerador> conTrafo = p.filas().stream().filter(PlantaEnVivoService.FilaGenerador::completa).toList();
+        double importadaTrafos = conTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::importada).sum();
+        double exportadaTrafos = conTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::exportada).sum();
+        double consumoTrafos = conTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::consumoTransformador).sum();
         h.setLength(0);
         h.append("<div style='display:grid;gap:14px;width:100%;max-width:1150px'>");
         String th = "<th style='text-align:right;padding:6px 10px;font-size:12px;color:#555;border-bottom:1px solid #ccc'>";
         String thIzq = "<th style='text-align:left;padding:6px 10px;font-size:12px;color:#555;border-bottom:1px solid #ccc'>";
         String td = "<td style='text-align:right;padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap'>";
         String tdIzq = "<td style='text-align:left;padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap'>";
+        String chipRed = "<span style='" + CHIP + "background:" + semaforo[0] + ";color:" + semaforo[1] + "'>" + pctTexto(pctRed) + "</span>";
         h.append("<div style='overflow-x:auto'><table style='border-collapse:collapse;width:100%;font-size:14px'><thead><tr>")
                 .append(thIzq).append("Generador</th>").append(thIzq).append("Estado</th>").append(th).append("Generada (kW)</th>")
                 .append(th).append("Aporte en planta (kW)</th>").append(th).append("% del consumo de la planta</th>")
                 .append(thIzq).append("Transformador</th>").append(th).append("Importada por su transformador (kW)</th>")
+                .append(th).append("% importado por su transformador</th>")
                 .append(th).append("Exportada por su transformador (kW)</th>")
                 .append(th).append("Consumo del transformador (kW)</th></tr></thead><tbody>");
         for (PlantaEnVivoService.FilaGenerador f : p.filas()) {
@@ -664,6 +609,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 case PARADO -> Estado.SIN_DATO;
                 case SIN_COMUNICACION -> Estado.FUERA;
             });
+            Double consumoTrafo = f.consumoTransformador();
             h.append("<tr>").append(tdIzq).append("<b>").append(esc(f.generador())).append("</b></td>")
                     .append(tdIzq).append("<span style='").append(CHIP).append("background:").append(c[0]).append(";color:").append(c[1])
                     .append("'>").append(f.estado().etiqueta()).append("</span></td>")
@@ -672,18 +618,27 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                     .append(td).append(p.aporte(f) == null ? "-" : pctTexto(p.porcentaje(p.aporte(f)))).append("</td>")
                     .append(tdIzq).append(esc(nombreRed(f.red()))).append("</td>")
                     .append(td).append(num0(f.importada())).append("</td>")
+                    .append(td).append(consumoTrafo == null || consumoTrafo <= 0 ? "-" : pctTexto(f.importada() / consumoTrafo * 100)).append("</td>")
                     .append(td).append(num0(f.exportada())).append("</td>")
-                    .append(td).append(num0(f.consumoTransformador())).append("</td></tr>");
+                    .append(td).append(num0(consumoTrafo)).append("</td></tr>");
         }
+        h.append("<tr>").append(tdIzq).append("<b>Red</b> <span style='font-size:12px;color:#555'>(")
+                .append(p.conPrincipal() ? "medidor principal" : "transformadores").append(")</span></td>")
+                .append(tdIzq).append("</td>").append(td).append("</td>")
+                .append(td).append(num0(p.importada())).append("</td>")
+                .append(td).append(chipRed).append("</td>")
+                .append(tdIzq).append("</td>").append(td).append("</td>").append(td).append("</td>").append(td).append("</td>")
+                .append(td).append("</td></tr>");
         String tdTotal = "<td style='text-align:right;padding:6px 10px;border-top:2px solid #333;font-weight:700;white-space:nowrap'>";
-        h.append("</tbody><tfoot><tr><td style='padding:6px 10px;border-top:2px solid #333;font-weight:700'>Total</td>")
+        h.append("</tbody><tfoot><tr><td style='padding:6px 10px;border-top:2px solid #333;font-weight:700'>Consumo de la planta</td>")
                 .append("<td style='border-top:2px solid #333'></td>")
                 .append(tdTotal).append(num0(p.generada())).append("</td>")
-                .append(tdTotal).append(num0(p.consumidaDeGeneradores())).append("</td>")
-                .append(tdTotal).append(pctTexto(pctGen)).append("</td>")
+                .append(tdTotal).append(num0(consumo)).append("</td>")
+                .append(tdTotal).append(consumo > 0 ? "100.0 %" : "-").append("</td>")
                 .append("<td style='border-top:2px solid #333'></td>")
-                .append(tdTotal).append(num0(porTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::importada).sum())).append("</td>")
-                .append(tdTotal).append(num0(porTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::exportada).sum())).append("</td>")
+                .append(tdTotal).append(num0(importadaTrafos)).append("</td>")
+                .append(tdTotal).append(consumoTrafos > 0 ? pctTexto(importadaTrafos / consumoTrafos * 100) : "-").append("</td>")
+                .append(tdTotal).append(num0(exportadaTrafos)).append("</td>")
                 .append(tdTotal).append(num0(consumoTrafos)).append("</td></tr></tfoot></table></div>");
 
         // Máquinas: trabajando o paradas (criterio del horómetro), por grupo.
@@ -741,11 +696,6 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     private static String kw(double v) {
         return String.format(Locale.ROOT, "%,.0f kW", v);
-    }
-
-    /** + toma de la red, - entrega a la red. */
-    private static String sentidoRed(double kw) {
-        return kw >= 0 ? "toma " + kw(kw) + " de la red" : "entrega " + kw(-kw) + " a la red";
     }
 
     private static String num0(Double v) {
