@@ -361,12 +361,7 @@ const semaforo = p => p <= VERDE_HASTA ? "ok" : p <= AMARILLO_HASTA ? "warn" : "
 const pctUmbral = v => fmt(v, v % 1 ? 1 : 0) + " %";
 document.querySelectorAll(".umbralVerde").forEach(e => e.textContent = pctUmbral(VERDE_HASTA));
 document.querySelectorAll(".umbralAmarillo").forEach(e => e.textContent = pctUmbral(AMARILLO_HASTA));
-const pctImportado = a => (a.consumo ?? 0) > 0 ? Math.min(100, (a.tomado ?? 0) / a.consumo * 100) : null;
-// Referencia: el mismo % con el medidor del transformador del generador (cuánto de ese transformador no cubrió).
-const consumoTrafo = a => a.tomadoTrafo == null ? null : (a.generado ?? 0) + a.tomadoTrafo - (a.entregadoTrafo ?? 0);
-const pctTrafo = a => { const c = consumoTrafo(a); return c > 0 ? Math.min(100, a.tomadoTrafo / c * 100) : null; };
-const celdaPct = p => p == null ? "&ndash;" : pct(p);
-const chipPct = p => p == null ? "&ndash;" : `<span class="chip ${semaforo(p)}">${pct(p)}</span>`;
+const pctImportado = a => (a.consumo ?? 0) > 0 ? Math.min(100, (a.tomado ?? 0) / a.consumo * 100) : null;const chipPct = p => p == null ? "&ndash;" : `<span class="chip ${semaforo(p)}">${pct(p)}</span>`;
 // Costo del diésel / costo de esa energía en la red: rojo si generar salió más caro.
 const chipVeces = v => `<span class="chip ${v > 1 ? "bad" : "ok"}">${fmt(v, 1)}×</span>`;
 
@@ -614,24 +609,20 @@ function generar() {
 
   // Por periodo
   const celdaComb = (v, f) => v == null ? `<td class="num sin">&ndash;</td>` : `<td class="num">${f(v)}</td>`;
-  const conTrafo = seleccion.filter(a => consumoTrafo(a) > 0);
-  const totalTrafo = conTrafo.reduce((s, a) => s + consumoTrafo(a), 0);
-  T.pctTrafo = totalTrafo > 0 ? Math.min(100, suma(conTrafo, "tomadoTrafo") / totalTrafo * 100) : null;
   document.getElementById("tArr").innerHTML = `<thead><tr><th scope="col">Generador</th><th scope="col">Inicio → fin</th><th scope="col">Horas</th><th scope="col">Generada (kWh)</th>
-    <th scope="col">Consumida (kWh)</th><th scope="col">Importada (kWh)</th><th scope="col">% del consumo</th><th scope="col">% por su transformador (referencia)</th><th scope="col">Exportada (kWh)</th><th scope="col">Galones</th><th scope="col">Costo</th>
+    <th scope="col">Consumida (kWh)</th><th scope="col">Importada (kWh)</th><th scope="col">% del consumo</th><th scope="col">Exportada (kWh)</th><th scope="col">Galones</th><th scope="col">Costo</th>
     <th scope="col">Costo equivalente en la red</th><th scope="col">Relación diésel / red</th></tr></thead>
     <tbody>${seleccion.map(a => `<tr><td>${a.generador}${esInicioDeLectura(a) ? "*" : ""}</td><td>${cuando(a)}</td><td class="num">${fmt(a.horas, 1)}</td>
-      <td class="num">${fmt(a.generado)}</td><td class="num">${fmt(a.consumo)}</td><td class="num">${fmt(a.tomado)}</td><td class="num">${chipPct(pctImportado(a))}</td><td class="num">${celdaPct(pctTrafo(a))}</td><td class="num">${fmt(a.entregado)}</td>
+      <td class="num">${fmt(a.generado)}</td><td class="num">${fmt(a.consumo)}</td><td class="num">${fmt(a.tomado)}</td><td class="num">${chipPct(pctImportado(a))}</td><td class="num">${fmt(a.entregado)}</td>
       ${celdaComb(a.galones, v => fmt(v))}${celdaComb(a.costo, v => dinero(v))}
       ${celdaComb(a.costo != null ? a.costoRed : null, v => dinero(v))}${celdaComb(a.costo != null && a.costoRed > 0 ? a.costo / a.costoRed : null, chipVeces)}</tr>`).join("")}</tbody>
     <tfoot><tr><td>Total</td><td>${n === 1 ? "1 arranque" : n + " arranques"}</td><td class="num">${fmt(T.horas, 1)}</td><td class="num">${fmt(T.generado)}</td>
-      <td class="num">${fmt(T.consumo)}</td><td class="num">${fmt(T.tomado)}</td><td class="num">${chipPct(T.pctRed)}</td><td class="num">${celdaPct(T.pctTrafo)}</td><td class="num">${fmt(T.entregado)}</td>
+      <td class="num">${fmt(T.consumo)}</td><td class="num">${fmt(T.tomado)}</td><td class="num">${chipPct(T.pctRed)}</td><td class="num">${fmt(T.entregado)}</td>
       <td class="num">${C.k ? fmt(C.galones) : "&ndash;"}</td><td class="num">${C.k ? dinero(C.costo) : "&ndash;"}</td>
       <td class="num">${conTarifa.length ? dinero(C.costoRed) : "&ndash;"}</td><td class="num">${conTarifa.length && C.costoRed > 0 ? chipVeces(C.costoComparado / C.costoRed) : "&ndash;"}</td></tr></tfoot>`;
 
   // Notas
-  const notas = ["Energía consumida = generada + importada − exportada, de toda la planta 1 (transformadores 1 y 2), mientras cada generador estaba en marcha. Importada y exportada son las del medidor principal de la planta; si los dos generadores estaban en marcha a la vez, se reparten entre los dos según lo que generaba cada uno, para no contarlas dos veces. Por eso el balance cuadra.",
-    "% por su transformador (referencia): el mismo cálculo con el medidor del transformador de cada generador; dice cuánto del consumo de ese transformador no cubrió el generador."];
+  const notas = ["Energía consumida = generada + importada − exportada, de toda la planta 1 (transformadores 1 y 2), mientras cada generador estaba en marcha. Importada y exportada son las del medidor principal de la planta; si los dos generadores estaban en marcha a la vez, se reparten entre los dos según lo que generaba cada uno, para no contarlas dos veces. Por eso el balance cuadra."];
   if (chkCostoExp.checked && C.k) notas.push(`Costo estimado de la energía exportada: kWh exportados por el costo por kWh generado (${dinero(C.costo / C.kwh, 3)}). Es el diésel que se usó para generar energía que salió a la red.`);
   // Solo el comienzo de la lectura de cada generador en LineaBaseX (ej. el Caterpillar se configuró después que el GenPower).
   // Lo demás que falta (combustible, tarifa, lecturas cortadas, arranques en curso) se avisa arriba antes de imprimir.

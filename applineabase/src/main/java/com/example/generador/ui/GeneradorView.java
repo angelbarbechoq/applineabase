@@ -493,8 +493,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 + "asi que entre uno y otro puede haber hasta un minuto. Consumo de la planta = lo que los generadores pusieron en la "
                 + "planta + lo importado de la red (suman 100 %); lo exportado a la red es el excedente de los generadores y va aparte, "
                 + "repartido entre los generadores segun lo que genera cada uno. En la tabla, aporte y % del consumo de la planta "
-                + "(con la fila Red) suman el 100 %; las columnas de cada transformador son de su propio medidor (referencia: cuanto "
-                + "de ese transformador no cubrio su generador). Todo en kW. Se actualiza cada 15 s.");
+                + "(con la fila Red) suman el 100 %. Todo en kW. Se actualiza cada 15 s.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
         VerticalLayout v = new VerticalLayout(barra, plantaContenido, plantaDetalle, nota);
         v.setPadding(false);
@@ -512,7 +511,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         if (!p.conPrincipal()) {
             h.append(aviso).append("Medidor principal sin lectura reciente")
                     .append(p.principal() == null || p.principal().fecha() == null ? "" : " (ultima: " + p.principal().fecha().format(CORTA) + ")")
-                    .append(": importada y exportada con los medidores de los transformadores.</div>");
+                    .append(": sin consumo de la planta ni red hasta la proxima lectura.</div>");
         }
         if (!p.completa()) {
             h.append(aviso).append("Cifras parciales: ");
@@ -529,117 +528,100 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             case AMARILLO -> Estado.AVISO;
             case ROJO -> Estado.FUERA;
         });
-        h.append("<div style='display:flex;flex-wrap:wrap;gap:12px'>")
-                .append(tarjetaPlanta("Consumo de la planta", kw(consumo),
-                        p.conPrincipal() ? "generadores + red (medidor principal)" : "generadores + red (transformadores)", "#4a525c"));
-        PlantaEnVivoService.AntesDelArranque antes = p.antes();
-        if (antes != null) {
-            String cuando = antes.inicio().format(CORTA) + (antes.inicioEstimado() ? " (aprox.)" : "");
-            String detalle = antes.kw() == null ? "sin lecturas del medidor principal antes del arranque del " + cuando
-                    : "promedio de " + PlantaEnVivoService.MINUTOS_ANTES + " min antes del " + (antes.enCurso() ? "arranque" : "ultimo arranque")
-                    + " (" + cuando + ")" + (consumo > 0 ? String.format(Locale.ROOT, "; ahora %+,.0f kW", consumo - antes.kw()) : "");
-            h.append(tarjetaPlanta("Consumo antes del arranque", antes.kw() == null ? "-" : kw(antes.kw()), detalle, "#9aa3ad"));
-        }
-        h.append("")
-                .append(tarjetaPlanta("Aporte de los generadores", kw(p.consumidaDeGeneradores()),
-                        pctTexto(pctGen) + " del consumo" + (p.generada() > p.consumidaDeGeneradores() + 0.5
-                                ? " (generan " + kw(p.generada()) + ")" : ""), "#eb6834"))
-                .append(tarjetaPlanta("Importada de la red", kw(p.importada()),
-                        "<span style='" + CHIP + "background:" + semaforo[0] + ";color:" + semaforo[1] + "'>" + pctTexto(pctRed)
-                                + " del consumo</span> meta 0 %", "#2a78d6"))
-                .append(tarjetaPlanta("Exportada a la red", kw(p.exportada()), "excedente de los generadores", "#1baf7a"))
-                .append("</div>");
+        if (p.conPrincipal()) {
+            h.append("<div style='display:flex;flex-wrap:wrap;gap:12px'>")
+                    .append(tarjetaPlanta("Consumo de la planta", kw(consumo), "generadores + red (medidor principal)", "#4a525c"));
+            PlantaEnVivoService.AntesDelArranque antes = p.antes();
+            if (antes != null) {
+                String cuando = antes.inicio().format(CORTA) + (antes.inicioEstimado() ? " (aprox.)" : "");
+                String detalle = antes.kw() == null ? "sin lecturas del medidor principal antes del arranque del " + cuando
+                        : "promedio de " + PlantaEnVivoService.MINUTOS_ANTES + " min antes del " + (antes.enCurso() ? "arranque" : "ultimo arranque")
+                        + " (" + cuando + ")" + (consumo > 0 ? String.format(Locale.ROOT, "; ahora %+,.0f kW", consumo - antes.kw()) : "");
+                h.append(tarjetaPlanta("Consumo antes del arranque", antes.kw() == null ? "-" : kw(antes.kw()), detalle, "#9aa3ad"));
+            }
+            h.append("")
+                    .append(tarjetaPlanta("Aporte de los generadores", kw(p.consumidaDeGeneradores()),
+                            pctTexto(pctGen) + " del consumo" + (p.generada() > p.consumidaDeGeneradores() + 0.5
+                                    ? " (generan " + kw(p.generada()) + ")" : ""), "#eb6834"))
+                    .append(tarjetaPlanta("Importada de la red", kw(p.importada()),
+                            "<span style='" + CHIP + "background:" + semaforo[0] + ";color:" + semaforo[1] + "'>" + pctTexto(pctRed)
+                                    + " del consumo</span> meta 0 %", "#2a78d6"))
+                    .append(tarjetaPlanta("Exportada a la red", kw(p.exportada()), "excedente de los generadores", "#1baf7a"))
+                    .append("</div>");
 
-        // Barra del consumo de la planta: lo que puso cada generador y lo importado de la red (100 %).
-        List<String[]> tramos = new ArrayList<>(); // nombre, kW, color
-        int i = 0;
-        for (PlantaEnVivoService.FilaGenerador f : p.filas()) {
-            if (p.contado(f)) tramos.add(new String[]{f.generador(), String.valueOf(p.aporte(f)), COLORES_GEN[i % COLORES_GEN.length]});
-            i++;
-        }
-        tramos.add(new String[]{"Red", String.valueOf(p.importada()), "#2a78d6"});
-        if (consumo > 0) {
-            h.append("<div style='display:grid;gap:6px'><div style='font-weight:600'>Consumo de la planta: ").append(kw(consumo)).append("</div>")
-                    .append("<div style='display:flex;height:34px;border-radius:4px;overflow:hidden;background:#e2e3e5'>");
-            for (String[] t : tramos) {
-                double pct = Double.parseDouble(t[1]) / consumo * 100;
-                if (pct <= 0) continue;
-                h.append("<div style='width:").append(String.format(Locale.ROOT, "%.2f%%", pct)).append(";background:").append(t[2])
-                        .append(";color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;"
-                                + "white-space:nowrap;overflow:hidden'>")
-                        .append(pct >= 12 ? esc(t[0]) + " " + pctTexto(pct) : "").append("</div>");
+            // Barra del consumo de la planta: lo que puso cada generador y lo importado de la red (100 %).
+            List<String[]> tramos = new ArrayList<>(); // nombre, kW, color
+            int i = 0;
+            for (PlantaEnVivoService.FilaGenerador f : p.filas()) {
+                if (p.contado(f)) tramos.add(new String[]{f.generador(), String.valueOf(p.aporte(f)), COLORES_GEN[i % COLORES_GEN.length]});
+                i++;
             }
-            h.append("</div><div style='display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;color:#555'>");
-            for (String[] t : tramos) {
-                double v = Double.parseDouble(t[1]);
-                h.append("<span><i style='display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:")
-                        .append(t[2]).append("'></i>").append(esc(t[0])).append(": ").append(kw(v)).append(" (")
-                        .append(pctTexto(v / consumo * 100)).append(")</span>");
+            tramos.add(new String[]{"Red", String.valueOf(p.importada()), "#2a78d6"});
+            if (consumo > 0) {
+                h.append("<div style='display:grid;gap:6px'><div style='font-weight:600'>Consumo de la planta: ").append(kw(consumo)).append("</div>")
+                        .append("<div style='display:flex;height:34px;border-radius:4px;overflow:hidden;background:#e2e3e5'>");
+                for (String[] t : tramos) {
+                    double pct = Double.parseDouble(t[1]) / consumo * 100;
+                    if (pct <= 0) continue;
+                    h.append("<div style='width:").append(String.format(Locale.ROOT, "%.2f%%", pct)).append(";background:").append(t[2])
+                            .append(";color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;"
+                                    + "white-space:nowrap;overflow:hidden'>")
+                            .append(pct >= 12 ? esc(t[0]) + " " + pctTexto(pct) : "").append("</div>");
+                }
+                h.append("</div><div style='display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;color:#555'>");
+                for (String[] t : tramos) {
+                    double v = Double.parseDouble(t[1]);
+                    h.append("<span><i style='display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:")
+                            .append(t[2]).append("'></i>").append(esc(t[0])).append(": ").append(kw(v)).append(" (")
+                            .append(pctTexto(v / consumo * 100)).append(")</span>");
+                }
+                h.append("</div></div>");
             }
-            h.append("</div></div>");
         }
 
         h.append("</div>");
         plantaContenido.removeAll();
         plantaContenido.add(new Html(h.toString()));
 
-        // Detalle: una fila por generador y una de la red; las columnas de la planta suman el 100 % del consumo. Las de
-        // cada transformador salen de su medidor (referencia).
-        List<PlantaEnVivoService.FilaGenerador> conTrafo = p.filas().stream().filter(PlantaEnVivoService.FilaGenerador::completa).toList();
-        double importadaTrafos = conTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::importada).sum();
-        double exportadaTrafos = conTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::exportada).sum();
-        double consumoTrafos = conTrafo.stream().mapToDouble(PlantaEnVivoService.FilaGenerador::consumoTransformador).sum();
+        // Detalle: una fila por generador y una de la red (medidor principal); aporte y % suman el consumo de la planta.
         h.setLength(0);
         h.append("<div style='display:grid;gap:14px;width:100%;max-width:1150px'>");
         String th = "<th style='text-align:right;padding:6px 10px;font-size:12px;color:#555;border-bottom:1px solid #ccc'>";
         String thIzq = "<th style='text-align:left;padding:6px 10px;font-size:12px;color:#555;border-bottom:1px solid #ccc'>";
         String td = "<td style='text-align:right;padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap'>";
         String tdIzq = "<td style='text-align:left;padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap'>";
+        boolean conRed = p.conPrincipal();
         String chipRed = "<span style='" + CHIP + "background:" + semaforo[0] + ";color:" + semaforo[1] + "'>" + pctTexto(pctRed) + "</span>";
         h.append("<div style='overflow-x:auto'><table style='border-collapse:collapse;width:100%;font-size:14px'><thead><tr>")
-                .append(thIzq).append("Generador</th>").append(thIzq).append("Estado</th>").append(th).append("Generada (kW)</th>")
-                .append(th).append("Aporte en planta (kW)</th>").append(th).append("% del consumo de la planta</th>")
-                .append(thIzq).append("Transformador</th>").append(th).append("Importada por su transformador (kW)</th>")
-                .append(th).append("% importado por su transformador</th>")
-                .append(th).append("Exportada por su transformador (kW)</th>")
-                .append(th).append("Consumo del transformador (kW)</th></tr></thead><tbody>");
+                .append(thIzq).append("Generador</th>").append(thIzq).append("Estado</th>").append(thIzq).append("Transformador</th>")
+                .append(th).append("Generada (kW)</th>").append(th).append("Aporte en planta (kW)</th>")
+                .append(th).append("% del consumo de la planta</th></tr></thead><tbody>");
         for (PlantaEnVivoService.FilaGenerador f : p.filas()) {
             String[] c = colores(switch (f.estado()) {
                 case EN_MARCHA -> Estado.OK;
                 case PARADO -> Estado.SIN_DATO;
                 case SIN_COMUNICACION -> Estado.FUERA;
             });
-            Double consumoTrafo = f.consumoTransformador();
+            Double aporte = conRed ? p.aporte(f) : null;
             h.append("<tr>").append(tdIzq).append("<b>").append(esc(f.generador())).append("</b></td>")
                     .append(tdIzq).append("<span style='").append(CHIP).append("background:").append(c[0]).append(";color:").append(c[1])
                     .append("'>").append(f.estado().etiqueta()).append("</span></td>")
-                    .append(td).append(num0(f.kwGenerador())).append("</td>")
-                    .append(td).append(num0(p.aporte(f))).append("</td>")
-                    .append(td).append(p.aporte(f) == null ? "-" : pctTexto(p.porcentaje(p.aporte(f)))).append("</td>")
                     .append(tdIzq).append(esc(nombreRed(f.red()))).append("</td>")
-                    .append(td).append(num0(f.importada())).append("</td>")
-                    .append(td).append(consumoTrafo == null || consumoTrafo <= 0 ? "-" : pctTexto(f.importada() / consumoTrafo * 100)).append("</td>")
-                    .append(td).append(num0(f.exportada())).append("</td>")
-                    .append(td).append(num0(consumoTrafo)).append("</td></tr>");
+                    .append(td).append(num0(f.kwGenerador())).append("</td>")
+                    .append(td).append(num0(aporte)).append("</td>")
+                    .append(td).append(aporte == null ? "-" : pctTexto(p.porcentaje(aporte))).append("</td></tr>");
         }
-        h.append("<tr>").append(tdIzq).append("<b>Red</b> <span style='font-size:12px;color:#555'>(")
-                .append(p.conPrincipal() ? "medidor principal" : "transformadores").append(")</span></td>")
-                .append(tdIzq).append("</td>").append(td).append("</td>")
-                .append(td).append(num0(p.importada())).append("</td>")
-                .append(td).append(chipRed).append("</td>")
-                .append(tdIzq).append("</td>").append(td).append("</td>").append(td).append("</td>").append(td).append("</td>")
-                .append(td).append("</td></tr>");
+        h.append("<tr>").append(tdIzq).append("<b>Red</b> <span style='font-size:12px;color:#555'>(medidor principal)</span></td>")
+                .append(tdIzq).append("</td>").append(tdIzq).append("</td>").append(td).append("</td>")
+                .append(td).append(conRed ? num0(p.importada()) : "-").append("</td>")
+                .append(td).append(conRed ? chipRed : "-").append("</td></tr>");
         String tdTotal = "<td style='text-align:right;padding:6px 10px;border-top:2px solid #333;font-weight:700;white-space:nowrap'>";
+        String tdVacio = "<td style='border-top:2px solid #333'></td>";
         h.append("</tbody><tfoot><tr><td style='padding:6px 10px;border-top:2px solid #333;font-weight:700'>Consumo de la planta</td>")
-                .append("<td style='border-top:2px solid #333'></td>")
+                .append(tdVacio).append(tdVacio)
                 .append(tdTotal).append(num0(p.generada())).append("</td>")
-                .append(tdTotal).append(num0(consumo)).append("</td>")
-                .append(tdTotal).append(consumo > 0 ? "100.0 %" : "-").append("</td>")
-                .append("<td style='border-top:2px solid #333'></td>")
-                .append(tdTotal).append(num0(importadaTrafos)).append("</td>")
-                .append(tdTotal).append(consumoTrafos > 0 ? pctTexto(importadaTrafos / consumoTrafos * 100) : "-").append("</td>")
-                .append(tdTotal).append(num0(exportadaTrafos)).append("</td>")
-                .append(tdTotal).append(num0(consumoTrafos)).append("</td></tr></tfoot></table></div>");
+                .append(tdTotal).append(conRed ? num0(consumo) : "-").append("</td>")
+                .append(tdTotal).append(conRed && consumo > 0 ? "100.0 %" : "-").append("</td></tr></tfoot></table></div>");
 
         // Máquinas: trabajando o paradas (criterio del horómetro), por grupo.
         List<PlantaEnVivoService.EstadoMaquina> maquinas = p.maquinas();

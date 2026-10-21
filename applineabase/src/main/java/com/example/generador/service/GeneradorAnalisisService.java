@@ -46,8 +46,8 @@ import java.util.function.Predicate;
  *
  * La red es siempre la del medidor principal (KWhPlanta1, ION8600 clase 0,2, propio de la fábrica y en paralelo con
  * el de la empresa eléctrica, con el que coincide a menos de 0,3 %): ve los dos transformadores juntos, así que lo que
- * sale por uno y entra por el otro no cuenta como exportado ni importado. Los medidores de los transformadores
- * (PM5110, marcan 1 a 3 % de más contra el principal) quedan solo como referencia de cada arranque.
+ * sale por uno y entra por el otro no cuenta como exportado ni importado. Los medidores de los transformadores no se
+ * usan: con los generadores en marcha no coinciden con el principal (hasta ~100 kW de diferencia).
  *
  * Toda energía sale de diferencias de contadores (no de integrar potencias): las lecturas
  * faltantes no pierden energía, solo la corren a la lectura siguiente. Se descartan valores en
@@ -284,26 +284,13 @@ public class GeneradorAnalisisService {
      *                         hora en que se generaron; null si las lecturas del generador no alcanzan para repartirlos
      * @param costoRed         lo que habría costado lo aprovechado comprado a la red, con el precio de la franja de cada
      *                         hora y la tarifa de su mes (Consumo por franja horaria); null sin reparto o sin tarifa
-     * @param kwhTrafoImportada referencia: importado por el medidor del transformador del generador (no por el principal)
-     * @param kwhTrafoExportada referencia: exportado por el medidor del transformador del generador
      */
     public record PeriodoMarcha(String generador, String red, long arranqueId, Integer nro, LocalDateTime inicio,
                                 LocalDateTime fin, boolean enCurso, boolean inicioEstimado,
                                 Double kwhGenerado, Double kwhRedImportada, Double kwhRedExportada, Double kwMax,
                                 double minParalelo, double minIsla, double minVacio,
                                 int lecturasTomando, int lecturasRed, Double picoTomadoKw,
-                                double[] aprovechadoFranja, Double costoRed,
-                                Double kwhTrafoImportada, Double kwhTrafoExportada) {
-
-        /**
-         * Referencia: % importado según el medidor de su transformador (cuánto del consumo de ese transformador no
-         * cubrió el generador); null sin lecturas del transformador.
-         */
-        public Double porcentajeDeRedTransformador() {
-            if (kwhTrafoImportada == null || kwhGenerado == null) return null;
-            double c = kwhTrafoImportada + kwhGenerado - nz(kwhTrafoExportada);
-            return c <= 0 ? null : Math.min(100, kwhTrafoImportada / c * 100);
-        }
+                                double[] aprovechadoFranja, Double costoRed) {
 
         /** $/kWh medio de la red en las horas en que trabajó el generador. */
         public Double precioRedMedio() {
@@ -385,10 +372,6 @@ public class GeneradorAnalisisService {
             lecturas.values().forEach(l -> { if (l.kwh() != null && l.kwh() > 0) kwhGen.put(l.fecha(), l.kwh()); });
             TreeMap<LocalDateTime, Double> importada = red.importadaDe().getOrDefault(g.nombre(), new TreeMap<>());
             TreeMap<LocalDateTime, Double> exportada = red.exportadaDe().getOrDefault(g.nombre(), new TreeMap<>());
-            // Referencia: el medidor de su transformador.
-            boolean trafoValido = g.redAsociada() != null && PLCDataQueryService.esNombreMaquinaValido(g.redAsociada());
-            TreeMap<LocalDateTime, Double> importadaTrafo = trafoValido ? serieContador(g.redAsociada(), false, primero, ultimo) : new TreeMap<>();
-            TreeMap<LocalDateTime, Double> exportadaTrafo = trafoValido ? serieContador(g.redAsociada(), true, primero, ultimo) : new TreeMap<>();
 
             for (GeneradorService.Arranque a : e.getValue()) {
                 LocalDateTime f = a.fin() == null ? LocalDateTime.now().withNano(0) : a.fin();
@@ -438,9 +421,7 @@ public class GeneradorAnalisisService {
                 }
                 lista.add(new PeriodoMarcha(g.nombre(), g.redAsociada(), a.id(), a.arranqueNro(), a.inicio(), f, a.fin() == null,
                         a.inicioEstimado(), generado, deltaEnVentana(importada, a.inicio(), f, KW_MAX_RED),
-                        exportado, kwMax, min[0], min[1], min[2], tomando, lecturasRed, pico, aprovechadoFranja, costoRed,
-                        trafoValido ? deltaEnVentana(importadaTrafo, a.inicio(), f, KW_MAX_RED) : null,
-                        trafoValido ? deltaEnVentana(exportadaTrafo, a.inicio(), f, KW_MAX_RED) : null));
+                        exportado, kwMax, min[0], min[1], min[2], tomando, lecturasRed, pico, aprovechadoFranja, costoRed));
             }
         }
         lista.sort((x, y) -> y.inicio().compareTo(x.inicio()));

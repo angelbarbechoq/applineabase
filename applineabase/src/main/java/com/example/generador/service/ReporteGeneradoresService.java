@@ -133,9 +133,6 @@ public class ReporteGeneradoresService {
         m.put("tomado", redondo(p.kwhRedImportada()));
         m.put("entregado", redondo(p.kwhRedExportada()));
         m.put("consumo", redondo(p.consumo()));
-        // Referencia: el medidor del transformador del generador (columna "% por su transformador").
-        m.put("tomadoTrafo", redondo(p.kwhTrafoImportada()));
-        m.put("entregadoTrafo", redondo(p.kwhTrafoExportada()));
 
         List<Object[]> porDia = new ArrayList<>();
         for (DiaMarcha d : analisis.repartoPorDia(p)) {

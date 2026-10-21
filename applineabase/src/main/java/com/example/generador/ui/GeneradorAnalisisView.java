@@ -69,7 +69,7 @@ import java.util.function.Function;
  * - Energía: importada de la red, exportada a la red (solo con algún generador en marcha), generada y consumo de la
  *   planta 1 por día, semana o mes; horas en paralelo / isla / vacío; arranques. La red es la del medidor principal.
  * - Períodos en marcha: por cada arranque, lo que trabajó el generador y lo que la planta 1 tomó de la red y le
- *   entregó en ese mismo intervalo (repartido si otro generador estaba en marcha); el % de su transformador, de referencia.
+ *   entregó en ese mismo intervalo (repartido si otro generador estaba en marcha).
  * - Costos: galones y precio del galón cargados a mano por período en marcha; comparación del costo del diésel con
  *   lo que habría costado la misma energía en la red, con el precio de la franja horaria de cada hora (tarifas y
  *   feriados de Consumo por franja horaria).
@@ -520,7 +520,6 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         columna(periodosGrid, "Duracion", p -> duracion(p.horas()));
         columna(periodosGrid, "Consumo de la planta 1 (kWh)", p -> kwhNum(p.consumo()));
         periodosGrid.addComponentColumn(p -> badgeRed(p.porcentajeDeRed())).setHeader("% importado de la red (meta 0)").setAutoWidth(true).setFlexGrow(0);
-        columna(periodosGrid, "% importado por su transformador (referencia)", p -> porcentaje(p.porcentajeDeRedTransformador()));
         columna(periodosGrid, "Importada de la red (kWh)", p -> kwhNum(p.kwhRedImportada()));
         columna(periodosGrid, "% aportado por el generador", p -> porcentaje(p.aporteGenerador()));
         columna(periodosGrid, "Exportada a la red (kWh)", p -> kwhNum(p.kwhRedExportada()));
@@ -545,9 +544,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + "). % aportado por el generador = el resto (suman 100%). Exportada a la red = excedente de la planta. "
                 + "Importada y exportada salen de los contadores del medidor principal (transformadores 1 y 2 juntos, el que coincide "
                 + "con el de la empresa electrica); si otro generador estaba en marcha a la vez, se reparten entre los dos segun lo "
-                + "que generaba cada uno, asi la suma de los arranques no cuenta nada dos veces. % importado por su transformador "
-                + "(referencia) = lo mismo con el medidor del transformador del generador: cuanto de ese transformador no cubrio el "
-                + "generador. Balance neto = importada - exportada (negativo = se exporto mas de lo que se importo). Tiempo "
+                + "que generaba cada uno, asi la suma de los arranques no cuenta nada dos veces. Balance neto = importada - exportada (negativo = se exporto mas de lo que se importo). Tiempo "
                 + "importando de la red y pico importado: cuanto tiempo y con cuanta potencia tomo la planta. El minuto que cruza el "
                 + "inicio o el fin se reparte en proporcion. Paralelo / isla / vacio: minutos segun la tension de red y la carga "
                 + "(desde el 09-10-2026).");
@@ -1007,9 +1004,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     /**
      * Balance simple del arranque (pedido del usuario: de lo simple a lo complejo): generado, consumido
      * por las máquinas de su transformador (suma de sus medidores, sin contar los submedidores dos veces) y
-     * lo que salió por ese transformador (medidor del transformador: a la red o al otro transformador). Debajo, la
-     * barra de 100% de dónde salió el consumo de la planta 1 (medidor principal). El desperdicio queda para una etapa
-     * siguiente.
+     * su parte de lo exportado a la red (medidor principal). Debajo, la barra de 100% de dónde salió el consumo de la
+     * planta 1. El desperdicio queda para una etapa siguiente.
      */
     private void mostrarBalance(PeriodoMarcha p, List<ConsumoMedidor> lista) {
         balance.removeAll();
@@ -1020,26 +1016,24 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         double generado = p.kwhGenerado() == null ? 0 : p.kwhGenerado();
         double entregado = p.kwhRedExportada() == null ? 0 : p.kwhRedExportada();
-        Double salioTrafo = p.kwhTrafoExportada(), entroTrafo = p.kwhTrafoImportada();
         Double consumido = ConsumoMedidoresService.sumaBalance(lista);
 
-        Span titulo = new Span("Balance del arranque " + GeneradorView.deRed(p.red()));
+        Span titulo = new Span("Balance del arranque");
         titulo.getStyle().set("font-size", "14px").set("font-weight", "700").set("color", "#0b0b0b");
-        double max = Math.max(generado, Math.max(salioTrafo == null ? 0 : salioTrafo, consumido == null ? 0 : consumido));
+        double max = Math.max(generado, Math.max(entregado, consumido == null ? 0 : consumido));
         Div filas = new Div();
         filas.getStyle().set("display", "grid").set("grid-template-columns", "minmax(200px, auto) 1fr auto")
                 .set("column-gap", "12px").set("row-gap", "6px").set("align-items", "center").set("font-size", "13px")
                 .set("margin", "4px 0");
         filaBalance(filas, "Generado por " + p.generador(), generado, max, "#eb6834");
         filaBalance(filas, "Consumido por las maquinas " + GeneradorView.deRed(p.red()), consumido, max, "#52514e");
-        filaBalance(filas, "Salio por el " + GeneradorView.nombreRed(p.red()) + " (a la red o al otro transformador)", salioTrafo, max, "#1baf7a");
+        filaBalance(filas, "Exportada a la red", entregado, max, "#1baf7a");
         balance.add(titulo, filas);
-        if (consumido != null && salioTrafo != null) {
-            double diferencia = generado - consumido - salioTrafo;
-            Span nota = new Span(String.format(Locale.ROOT, "Generado - consumido - salido = %,.0f kWh: consumo que ningun medidor de "
-                    + "maquina registra (alumbrado, cargas sin medidor) y perdidas%s. Salido = medidor del transformador.", diferencia,
-                    entroTrafo != null && entroTrafo >= 0.5
-                            ? String.format(Locale.ROOT, ", menos lo que entro por el transformador (%,.0f kWh)", entroTrafo) : ""));
+        if (consumido != null) {
+            double diferencia = generado - consumido - entregado;
+            Span nota = new Span(String.format(Locale.ROOT, "Generado - consumido - exportado = %,.0f kWh. Si es positivo, el generador "
+                    + "tambien alimento cargas sin medidor (alumbrado y otras), maquinas del otro transformador y perdidas; si es "
+                    + "negativo, esas maquinas tomaron ademas de la red (la planta importo %,.0f kWh en el arranque).", diferencia, red));
             nota.getStyle().set("font-size", "12px").set("color", "#52514e");
             balance.add(nota);
         }
@@ -1055,9 +1049,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         barra.add(segmento(pctGen, "#eb6834", String.format(Locale.ROOT, "Generador %.1f%%", pctGen)),
                 segmento(pctRed, "#2a78d6", String.format(Locale.ROOT, "Red %.1f%%", pctRed)));
         Span leyenda = new Span(String.format(Locale.ROOT, "Generador %.1f%% (%,.0f kWh)   |   Red %.1f%% (%,.0f kWh), meta 0%%"
-                + "   |   Exportada a la red: %,.0f kWh (excedente, no es parte del consumo)", pctGen, gen, pctRed, red, entregado)
-                + (p.porcentajeDeRedTransformador() == null ? "" : String.format(Locale.ROOT,
-                "   |   Referencia, medidor %s: %.1f%% importado", GeneradorView.deRed(p.red()), p.porcentajeDeRedTransformador())));
+                + "   |   Exportada a la red: %,.0f kWh (excedente, no es parte del consumo)", pctGen, gen, pctRed, red, entregado));
         leyenda.getStyle().set("font-size", "12px").set("color", "#52514e");
         balance.add(subtitulo, barra, leyenda);
         balance.setVisible(true);
