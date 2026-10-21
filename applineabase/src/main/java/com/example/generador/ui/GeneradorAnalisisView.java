@@ -87,8 +87,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             "agosto", "septiembre", "octubre", "noviembre", "diciembre"};
     private static final DateTimeFormatter DIA = DateTimeFormatter.ofPattern("dd-MM-yyyy");
     private static final DateTimeFormatter CORTA = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
-    // Paleta categórica de referencia (validada para daltonismo): azul, naranja, aqua.
-    private static final String AZUL = "0x2a78d6", NARANJA = "0xeb6834", AQUA = "0x1baf7a";
+    // Colores de los gráficos (amCharts, "0xrrggbb"): los mismos apagados de Balance energético P1 y del reporte.
+    private static final String GRAF_RED = "0x" + GeneradorView.COLOR_RED.substring(1), GRAF_GEN = "0x" + GeneradorView.COLORES_GEN[0].substring(1),
+            GRAF_EXP = "0x" + GeneradorView.COLOR_EXPORTADA.substring(1);
 
     private final GeneradorService generadorService;
     private final GeneradorAnalisisService analisis;
@@ -433,8 +434,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         series.add("Importada de la red");
         series.add("Exportada a la red (excedente)");
-        colores.add(AZUL);
-        colores.add(AQUA);
+        colores.add(GRAF_RED);
+        colores.add(GRAF_EXP);
         for (Fila f : filas) {
             categorias.add(a == Agrupacion.DIA ? f.periodo().substring(0, 5) : f.periodo());
             List<Double> v = new ArrayList<>();
@@ -458,7 +459,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         for (int i = 0; i < todos.size(); i++) {
             if (todos.get(i).nombre().equals(nombre)) return "0x" + GeneradorView.COLORES_GEN[i % GeneradorView.COLORES_GEN.length].substring(1);
         }
-        return NARANJA;
+        return GRAF_GEN;
     }
 
     /**
@@ -605,7 +606,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         // Tooltips semitransparentes solo en esta pestaña (pedido del usuario: tapaban el detalle).
         scriptPeriodos = GraficaModel.conTooltipsTransparentes(GraficaModel.getBarrasApiladasScript(CHART_PERIODOS, categorias,
                 new String[]{"Aporte del generador", "Importada de la red", "Exportada a la red (excedente)"},
-                new String[]{NARANJA, AZUL, AQUA}, valores, "kWh"));
+                new String[]{GRAF_GEN, GRAF_RED, GRAF_EXP}, valores, "kWh"));
         if (tabs.getSelectedTab() == tabPeriodos) getElement().executeJs(scriptPeriodos);
     }
 
@@ -642,7 +643,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + "<div style='width:" + ancho.apply(meta.verdeHasta()) + ";background:#d4edda'></div>"
                 + "<div style='width:" + ancho.apply(meta.amarilloHasta() - meta.verdeHasta()) + ";background:#fff3cd'></div>"
                 + "<div style='flex:1;background:#f8d7da'></div>"
-                + "<div style='position:absolute;left:0;top:7px;height:16px;width:" + ancho.apply(pct) + ";background:#2a78d6'></div></div>"
+                + "<div style='position:absolute;left:0;top:7px;height:16px;width:" + ancho.apply(pct) + ";background:" + GeneradorView.COLOR_RED + "'></div></div>"
                 + "<div style='position:relative;height:16px;font-size:12px;color:#555'>" + marca.apply(0.0) + marca.apply(meta.verdeHasta())
                 + marca.apply(meta.amarilloHasta()) + marca.apply(tope) + "</div>"
                 + "<div style='font-size:12px;color:#555'>Barra azul = importacion de la red del periodo, en % del consumo. Fondo: verde hasta "
@@ -877,7 +878,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         chartCostos.setVisible(true);
         scriptCostos = GraficaModel.getBarrasAgrupadasScript(CHART_COSTOS, categorias,
-                new String[]{"Diesel $/kWh consumido en planta", "Red $/kWh (franja de cada hora)"}, new String[]{NARANJA, AZUL},
+                new String[]{"Diesel $/kWh consumido en planta", "Red $/kWh (franja de cada hora)"}, new String[]{GRAF_GEN, GRAF_RED},
                 valores, "$/kWh", "#.000");
         if (tabs.getSelectedTab() == tabCostos) getElement().executeJs(scriptCostos);
     }
@@ -1019,6 +1020,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         double generado = p.kwhGenerado() == null ? 0 : p.kwhGenerado();
         double entregado = p.kwhRedExportada() == null ? 0 : p.kwhRedExportada();
         Double consumido = ConsumoMedidoresService.sumaBalance(lista);
+        String colorGen = "#" + colorGenerador(p.generador()).substring(2); // el color de ese generador en todas las pantallas
 
         Span titulo = new Span("Balance del arranque");
         titulo.getStyle().set("font-size", "14px").set("font-weight", "700").set("color", "#0b0b0b");
@@ -1027,9 +1029,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         filas.getStyle().set("display", "grid").set("grid-template-columns", "minmax(200px, auto) 1fr auto")
                 .set("column-gap", "12px").set("row-gap", "6px").set("align-items", "center").set("font-size", "13px")
                 .set("margin", "4px 0");
-        filaBalance(filas, "Generado por " + p.generador(), generado, max, "#eb6834");
+        filaBalance(filas, "Generado por " + p.generador(), generado, max, colorGen);
         filaBalance(filas, "Consumido por las maquinas " + GeneradorView.deRed(p.red()), consumido, max, "#52514e");
-        filaBalance(filas, "Exportada a la red", entregado, max, "#1baf7a");
+        filaBalance(filas, "Exportada a la red", entregado, max, GeneradorView.COLOR_EXPORTADA);
         balance.add(titulo, filas);
         if (consumido != null) {
             double diferencia = generado - consumido - entregado;
@@ -1048,8 +1050,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Div barra = new Div();
         barra.getStyle().set("display", "flex").set("width", "100%").set("height", "30px").set("border-radius", "6px")
                 .set("overflow", "hidden").set("margin", "4px 0");
-        barra.add(segmento(pctGen, "#eb6834", String.format(Locale.ROOT, "Generador %.1f%%", pctGen)),
-                segmento(pctRed, "#2a78d6", String.format(Locale.ROOT, "Red %.1f%%", pctRed)));
+        barra.add(segmento(pctGen, colorGen, String.format(Locale.ROOT, "Generador %.1f%%", pctGen)),
+                segmento(pctRed, GeneradorView.COLOR_RED, String.format(Locale.ROOT, "Red %.1f%%", pctRed)));
         Span leyenda = new Span(String.format(Locale.ROOT, "Generador %.1f%% (%,.0f kWh)   |   Red %.1f%% (%,.0f kWh), meta 0%%"
                 + "   |   Exportada a la red: %,.0f kWh (excedente, no es parte del consumo)", pctGen, gen, pctRed, red, entregado));
         leyenda.getStyle().set("font-size", "12px").set("color", "#52514e");
@@ -1075,7 +1077,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private static Div segmento(double pct, String color, String texto) {
         Div d = new Div();
         d.getStyle().set("flex", "0 0 " + String.format(Locale.ROOT, "%.2f", pct) + "%").set("background-color", color)
-                .set("color", "#ffffff").set("font-size", "12px").set("font-weight", "600").set("display", "flex")
+                .set("color", GeneradorView.tintaSobre(color)).set("font-size", "12px").set("font-weight", "600").set("display", "flex")
                 .set("align-items", "center").set("justify-content", "center").set("white-space", "nowrap").set("overflow", "hidden");
         if (pct >= 12) d.setText(texto);
         return d;
@@ -1102,7 +1104,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         chartMinutos.setVisible(true);
         getElement().executeJs(GraficaModel.conTooltipsTransparentes(GraficaModel.getMarchaMinutoScript(CHART_MINUTOS, t, gen, consumo, red,
-                "Consumo " + GeneradorView.deRed(p.red()), NARANJA, AZUL, AQUA)));
+                "Consumo " + GeneradorView.deRed(p.red()), colorGenerador(p.generador()), GRAF_RED, GRAF_EXP)));
     }
 
     private void mostrarMaquinas(PeriodoMarcha p) {

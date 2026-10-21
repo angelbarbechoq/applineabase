@@ -1199,8 +1199,8 @@ public class GraficaModel {
                 .append("  s.data.setAll(datos); return s;")
                 .append("}")
                 .append("var leyenda = [];")
-                .append("var tomado = columnas('Importada de la red', 'ri', 0x2a78d6, true);")
-                .append("var entregado = columnas('Exportada a la red', 're', 0x1baf7a, false);");
+                .append("var tomado = columnas('Importada de la red', 'ri', 0x4c83bf, true);")
+                .append("var entregado = columnas('Exportada a la red', 're', 0x5c9e5a, false);");
         for (int g = 0; g < n; g++) {
             js.append("leyenda.push(linea(").append(jsString(generadores[g])).append(", 'g").append(g).append("', ")
                     .append(coloresGen[g % coloresGen.length]).append("));");

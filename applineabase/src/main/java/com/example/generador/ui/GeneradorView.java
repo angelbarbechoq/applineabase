@@ -477,10 +477,13 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     // ================= Balance energético P1 (planta 1 en vivo) =================
 
     /**
-     * Color de cada generador (en el orden de generador-config.json), el mismo en la barra y en el gráfico: naranja y
-     * violeta de la paleta de referencia, validados para daltonismo junto al azul de la red y el verde agua de lo entregado.
+     * Color de cada generador (en el orden de generador-config.json), el mismo en la barra, los gráficos y el reporte:
+     * ladrillo y ocre, apagados a pedido del usuario (2026-10-21: los anteriores eran "chillones"). Validados para
+     * daltonismo en ese orden junto al azul de la red y el verde de lo exportado (validador de la paleta, pares vecinos).
      */
-    static final String[] COLORES_GEN = {"#eb6834", "#6250d6", "#e87ba4", "#eda100"};
+    static final String[] COLORES_GEN = {"#b65a48", "#c9a248", "#a8738c", "#7f8f52"};
+    /** Importada de la red y exportada a la red (misma paleta apagada). */
+    static final String COLOR_RED = "#4c83bf", COLOR_EXPORTADA = "#5c9e5a";
     private static final String CHIP = "padding:2px 8px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;";
 
     private VerticalLayout crearPlanta() {
@@ -545,11 +548,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             h.append("")
                     .append(tarjetaPlanta("Aporte de los generadores", kw(p.consumidaDeGeneradores()),
                             pctTexto(pctGen) + " del consumo" + (p.generada() > p.consumidaDeGeneradores() + 0.5
-                                    ? " (generan " + kw(p.generada()) + ")" : ""), "#eb6834"))
+                                    ? " (generan " + kw(p.generada()) + ")" : ""), COLORES_GEN[0]))
                     .append(tarjetaPlanta("Importada de la red", kw(p.importada()),
                             "<span style='" + CHIP + "background:" + semaforo[0] + ";color:" + semaforo[1] + "'>" + pctTexto(pctRed)
-                                    + " del consumo</span> meta 0 %", "#2a78d6"))
-                    .append(tarjetaPlanta("Exportada a la red", kw(p.exportada()), "excedente de los generadores", "#1baf7a"))
+                                    + " del consumo</span> meta 0 %", COLOR_RED))
+                    .append(tarjetaPlanta("Exportada a la red", kw(p.exportada()), "excedente de los generadores", COLOR_EXPORTADA))
                     .append("</div>");
 
             // Barra del consumo de la planta: lo que puso cada generador y lo importado de la red (100 %).
@@ -559,7 +562,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 if (p.contado(f)) tramos.add(new String[]{f.generador(), String.valueOf(p.aporte(f)), COLORES_GEN[i % COLORES_GEN.length]});
                 i++;
             }
-            tramos.add(new String[]{"Red", String.valueOf(p.importada()), "#2a78d6"});
+            tramos.add(new String[]{"Red", String.valueOf(p.importada()), COLOR_RED});
             if (consumo > 0) {
                 h.append("<div style='display:grid;gap:6px'><div style='font-weight:600'>Consumo de la planta: ").append(kw(consumo)).append("</div>")
                         .append("<div style='display:flex;height:34px;border-radius:4px;overflow:hidden;background:#e2e3e5'>");
@@ -567,7 +570,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                     double pct = Double.parseDouble(t[1]) / consumo * 100;
                     if (pct <= 0) continue;
                     h.append("<div style='width:").append(String.format(Locale.ROOT, "%.2f%%", pct)).append(";background:").append(t[2])
-                            .append(";color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;"
+                            .append(";color:").append(tintaSobre(t[2]))
+                            .append(";font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center;"
                                     + "white-space:nowrap;overflow:hidden'>")
                             .append(pct >= 12 ? esc(t[0]) + " " + pctTexto(pct) : "").append("</div>");
                 }
@@ -693,6 +697,15 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     private static String esc(String s) {
         return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("'", "&#39;");
+    }
+
+    /** Texto legible sobre un fondo "#rrggbb": blanco sobre los oscuros, casi negro sobre los claros (como el ocre). */
+    static String tintaSobre(String hex) {
+        int rgb = Integer.parseInt(hex.substring(1), 16);
+        double[] c = {(rgb >> 16 & 0xff) / 255.0, (rgb >> 8 & 0xff) / 255.0, (rgb & 0xff) / 255.0};
+        for (int k = 0; k < 3; k++) c[k] = c[k] <= 0.03928 ? c[k] / 12.92 : Math.pow((c[k] + 0.055) / 1.055, 2.4);
+        double luminancia = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+        return luminancia > 0.25 ? "#1f2328" : "#ffffff";
     }
 
     // ================= Estado actual =================

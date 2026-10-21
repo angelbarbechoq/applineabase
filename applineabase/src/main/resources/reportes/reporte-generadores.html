@@ -18,10 +18,10 @@
   --ink: #17212b;
   --muted: #5a6572;
   --line: #dce1e7;
-  --gen: #dd5f2a;
+  --gen: #b65a48;
   --cons: #4a525c;
-  --grid: #2a6fd0;
-  --out: #16956a;
+  --grid: #4c83bf;
+  --out: #5c9e5a;
   --ok-bg: #d8f0e0; --ok-fg: #15602f;
   --warn-bg: #fdf0d2; --warn-fg: #7a5208;
   --bad-bg: #fadcdc; --bad-fg: #8a1f1f;
@@ -34,7 +34,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #10161c; --surface: #172028; --ink: #e5eaef; --muted: #9ba6b2; --line: #2a3540;
-    --gen: #f07a45; --cons: #c3cad3; --grid: #6aa2f2; --out: #37c28f;
+    --gen: #b8604d; --cons: #c3cad3; --grid: #5f8fc9; --out: #64a562;
     --ok-bg: #173826; --ok-fg: #8fe0ad; --warn-bg: #3d3014; --warn-fg: #f1cf7e;
     --bad-bg: #3f1d1d; --bad-fg: #f3a5a5; --info-bg: #1b2b40; --info-fg: #a9c6ee;
     color-scheme: dark;
@@ -42,7 +42,7 @@
 }
 :root[data-theme="dark"] {
   --bg: #10161c; --surface: #172028; --ink: #e5eaef; --muted: #9ba6b2; --line: #2a3540;
-  --gen: #f07a45; --cons: #c3cad3; --grid: #6aa2f2; --out: #37c28f;
+  --gen: #b8604d; --cons: #c3cad3; --grid: #5f8fc9; --out: #64a562;
   --ok-bg: #173826; --ok-fg: #8fe0ad; --warn-bg: #3d3014; --warn-fg: #f1cf7e;
   --bad-bg: #3f1d1d; --bad-fg: #f3a5a5; --info-bg: #1b2b40; --info-fg: #a9c6ee;
   color-scheme: dark;
@@ -330,8 +330,8 @@ const DATOS = /*DATOS*/;
 // Consumo de toda la planta (promedios de 15 min) en los tramos con algún generador en marcha; null con un solo generador.
 // Cada punto: [fecha, generó cada generador..., puso en planta cada uno..., importada, exportada] en kW.
 const PLANTA = /*PLANTA*/null;
-// Color de cada generador, el mismo que en LineaBaseX (Balance energético P1): naranja, violeta, ...
-const COLORES_GEN = ["#eb6834", "#6250d6", "#e87ba4", "#eda100"];
+// Color de cada generador, el mismo que en LineaBaseX (Balance energético P1): ladrillo, ocre, ... (apagados)
+const COLORES_GEN = ["#b65a48", "#c9a248", "#a8738c", "#7f8f52"];
 const GENERADO_EL = "/*GENERADO_EL*/";
 // Semaforo de la meta de consumo cero de la red (generador-config.json, metaImportacionRed): verde hasta VERDE_HASTA %,
 // amarillo hasta AMARILLO_HASTA %, rojo por encima. Sin reemplazar (abierto como plantilla) quedan 2 y 10.
