@@ -16,6 +16,7 @@ import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.TipoEventoGenerador;
 import com.example.generador.service.AlarmaComap;
 import com.example.generador.service.HistorialEventosService;
+import com.example.generador.service.IslaService;
 import com.example.generador.service.PlantaEnVivoService;
 import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.ParametroGenerador;
@@ -97,6 +98,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final CalidadEnergiaService calidad;
     private final LineaAccessService lineaAccessService;
     private final PlantaEnVivoService plantaService;
+    private final IslaService islaService;
     private Generador generador;
     private final TabSheet tabs = new TabSheet();
     private Tab tabPlanta;
@@ -153,12 +155,13 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     }
 
     public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService,
-                         HistorialEventosService historial, PlantaEnVivoService plantaService) {
+                         HistorialEventosService historial, PlantaEnVivoService plantaService, IslaService islaService) {
         this.service = service;
         this.calidad = calidad;
         this.lineaAccessService = lineaAccessService;
         this.historial = historial;
         this.plantaService = plantaService;
+        this.islaService = islaService;
         List<Generador> lista = service.generadores();
         this.generador = lista.isEmpty() ? null : lista.get(0);
 
@@ -838,9 +841,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         if (marcha && l.kw() != null && l.redVL1L2() != null) {
             boolean conRed = prom(l.redVL1L2(), l.redVL2L3(), l.redVL3L1()) != null
                     && prom(l.redVL1L2(), l.redVL2L3(), l.redVL3L1()) >= com.example.generador.service.GeneradorAnalisisService.V_RED_PRESENTE;
+            // Isla con el controlador viendo red (interruptor de la planta abierto): la detecta IslaService cada minuto.
+            LocalDateTime islaDesde = islaService.enIslaDesde(gen.nombre());
             String modo = l.kw() < com.example.generador.service.GeneradorAnalisisService.KW_VACIO ? "En vacio"
+                    : islaDesde != null ? "En isla desde las " + islaDesde.format(DateTimeFormatter.ofPattern("HH:mm"))
+                            + " (interruptor de la planta abierto, esperando el retorno de red)"
                     : conRed ? "En paralelo con la red" : "En isla (sin red)";
-            panelGen.add(fila("Modo", texto(modo)));
+            if (islaDesde != null) panelGen.add(fila("Modo", badgeNuevo(modo, Estado.AVISO)));
+            else panelGen.add(fila("Modo", texto(modo)));
         }
 
         // Motor.

@@ -179,12 +179,23 @@ public class GeneradorAnalisisService {
     private final GeneradorService generadorService;
     private final TarifaFranjaService tarifaFranjaService;
     private final FeriadoService feriadoService;
+    private final IslaService islaService;
 
     public GeneradorAnalisisService(GeneradorService generadorService, TarifaFranjaService tarifaFranjaService,
-                                    FeriadoService feriadoService) {
+                                    FeriadoService feriadoService, IslaService islaService) {
         this.generadorService = generadorService;
         this.tarifaFranjaService = tarifaFranjaService;
         this.feriadoService = feriadoService;
+        this.islaService = islaService;
+    }
+
+    /**
+     * En isla: dentro de una isla detectada (interruptor de la planta abierto, ver IslaService) o, si no, sin tensión de
+     * red en el controlador. En paralelo: con tensión de red y fuera de una isla. null = no se sabe (sin tensión leída).
+     */
+    private static Boolean enParalelo(LecturaGuardada l, List<IslaService.Isla> islas) {
+        for (IslaService.Isla i : islas) if (i.contiene(l.fecha())) return false;
+        return l.redV() == null ? null : l.redV() >= V_RED_PRESENTE;
     }
 
     /**
@@ -372,6 +383,7 @@ public class GeneradorAnalisisService {
             lecturas.values().forEach(l -> { if (l.kwh() != null && l.kwh() > 0) kwhGen.put(l.fecha(), l.kwh()); });
             TreeMap<LocalDateTime, Double> importada = red.importadaDe().getOrDefault(g.nombre(), new TreeMap<>());
             TreeMap<LocalDateTime, Double> exportada = red.exportadaDe().getOrDefault(g.nombre(), new TreeMap<>());
+            List<IslaService.Isla> islas = islaService.islas(g, primero.atStartOfDay(), ultimo.plusDays(1).atStartOfDay());
 
             for (GeneradorService.Arranque a : e.getValue()) {
                 LocalDateTime f = a.fin() == null ? LocalDateTime.now().withNano(0) : a.fin();
@@ -383,9 +395,10 @@ public class GeneradorAnalisisService {
                 for (LecturaGuardada l : lecturas.subMap(a.inicio(), true, f, true).values()) {
                     if (previa != null && previa.marcha()) {
                         double m = Math.min(Duration.between(previa.fecha(), l.fecha()).toSeconds() / 60.0, MAX_MIN_POR_LECTURA);
+                        Boolean paralelo = enParalelo(previa, islas);
                         if (previa.kw() != null && previa.kw() < KW_VACIO) min[2] += m;
-                        else if (previa.redV() != null && previa.redV() >= V_RED_PRESENTE) min[0] += m;
-                        else if (previa.redV() != null) min[1] += m;
+                        else if (Boolean.TRUE.equals(paralelo)) min[0] += m;
+                        else if (paralelo != null) min[1] += m;
                     }
                     if (l.marcha() && l.kw() != null && (kwMax == null || l.kw() > kwMax)) kwMax = l.kw();
                     previa = l;
@@ -658,6 +671,7 @@ public class GeneradorAnalisisService {
 
     private void acumularGenerador(Generador g, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
         TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, desde, hasta);
+        List<IslaService.Isla> islas = islaService.islas(g, desde.minusDays(1).atStartOfDay(), hasta.plusDays(1).atStartOfDay());
         LecturaGuardada a = null;
         for (LecturaGuardada b : lecturas.values()) {
             LocalDate dia = b.fecha().toLocalDate();
@@ -676,8 +690,9 @@ public class GeneradorAnalisisService {
                 Double dkwh = delta(a.kwh(), b.kwh(), KW_MAX_GENERADOR * horas + 1);
                 if (dkwh != null) {
                     acum.generado += dkwh;
-                    if (enMarcha != null && enMarcha.redV() != null) {
-                        if (enMarcha.redV() >= V_RED_PRESENTE) acum.generadoParalelo = suma(acum.generadoParalelo, dkwh);
+                    Boolean paralelo = enMarcha == null ? null : enParalelo(enMarcha, islas);
+                    if (paralelo != null) {
+                        if (paralelo) acum.generadoParalelo = suma(acum.generadoParalelo, dkwh);
                         else acum.generadoIsla = suma(acum.generadoIsla, dkwh);
                     }
                 }
@@ -686,9 +701,10 @@ public class GeneradorAnalisisService {
                 double minutos = a.marcha() ? Math.min(horas * 60, MAX_MIN_POR_LECTURA) : 0;
                 acum.horasMarcha += dh != null ? dh : minutos / 60.0;
                 if (minutos > 0) {
+                    Boolean paralelo = enParalelo(a, islas);
                     if (a.kw() != null && a.kw() < KW_VACIO) acum.horasVacio = suma(acum.horasVacio, minutos / 60.0);
-                    else if (a.redV() != null && a.redV() >= V_RED_PRESENTE) acum.horasParalelo = suma(acum.horasParalelo, minutos / 60.0);
-                    else if (a.redV() != null) acum.horasIsla = suma(acum.horasIsla, minutos / 60.0);
+                    else if (Boolean.TRUE.equals(paralelo)) acum.horasParalelo = suma(acum.horasParalelo, minutos / 60.0);
+                    else if (paralelo != null) acum.horasIsla = suma(acum.horasIsla, minutos / 60.0);
                 }
                 Double darr = delta(a.arranques(), b.arranques(), 50);
                 if (darr != null) acum.arranques += (int) Math.round(darr);

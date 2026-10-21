@@ -35,6 +35,7 @@ public class GeneradorReaderService {
     private final GeneradorAlmacen almacen;
     private final HistorialEventosService historial;
     private final GeneradorAlarmasService alarmas;
+    private final IslaService islas;
 
     /** Último estado conocido (true = en marcha) y última lectura guardada estando parado. */
     private final Map<String, Boolean> enMarchaAnterior = new ConcurrentHashMap<>();
@@ -44,11 +45,12 @@ public class GeneradorReaderService {
     private final Set<String> avisados = ConcurrentHashMap.newKeySet();
 
     public GeneradorReaderService(GeneradoresConfigService config, GeneradorAlmacen almacen, HistorialEventosService historial,
-                                  GeneradorAlarmasService alarmas) {
+                                  GeneradorAlarmasService alarmas, IslaService islas) {
         this.config = config;
         this.almacen = almacen;
         this.historial = historial;
         this.alarmas = alarmas;
+        this.islas = islas;
     }
 
     public void leerGeneradores() {
@@ -97,6 +99,12 @@ public class GeneradorReaderService {
             } catch (Exception e) {
                 logger.error("Generador {}: error pasando sus alarmas a Alarmas Activas: {}", g.nombre(), e.getMessage(), e);
             }
+        }
+        // Isla (interruptor de la planta abierto con el controlador viendo red): se busca en lo recién guardado.
+        try {
+            islas.revisar();
+        } catch (Exception e) {
+            logger.error("Generadores: error revisando islas: {}", e.getMessage(), e);
         }
     }
 

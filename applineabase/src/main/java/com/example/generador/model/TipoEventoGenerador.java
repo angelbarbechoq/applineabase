@@ -22,6 +22,12 @@ public enum TipoEventoGenerador {
     ALARMA_RESUELTA("Alarma resuelta", Nivel.BUENO),
     SIN_COMUNICACION("Sin comunicacion", Nivel.FALLA),
     COMUNICACION_RECUPERADA("Comunicacion recuperada", Nivel.BUENO),
+    /**
+     * Se abrió el interruptor de la planta (MCB) y el generador quedó solo con su parte de la planta, aunque el
+     * controlador siga viendo tensión de red. Lo detecta IslaService con lo guardado (medidor del transformador en 0).
+     */
+    ISLA("Paso a isla", Nivel.FALLA),
+    FIN_ISLA("Vuelve a paralelo", Nivel.BUENO),
     // Copiados del historial interno del controlador (pantalla History; no se lee por Modbus sin escribirle).
     // Fecha = hora real (la del controlador corregida por el desfase de su reloj); la descripción lleva el
     // motivo de ComAp y la hora del controlador. Primera carga: docs/ig500/historial-controlador-2026-10-12.csv.

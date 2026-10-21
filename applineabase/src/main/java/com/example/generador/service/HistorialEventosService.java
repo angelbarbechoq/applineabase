@@ -322,6 +322,32 @@ public class HistorialEventosService {
         return nuevos.size();
     }
 
+    /**
+     * Guarda los eventos que todavía no estén (misma fecha y tipo = ya estaba). Para los que se detectan revisando lo
+     * guardado (islas), que se vuelven a encontrar en cada revisión. Devuelve cuántos se agregaron.
+     */
+    public int agregarSiFaltan(String generador, List<EventoGenerador> eventos) {
+        if (eventos.isEmpty()) return 0;
+        Set<String> existentes = new java.util.HashSet<>();
+        if (new File(ruta()).exists()) {
+            try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta().replace('\\', '/') + "?mode=ro");
+                 ResultSet r = c.createStatement().executeQuery("SELECT fecha, tipo FROM \"" + generador + "\"")) {
+                while (r.next()) existentes.add(r.getString(1) + "|" + r.getString(2));
+            } catch (Exception ex) {
+                if (!String.valueOf(ex.getMessage()).contains("no such table")) {
+                    logger.warn("No se pudo leer el historial de eventos de {}: {}", generador, ex.getMessage());
+                    return 0;
+                }
+            }
+        }
+        List<EventoGenerador> nuevos = new ArrayList<>();
+        for (EventoGenerador ev : eventos) {
+            if (existentes.add(ev.fecha().format(FECHA) + "|" + ev.tipo().name())) nuevos.add(ev);
+        }
+        guardar(generador, nuevos);
+        return nuevos.size();
+    }
+
     /** Eventos entre dos fechas, del más reciente al más viejo (tipo null = todos). */
     public List<EventoGenerador> listar(String generador, LocalDateTime desde, LocalDateTime hasta, TipoEventoGenerador tipo) {
         List<EventoGenerador> lista = new ArrayList<>();
