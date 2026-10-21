@@ -93,7 +93,21 @@ public class GraficaModel {
                 "  try { window.am5Charts[id].root.dispose(); } catch(e) {}" +
                 "}" +
                 "var root = am5.Root.new(id);" +
-                "root.setThemes([am5themes_Animated.new(root)]);";
+                TEMAS;
+    }
+
+    private static final String TEMAS = "root.setThemes([am5themes_Animated.new(root)]);";
+
+    /**
+     * El mismo gráfico con los tooltips semitransparentes: fondo blanco al 40 %, borde y texto del color de la serie.
+     * Pedido del usuario el 2026-10-21 solo para la pestaña Períodos en marcha de Análisis (los tooltips tapaban el
+     * detalle al pasar el mouse); los demás gráficos quedan como estaban.
+     */
+    public static String conTooltipsTransparentes(String script) {
+        return script.replace(TEMAS, "var temaTooltip = am5.Theme.new(root);"
+                + "temaTooltip.rule('Tooltip').setAll({ getFillFromSprite: false, getStrokeFromSprite: true, getLabelFillFromSprite: true, autoTextColor: false });"
+                + "temaTooltip.rule('PointedRectangle', ['tooltip', 'background']).setAll({ fill: am5.color(0xffffff), fillOpacity: 0.4, strokeWidth: 1.5, strokeOpacity: 0.9 });"
+                + "root.setThemes([am5themes_Animated.new(root), temaTooltip]);");
     }
 
     public String getInitScript2(String containerId) {

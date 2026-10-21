@@ -465,6 +465,27 @@ public class GeneradorAnalisisService {
         return lista;
     }
 
+    /**
+     * Minuto a minuto de un período en marcha contra el transformador del generador (pedido del usuario el 2026-10-21 para
+     * el gráfico del detalle del arranque): potencia del generador y la del medidor de su transformador en la lectura más
+     * cercana anterior (hasta 90 s; + importa de la red, - exporta). Consumo = generador + transformador (otrosKw = 0).
+     */
+    public List<MinutoMarcha> minutosMarchaTransformador(PeriodoMarcha p) {
+        List<MinutoMarcha> lista = new ArrayList<>();
+        Generador g = generadorService.generadores().stream().filter(x -> x.nombre().equals(p.generador())).findFirst().orElse(null);
+        if (g == null || g.redAsociada() == null || !PLCDataQueryService.esNombreMaquinaValido(g.redAsociada())) return lista;
+        LocalDate desde = p.inicio().toLocalDate(), hasta = p.fin().toLocalDate();
+        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, desde, hasta);
+        TreeMap<LocalDateTime, Double> trafo = seriePotencia(g.redAsociada(), desde, hasta);
+        for (LecturaGuardada l : lecturas.subMap(p.inicio(), true, p.fin(), true).values()) {
+            if (!l.marcha()) continue;
+            Map.Entry<LocalDateTime, Double> t = trafo.floorEntry(l.fecha());
+            Double redKw = t != null && Duration.between(t.getKey(), l.fecha()).toSeconds() <= 90 ? t.getValue() : null;
+            lista.add(new MinutoMarcha(l.fecha(), l.kw(), 0, redKw));
+        }
+        return lista;
+    }
+
     /** Potencia media de un medidor entre desde (incluido) y hasta (excluido), del archivo VIP; null sin lecturas. */
     public Double potenciaMedia(String maquina, LocalDateTime desde, LocalDateTime hasta) {
         if (!PLCDataQueryService.esNombreMaquinaValido(maquina)) return null;

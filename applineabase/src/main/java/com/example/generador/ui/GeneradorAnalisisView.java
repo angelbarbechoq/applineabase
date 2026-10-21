@@ -602,9 +602,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             valores.add(new Double[]{p.generadorUsado(), p.kwhRedImportada(),
                     p.kwhRedExportada() == null || p.kwhRedExportada() < 0.5 ? null : -p.kwhRedExportada()});
         }
-        scriptPeriodos = GraficaModel.getBarrasApiladasScript(CHART_PERIODOS, categorias,
+        // Tooltips semitransparentes solo en esta pestaña (pedido del usuario: tapaban el detalle).
+        scriptPeriodos = GraficaModel.conTooltipsTransparentes(GraficaModel.getBarrasApiladasScript(CHART_PERIODOS, categorias,
                 new String[]{"Aporte del generador", "Importada de la red", "Exportada a la red (excedente)"},
-                new String[]{NARANJA, AZUL, AQUA}, valores, "kWh");
+                new String[]{NARANJA, AZUL, AQUA}, valores, "kWh"));
         if (tabs.getSelectedTab() == tabPeriodos) getElement().executeJs(scriptPeriodos);
     }
 
@@ -1080,9 +1081,13 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         return d;
     }
 
-    /** Gráfico minuto a minuto del arranque: generador, consumo de la planta 1 y red del medidor principal (+ tomado / - entregado). */
+    /**
+     * Gráfico minuto a minuto del arranque: el generador contra su transformador (pedido del usuario el 2026-10-21): su
+     * potencia, el consumo del transformador (generador + medidor del transformador) y la red por ese transformador
+     * (+ importada / - exportada). Las cifras del detalle siguen siendo las de la planta 1 (medidor principal).
+     */
     private void mostrarGraficoMinutos(PeriodoMarcha p) {
-        List<GeneradorAnalisisService.MinutoMarcha> minutos = analisis.minutosMarcha(p);
+        List<GeneradorAnalisisService.MinutoMarcha> minutos = analisis.minutosMarchaTransformador(p);
         if (minutos.isEmpty()) {
             chartMinutos.setVisible(false);
             return;
@@ -1096,8 +1101,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             red.add(m.redKw());
         }
         chartMinutos.setVisible(true);
-        getElement().executeJs(GraficaModel.getMarchaMinutoScript(CHART_MINUTOS, t, gen, consumo, red,
-                "Consumo de la planta 1", NARANJA, AZUL, AQUA));
+        getElement().executeJs(GraficaModel.conTooltipsTransparentes(GraficaModel.getMarchaMinutoScript(CHART_MINUTOS, t, gen, consumo, red,
+                "Consumo " + GeneradorView.deRed(p.red()), NARANJA, AZUL, AQUA)));
     }
 
     private void mostrarMaquinas(PeriodoMarcha p) {

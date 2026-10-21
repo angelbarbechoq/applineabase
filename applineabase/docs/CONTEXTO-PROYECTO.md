@@ -368,7 +368,11 @@ una opcion mas de la lista.
   importado de la planta; 14-10 18-22 h con los dos = 336 kWh exportados (antes 623 por transformador). Por el descuadre
   de arriba, el usuario pidio quitar de Grupo electrogeno todo lo que salia de los medidores de los transformadores
   (columnas de Balance P1, % de referencia en Periodos en marcha y reporte, fila del balance del arranque); no
-  reintroducirlos sin que lo pida. Queda solo Estado actual (potencia, corrientes y PF del medidor de su transformador).
+  reintroducirlos sin que lo pida. Queda solo Estado actual (potencia, corrientes y PF del medidor de su transformador) y,
+  desde el 2026-10-21 a pedido del usuario, el grafico minuto a minuto del detalle de un arranque en Periodos en marcha:
+  el generador contra su transformador (consumo del transformador = generador + su medidor; red por ese transformador);
+  las cifras del detalle siguen siendo de la planta 1. En esa pestana (solo ahi) los tooltips de los graficos son
+  semitransparentes (`GraficaModel.conTooltipsTransparentes`).
 - **Modulo de Mantenimiento Correctivo (MF21 + AMEF):** diseno acordado, sin implementar. Ver
   `docs/PLAN-MANTENIMIENTO-CORRECTIVO.md`. Falta el AMEF del usuario.
 - Campos que hoy violan la regla de datos (corregir sobre la marcha, no ahora): tecnico y
