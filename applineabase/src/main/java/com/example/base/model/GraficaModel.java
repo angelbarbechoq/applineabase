@@ -1143,8 +1143,53 @@ public class GraficaModel {
                 + "chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'zoomX', xAxis: xAxis }));"
                 + "chart.get('cursor').lineY.set('visible', false);"
                 + "chart.set('scrollbarX', am5.Scrollbar.new(root, { orientation: 'horizontal' }));"
+                + scriptMarcadoresDeClic()
                 + "window.am5Charts[id] = { root: root, chart: chart };"
                 + "chart.appear(800, 100);";
+    }
+
+    /**
+     * Marcadores al hacer clic, como en las gráficas de Tiempo Real (pedido del usuario el 2026-10-22 para el minuto a
+     * minuto de un arranque): cada clic deja una línea roja punteada con la fecha y la hora; desde el segundo, también
+     * el tiempo desde el marcador anterior (Δ hh:mm:ss). Doble clic los borra. Usa las variables chart y xAxis del script.
+     */
+    private static String scriptMarcadoresDeClic() {
+        return "var marcas = { tiempos: [], rangos: [], ultimoClic: 0 };"
+                + "chart.plotContainer.events.on('click', function(ev) {"
+                + "  try {"
+                + "    var ahora = Date.now(), doble = ahora - marcas.ultimoClic < 300;"
+                + "    marcas.ultimoClic = ahora;"
+                + "    if (doble) {"
+                + "      marcas.rangos.forEach(function(r) { xAxis.axisRanges.removeValue(r); });"
+                + "      marcas.rangos = []; marcas.tiempos = [];"
+                + "      return;"
+                + "    }"
+                + "    if (!ev.point) return;"
+                + "    var p = chart.plotContainer.toLocal(ev.point);"
+                + "    var t = xAxis.positionToValue(xAxis.toAxisPosition(p.x / chart.plotContainer.width()));"
+                + "    if (!t) return;"
+                + "    var d = new Date(t);"
+                + "    var texto = '[bold #d32f2f]' + d.toLocaleDateString('es-ES') + ' '"
+                + "        + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '[/]';"
+                + "    if (marcas.tiempos.length > 0) {"
+                + "      var s = Math.floor(Math.abs(t - marcas.tiempos[marcas.tiempos.length - 1]) / 1000);"
+                + "      var dos = function(n) { return String(n).padStart(2, '0'); };"
+                + "      texto += '\\n[bold #4a6572]\\u0394 ' + dos(Math.floor(s / 3600)) + ':' + dos(Math.floor(s % 3600 / 60)) + ':' + dos(s % 60) + '[/]';"
+                + "    }"
+                + "    var item = xAxis.makeDataItem({ value: t });"
+                + "    var rango = xAxis.createAxisRange(item);"
+                + "    setTimeout(function() {"
+                + "      if (rango.get('grid')) rango.get('grid').setAll({ stroke: am5.color(0xd32f2f), strokeWidth: 1, strokeDasharray: [3, 3], strokeOpacity: 0.6, visible: true });"
+                + "    }, 0);"
+                // Fondo blanco: aquí el texto cae sobre las columnas de la red y sin fondo no se lee.
+                + "    rango.get('label').setAll({ text: texto, fontWeight: 'bold', fontSize: '10px', visible: true, inside: true,"
+                + "        centerX: am5.p0, centerY: am5.p100, dy: marcas.tiempos.length * -26 - 25, dx: 5,"
+                + "        paddingTop: 2, paddingBottom: 2, paddingLeft: 4, paddingRight: 4,"
+                + "        background: am5.RoundedRectangle.new(root, { fill: am5.color(0xffffff), fillOpacity: 0.9 }) });"
+                + "    marcas.rangos.push(item);"
+                + "    marcas.tiempos.push(t);"
+                + "  } catch (e) { console.error('Marcador:', e); }"
+                + "});";
     }
 
     /**

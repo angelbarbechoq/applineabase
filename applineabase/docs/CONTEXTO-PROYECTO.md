@@ -372,7 +372,10 @@ una opcion mas de la lista.
   desde el 2026-10-21 a pedido del usuario, el grafico minuto a minuto del detalle de un arranque en Periodos en marcha:
   el generador contra su transformador (consumo del transformador = generador + su medidor; red por ese transformador);
   las cifras del detalle siguen siendo de la planta 1. En esa pestana (solo ahi) los tooltips de los graficos son
-  semitransparentes (`GraficaModel.conTooltipsTransparentes`).
+  semitransparentes (`GraficaModel.conTooltipsTransparentes`). Desde el 2026-10-22, en ese grafico minuto a minuto (solo
+  ahi) se marcan instantes con clic como en Tiempo Real: linea roja punteada con fecha y hora, desde el segundo tambien
+  el tiempo desde el anterior (Δ hh:mm:ss), etiqueta con fondo blanco porque cae sobre las columnas; doble clic borra
+  (`GraficaModel.scriptMarcadoresDeClic`).
 - **Modulo de Mantenimiento Correctivo (MF21 + AMEF):** diseno acordado, sin implementar. Ver
   `docs/PLAN-MANTENIMIENTO-CORRECTIVO.md`. Falta el AMEF del usuario.
 - Campos que hoy violan la regla de datos (corregir sobre la marcha, no ahora): tecnico y
