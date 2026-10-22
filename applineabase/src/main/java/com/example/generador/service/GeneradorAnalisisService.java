@@ -22,6 +22,7 @@ import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
@@ -37,6 +38,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * Análisis del grupo electrógeno por día, semana o mes: energía generada (contador del
@@ -176,6 +178,26 @@ public class GeneradorAnalisisService {
                                    Double arranques, Double redV) {
     }
 
+    /**
+     * Lo leído durante una consulta (un "Ver" de Análisis): cada archivo se lee una sola vez y la isla se detecta una sola
+     * vez por generador, aunque el resumen, el consumo de la planta y los períodos en marcha los pidan varias veces (antes,
+     * con "Todos", unas 20 lecturas de cada archivo y 8 detecciones de isla por "Ver"). Es de un solo hilo y se descarta
+     * al terminar la consulta: no guarda nada entre un "Ver" y el siguiente.
+     */
+    public static final class Consulta {
+        private final Map<String, Object> leido = new HashMap<>();
+
+        @SuppressWarnings("unchecked")
+        private <T> T leer(String clave, Supplier<T> lectura) {
+            Object v = leido.get(clave);
+            if (v == null) {
+                v = lectura.get();
+                leido.put(clave, v);
+            }
+            return (T) v;
+        }
+    }
+
     private final GeneradorService generadorService;
     private final TarifaFranjaService tarifaFranjaService;
     private final FeriadoService feriadoService;
@@ -198,31 +220,43 @@ public class GeneradorAnalisisService {
         return l.redV() == null ? null : l.redV() >= V_RED_PRESENTE;
     }
 
+    private List<Generador> generadores(Consulta c) {
+        return c.leer("generadores", generadorService::generadores);
+    }
+
+    private List<GeneradorService.Arranque> arranques(Consulta c, Generador g) {
+        return c.leer("arranques|" + g.nombre(), () -> generadorService.arranques(g));
+    }
+
+    private List<IslaService.Isla> islas(Consulta c, Generador g, LocalDateTime desde, LocalDateTime hasta) {
+        return c.leer("islas|" + g.nombre() + "|" + desde + "|" + hasta, () -> islaService.islas(g, desde, hasta));
+    }
+
     /**
      * Filas por período entre dos fechas (inclusive) para uno o varios generadores. La red es siempre la de toda la
      * planta 1 (medidor principal); los generadores no elegidos entran como "otros" para que el consumo sea el de la planta.
      */
-    public List<Fila> analizar(List<Generador> generadores, Agrupacion agrupacion, LocalDate desde, LocalDate hasta) {
+    public List<Fila> analizar(Consulta c, List<Generador> generadores, Agrupacion agrupacion, LocalDate desde, LocalDate hasta) {
         TreeMap<LocalDate, Acum> dias = new TreeMap<>(), diasOtros = new TreeMap<>();
         for (LocalDate d = desde; !d.isAfter(hasta); d = d.plusDays(1)) {
             dias.put(d, new Acum());
             diasOtros.put(d, new Acum());
         }
 
-        List<Generador> todos = generadorService.generadores();
+        List<Generador> todos = generadores(c);
         Set<String> elegidos = new HashSet<>();
         for (Generador g : generadores) {
             elegidos.add(g.nombre());
-            acumularGenerador(g, desde, hasta, dias);
+            acumularGenerador(c, g, desde, hasta, dias);
         }
         boolean hayOtros = false;
         for (Generador g : todos) {
             if (elegidos.contains(g.nombre())) continue;
             hayOtros = true;
-            acumularGenerador(g, desde, hasta, diasOtros);
+            acumularGenerador(c, g, desde, hasta, diasOtros);
         }
         if (hayOtros) dias.forEach((d, a) -> a.generadoOtros = diasOtros.get(d).generado);
-        acumularRed(elegidos, todos, desde, hasta, dias);
+        acumularRed(c, elegidos, todos, desde, hasta, dias);
 
         List<Fila> filas = new ArrayList<>();
         LocalDate inicio = desde;
@@ -295,13 +329,14 @@ public class GeneradorAnalisisService {
      *                         hora en que se generaron; null si las lecturas del generador no alcanzan para repartirlos
      * @param costoRed         lo que habría costado lo aprovechado comprado a la red, con el precio de la franja de cada
      *                         hora y la tarifa de su mes (Consumo por franja horaria); null sin reparto o sin tarifa
+     * @param horometroInicio  horas de marcha del controlador al arrancar; horometroFin, al parar (null si sigue en marcha)
      */
     public record PeriodoMarcha(String generador, String red, long arranqueId, Integer nro, LocalDateTime inicio,
                                 LocalDateTime fin, boolean enCurso, boolean inicioEstimado,
                                 Double kwhGenerado, Double kwhRedImportada, Double kwhRedExportada, Double kwMax,
                                 double minParalelo, double minIsla, double minVacio,
                                 int lecturasTomando, int lecturasRed, Double picoTomadoKw,
-                                double[] aprovechadoFranja, Double costoRed) {
+                                double[] aprovechadoFranja, Double costoRed, Double horometroInicio, Double horometroFin) {
 
         /** $/kWh medio de la red en las horas en que trabajó el generador. */
         public Double precioRedMedio() {
@@ -352,6 +387,11 @@ public class GeneradorAnalisisService {
 
     /** Arranques que se pisan con el período elegido (completos, no recortados), del más reciente al más viejo. */
     public List<PeriodoMarcha> periodosEnMarcha(List<Generador> generadores, LocalDate desde, LocalDate hasta) {
+        return periodosEnMarcha(new Consulta(), generadores, desde, hasta);
+    }
+
+    /** Igual, con lo ya leído en la consulta (ver {@link Consulta}). */
+    public List<PeriodoMarcha> periodosEnMarcha(Consulta c, List<Generador> generadores, LocalDate desde, LocalDate hasta) {
         LocalDateTime ini = desde.atStartOfDay();
         LocalDateTime fin = hasta.atTime(23, 59, 59);
         List<PeriodoMarcha> lista = new ArrayList<>();
@@ -360,7 +400,7 @@ public class GeneradorAnalisisService {
         Function<YearMonth, TarifaDelMes> tarifaDe = m -> tarifaPorMes.computeIfAbsent(m, k -> TarifaFranjaService.delMes(tarifas, k));
         Map<Generador, List<GeneradorService.Arranque>> porGenerador = new LinkedHashMap<>();
         for (Generador g : generadores) {
-            List<GeneradorService.Arranque> arranques = generadorService.arranques(g).stream()
+            List<GeneradorService.Arranque> arranques = arranques(c, g).stream()
                     .filter(a -> !a.inicio().isAfter(fin) && (a.fin() == null || !a.fin().isBefore(ini))).toList();
             if (!arranques.isEmpty()) porGenerador.put(g, arranques);
         }
@@ -369,21 +409,26 @@ public class GeneradorAnalisisService {
                 .min(LocalDate::compareTo).orElse(desde);
         LocalDate ultimo = porGenerador.values().stream().flatMap(List::stream)
                 .map(a -> a.fin() == null ? LocalDate.now() : a.fin().toLocalDate()).max(LocalDate::compareTo).orElse(hasta);
-        List<Generador> todos = generadorService.generadores();
-        Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe = lecturasDe(todos, primero, ultimo);
-        RedPrincipal red = redPrincipal(todos, lecturasDe, primero, ultimo);
-        TreeMap<LocalDateTime, Double> potenciaRed = seriePotenciaPrincipal(primero, ultimo);
-        Set<LocalDate> feriados = feriadoService.fechasEntre(primero, ultimo);
+        // Se lee todo el período elegido (o más, si un arranque empieza antes o termina después): el mismo tramo que el
+        // resumen de energía, así se aprovecha lo que ya leyó la consulta.
+        LocalDate leerDesde = primero.isBefore(desde) ? primero : desde;
+        LocalDate leerHasta = ultimo.isAfter(hasta) ? ultimo : hasta;
+        List<Generador> todos = generadores(c);
+        Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe = lecturasDe(c, todos, leerDesde, leerHasta);
+        RedPrincipal red = redPrincipal(c, todos, leerDesde, leerHasta);
+        TreeMap<LocalDateTime, Double> potenciaRed = seriePotenciaPrincipal(c, leerDesde, leerHasta);
+        Set<LocalDate> feriados = feriadoService.fechasEntre(leerDesde, leerHasta);
         Predicate<LocalDate> especial = d -> Franja.finDeSemana(d) || feriados.contains(d);
 
         for (Map.Entry<Generador, List<GeneradorService.Arranque>> e : porGenerador.entrySet()) {
             Generador g = e.getKey();
-            TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasDe.computeIfAbsent(g.nombre(), k -> lecturasGenerador(g, primero, ultimo));
+            TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasDe.computeIfAbsent(g.nombre(),
+                    k -> lecturasGenerador(c, g, leerDesde, leerHasta));
             TreeMap<LocalDateTime, Double> kwhGen = new TreeMap<>();
             lecturas.values().forEach(l -> { if (l.kwh() != null && l.kwh() > 0) kwhGen.put(l.fecha(), l.kwh()); });
             TreeMap<LocalDateTime, Double> importada = red.importadaDe().getOrDefault(g.nombre(), new TreeMap<>());
             TreeMap<LocalDateTime, Double> exportada = red.exportadaDe().getOrDefault(g.nombre(), new TreeMap<>());
-            List<IslaService.Isla> islas = islaService.islas(g, primero.atStartOfDay(), ultimo.plusDays(1).atStartOfDay());
+            List<IslaService.Isla> islas = islas(c, g, leerDesde.minusDays(1).atStartOfDay(), leerHasta.plusDays(1).atStartOfDay());
 
             for (GeneradorService.Arranque a : e.getValue()) {
                 LocalDateTime f = a.fin() == null ? LocalDateTime.now().withNano(0) : a.fin();
@@ -434,7 +479,8 @@ public class GeneradorAnalisisService {
                 }
                 lista.add(new PeriodoMarcha(g.nombre(), g.redAsociada(), a.id(), a.arranqueNro(), a.inicio(), f, a.fin() == null,
                         a.inicioEstimado(), generado, deltaEnVentana(importada, a.inicio(), f, KW_MAX_RED),
-                        exportado, kwMax, min[0], min[1], min[2], tomando, lecturasRed, pico, aprovechadoFranja, costoRed));
+                        exportado, kwMax, min[0], min[1], min[2], tomando, lecturasRed, pico, aprovechadoFranja, costoRed,
+                        a.horasInicio(), a.horasFin()));
             }
         }
         lista.sort((x, y) -> y.inicio().compareTo(x.inicio()));
@@ -451,10 +497,11 @@ public class GeneradorAnalisisService {
         Generador g = generadorService.generadores().stream().filter(x -> x.nombre().equals(p.generador())).findFirst().orElse(null);
         if (g == null) return lista;
         LocalDate desde = p.inicio().toLocalDate(), hasta = p.fin().toLocalDate();
-        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, desde, hasta);
+        Consulta c = new Consulta();
+        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(c, g, desde, hasta);
         List<TreeMap<LocalDateTime, LecturaGuardada>> otros = generadorService.generadores().stream()
-                .filter(x -> !x.nombre().equals(g.nombre())).map(x -> lecturasGenerador(x, desde, hasta)).toList();
-        TreeMap<LocalDateTime, Double> potenciaRed = seriePotenciaPrincipal(desde, hasta);
+                .filter(x -> !x.nombre().equals(g.nombre())).map(x -> lecturasGenerador(c, x, desde, hasta)).toList();
+        TreeMap<LocalDateTime, Double> potenciaRed = seriePotenciaPrincipal(c, desde, hasta);
         for (LecturaGuardada l : lecturas.subMap(p.inicio(), true, p.fin(), true).values()) {
             if (!l.marcha()) continue;
             Map.Entry<LocalDateTime, Double> red = potenciaRed.floorEntry(l.fecha());
@@ -475,8 +522,9 @@ public class GeneradorAnalisisService {
         Generador g = generadorService.generadores().stream().filter(x -> x.nombre().equals(p.generador())).findFirst().orElse(null);
         if (g == null || g.redAsociada() == null || !PLCDataQueryService.esNombreMaquinaValido(g.redAsociada())) return lista;
         LocalDate desde = p.inicio().toLocalDate(), hasta = p.fin().toLocalDate();
-        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, desde, hasta);
-        TreeMap<LocalDateTime, Double> trafo = seriePotencia(g.redAsociada(), desde, hasta);
+        Consulta c = new Consulta();
+        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(c, g, desde, hasta);
+        TreeMap<LocalDateTime, Double> trafo = seriePotencia(c, g.redAsociada(), desde, hasta);
         for (LecturaGuardada l : lecturas.subMap(p.inicio(), true, p.fin(), true).values()) {
             if (!l.marcha()) continue;
             Map.Entry<LocalDateTime, Double> t = trafo.floorEntry(l.fecha());
@@ -489,7 +537,7 @@ public class GeneradorAnalisisService {
     /** Potencia media de un medidor entre desde (incluido) y hasta (excluido), del archivo VIP; null sin lecturas. */
     public Double potenciaMedia(String maquina, LocalDateTime desde, LocalDateTime hasta) {
         if (!PLCDataQueryService.esNombreMaquinaValido(maquina)) return null;
-        var lecturas = seriePotencia(maquina, desde.toLocalDate(), hasta.toLocalDate()).subMap(desde, true, hasta, false);
+        var lecturas = seriePotencia(new Consulta(), maquina, desde.toLocalDate(), hasta.toLocalDate()).subMap(desde, true, hasta, false);
         return lecturas.isEmpty() ? null : lecturas.values().stream().mapToDouble(Double::doubleValue).average().orElse(0);
     }
 
@@ -524,19 +572,30 @@ public class GeneradorAnalisisService {
      * (hueco en el gráfico).
      */
     public List<PuntoPlanta> consumoPlanta(List<Generador> generadores, LocalDateTime desde, LocalDateTime hasta, int minutosPorPunto) {
-        List<Generador> todos = generadorService.generadores();
+        return consumoPlanta(new Consulta(), generadores, desde, hasta, minutosPorPunto);
+    }
+
+    /** Igual, con lo ya leído en la consulta (ver {@link Consulta}). */
+    public List<PuntoPlanta> consumoPlanta(Consulta c, List<Generador> generadores, LocalDateTime desde, LocalDateTime hasta,
+                                           int minutosPorPunto) {
+        List<Generador> todos = generadores(c);
         int n = generadores.size(), m = todos.size();
+        // hasta no se incluye: si es medianoche, alcanza con leer hasta el día anterior (el mismo tramo que el resumen de
+        // energía, así se aprovecha lo que ya leyó la consulta).
+        LocalDate diaDesde = desde.toLocalDate();
+        LocalDate diaHasta = hasta.toLocalTime().equals(LocalTime.MIDNIGHT) && hasta.toLocalDate().isAfter(diaDesde)
+                ? hasta.toLocalDate().minusDays(1) : hasta.toLocalDate();
         int[] indice = new int[m]; // lugar de cada generador en la lista pedida; -1 = uno de los "otros"
         List<TreeMap<LocalDateTime, LecturaGuardada>> lecturas = new ArrayList<>();
         for (int j = 0; j < m; j++) {
             String nombre = todos.get(j).nombre();
             indice[j] = -1;
             for (int i = 0; i < n; i++) if (generadores.get(i).nombre().equals(nombre)) indice[j] = i;
-            lecturas.add(lecturasGenerador(todos.get(j), desde.toLocalDate(), hasta.toLocalDate()));
+            lecturas.add(lecturasGenerador(c, todos.get(j), diaDesde, diaHasta));
         }
         // Por punto: {lecturas, importada, exportada, aporte de los otros, aporte de cada pedido..., generado de cada pedido...}.
         TreeMap<LocalDateTime, double[]> puntos = new TreeMap<>();
-        for (Map.Entry<LocalDateTime, Double> l : seriePotenciaPrincipal(desde.toLocalDate(), hasta.toLocalDate())
+        for (Map.Entry<LocalDateTime, Double> l : seriePotenciaPrincipal(c, diaDesde, diaHasta)
                 .subMap(desde, true, hasta, false).entrySet()) {
             double kw = l.getValue();
             double exportada = Math.max(0, -kw);
@@ -603,10 +662,11 @@ public class GeneradorAnalisisService {
         List<Generador> todos = generadorService.generadores();
         if (todos.stream().noneMatch(x -> x.nombre().equals(p.generador()))) return lista;
         LocalDate desde = p.inicio().toLocalDate(), hasta = p.fin().toLocalDate();
-        Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe = lecturasDe(todos, desde, hasta);
+        Consulta c = new Consulta();
+        Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe = lecturasDe(c, todos, desde, hasta);
         TreeMap<LocalDateTime, Double> kwhGen = new TreeMap<>();
         lecturasDe.get(p.generador()).values().forEach(l -> { if (l.kwh() != null && l.kwh() > 0) kwhGen.put(l.fecha(), l.kwh()); });
-        RedPrincipal red = redPrincipal(todos, lecturasDe, desde, hasta);
+        RedPrincipal red = redPrincipal(c, todos, desde, hasta);
         TreeMap<LocalDateTime, Double> importada = red.importadaDe().get(p.generador());
         TreeMap<LocalDateTime, Double> exportada = red.exportadaDe().get(p.generador());
         LocalDateTime ini = p.inicio();
@@ -690,9 +750,9 @@ public class GeneradorAnalisisService {
 
     // ================= Generador =================
 
-    private void acumularGenerador(Generador g, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
-        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(g, desde, hasta);
-        List<IslaService.Isla> islas = islaService.islas(g, desde.minusDays(1).atStartOfDay(), hasta.plusDays(1).atStartOfDay());
+    private void acumularGenerador(Consulta c, Generador g, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
+        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(c, g, desde, hasta);
+        List<IslaService.Isla> islas = islas(c, g, desde.minusDays(1).atStartOfDay(), hasta.plusDays(1).atStartOfDay());
         LecturaGuardada a = null;
         for (LecturaGuardada b : lecturas.values()) {
             LocalDate dia = b.fecha().toLocalDate();
@@ -735,7 +795,11 @@ public class GeneradorAnalisisService {
     }
 
     /** Lecturas guardadas del generador entre el día anterior a {@code desde} y {@code hasta} (sin repetidas). */
-    private TreeMap<LocalDateTime, LecturaGuardada> lecturasGenerador(Generador g, LocalDate desde, LocalDate hasta) {
+    private TreeMap<LocalDateTime, LecturaGuardada> lecturasGenerador(Consulta c, Generador g, LocalDate desde, LocalDate hasta) {
+        return c.leer("lecturas|" + g.nombre() + "|" + desde + "|" + hasta, () -> leerLecturasGenerador(g, desde, hasta));
+    }
+
+    private TreeMap<LocalDateTime, LecturaGuardada> leerLecturasGenerador(Generador g, LocalDate desde, LocalDate hasta) {
         TreeMap<LocalDateTime, LecturaGuardada> lecturas = new TreeMap<>();
         for (YearMonth m = YearMonth.from(desde.minusDays(1)); !m.isAfter(YearMonth.from(hasta)); m = m.plusMonths(1)) {
             String ruta = GeneradorAlmacen.rutaLecturas(m);
@@ -767,8 +831,9 @@ public class GeneradorAnalisisService {
      * los demás, por día; lo exportado sin ningún generador en marcha no se cuenta (ej. Caterpillar el 09-10: antes de
      * que se registrara su arranque, el transformador marcaba 505 kWh "exportados" contra 194 generados desde las 09:19).
      */
-    private void acumularRed(Set<String> elegidos, List<Generador> todos, LocalDate desde, LocalDate hasta, TreeMap<LocalDate, Acum> dias) {
-        RedPrincipal red = redPrincipal(todos, lecturasDe(todos, desde, hasta), desde, hasta);
+    private void acumularRed(Consulta c, Set<String> elegidos, List<Generador> todos, LocalDate desde, LocalDate hasta,
+                             TreeMap<LocalDate, Acum> dias) {
+        RedPrincipal red = redPrincipal(c, todos, desde, hasta);
         sumarDeltas(red.importada(), dias, true);
         for (Map.Entry<LocalDate, Acum> e : dias.entrySet()) {
             Acum a = e.getValue();
@@ -793,19 +858,21 @@ public class GeneradorAnalisisService {
                                 Map<String, TreeMap<LocalDateTime, Double>> exportadaDe) {
     }
 
-    private RedPrincipal redPrincipal(List<Generador> todos, Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe,
-                                      LocalDate desde, LocalDate hasta) {
-        LocalDateTime ahora = LocalDateTime.now().withNano(0);
-        Map<String, TreeMap<LocalDateTime, LocalDateTime>> marchas = new HashMap<>();
-        for (Generador g : todos) {
-            TreeMap<LocalDateTime, LocalDateTime> m = new TreeMap<>();
-            for (GeneradorService.Arranque a : generadorService.arranques(g)) m.put(a.inicio(), a.fin() == null ? ahora : a.fin());
-            marchas.put(g.nombre(), m);
-        }
-        TreeMap<LocalDateTime, Double> importada = serieContador(PRINCIPAL, false, desde, hasta);
-        TreeMap<LocalDateTime, Double> exportada = serieContador(PRINCIPAL, true, desde, hasta);
-        return new RedPrincipal(importada, exportada, repartirEntreGeneradores(importada, todos, lecturasDe, marchas),
-                repartirEntreGeneradores(exportada, todos, lecturasDe, marchas));
+    private RedPrincipal redPrincipal(Consulta c, List<Generador> todos, LocalDate desde, LocalDate hasta) {
+        return c.leer("red|" + desde + "|" + hasta, () -> {
+            Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe = lecturasDe(c, todos, desde, hasta);
+            LocalDateTime ahora = LocalDateTime.now().withNano(0);
+            Map<String, TreeMap<LocalDateTime, LocalDateTime>> marchas = new HashMap<>();
+            for (Generador g : todos) {
+                TreeMap<LocalDateTime, LocalDateTime> m = new TreeMap<>();
+                for (GeneradorService.Arranque a : arranques(c, g)) m.put(a.inicio(), a.fin() == null ? ahora : a.fin());
+                marchas.put(g.nombre(), m);
+            }
+            TreeMap<LocalDateTime, Double> importada = serieContador(c, PRINCIPAL, false, desde, hasta);
+            TreeMap<LocalDateTime, Double> exportada = serieContador(c, PRINCIPAL, true, desde, hasta);
+            return new RedPrincipal(importada, exportada, repartirEntreGeneradores(importada, todos, lecturasDe, marchas),
+                    repartirEntreGeneradores(exportada, todos, lecturasDe, marchas));
+        });
     }
 
     /**
@@ -852,21 +919,28 @@ public class GeneradorAnalisisService {
     }
 
     /** Lecturas guardadas de cada generador (por nombre). */
-    private Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe(List<Generador> generadores, LocalDate desde, LocalDate hasta) {
+    private Map<String, TreeMap<LocalDateTime, LecturaGuardada>> lecturasDe(Consulta c, List<Generador> generadores,
+                                                                            LocalDate desde, LocalDate hasta) {
         Map<String, TreeMap<LocalDateTime, LecturaGuardada>> m = new HashMap<>();
-        for (Generador g : generadores) m.put(g.nombre(), lecturasGenerador(g, desde, hasta));
+        for (Generador g : generadores) m.put(g.nombre(), lecturasGenerador(c, g, desde, hasta));
         return m;
     }
 
     /** Potencia del medidor principal minuto a minuto, en kW (+ toma de la red, - entrega). */
-    private TreeMap<LocalDateTime, Double> seriePotenciaPrincipal(LocalDate desde, LocalDate hasta) {
-        TreeMap<LocalDateTime, Double> serie = seriePotencia(PRINCIPAL, desde, hasta);
-        serie.replaceAll((t, v) -> v * KW_POR_UNIDAD_PRINCIPAL);
-        return serie;
+    private TreeMap<LocalDateTime, Double> seriePotenciaPrincipal(Consulta c, LocalDate desde, LocalDate hasta) {
+        return c.leer("potenciaPrincipal|" + desde + "|" + hasta, () -> {
+            TreeMap<LocalDateTime, Double> serie = leerSeriePotencia(PRINCIPAL, desde, hasta);
+            serie.replaceAll((t, v) -> v * KW_POR_UNIDAD_PRINCIPAL);
+            return serie;
+        });
     }
 
     /** Potencia del medidor de la red minuto a minuto (archivo VIP); negativa = entregando a la red. */
-    private TreeMap<LocalDateTime, Double> seriePotencia(String maquina, LocalDate desde, LocalDate hasta) {
+    private TreeMap<LocalDateTime, Double> seriePotencia(Consulta c, String maquina, LocalDate desde, LocalDate hasta) {
+        return c.leer("potencia|" + maquina + "|" + desde + "|" + hasta, () -> leerSeriePotencia(maquina, desde, hasta));
+    }
+
+    private TreeMap<LocalDateTime, Double> leerSeriePotencia(String maquina, LocalDate desde, LocalDate hasta) {
         TreeMap<LocalDateTime, Double> serie = new TreeMap<>();
         for (YearMonth m = YearMonth.from(desde.minusDays(1)); !m.isAfter(YearMonth.from(hasta)); m = m.plusMonths(1)) {
             String ruta = RutaArchivosEnergia.construirRutaMensual(m.getYear(), m.getMonthValue(), true);
@@ -887,13 +961,15 @@ public class GeneradorAnalisisService {
     }
 
     /** Contador del medidor de la red: kWh importado (archivo normal) o KWhR exportado (archivo VIP). */
-    private TreeMap<LocalDateTime, Double> serieContador(String maquina, boolean exportada, LocalDate desde, LocalDate hasta) {
-        TreeMap<LocalDateTime, Double> serie = new TreeMap<>();
-        for (YearMonth m = YearMonth.from(desde.minusDays(1)); !m.isAfter(YearMonth.from(hasta)); m = m.plusMonths(1)) {
-            leerContador(RutaArchivosEnergia.construirRutaMensual(m.getYear(), m.getMonthValue(), exportada), maquina,
-                    exportada ? "KWhR" : "kwh", desde, hasta, serie);
-        }
-        return serie;
+    private TreeMap<LocalDateTime, Double> serieContador(Consulta c, String maquina, boolean exportada, LocalDate desde, LocalDate hasta) {
+        return c.leer("contador|" + maquina + "|" + exportada + "|" + desde + "|" + hasta, () -> {
+            TreeMap<LocalDateTime, Double> serie = new TreeMap<>();
+            for (YearMonth m = YearMonth.from(desde.minusDays(1)); !m.isAfter(YearMonth.from(hasta)); m = m.plusMonths(1)) {
+                leerContador(RutaArchivosEnergia.construirRutaMensual(m.getYear(), m.getMonthValue(), exportada), maquina,
+                        exportada ? "KWhR" : "kwh", desde, hasta, serie);
+            }
+            return serie;
+        });
     }
 
     private void leerContador(String ruta, String maquina, String columna, LocalDate desde, LocalDate hasta,

@@ -16,6 +16,7 @@ import com.example.generador.service.GeneradorAnalisisService.Agrupacion;
 import com.example.generador.service.GeneradorAnalisisService.Fila;
 import com.example.generador.service.GeneradorAnalisisService.PeriodoMarcha;
 import com.example.generador.service.GeneradorService;
+import com.example.generador.service.GeneradorService.Punto;
 import com.example.generador.service.ReporteGeneradoresService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.Component;
@@ -54,6 +55,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
@@ -62,6 +64,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.function.Function;
 
 /**
@@ -69,7 +72,10 @@ import java.util.function.Function;
  * - Energía: importada de la red, exportada a la red (solo con algún generador en marcha), generada y consumo de la
  *   planta 1 por día, semana o mes; horas en paralelo / isla / vacío; arranques. La red es la del medidor principal.
  * - Períodos en marcha: por cada arranque, lo que trabajó el generador y lo que la planta 1 tomó de la red y le
- *   entregó en ese mismo intervalo (repartido si otro generador estaba en marcha).
+ *   entregó en ese mismo intervalo (repartido si otro generador estaba en marcha), con el horómetro al arrancar y al
+ *   parar (reemplaza a la pestaña Arranques que había en Generadores).
+ * - Tendencias: una variable guardada del controlador (batería, temperaturas, potencia...) en las últimas 24 h a 90
+ *   días; usa solo el generador del filtro, con su propio período (son lecturas de cada minuto).
  * - Costos: galones y precio del galón cargados a mano por período en marcha; comparación del costo del diésel con
  *   lo que habría costado la misma energía en la red, con el precio de la franja horaria de cada hora (tarifas y
  *   feriados de Consumo por franja horaria).
@@ -106,9 +112,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final ComboBox<Integer> anioCombo = new ComboBox<>("Anio");
     private final Span mensaje = new Span();
     private final TabSheet tabs = new TabSheet();
-    private Tab tabEnergia, tabPeriodos, tabCostos;
+    private Tab tabEnergia, tabPeriodos, tabTendencias, tabCostos;
     private String scriptGrafico, scriptPeriodos, scriptCostos;
     private static final String CHART_PERIODOS = "chartdiv_periodos_marcha";
+    private static final String CHART_TENDENCIAS = "chartdiv_tendencias_generador";
     private static final String CHART_COSTOS = "chartdiv_costos_red";
     private static final String CHART_MINUTOS = "chartdiv_marcha_minutos";
 
@@ -129,6 +136,24 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final HorizontalLayout tarjetasPeriodos = new HorizontalLayout();
     private final Div kpiMeta = new Div();
     private final Grid<PeriodoMarcha> periodosGrid = new Grid<>();
+    // Tendencias
+    private final Span tendenciaMensaje = new Span();
+    /** Columnas de {mes}Generador que se pueden graficar. */
+    private static final Map<String, String[]> VARIABLES = new LinkedHashMap<>();
+    static {
+        VARIABLES.put("Tension de bateria (V)", new String[]{"bateria"});
+        VARIABLES.put("Temperatura refrigerante (C)", new String[]{"temp_refrigerante"});
+        VARIABLES.put("Presion de aceite (bar)", new String[]{"presion_aceite"});
+        VARIABLES.put("Potencia (kW)", new String[]{"kw"});
+        VARIABLES.put("Corrientes (A)", new String[]{"i_l1", "i_l2", "i_l3"});
+        VARIABLES.put("Tension fase-fase (V)", new String[]{"v_l1l2", "v_l2l3", "v_l3l1"});
+        VARIABLES.put("Frecuencia (Hz)", new String[]{"frecuencia"});
+        VARIABLES.put("RPM", new String[]{"rpm"});
+        VARIABLES.put("Tension de red fase-fase (V)", new String[]{"red_v_l1l2", "red_v_l2l3", "red_v_l3l1"});
+        VARIABLES.put("Frecuencia de red (Hz)", new String[]{"red_frecuencia"});
+        VARIABLES.put("Temperatura de aceite (C)", new String[]{"temp_aceite"});
+        VARIABLES.put("Nivel de combustible (%)", new String[]{"nivel_combustible"});
+    }
     // Costos
     private final HorizontalLayout tarjetasCostos = new HorizontalLayout();
     private final Div chartCostos = new Div();
@@ -230,6 +255,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         tabs.setWidthFull();
         tabEnergia = tabs.add("Resumen de energia", crearEnergia());
         tabPeriodos = tabs.add("Periodos en marcha", crearPeriodos());
+        tabTendencias = tabs.add("Tendencias", crearTendencias());
         tabCostos = tabs.add("Costos", crearCostos());
         // El gráfico se arma con la pestaña visible (con display:none amCharts lo dibuja sin tamaño).
         tabs.addSelectedChangeListener(e -> {
@@ -237,6 +263,16 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             if (e.getSelectedTab() == tabEnergia && scriptPlanta != null) getElement().executeJs(scriptPlanta);
             if (e.getSelectedTab() == tabPeriodos && scriptPeriodos != null) getElement().executeJs(scriptPeriodos);
             if (e.getSelectedTab() == tabCostos && scriptCostos != null) getElement().executeJs(scriptCostos);
+            // Tendencias tiene su propio período (lecturas de cada minuto): el de arriba, Ver y el reporte no le aplican.
+            boolean tendencias = e.getSelectedTab() == tabTendencias;
+            for (Component c : new Component[]{agrupacionCombo, ver, reporteLink, mensaje}) c.setVisible(!tendencias);
+            if (tendencias) {
+                mesCombo.setVisible(false);
+                semanasCombo.setVisible(false);
+                anioCombo.setVisible(false);
+            } else {
+                visibilidadPeriodo();
+            }
         });
 
         add(filtros, mensaje, tabs);
@@ -292,8 +328,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         List<Generador> gens = seleccionados();
         gensVistos = gens;
         meta = generadorService.metaImportacionRed();
-        verEnergia(gens, a);
-        periodos = analisis.periodosEnMarcha(gens, desde, hasta);
+        // Una sola consulta para todo el "Ver": cada archivo se lee una vez y la isla se detecta una vez por generador.
+        GeneradorAnalisisService.Consulta consulta = new GeneradorAnalisisService.Consulta();
+        verEnergia(consulta, gens, a);
+        periodos = analisis.periodosEnMarcha(consulta, gens, desde, hasta);
         verPeriodos();
         verCostos();
         limpiarDetalleMaquinas();
@@ -372,8 +410,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         return v;
     }
 
-    private void verEnergia(List<Generador> gens, Agrupacion a) {
-        List<Fila> filas = analisis.analizar(gens, a, desde, hasta);
+    private void verEnergia(GeneradorAnalisisService.Consulta consulta, List<Generador> gens, Agrupacion a) {
+        List<Fila> filas = analisis.analizar(consulta, gens, a, desde, hasta);
         Fila t = analisis.total(filas);
         // Con "Todos": lo que puso cada generador, de su propio análisis (su generado y su parte de lo exportado).
         boolean todos = gens.size() > 1;
@@ -382,7 +420,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Map<String, Double> totalPorGenerador = new LinkedHashMap<>();
         if (todos) {
             for (Generador g : gens) {
-                List<Fila> delGenerador = analisis.analizar(List.of(g), a, desde, hasta);
+                List<Fila> delGenerador = analisis.analizar(consulta, List.of(g), a, desde, hasta);
                 Map<String, Double> porPeriodo = new HashMap<>();
                 delGenerador.forEach(f -> porPeriodo.put(f.periodo(), f.generadorUsado()));
                 usadoPorGenerador.put(g.nombre(), porPeriodo);
@@ -449,7 +487,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         scriptGrafico = GraficaModel.getBarrasApiladasScript(CHART_ID, categorias, series.toArray(new String[0]),
                 colores.toArray(new String[0]), valores, "kWh");
         if (tabs.getSelectedTab() == tabEnergia) getElement().executeJs(scriptGrafico);
-        verConsumoPlanta(gens, todos);
+        verConsumoPlanta(consulta, gens, todos);
     }
 
     /** Color de un generador: el mismo que en Balance energético P1 (según su lugar en generador-config.json). */
@@ -465,7 +503,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
      * Con "Todos": consumo de toda la planta en el tiempo durante el período (mismo gráfico que Balance energético P1),
      * en puntos de 1 min (hasta 2 días), 15 min (hasta 8), 1 h (hasta 62) o 1 día.
      */
-    private void verConsumoPlanta(List<Generador> gens, boolean todos) {
+    private void verConsumoPlanta(GeneradorAnalisisService.Consulta consulta, List<Generador> gens, boolean todos) {
         tituloPlanta.setVisible(todos);
         resumenPlanta.setVisible(todos);
         chartPlanta.setVisible(todos);
@@ -476,7 +514,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         if (fin.isAfter(LocalDateTime.now())) fin = LocalDateTime.now().withNano(0);
         long dias = Duration.between(ini, fin).toDays();
         int minutos = dias <= 2 ? 1 : dias <= 8 ? 15 : dias <= 62 ? 60 : 1440;
-        List<GeneradorAnalisisService.PuntoPlanta> puntos = analisis.consumoPlanta(gens, ini, fin, minutos);
+        List<GeneradorAnalisisService.PuntoPlanta> puntos = analisis.consumoPlanta(consulta, gens, ini, fin, minutos);
         String[] nombres = gens.stream().map(Generador::nombre).toArray(String[]::new);
         String[] colores = new String[nombres.length];
         for (int i = 0; i < nombres.length; i++) colores[i] = colorGenerador(nombres[i]);
@@ -519,6 +557,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             return s;
         }).setHeader("Fin").setAutoWidth(true).setFlexGrow(0);
         columna(periodosGrid, "Duracion", p -> duracion(p.horas()));
+        columna(periodosGrid, "Horometro (h)", p -> horometro(p.horometroInicio()) + " -> " + horometro(p.horometroFin()));
         columna(periodosGrid, "Consumo de la planta 1 (kWh)", p -> kwhNum(p.consumo()));
         periodosGrid.addComponentColumn(p -> badgeRed(p.porcentajeDeRed())).setHeader("% importado de la red (meta 0)").setAutoWidth(true).setFlexGrow(0);
         columna(periodosGrid, "Importada de la red (kWh)", p -> kwhNum(p.kwhRedImportada()));
@@ -539,7 +578,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         periodosGrid.setHeight("360px");
         periodosGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
         periodosGrid.asSingleSelect().addValueChangeListener(e -> mostrarMaquinas(e.getValue()));
-        Span nota = nota("Cada fila es un arranque: una vez que el generador estuvo encendido. % importado de la red = parte del consumo "
+        Span nota = nota("Cada fila es un arranque: una vez que el generador estuvo encendido (RPM > 0); \"aprox.\" = la app arranco "
+                + "con el generador ya en marcha. Horometro = horas de marcha del controlador al arrancar y al parar. "
+                + "% importado de la red = parte del consumo "
                 + "de la planta 1 que vino de la red mientras el generador estaba en marcha (meta 0; verde hasta "
                 + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
                 + "). % aportado por el generador = el resto (suman 100%). Exportada a la red = excedente de la planta. "
@@ -684,6 +725,103 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Span s = new Span();
         GeneradorView.badge(s, pct == null ? "-" : String.format(Locale.ROOT, "%.1f %%", pct), semaforoRed(pct));
         return s;
+    }
+
+    // ================= Tendencias =================
+
+    private VerticalLayout crearTendencias() {
+        ComboBox<String> variable = new ComboBox<>("Variable");
+        variable.setItems(VARIABLES.keySet());
+        variable.setValue("Tension de bateria (V)");
+        variable.setWidth("260px");
+        ComboBox<Integer> rango = new ComboBox<>("Periodo");
+        rango.setItems(1, 7, 30, 90);
+        rango.setItemLabelGenerator(d -> d == 1 ? "Ultimas 24 h" : "Ultimos " + d + " dias");
+        rango.setValue(7);
+        Button verTendencia = new Button("Ver", VaadinIcon.CHART.create(), e -> graficarTendencia(variable.getValue(), rango.getValue()));
+        verTendencia.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        HorizontalLayout filtros = new HorizontalLayout(variable, rango, verTendencia);
+        filtros.setAlignItems(Alignment.END);
+
+        tendenciaMensaje.getStyle().set("font-size", "12px").set("color", "#555");
+        tendenciaMensaje.setText("Datos tomados de la base de datos: una lectura por minuto en marcha y una cada 15 min parado. "
+                + "La bateria y la temperatura parado muestran si el generador esta listo para arrancar. Usa el generador elegido "
+                + "arriba; con Todos, una linea por generador.");
+        Div chart = new Div();
+        chart.setId(CHART_TENDENCIAS);
+        chart.setWidthFull();
+        chart.setHeight("420px");
+        VerticalLayout v = new VerticalLayout(descripcion("Como evoluciono una variable del controlador en las ultimas horas o "
+                + "dias: bateria, temperaturas, presion de aceite, potencia, corrientes, tensiones o frecuencia."),
+                filtros, tendenciaMensaje, chart);
+        v.setPadding(false);
+        v.setWidthFull();
+        return v;
+    }
+
+    private void graficarTendencia(String variable, Integer dias) {
+        if (variable == null || dias == null) return;
+        String[] columnas = VARIABLES.get(variable);
+        LocalDateTime hasta = LocalDateTime.now();
+        LocalDateTime desde = hasta.minusDays(dias);
+        // Una serie por columna; con "Todos", por cada generador (mismo color de generador si es una sola columna;
+        // si son varias, el segundo generador en línea punteada).
+        List<Generador> gens = seleccionados();
+        boolean todos = gens.size() > 1;
+        List<List<Punto>> series = new ArrayList<>();
+        List<String> nombres = new ArrayList<>();
+        List<String> colores = new ArrayList<>();
+        List<Boolean> punteadas = new ArrayList<>();
+        for (int gi = 0; gi < gens.size(); gi++) {
+            Generador gen = gens.get(gi);
+            for (String col : columnas) {
+                series.add(generadorService.serie(gen, col, desde, hasta));
+                nombres.add(!todos ? (columnas.length == 1 ? variable : col) : columnas.length == 1 ? gen.nombre() : gen.nombre() + " " + col);
+                colores.add(colorGenerador(gen.nombre()));
+                punteadas.add(gi > 0);
+            }
+        }
+        int n = series.size();
+
+        TreeMap<LocalDateTime, Float[]> filas = new TreeMap<>();
+        double min = Double.MAX_VALUE, max = -Double.MAX_VALUE;
+        for (int s = 0; s < n; s++) {
+            for (Punto p : series.get(s)) {
+                if (p.valor() == null) continue;
+                filas.computeIfAbsent(p.fecha(), k -> new Float[n])[s] = p.valor().floatValue();
+                min = Math.min(min, p.valor());
+                max = Math.max(max, p.valor());
+            }
+        }
+        GraficaModel g = new GraficaModel(n);
+        g.setSeriesNames(nombres.toArray(new String[0]));
+        g.setMostrarLeyenda(n > 1);
+        if (todos && columnas.length == 1) {
+            g.setColoresPersonalizados(colores.toArray(new String[0]));
+        } else if (todos) {
+            boolean[] d = new boolean[n];
+            for (int i = 0; i < n; i++) d[i] = punteadas.get(i);
+            g.setSeriesDiscontinuas(d);
+        }
+        if (filas.isEmpty()) {
+            tendenciaMensaje.setText("Sin datos de " + variable + " en el periodo.");
+            getElement().executeJs(g.getInitScript2(CHART_TENDENCIAS));
+            return;
+        }
+        double margen = Math.max((max - min) * 0.1, 0.5);
+        g.setMinY(Math.max(0, min - margen));
+        g.setMaxY(max + margen);
+        List<Long> t = new ArrayList<>();
+        List<Float[]> v = new ArrayList<>();
+        filas.forEach((f, val) -> {
+            t.add(f.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+            v.add(val);
+        });
+        tendenciaMensaje.setText(variable + ": " + filas.size() + " lecturas de "
+                + gens.stream().map(Generador::nombre).reduce((x, y) -> x + " y " + y).orElse("")
+                + (todos ? ", una linea por generador." : "."));
+        getElement().executeJs(g.getInitScript2(CHART_TENDENCIAS) + g.getSetAllDataScript(CHART_TENDENCIAS, t, v)
+                + g.getAplicarZoomInicialScript(CHART_TENDENCIAS));
     }
 
     // ================= Costos =================
@@ -1263,6 +1401,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     private static String horas(Double v) {
         return v == null ? "-" : String.format(Locale.ROOT, "%.1f h", v);
+    }
+
+    private static String horometro(Double v) {
+        return v == null ? "-" : String.format(Locale.ROOT, "%.1f", v);
     }
 
     private static String duracion(double horas) {

@@ -1,6 +1,5 @@
 package com.example.generador.ui;
 
-import com.example.base.model.GraficaModel;
 import com.example.base.ui.ChartsView;
 import com.example.base.ui.MainLayout;
 import com.example.calidad.model.ConfiguracionCalidad;
@@ -21,9 +20,7 @@ import com.example.generador.service.PlantaEnVivoService;
 import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.ParametroGenerador;
 import com.example.generador.service.GeneradorService;
-import com.example.generador.service.GeneradorService.Arranque;
 import com.example.generador.service.GeneradorService.FilaRegistro;
-import com.example.generador.service.GeneradorService.Punto;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
@@ -58,7 +55,6 @@ import jakarta.annotation.security.PermitAll;
 
 import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -71,11 +67,11 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * Generadores (fase G): estado actual leído en vivo del controlador (SOLO LECTURA) con el mapa de
- * su modelo, la red asociada (medidor del transformador, del histórico del PLC), historial de
- * arranques, tendencias y, para ADMIN, exploración de registros para verificar un mapa nuevo.
- * Semáforo de tensión/frecuencia/PF con los límites de Calidad de Energía; los del motor son
- * provisorios hasta la sesión de alarmas (G3).
+ * Generadores (fase G), lo que pasa ahora: balance energético de la planta 1 en vivo, estado actual leído en vivo del
+ * controlador (SOLO LECTURA) con el mapa de su modelo y la red asociada (medidor del transformador, del histórico del
+ * PLC), historial de eventos y, para ADMIN, exploración de registros para verificar un mapa nuevo. Lo calculado sobre lo
+ * guardado (arranques, tendencias, energía, costos) está en Análisis. Semáforo de tensión/frecuencia/PF con los límites
+ * de Calidad de Energía; los del motor son provisorios hasta la sesión de alarmas (G3).
  */
 @PageTitle("Generadores | LineaBase")
 @Route(value = "generador", layout = MainLayout.class)
@@ -84,7 +80,6 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
     private static final DateTimeFormatter CORTA = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
-    private static final String CHART_ID = "chartdiv_generador";
     private static final int POLL_MS = 15000;
     private static final int POLL_MS_APP = 30000;
 
@@ -116,13 +111,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private Tab tabRegistros;
     /** Estado actual: un bloque por generador elegido (los dos con "Todos"). */
     private final Div estadoContenido = new Div();
-    /** Generador de cada fila de Arranques y del Historial de eventos (sus registros no lo traen); se ve con "Todos". */
-    private final Map<Arranque, String> generadorDeArranque = new IdentityHashMap<>();
+    /** Generador de cada fila del Historial de eventos (sus registros no lo traen); se ve con "Todos". */
     private final Map<EventoGenerador, String> generadorDeEvento = new IdentityHashMap<>();
-    private Grid.Column<Arranque> colArranqueGenerador;
     private Grid.Column<EventoGenerador> colEventoGenerador;
-    private final Grid<Arranque> arranquesGrid = new Grid<>();
-    private final Span tendenciaMensaje = new Span();
     private final Grid<FilaRegistro> registrosGrid = new Grid<>();
     private final HistorialEventosService historial;
     private final Grid<EventoGenerador> eventosGrid = new Grid<>();
@@ -136,23 +127,6 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private List<FilaRegistro> ultimaExploracion = List.of();
     private Map<Integer, Integer> exploracionAnterior = Map.of();
     private Registration pollRegistration;
-
-    /** Columnas de {mes}Generador que se pueden graficar. */
-    private static final Map<String, String[]> VARIABLES = new LinkedHashMap<>();
-    static {
-        VARIABLES.put("Tension de bateria (V)", new String[]{"bateria"});
-        VARIABLES.put("Temperatura refrigerante (C)", new String[]{"temp_refrigerante"});
-        VARIABLES.put("Presion de aceite (bar)", new String[]{"presion_aceite"});
-        VARIABLES.put("Potencia (kW)", new String[]{"kw"});
-        VARIABLES.put("Corrientes (A)", new String[]{"i_l1", "i_l2", "i_l3"});
-        VARIABLES.put("Tension fase-fase (V)", new String[]{"v_l1l2", "v_l2l3", "v_l3l1"});
-        VARIABLES.put("Frecuencia (Hz)", new String[]{"frecuencia"});
-        VARIABLES.put("RPM", new String[]{"rpm"});
-        VARIABLES.put("Tension de red fase-fase (V)", new String[]{"red_v_l1l2", "red_v_l2l3", "red_v_l3l1"});
-        VARIABLES.put("Frecuencia de red (Hz)", new String[]{"red_frecuencia"});
-        VARIABLES.put("Temperatura de aceite (C)", new String[]{"temp_aceite"});
-        VARIABLES.put("Nivel de combustible (%)", new String[]{"nivel_combustible"});
-    }
 
     public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService,
                          HistorialEventosService historial, PlantaEnVivoService plantaService, IslaService islaService) {
@@ -173,7 +147,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             return;
         }
 
-        // Con más de un generador, primero "Todos": Estado actual, Arranques, Historial y Tendencias de todos juntos.
+        // Con más de un generador, primero "Todos": Estado actual e Historial de eventos de todos juntos.
         List<Generador> opciones = new ArrayList<>();
         if (lista.size() > 1) opciones.add(TODOS);
         opciones.addAll(lista);
@@ -190,7 +164,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 cambiarGenerador();
             }
         });
-        H3 titulo = new H3("Generador");
+        H3 titulo = new H3("Generadores");
         titulo.getStyle().set("margin", "0");
         descripcion.getStyle().set("font-size", "12px").set("color", "#555");
         HorizontalLayout cabecera = new HorizontalLayout(titulo, selector, descripcion);
@@ -202,14 +176,13 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         // Primero lo global: la planta completa en vivo (todos los generadores y la red), después cada generador.
         tabPlanta = tabs.add("Balance energetico P1", crearPlanta());
         tabs.add("Estado actual", crearEstado());
-        tabs.add("Arranques", crearArranques());
         tabs.add("Historial de eventos", crearEventos());
-        tabs.add("Tendencias", crearTendencias());
         if (lineaAccessService.esAdmin()) {
             tabRegistros = tabs.add("Registros", crearRegistros());
         }
         tabs.addSelectedChangeListener(e -> {
             if (e.getSelectedTab() == tabPlanta) refrescarPlanta();
+            mostrarSelector();
         });
         alertaAlarmas.setWidthFull();
         alertaAlarmas.setVisible(false);
@@ -217,6 +190,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         setFlexGrow(1, tabs);
         cambiarGenerador();
         refrescarPlanta();
+        mostrarSelector();
+    }
+
+    /** Balance energético P1 muestra siempre todos los generadores: ahí el selector no cambia nada y se oculta. */
+    private void mostrarSelector() {
+        boolean visible = tabs.getSelectedTab() != tabPlanta;
+        selector.setVisible(visible);
+        descripcion.setVisible(visible);
     }
 
     @Override
@@ -277,14 +258,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             if (todos() && tabs.getSelectedTab() == tabRegistros) tabs.setSelectedTab(tabPlanta);
             tabRegistros.setVisible(!todos());
         }
-        colArranqueGenerador.setVisible(todos());
         colEventoGenerador.setVisible(todos());
         registrosGrid.setItems(List.of());
         ultimaExploracion = List.of();
         exploracionAnterior = Map.of();
         registrosMensaje.setText("");
-        tendenciaMensaje.setText("Datos tomados de la base de datos: una lectura por minuto en marcha y una cada 15 min parado. La bateria y la temperatura parado "
-                + "muestran si el generador esta listo para arrancar.");
         cargarEventos();
         refrescar();
     }
@@ -713,17 +691,6 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private void refrescar() {
         if (generador == null) return;
         List<Generador> gens = elegidos();
-        generadorDeArranque.clear();
-        List<Arranque> arranques = new ArrayList<>();
-        for (Generador g : gens) {
-            for (Arranque a : service.arranques(g)) {
-                arranques.add(a);
-                generadorDeArranque.put(a, g.nombre());
-            }
-        }
-        // Con "Todos", los de todos los generadores juntos, del más nuevo al más viejo.
-        if (todos()) arranques.sort(java.util.Comparator.comparing(Arranque::inicio).reversed());
-        arranquesGrid.setItems(arranques);
         // El historial se recarga solo cuando la lectura de fondo (cada minuto) guardó un evento nuevo.
         if (ultimoIdEventos() != ultimoEventoMostrado) cargarEventos();
         estadoContenido.removeAll();
@@ -900,118 +867,6 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private static Estado estadoTemp(Double v) {
         if (v == null) return Estado.SIN_DATO;
         return v > TEMP_FUERA ? Estado.FUERA : v > TEMP_AVISO ? Estado.AVISO : Estado.OK;
-    }
-
-    // ================= Arranques =================
-
-    private VerticalLayout crearArranques() {
-        colArranqueGenerador = arranquesGrid.addColumn(a -> generadorDeArranque.getOrDefault(a, "")).setHeader("Generador").setAutoWidth(true);
-        colArranqueGenerador.setVisible(false);
-        arranquesGrid.addColumn(a -> a.arranqueNro() == null ? "-" : String.valueOf(a.arranqueNro())).setHeader("Nro").setAutoWidth(true);
-        arranquesGrid.addColumn(a -> a.inicio().format(CORTA) + (a.inicioEstimado() ? " (aprox.)" : "")).setHeader("Inicio").setAutoWidth(true);
-        arranquesGrid.addComponentColumn(a -> a.fin() == null ? badgeNuevo("En marcha", Estado.OK) : new Span(a.fin().format(CORTA)))
-                .setHeader("Fin").setAutoWidth(true);
-        arranquesGrid.addColumn(a -> a.duracionMin() == null ? "-" : String.format(Locale.ROOT, "%.0f min", a.duracionMin()))
-                .setHeader("Duracion").setAutoWidth(true);
-        arranquesGrid.addColumn(a -> a.kwhGenerados() == null ? "-" : a.kwhGenerados() + " kWh").setHeader("Energia generada").setAutoWidth(true);
-        arranquesGrid.addColumn(a -> a.kwMax() == null ? "-" : String.format(Locale.ROOT, "%.0f kW", a.kwMax())).setHeader("Carga maxima").setAutoWidth(true);
-        arranquesGrid.addColumn(a -> fmt(a.horasInicio(), "%.1f") + " -> " + fmt(a.horasFin(), "%.1f") + " h").setHeader("Horometro").setAutoWidth(true);
-        arranquesGrid.setSizeFull();
-        Span nota = nota("Cada arranque que detecta la app (RPM > 0). \"aprox.\" = la app arranco con el generador ya en marcha.");
-        VerticalLayout v = new VerticalLayout(nota, arranquesGrid);
-        v.setSizeFull();
-        v.setPadding(false);
-        v.setFlexGrow(1, arranquesGrid);
-        return v;
-    }
-
-    // ================= Tendencias =================
-
-    private VerticalLayout crearTendencias() {
-        ComboBox<String> variable = new ComboBox<>("Variable");
-        variable.setItems(VARIABLES.keySet());
-        variable.setValue("Tension de bateria (V)");
-        variable.setWidth("260px");
-        ComboBox<Integer> rango = new ComboBox<>("Periodo");
-        rango.setItems(1, 7, 30, 90);
-        rango.setItemLabelGenerator(d -> d == 1 ? "Ultimas 24 h" : "Ultimos " + d + " dias");
-        rango.setValue(7);
-        Button ver = new Button("Ver", VaadinIcon.CHART.create(), e -> graficar(variable.getValue(), rango.getValue()));
-        ver.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        HorizontalLayout filtros = new HorizontalLayout(variable, rango, ver);
-        filtros.setAlignItems(Alignment.END);
-
-        tendenciaMensaje.getStyle().set("font-size", "12px").set("color", "#555");
-        Div chart = new Div();
-        chart.setId(CHART_ID);
-        chart.setWidthFull();
-        chart.setHeight("420px");
-        VerticalLayout v = new VerticalLayout(filtros, tendenciaMensaje, chart);
-        v.setSizeFull();
-        v.setPadding(false);
-        return v;
-    }
-
-    private void graficar(String variable, Integer dias) {
-        if (variable == null || dias == null) return;
-        String[] columnas = VARIABLES.get(variable);
-        LocalDateTime hasta = LocalDateTime.now();
-        LocalDateTime desde = hasta.minusDays(dias);
-        // Una serie por columna; con "Todos", por cada generador (mismo color de generador si es una sola columna;
-        // si son varias, el segundo generador en línea punteada).
-        List<Generador> gens = elegidos();
-        List<List<Punto>> series = new ArrayList<>();
-        List<String> nombres = new ArrayList<>();
-        List<String> colores = new ArrayList<>();
-        List<Boolean> punteadas = new ArrayList<>();
-        for (int gi = 0; gi < gens.size(); gi++) {
-            Generador gen = gens.get(gi);
-            for (String col : columnas) {
-                series.add(service.serie(gen, col, desde, hasta));
-                nombres.add(!todos() ? (columnas.length == 1 ? variable : col) : columnas.length == 1 ? gen.nombre() : gen.nombre() + " " + col);
-                colores.add("0x" + COLORES_GEN[service.generadores().indexOf(gen) % COLORES_GEN.length].substring(1));
-                punteadas.add(gi > 0);
-            }
-        }
-        int n = series.size();
-
-        java.util.TreeMap<LocalDateTime, Float[]> filas = new java.util.TreeMap<>();
-        double min = Double.MAX_VALUE, max = -Double.MAX_VALUE;
-        for (int s = 0; s < n; s++) {
-            for (Punto p : series.get(s)) {
-                if (p.valor() == null) continue;
-                filas.computeIfAbsent(p.fecha(), k -> new Float[n])[s] = p.valor().floatValue();
-                min = Math.min(min, p.valor());
-                max = Math.max(max, p.valor());
-            }
-        }
-        GraficaModel g = new GraficaModel(n);
-        g.setSeriesNames(nombres.toArray(new String[0]));
-        g.setMostrarLeyenda(n > 1);
-        if (todos() && columnas.length == 1) {
-            g.setColoresPersonalizados(colores.toArray(new String[0]));
-        } else if (todos()) {
-            boolean[] d = new boolean[n];
-            for (int i = 0; i < n; i++) d[i] = punteadas.get(i);
-            g.setSeriesDiscontinuas(d);
-        }
-        if (filas.isEmpty()) {
-            tendenciaMensaje.setText("Sin datos de " + variable + " en el periodo.");
-            getElement().executeJs(g.getInitScript2(CHART_ID));
-            return;
-        }
-        double margen = Math.max((max - min) * 0.1, 0.5);
-        g.setMinY(Math.max(0, min - margen));
-        g.setMaxY(max + margen);
-        List<Long> t = new ArrayList<>();
-        List<Float[]> v = new ArrayList<>();
-        filas.forEach((f, val) -> {
-            t.add(f.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-            v.add(val);
-        });
-        tendenciaMensaje.setText(variable + ": " + filas.size() + " lecturas" + (todos() ? ", una linea por generador." : "."));
-        getElement().executeJs(g.getInitScript2(CHART_ID) + g.getSetAllDataScript(CHART_ID, t, v)
-                + g.getAplicarZoomInicialScript(CHART_ID));
     }
 
     // ================= Registros (ADMIN) =================
