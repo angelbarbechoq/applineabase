@@ -75,6 +75,11 @@ public class GeneradorService {
         return config.metaImportacionRed();
     }
 
+    /** Guarda los límites del semáforo de la meta (solo el administrador, desde Análisis). */
+    public void guardarMetaImportacionRed(double verdeHasta, double amarilloHasta) {
+        config.guardarMetaImportacionRed(verdeHasta, amarilloHasta);
+    }
+
     /** Lectura en vivo del controlador (función 03, nunca escribe). */
     public LecturaGenerador leerEnVivo(Generador g) throws IOException {
         ModeloControlador m = modelo(g).orElseThrow(() ->

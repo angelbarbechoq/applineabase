@@ -66,6 +66,17 @@ public class GeneradoresConfigService {
         return MetaImportacionRed.POR_DEFECTO;
     }
 
+    /**
+     * Guarda los límites del semáforo de la meta en generador-config.json (lo hace el administrador desde Análisis >
+     * Períodos en marcha). Mismas reglas que al leerlo: 0 &lt;= verde &lt; amarillo &lt;= 100.
+     */
+    public void guardarMetaImportacionRed(double verdeHasta, double amarilloHasta) {
+        if (!(verdeHasta >= 0 && verdeHasta < amarilloHasta && amarilloHasta <= 100)) {
+            throw new IllegalArgumentException("El limite verde debe ser menor que el amarillo, entre 0 y 100 %");
+        }
+        configLoaderService.saveGeneradorMetaImportacionRed(verdeHasta, amarilloHasta);
+    }
+
     public Optional<Generador> generador(String nombre) {
         return generadores().stream().filter(g -> g.nombre().equals(nombre)).findFirst();
     }

@@ -147,7 +147,6 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     // Indicador de la meta de un arranque, arriba de la pestaña: el último (o el que está en marcha) o el elegido en la lista.
     private final Div bloqueIndicador = new Div();
     private final Div chartIndicador = new Div();
-    private final Div indicadorValor = new Div();
     private final Div indicadorTexto = new Div();
     private PeriodoMarcha arranqueInicial;
     /** El período elegido no tiene arranques: el del indicador es el último de antes. */
@@ -400,7 +399,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
         Span nota = nota("% importado de la red = parte del consumo de la planta 1 que vino de la red (meta en estiaje: 0; verde hasta "
                 + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
-                + ", rojo por encima; se cambia en generador-config.json). % aportado por el generador = su parte del consumo. "
+                + ", rojo por encima; el administrador lo cambia con \"Limites del semaforo\" en Periodos en marcha). "
+                + "% aportado por el generador = su parte del consumo. "
                 + "Balance neto = importada - exportada por la planta (negativo = se exporto mas de lo que se importo). Importada y "
                 + "exportada = contadores de energia del medidor principal de la planta 1 (transformadores 1 y 2 juntos), el que "
                 + "coincide con el de la empresa electrica. La importada es de todo el dia; la exportada solo cuenta con algun "
@@ -720,7 +720,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + marca.apply(meta.amarilloHasta()) + marca.apply(tope) + "</div>"
                 + "<div style='font-size:12px;color:" + TEXTO_SUAVE + "'>Barra oscura = importacion de la red del periodo, en % del consumo. Fondo: verde hasta "
                 + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
-                + ", rojo por encima (se cambia en generador-config.json). Cada arranque, en la columna \"% importado de la red\".</div></div>"));
+                + ", rojo por encima (el administrador lo cambia con \"Limites del semaforo\", arriba). Cada arranque, en la columna "
+                + "\"% importado de la red\".</div></div>"));
     }
 
     // ================= Indicador de la meta de un arranque =================
@@ -732,19 +733,88 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
      */
     private Div crearIndicador() {
         chartIndicador.setId(CHART_INDICADOR);
-        chartIndicador.setWidth("320px");
-        chartIndicador.setHeight("170px");
-        indicadorValor.getStyle().set("text-align", "center");
-        Div gauge = new Div(chartIndicador, indicadorValor);
-        gauge.getStyle().set("flex", "0 0 320px");
+        chartIndicador.setWidth("300px");
+        chartIndicador.setHeight("250px");
+        Div gauge = new Div(chartIndicador);
+        gauge.getStyle().set("flex", "0 0 300px");
         indicadorTexto.getStyle().set("flex", "1 1 320px").set("min-width", "260px").set("color", TEXTO);
         bloqueIndicador.add(gauge, indicadorTexto);
         bloqueIndicador.setWidthFull();
         bloqueIndicador.getStyle().set("display", "flex").set("flex-wrap", "wrap").set("align-items", "center").set("gap", "8px 32px")
                 .set("border", "1px solid " + BORDE).set("border-radius", "12px").set("padding", "14px 20px")
                 .set("background-color", "#ffffff").set("box-shadow", "0 1px 3px rgba(30,30,44,0.06)")
-                .set("box-sizing", "border-box").set("scroll-margin-top", "12px");
+                .set("box-sizing", "border-box").set("scroll-margin-top", "12px").set("position", "relative");
+        // Límites del semáforo: solo el administrador los cambia (se guardan en generador-config.json).
+        if (lineaAccessService.esAdmin()) {
+            bloqueIndicador.getStyle().set("padding-top", "40px"); // lugar para el botón, sin tapar el texto
+            Button limites = new Button("Limites del semaforo", VaadinIcon.COG.create(), e -> abrirDialogoLimites());
+            limites.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+            limites.getStyle().set("position", "absolute").set("top", "8px").set("right", "10px");
+            bloqueIndicador.add(limites);
+        }
         return bloqueIndicador;
+    }
+
+    /**
+     * Límites del semáforo de la meta "cero importación de la red" (% del consumo importado): verde hasta el primero,
+     * amarillo hasta el segundo, rojo por encima. Solo el administrador; valen para toda la ventana Análisis y el reporte
+     * de generadores, y pasan al servidor con "Pasar configuracion" (están en generador-config.json).
+     */
+    private void abrirDialogoLimites() {
+        if (!lineaAccessService.esAdmin()) return;
+        MetaImportacionRed actual = generadorService.metaImportacionRed();
+        Dialog d = new Dialog();
+        d.setHeaderTitle("Limites del semaforo: meta cero importacion de la red");
+        Span explicacion = new Span("En % del consumo de la planta importado de la red. Verde: de 0 hasta el primer limite; "
+                + "amarillo: hasta el segundo; rojo: por encima. Valen para Analisis y el reporte de generadores.");
+        explicacion.getStyle().set("font-size", "13px").set("color", TEXTO_SUAVE);
+        NumberField verde = new NumberField("Verde hasta (%)");
+        NumberField amarillo = new NumberField("Amarillo hasta (%)");
+        for (NumberField f : new NumberField[]{verde, amarillo}) {
+            f.setMin(0);
+            f.setMax(100);
+            f.setStep(0.5);
+            f.setWidthFull();
+        }
+        verde.setValue(actual.verdeHasta());
+        amarillo.setValue(actual.amarilloHasta());
+        Span rojo = new Span();
+        rojo.getStyle().set("font-size", "13px").set("font-weight", "600");
+        Runnable vistaPrevia = () -> {
+            Double v = verde.getValue(), a = amarillo.getValue();
+            boolean valido = v != null && a != null && v >= 0 && v < a && a <= 100;
+            rojo.setText(valido ? "Rojo: mas de " + pctUmbral(a) : "El limite verde debe ser menor que el amarillo, entre 0 y 100 %");
+            rojo.getStyle().set("color", tonos(valido ? Estado.FUERA : Estado.AVISO)[2]);
+        };
+        verde.addValueChangeListener(e -> vistaPrevia.run());
+        amarillo.addValueChangeListener(e -> vistaPrevia.run());
+        vistaPrevia.run();
+        VerticalLayout contenido = new VerticalLayout(explicacion, verde, amarillo, rojo);
+        contenido.setPadding(false);
+        contenido.setWidth("380px");
+        d.add(contenido);
+
+        Button guardar = new Button("Guardar", e -> {
+            Double v = verde.getValue(), a = amarillo.getValue();
+            if (v == null || a == null || !(v >= 0 && v < a && a <= 100)) {
+                Notification.show("El limite verde debe ser menor que el amarillo, entre 0 y 100 %", 3500, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            try {
+                generadorService.guardarMetaImportacionRed(v, a);
+                d.close();
+                ver();
+                Notification.show("Limites guardados: verde hasta " + pctUmbral(v) + ", amarillo hasta " + pctUmbral(a), 3000,
+                        Notification.Position.BOTTOM_START).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            } catch (RuntimeException ex) {
+                Notification.show("No se pudieron guardar los limites: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+        guardar.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        d.getFooter().add(new Button("Cancelar", e -> d.close()), guardar);
+        d.open();
     }
 
     /**
@@ -778,7 +848,6 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     /** Pinta el indicador de un arranque; elegido = lo eligió el usuario en la lista (si no, es el del arranque inicial). */
     private void pintarIndicador(PeriodoMarcha p, boolean elegido) {
-        indicadorValor.removeAll();
         indicadorTexto.removeAll();
         if (p == null) {
             chartIndicador.setVisible(false);
@@ -833,12 +902,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         h.append("</div>");
         indicadorTexto.add(new Html(h.toString()));
-        indicadorValor.add(new Html("<div><div style='font-size:34px;font-weight:700;line-height:1.1;color:" + c[2] + "'>"
-                + (pct == null ? "-" : String.format(Locale.ROOT, "%.1f %%", pct)) + "</div>"
-                + "<div style='font-size:12px;color:" + TEXTO_SUAVE + "'>del consumo importado de la red</div></div>"));
         chartIndicador.setVisible(true);
         scriptIndicador = GraficaModel.getGaugeMetaScript(CHART_INDICADOR, pct, meta.verdeHasta(), meta.amarilloHasta(),
-                new String[]{am(tonos(Estado.OK)[0]), am(tonos(Estado.AVISO)[0]), am(tonos(Estado.FUERA)[0]), NOCHE});
+                new String[]{am(tonos(Estado.OK)[0]), am(tonos(Estado.AVISO)[0]), am(tonos(Estado.FUERA)[0]), NOCHE, am(c[2])},
+                "importado de la red");
         if (tabs.getSelectedTab() == tabPeriodos) getElement().executeJs(scriptIndicador);
     }
 

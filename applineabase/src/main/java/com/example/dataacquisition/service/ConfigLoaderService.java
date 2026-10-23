@@ -74,6 +74,24 @@ public class ConfigLoaderService {
         return meta instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
     }
 
+    /**
+     * Guarda los límites del semáforo de la meta (clave "metaImportacionRed" de generador-config.json); el resto del
+     * archivo queda igual. Si no se puede leer el archivo no escribe nada, para no perder los generadores.
+     */
+    public void saveGeneradorMetaImportacionRed(double verdeHasta, double amarilloHasta) {
+        Map<String, Object> contenido = new LinkedHashMap<>(leerArchivo(GENERADOR_CONFIG_FILE));
+        if (contenido.isEmpty()) {
+            throw new IllegalStateException("No se pudo leer " + GENERADOR_CONFIG_FILE + ": no se guardo nada");
+        }
+        Map<String, Object> meta = new LinkedHashMap<>();
+        if (contenido.get("metaImportacionRed") instanceof Map<?, ?> m) m.forEach((k, v) -> meta.put(String.valueOf(k), v));
+        meta.put("verdeHasta", verdeHasta);
+        meta.put("amarilloHasta", amarilloHasta);
+        contenido.put("metaImportacionRed", meta);
+        escribirArchivo(GENERADOR_CONFIG_FILE, contenido);
+        logger.info("{}: semaforo de la meta guardado (verde hasta {} %, amarillo hasta {} %)", GENERADOR_CONFIG_FILE, verdeHasta, amarilloHasta);
+    }
+
     /** Modelos de controlador de generador con su mapa de registros. */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> loadGeneradorModelosConfig() {

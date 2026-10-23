@@ -1270,44 +1270,56 @@ public class GraficaModel {
     private static final String URL_RADAR = "https://cdn.amcharts.com/lib/5/radar.js";
 
     /**
-     * Gauge de medio círculo con zonas de semáforo y aguja (pedido del usuario el 2026-10-23 para la meta "cero
-     * importación de la red" en Períodos en marcha). Escala de 0 a 100 %, zonas verde hasta {@code verdeHasta},
-     * amarilla hasta {@code amarilloHasta} y roja por encima; la aguja va al valor (sin aguja si es null). El número
-     * grande va en la página, debajo del gráfico. En amCharts 5 los gauges salen del módulo "radar", que se carga acá
-     * la primera vez, del mismo sitio que los demás (así no hay que tocar index.html ni regenerar el paquete).
+     * Gauge con zonas de semáforo y aguja, al estilo del de la pantalla del controlador ComAp (pedido del usuario el
+     * 2026-10-23 para la meta "cero importación de la red" en Períodos en marcha): arco de 240°, marcas y números por
+     * fuera, aguja con eje al centro y el valor grande con su leyenda dentro del dial. Escala de 0 a 100 %, zonas verde
+     * hasta {@code verdeHasta}, amarilla hasta {@code amarilloHasta} y roja por encima; sin aguja si el valor es null.
+     * En amCharts 5 los gauges salen del módulo "radar", que se carga acá la primera vez, del mismo sitio que los demás
+     * (así no hay que tocar index.html ni regenerar el paquete).
      *
-     * @param colores colores "0xRRGGBB" de las zonas verde, amarilla y roja, y de la aguja
+     * @param colores colores "0xRRGGBB" de las zonas verde, amarilla y roja, de la aguja y del valor
+     * @param leyenda texto chico debajo del valor, ej. "importado de la red"
      */
     public static String getGaugeMetaScript(String containerId, Double valor, double verdeHasta, double amarilloHasta,
-                                            String[] colores) {
+                                            String[] colores, String leyenda) {
         StringBuilder js = new StringBuilder("(function() {")
                 .append("function dibujar() {")
                 .append(scriptInicializarRoot(containerId))
-                .append("var chart = root.container.children.push(am5radar.RadarChart.new(root, { panX: false, panY: false, startAngle: 180, endAngle: 360, paddingBottom: 0 }));")
-                .append("var renderer = am5radar.AxisRendererCircular.new(root, { innerRadius: -26, strokeOpacity: 0, minGridDistance: 40 });")
+                .append("var chart = root.container.children.push(am5radar.RadarChart.new(root, { panX: false, panY: false, startAngle: 150, endAngle: 390, radius: am5.percent(90) }));")
+                .append("var renderer = am5radar.AxisRendererCircular.new(root, { innerRadius: -24, strokeOpacity: 1, stroke: am5.color(0x9aa1ae), strokeWidth: 2, minGridDistance: 30 });")
                 .append("renderer.grid.template.setAll({ forceHidden: true });")
-                .append("renderer.labels.template.setAll({ fontSize: '11px', fill: am5.color(0x6c7383), radius: 8, textType: 'adjusted' });")
+                .append("renderer.ticks.template.setAll({ visible: true, strokeOpacity: 1, stroke: am5.color(0x6c7383), length: 7 });")
+                .append("renderer.labels.template.setAll({ fontSize: '11px', fill: am5.color(0x4b5263), radius: 12, textType: 'adjusted' });")
                 .append("var eje = chart.xAxes.push(am5xy.ValueAxis.new(root, { min: 0, max: 100, strictMinMax: true, numberFormat: \"#'%'\", renderer: renderer }));")
                 .append("function zona(desde, hasta, color) {")
                 .append("  var r = eje.createAxisRange(eje.makeDataItem({ value: desde, endValue: hasta }));")
                 .append("  r.get('axisFill').setAll({ visible: true, fill: am5.color(color), fillOpacity: 1 });")
                 .append("  r.get('label').setAll({ forceHidden: true }); r.get('grid').setAll({ forceHidden: true });")
+                .append("  if (r.get('tick')) r.get('tick').setAll({ forceHidden: true });")
                 .append("}")
                 .append("zona(0, ").append(verdeHasta).append(", ").append(colores[0]).append(");")
                 .append("zona(").append(verdeHasta).append(", ").append(amarilloHasta).append(", ").append(colores[1]).append(");")
                 .append("zona(").append(amarilloHasta).append(", 100, ").append(colores[2]).append(");");
         if (valor != null) {
             js.append("var item = eje.makeDataItem({ value: 0 });")
-                    .append("var aguja = am5radar.ClockHand.new(root, { pinRadius: 9, radius: am5.percent(92), innerRadius: 0, bottomWidth: 12, topWidth: 1 });")
-                    .append("aguja.hand.set('fill', am5.color(").append(colores[3]).append("));")
-                    .append("aguja.pin.set('fill', am5.color(").append(colores[3]).append("));")
+                    .append("var aguja = am5radar.ClockHand.new(root, { pinRadius: 11, radius: am5.percent(96), innerRadius: 0, bottomWidth: 10, topWidth: 1 });")
+                    .append("aguja.hand.setAll({ fill: am5.color(").append(colores[3]).append("), stroke: am5.color(0xffffff), strokeWidth: 1 });")
+                    .append("aguja.pin.setAll({ fill: am5.color(").append(colores[3]).append("), stroke: am5.color(0xffffff), strokeWidth: 2 });")
                     .append("item.set('bullet', am5xy.AxisBullet.new(root, { sprite: aguja }));")
                     .append("eje.createAxisRange(item);")
                     .append("item.get('grid').setAll({ forceHidden: true }); item.get('label').setAll({ forceHidden: true });")
+                    .append("if (item.get('tick')) item.get('tick').setAll({ forceHidden: true });")
                     .append("item.animate({ key: 'value', to: ").append(Math.max(0, Math.min(100, valor)))
                     .append(", duration: 900, easing: am5.ease.out(am5.ease.cubic) });");
         }
-        js.append("window.am5Charts[id] = { root: root, chart: chart };")
+        // Valor grande y leyenda dentro del dial, debajo del eje de la aguja (como en ComAp).
+        js.append("chart.radarContainer.children.push(am5.Label.new(root, { text: ")
+                .append(jsString(valor == null ? "-" : String.format(java.util.Locale.ROOT, "%.1f %%", valor)))
+                .append(", fontSize: '30px', fontWeight: '700', fill: am5.color(").append(colores[4])
+                .append("), centerX: am5.p50, centerY: am5.p50, y: 52 }));")
+                .append("chart.radarContainer.children.push(am5.Label.new(root, { text: ").append(jsString(leyenda))
+                .append(", fontSize: '12px', fill: am5.color(0x6c7383), centerX: am5.p50, centerY: am5.p50, y: 80 }));")
+                .append("window.am5Charts[id] = { root: root, chart: chart };")
                 .append("chart.appear(800, 100);")
                 .append("}")
                 .append("if (window.am5radar) { dibujar(); return; }")
