@@ -1107,7 +1107,8 @@ public class GraficaModel {
      */
     public static String getMarchaMinutoScript(String containerId, List<Long> tiempos, List<Double> generador,
                                                List<Double> consumo, List<Double> red, String nombreConsumo,
-                                               String colorGenerador, String colorRed, String colorEntregado) {
+                                               String colorGenerador, String colorRed, String colorEntregado,
+                                               String colorConsumo) {
         StringBuilder datos = new StringBuilder("[");
         for (int i = 0; i < tiempos.size(); i++) {
             if (i > 0) datos.append(",");
@@ -1134,7 +1135,7 @@ public class GraficaModel {
                 + "var gen = chart.series.push(am5xy.LineSeries.new(root, { name: 'Generador', xAxis: xAxis, yAxis: yAxis, valueYField: 'g', valueXField: 't', stroke: am5.color(" + colorGenerador + "), fill: am5.color(" + colorGenerador + "), tooltip: am5.Tooltip.new(root, { labelText: 'Generador: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
                 + "gen.strokes.template.setAll({ strokeWidth: 2 });"
                 + "gen.data.setAll(datos);"
-                + "var cons = chart.series.push(am5xy.LineSeries.new(root, { name: '" + nombreConsumo.replace("'", "") + "', xAxis: xAxis, yAxis: yAxis, valueYField: 'c', valueXField: 't', stroke: am5.color(0x52514e), fill: am5.color(0x52514e), tooltip: am5.Tooltip.new(root, { labelText: 'Consumo: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
+                + "var cons = chart.series.push(am5xy.LineSeries.new(root, { name: '" + nombreConsumo.replace("'", "") + "', xAxis: xAxis, yAxis: yAxis, valueYField: 'c', valueXField: 't', stroke: am5.color(" + colorConsumo + "), fill: am5.color(" + colorConsumo + "), tooltip: am5.Tooltip.new(root, { labelText: 'Consumo: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
                 + "cons.strokes.template.setAll({ strokeWidth: 2 });"
                 + "cons.data.setAll(datos);"
                 + "var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));"
@@ -1201,7 +1202,8 @@ public class GraficaModel {
      * los datos (no pierde el zoom); si no, lo arma.
      */
     public static String getConsumoPlantaScript(String containerId, List<Long> tiempos, String[] generadores, String[] coloresGen,
-                                                List<double[]> valores, int minutosPorPunto, boolean soloDatos) {
+                                                List<double[]> valores, int minutosPorPunto, boolean soloDatos,
+                                                String colorConsumo, String colorRed, String colorEntregado) {
         int n = generadores.length;
         StringBuilder datos = new StringBuilder("[");
         for (int i = 0; i < tiempos.size(); i++) {
@@ -1244,13 +1246,13 @@ public class GraficaModel {
                 .append("  s.data.setAll(datos); return s;")
                 .append("}")
                 .append("var leyenda = [];")
-                .append("var tomado = columnas('Importada de la red', 'ri', 0x2a78d6, true);")
-                .append("var entregado = columnas('Exportada a la red', 're', 0x1baf7a, false);");
+                .append("var tomado = columnas('Importada de la red', 'ri', ").append(colorRed).append(", true);")
+                .append("var entregado = columnas('Exportada a la red', 're', ").append(colorEntregado).append(", false);");
         for (int g = 0; g < n; g++) {
             js.append("leyenda.push(linea(").append(jsString(generadores[g])).append(", 'g").append(g).append("', ")
                     .append(coloresGen[g % coloresGen.length]).append("));");
         }
-        js.append("leyenda.push(linea('Consumo de la planta', 'c', 0x52514e));")
+        js.append("leyenda.push(linea('Consumo de la planta', 'c', ").append(colorConsumo).append("));")
                 .append("leyenda.push(tomado); leyenda.push(entregado);")
                 .append("var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));")
                 .append("legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x0b0b0b) });")
@@ -1260,6 +1262,63 @@ public class GraficaModel {
                 .append("chart.set('scrollbarX', am5.Scrollbar.new(root, { orientation: 'horizontal' }));")
                 .append("window.am5Charts[id] = { root: root, chart: chart };")
                 .append("chart.appear(800, 100);")
+                .append("})();");
+        return js.toString();
+    }
+
+    /** Módulo de amCharts 5 con el que se arman los gauges (eje circular y aguja); index.html no lo carga. */
+    private static final String URL_RADAR = "https://cdn.amcharts.com/lib/5/radar.js";
+
+    /**
+     * Gauge de medio círculo con zonas de semáforo y aguja (pedido del usuario el 2026-10-23 para la meta "cero
+     * importación de la red" en Períodos en marcha). Escala de 0 a 100 %, zonas verde hasta {@code verdeHasta},
+     * amarilla hasta {@code amarilloHasta} y roja por encima; la aguja va al valor (sin aguja si es null). El número
+     * grande va en la página, debajo del gráfico. En amCharts 5 los gauges salen del módulo "radar", que se carga acá
+     * la primera vez, del mismo sitio que los demás (así no hay que tocar index.html ni regenerar el paquete).
+     *
+     * @param colores colores "0xRRGGBB" de las zonas verde, amarilla y roja, y de la aguja
+     */
+    public static String getGaugeMetaScript(String containerId, Double valor, double verdeHasta, double amarilloHasta,
+                                            String[] colores) {
+        StringBuilder js = new StringBuilder("(function() {")
+                .append("function dibujar() {")
+                .append(scriptInicializarRoot(containerId))
+                .append("var chart = root.container.children.push(am5radar.RadarChart.new(root, { panX: false, panY: false, startAngle: 180, endAngle: 360, paddingBottom: 0 }));")
+                .append("var renderer = am5radar.AxisRendererCircular.new(root, { innerRadius: -26, strokeOpacity: 0, minGridDistance: 40 });")
+                .append("renderer.grid.template.setAll({ forceHidden: true });")
+                .append("renderer.labels.template.setAll({ fontSize: '11px', fill: am5.color(0x6c7383), radius: 8, textType: 'adjusted' });")
+                .append("var eje = chart.xAxes.push(am5xy.ValueAxis.new(root, { min: 0, max: 100, strictMinMax: true, numberFormat: \"#'%'\", renderer: renderer }));")
+                .append("function zona(desde, hasta, color) {")
+                .append("  var r = eje.createAxisRange(eje.makeDataItem({ value: desde, endValue: hasta }));")
+                .append("  r.get('axisFill').setAll({ visible: true, fill: am5.color(color), fillOpacity: 1 });")
+                .append("  r.get('label').setAll({ forceHidden: true }); r.get('grid').setAll({ forceHidden: true });")
+                .append("}")
+                .append("zona(0, ").append(verdeHasta).append(", ").append(colores[0]).append(");")
+                .append("zona(").append(verdeHasta).append(", ").append(amarilloHasta).append(", ").append(colores[1]).append(");")
+                .append("zona(").append(amarilloHasta).append(", 100, ").append(colores[2]).append(");");
+        if (valor != null) {
+            js.append("var item = eje.makeDataItem({ value: 0 });")
+                    .append("var aguja = am5radar.ClockHand.new(root, { pinRadius: 9, radius: am5.percent(92), innerRadius: 0, bottomWidth: 12, topWidth: 1 });")
+                    .append("aguja.hand.set('fill', am5.color(").append(colores[3]).append("));")
+                    .append("aguja.pin.set('fill', am5.color(").append(colores[3]).append("));")
+                    .append("item.set('bullet', am5xy.AxisBullet.new(root, { sprite: aguja }));")
+                    .append("eje.createAxisRange(item);")
+                    .append("item.get('grid').setAll({ forceHidden: true }); item.get('label').setAll({ forceHidden: true });")
+                    .append("item.animate({ key: 'value', to: ").append(Math.max(0, Math.min(100, valor)))
+                    .append(", duration: 900, easing: am5.ease.out(am5.ease.cubic) });");
+        }
+        js.append("window.am5Charts[id] = { root: root, chart: chart };")
+                .append("chart.appear(800, 100);")
+                .append("}")
+                .append("if (window.am5radar) { dibujar(); return; }")
+                .append("var s = document.getElementById('am5radar-script');")
+                .append("if (!s) {")
+                .append("  s = document.createElement('script'); s.id = 'am5radar-script'; s.src = ").append(jsString(URL_RADAR)).append(";")
+                .append("  s.addEventListener('error', function() { var d = document.getElementById(").append(jsString(containerId))
+                .append("); if (d) d.textContent = 'No se pudo cargar el indicador (sin acceso a cdn.amcharts.com).'; });")
+                .append("  document.head.appendChild(s);")
+                .append("}")
+                .append("s.addEventListener('load', dibujar);")
                 .append("})();");
         return js.toString();
     }
