@@ -962,20 +962,21 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     }
 
     /**
-     * Las máquinas del transformador en el tiempo en que trabajó el generador, cada una con su estado (pedido del usuario
-     * el 2026-10-23, mismas palabras que Balance energético P1): "trabajando" en verde con su potencia media; "trabajando,
-     * parada" en amarillo con el tiempo que estuvo sin producción; "parada" y "sin dato" en gris. Arriba, cuántas de cada.
+     * Las máquinas del transformador en el tiempo en que trabajó el generador, cada una con su estado según el umbral de
+     * encendido del horómetro (acordado con el usuario el 2026-10-23; el color lo dice, sin explicarlo en el texto):
+     * verde "trabajando" = pasó el umbral, con su potencia media (si paró un rato, cuánto); amarillo "parada" = por
+     * debajo del umbral con consumo mínimo, con lo que consumió; gris "parada" = consumo cero, y "sin dato".
      */
     private static String textoMaquinas(List<ConsumoMedidor> lista, String transformador) {
         List<ConsumoMedidor> orden = new ArrayList<>(lista);
-        // Primero las que trabajaron (de mayor a menor potencia), después las que pararon un rato, las paradas y sin dato.
+        // Primero las que trabajaron (de mayor a menor potencia), después las paradas con consumo, las en cero y sin dato.
         orden.sort(java.util.Comparator.comparingInt((ConsumoMedidor c) -> switch (c.estado()) {
-            case ENCENDIDO -> 0;
-            case ENERGIZADO_Y_SIN_PRODUCCION -> 1;
-            case APAGADO_CONSUMO_MINIMO, APAGADO_CERO -> 2;
+            case ENCENDIDO, ENERGIZADO_Y_SIN_PRODUCCION -> 0;
+            case APAGADO_CONSUMO_MINIMO -> 1;
+            case APAGADO_CERO -> 2;
             case SIN_DATOS -> 3;
         }).thenComparing(c -> -(c.kwMedio() == null ? 0 : c.kwMedio())));
-        int trabajando = 0, conParadas = 0, paradas = 0;
+        int trabajando = 0, paradas = 0;
         StringBuilder chips = new StringBuilder();
         for (ConsumoMedidor c : orden) {
             String kw = c.kwMedio() == null ? "" : String.format(Locale.ROOT, " (%,.1f kW)", c.kwMedio());
@@ -988,11 +989,16 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                     e = Estado.OK;
                 }
                 case ENERGIZADO_Y_SIN_PRODUCCION -> {
-                    conParadas++;
-                    texto = "trabajando, parada " + duracion(c.horasSinProduccion()) + kw;
+                    trabajando++;
+                    texto = "trabajando" + kw + ", parada " + duracion(c.horasSinProduccion());
+                    e = Estado.OK;
+                }
+                case APAGADO_CONSUMO_MINIMO -> {
+                    paradas++;
+                    texto = "parada" + kw;
                     e = Estado.AVISO;
                 }
-                case APAGADO_CONSUMO_MINIMO, APAGADO_CERO -> {
+                case APAGADO_CERO -> {
                     paradas++;
                     texto = "parada";
                     e = Estado.SIN_DATO;
@@ -1006,9 +1012,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             chips.append("<span style='padding:2px 9px;border-radius:10px;font-size:12px;white-space:nowrap;background:").append(t[1])
                     .append(";color:").append(t[2]).append("'><b>").append(esc(c.medidor())).append("</b>: ").append(texto).append("</span>");
         }
-        StringBuilder resumen = new StringBuilder().append(trabajando).append(" trabajando");
-        if (conParadas > 0) resumen.append(", ").append(conParadas).append(" trabajando con paradas");
-        resumen.append(", ").append(paradas).append(paradas == 1 ? " parada" : " paradas");
+        StringBuilder resumen = new StringBuilder().append(trabajando).append(" trabajando, ")
+                .append(paradas).append(paradas == 1 ? " parada" : " paradas");
         return "<div style='display:grid;gap:6px;font-size:13px'>"
                 + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>Maquinas " + esc(GeneradorView.deRed(transformador)) + ": "
                 + resumen + "</span><div style='display:flex;flex-wrap:wrap;gap:5px'>" + chips + "</div></div>";
