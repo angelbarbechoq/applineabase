@@ -964,7 +964,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     /**
      * Las máquinas del transformador en el tiempo en que trabajó el generador, cada una con su estado según el umbral de
      * encendido del horómetro (acordado con el usuario el 2026-10-23; el color lo dice, sin explicarlo en el texto):
-     * verde "trabajando" = pasó el umbral, con su potencia media (si paró un rato, cuánto); amarillo "parada" = por
+     * verde "trabajando" = pasó el umbral, con su potencia media (sin el tiempo que paró: pedido del usuario); amarillo "parada" = por
      * debajo del umbral con consumo mínimo, con lo que consumió; gris "parada" = consumo cero, y "sin dato".
      */
     private static String textoMaquinas(List<ConsumoMedidor> lista, String transformador) {
@@ -983,14 +983,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             String texto;
             Estado e;
             switch (c.estado()) {
-                case ENCENDIDO -> {
+                case ENCENDIDO, ENERGIZADO_Y_SIN_PRODUCCION -> {
                     trabajando++;
                     texto = "trabajando" + kw;
-                    e = Estado.OK;
-                }
-                case ENERGIZADO_Y_SIN_PRODUCCION -> {
-                    trabajando++;
-                    texto = "trabajando" + kw + ", parada " + duracion(c.horasSinProduccion());
                     e = Estado.OK;
                 }
                 case APAGADO_CONSUMO_MINIMO -> {
