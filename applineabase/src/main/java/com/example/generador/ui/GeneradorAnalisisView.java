@@ -898,7 +898,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         if (p.kwhRedExportada() != null) {
             h.append("<span style='font-size:13px;color:").append(TEXTO_SUAVE).append("'>Exportada a la red: ").append(kwh(p.kwhRedExportada()))
-                    .append(". No cuenta para la meta: lo exportado no se resta de lo importado y no se paga.</span>");
+                    .append("</span>");
         }
         h.append("</div>");
         indicadorTexto.add(new Html(h.toString()));
@@ -916,7 +916,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private static Component tarjetaBalance(Double balance) {
         if (balance == null) return tarjetaKpi("Balance neto con la red", "-", null, Estado.SIN_DATO);
         String detalle = Math.abs(balance) < 0.5 ? "sin intercambio neto con la red"
-                : balance < 0 ? "se exporto mas de lo que se importo (no cuenta para la meta)"
+                : balance < 0 ? "se exporto mas de lo que se importo"
                 : "se importo de la red mas de lo que se exporto";
         return tarjetaKpi("Balance neto con la red", String.format(Locale.ROOT, "%,.0f kWh", balance), detalle, Estado.SIN_DATO);
     }
