@@ -962,38 +962,56 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     }
 
     /**
-     * Las máquinas del transformador en el tiempo en que trabajó el generador, como texto: las encendidas en verde con su
-     * potencia media (de mayor a menor) y, en gris, las apagadas y las sin datos.
+     * Las máquinas del transformador en el tiempo en que trabajó el generador, cada una con su estado (pedido del usuario
+     * el 2026-10-23, mismas palabras que Balance energético P1): "trabajando" en verde con su potencia media; "trabajando,
+     * parada" en amarillo con el tiempo que estuvo sin producción; "parada" y "sin dato" en gris. Arriba, cuántas de cada.
      */
     private static String textoMaquinas(List<ConsumoMedidor> lista, String transformador) {
-        List<ConsumoMedidor> encendidas = lista.stream()
-                .filter(c -> c.estado() == ConsumoMedidoresService.Estado.ENCENDIDO
-                        || c.estado() == ConsumoMedidoresService.Estado.ENERGIZADO_Y_SIN_PRODUCCION)
-                .sorted((x, y) -> Double.compare(y.kwMedio() == null ? 0 : y.kwMedio(), x.kwMedio() == null ? 0 : x.kwMedio())).toList();
-        List<String> apagadas = lista.stream().filter(c -> c.estado() == ConsumoMedidoresService.Estado.APAGADO_CONSUMO_MINIMO
-                || c.estado() == ConsumoMedidoresService.Estado.APAGADO_CERO).map(ConsumoMedidor::medidor).toList();
-        List<String> sinDatos = lista.stream().filter(c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS)
-                .map(ConsumoMedidor::medidor).toList();
-        String verde = tonos(Estado.OK)[2];
-        StringBuilder h = new StringBuilder("<div style='display:grid;gap:5px;font-size:13px'>")
-                .append("<span style='font-size:12px;color:").append(TEXTO_SUAVE).append("'>Maquinas encendidas ")
-                .append(esc(GeneradorView.deRed(transformador))).append(" (").append(encendidas.size()).append(")</span>")
-                .append("<div style='display:flex;flex-wrap:wrap;gap:4px 14px'>");
-        for (ConsumoMedidor c : encendidas) {
-            h.append("<span style='color:").append(verde).append(";font-weight:600;white-space:nowrap'>").append(esc(c.medidor()))
-                    .append(" <span style='font-weight:400'>").append(c.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%,.1f kW", c.kwMedio()))
-                    .append("</span></span>");
+        List<ConsumoMedidor> orden = new ArrayList<>(lista);
+        // Primero las que trabajaron (de mayor a menor potencia), después las que pararon un rato, las paradas y sin dato.
+        orden.sort(java.util.Comparator.comparingInt((ConsumoMedidor c) -> switch (c.estado()) {
+            case ENCENDIDO -> 0;
+            case ENERGIZADO_Y_SIN_PRODUCCION -> 1;
+            case APAGADO_CONSUMO_MINIMO, APAGADO_CERO -> 2;
+            case SIN_DATOS -> 3;
+        }).thenComparing(c -> -(c.kwMedio() == null ? 0 : c.kwMedio())));
+        int trabajando = 0, conParadas = 0, paradas = 0;
+        StringBuilder chips = new StringBuilder();
+        for (ConsumoMedidor c : orden) {
+            String kw = c.kwMedio() == null ? "" : String.format(Locale.ROOT, " (%,.1f kW)", c.kwMedio());
+            String texto;
+            Estado e;
+            switch (c.estado()) {
+                case ENCENDIDO -> {
+                    trabajando++;
+                    texto = "trabajando" + kw;
+                    e = Estado.OK;
+                }
+                case ENERGIZADO_Y_SIN_PRODUCCION -> {
+                    conParadas++;
+                    texto = "trabajando, parada " + duracion(c.horasSinProduccion()) + kw;
+                    e = Estado.AVISO;
+                }
+                case APAGADO_CONSUMO_MINIMO, APAGADO_CERO -> {
+                    paradas++;
+                    texto = "parada";
+                    e = Estado.SIN_DATO;
+                }
+                default -> {
+                    texto = "sin dato";
+                    e = Estado.SIN_DATO;
+                }
+            }
+            String[] t = tonos(e);
+            chips.append("<span style='padding:2px 9px;border-radius:10px;font-size:12px;white-space:nowrap;background:").append(t[1])
+                    .append(";color:").append(t[2]).append("'><b>").append(esc(c.medidor())).append("</b>: ").append(texto).append("</span>");
         }
-        h.append("</div>");
-        if (!apagadas.isEmpty()) {
-            h.append("<span style='font-size:12px;color:").append(TEXTO_SUAVE).append("'>Apagadas: ")
-                    .append(esc(String.join(", ", apagadas))).append("</span>");
-        }
-        if (!sinDatos.isEmpty()) {
-            h.append("<span style='font-size:12px;color:").append(TEXTO_SUAVE).append("'>Sin datos: ")
-                    .append(esc(String.join(", ", sinDatos))).append("</span>");
-        }
-        return h.append("</div>").toString();
+        StringBuilder resumen = new StringBuilder().append(trabajando).append(" trabajando");
+        if (conParadas > 0) resumen.append(", ").append(conParadas).append(" trabajando con paradas");
+        resumen.append(", ").append(paradas).append(paradas == 1 ? " parada" : " paradas");
+        return "<div style='display:grid;gap:6px;font-size:13px'>"
+                + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>Maquinas " + esc(GeneradorView.deRed(transformador)) + ": "
+                + resumen + "</span><div style='display:flex;flex-wrap:wrap;gap:5px'>" + chips + "</div></div>";
     }
 
     /**
