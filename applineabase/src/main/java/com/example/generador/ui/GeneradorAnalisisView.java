@@ -73,13 +73,13 @@ import java.util.function.Function;
  *   planta 1 por día, semana o mes; horas en paralelo / isla / vacío; arranques. La red es la del medidor principal.
  * - Períodos en marcha: por cada arranque, lo que trabajó el generador y lo que la planta 1 tomó de la red y le
  *   entregó en ese mismo intervalo (repartido si otro generador estaba en marcha), con el horómetro al arrancar y al
- *   parar (reemplaza a la pestaña Arranques que había en Generadores).
+ *   parar (reemplaza a la pestaña Arranques que había en Generadores). Arriba, la meta cero importación: gauge de todos
+ *   los períodos y gauge del seleccionado; al elegir uno se ven debajo su balance y el minuto a minuto.
  * - Tendencias: una variable guardada del controlador (batería, temperaturas, potencia...) en las últimas 24 h a 90
  *   días; usa solo el generador del filtro, con su propio período (son lecturas de cada minuto).
  * - Costos: galones y precio del galón cargados a mano por período en marcha; comparación del costo del diésel con
  *   lo que habría costado la misma energía en la red, con el precio de la franja horaria de cada hora (tarifas y
  *   feriados de Consumo por franja horaria).
- *   Al elegir un arranque se ve su balance y con qué máquinas trabajó el generador (encendido / con paradas / apagado).
  * En pantalla se nombra el transformador ("Transformador 1"), nunca "el tablero".
  */
 @PageTitle("Analisis grupo electrogeno | LineaBase")
@@ -103,6 +103,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     // Texto, bordes y fondos de la ventana.
     private static final String TEXTO = "#1E1E2C", TEXTO_SUAVE = "#6C7383", BORDE = "#E4E6EC", FONDO_SUAVE = "#F4F5F7";
     private static final String CHART_INDICADOR = "chartdiv_indicador_meta";
+    private static final String CHART_INDICADOR_TODOS = "chartdiv_indicador_meta_todos";
 
     private final GeneradorService generadorService;
     private final GeneradorAnalisisService analisis;
@@ -142,10 +143,13 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private String scriptPlanta;
     // Períodos en marcha
     private final HorizontalLayout tarjetasPeriodos = new HorizontalLayout();
-    private final Div kpiMeta = new Div();
     private final Grid<PeriodoMarcha> periodosGrid = new Grid<>();
-    // Indicador de la meta de un arranque, arriba de la pestaña: el último (o el que está en marcha) o el elegido en la lista.
+    // Meta cero importación, arriba de la pestaña: a la izquierda todos los períodos del rango elegido; a la derecha el
+    // período seleccionado en la lista (al abrir, el que está en marcha o el último).
     private final Div bloqueIndicador = new Div();
+    private final Div chartIndicadorTodos = new Div();
+    private final Div indicadorTodosTexto = new Div();
+    private String scriptIndicadorTodos;
     private final Div chartIndicador = new Div();
     private final Div indicadorTexto = new Div();
     private PeriodoMarcha arranqueInicial;
@@ -176,13 +180,12 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final Grid<PeriodoMarcha> costosGrid = new Grid<>();
     private Map<String, CostoCombustible> combustible = Map.of();
     private List<PeriodoMarcha> periodos = List.of();
-    // Máquinas del período en marcha elegido
-    private final H4 maquinasTitulo = new H4();
+    // Detalle del período en marcha seleccionado
+    private final H4 detalleTitulo = new H4();
     private final HorizontalLayout kpisDetalle = new HorizontalLayout();
     private final Div balance = new Div();
     private final Div chartMinutos = new Div();
-    private final Span maquinasResumen = new Span();
-    private final Grid<ConsumoMedidor> maquinasGrid = new Grid<>();
+    private final Span detalleAyuda = new Span();
 
     private LocalDate desde, hasta;
     /** Generadores del último "Ver" (los que usa el reporte, junto con desde y hasta). */
@@ -278,6 +281,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             if (e.getSelectedTab() == tabEnergia && scriptGrafico != null) getElement().executeJs(scriptGrafico);
             if (e.getSelectedTab() == tabEnergia && scriptPlanta != null) getElement().executeJs(scriptPlanta);
             if (e.getSelectedTab() == tabPeriodos && scriptPeriodos != null) getElement().executeJs(scriptPeriodos);
+            if (e.getSelectedTab() == tabPeriodos && scriptIndicadorTodos != null) getElement().executeJs(scriptIndicadorTodos);
             if (e.getSelectedTab() == tabPeriodos && scriptIndicador != null) getElement().executeJs(scriptIndicador);
             if (e.getSelectedTab() == tabCostos && scriptCostos != null) getElement().executeJs(scriptCostos);
             // Tendencias tiene su propio período (lecturas de cada minuto): el de arriba, Ver y el reporte no le aplican.
@@ -352,7 +356,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         arranqueInicial = arranqueDelIndicador(consulta, gens);
         verPeriodos();
         verCostos();
-        limpiarDetalleMaquinas();
+        limpiarDetalle();
         pintarIndicador(arranqueInicial, false);
 
         mensaje.setText(gens.stream().map(Generador::nombre).reduce((x, y) -> x + " + " + y).orElse("")
@@ -600,7 +604,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         periodosGrid.setSelectionMode(Grid.SelectionMode.SINGLE);
         periodosGrid.asSingleSelect().addValueChangeListener(e -> {
             PeriodoMarcha p = e.getValue();
-            mostrarMaquinas(p);
+            mostrarDetalle(p);
             pintarIndicador(p != null ? p : arranqueInicial, p != null);
             // El indicador y el detalle están arriba de la lista: la página sube a mostrarlos.
             if (p != null && e.isFromClient()) {
@@ -623,13 +627,13 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         chart.setId(CHART_PERIODOS);
         chart.setWidthFull();
         chart.setHeight("320px");
-        H4 tituloResumen = new H4("Todos los arranques del periodo");
+        H4 tituloResumen = new H4("Todos los periodos en marcha del rango elegido");
         tituloResumen.getStyle().set("margin", "18px 0 0 0").set("color", TEXTO);
-        VerticalLayout v = new VerticalLayout(descripcion("Solo los momentos en que el generador estuvo encendido. Arriba, que tan "
-                + "lejos de la meta cero (nada importado de la red) quedo el ultimo arranque; debajo, todos los arranques del periodo. "
-                + "Haga clic en un arranque de la lista para ver arriba su indicador, el detalle minuto a minuto y con que maquinas trabajo."),
-                crearIndicador(), crearDetalleMaquinas(), tituloResumen, tarjetasPeriodos, kpiMeta, chart, periodosGrid, nota);
-        kpiMeta.setWidthFull();
+        VerticalLayout v = new VerticalLayout(descripcion("Solo los momentos en que el generador estuvo encendido. Arriba, la meta "
+                + "cero (nada importado de la red): a la izquierda todos los periodos del rango elegido y a la derecha el periodo "
+                + "seleccionado (al abrir, el ultimo). Haga clic en un periodo de la lista para verlo a la derecha, con su detalle "
+                + "minuto a minuto debajo."),
+                crearIndicador(), crearDetalle(), tituloResumen, tarjetasPeriodos, chart, periodosGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -655,7 +659,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Double balance = imp == null ? null : imp - (exp == null ? 0 : exp);
         tarjetasPeriodos.add(kpiTomadoDeRed(pctRed, imp, cons));
         tarjetasPeriodos.add(tarjetaBalance(balance));
-        pintarMeta(pctRed, imp, cons);
+        pintarIndicadorTodos(pctRed, imp, cons, exp);
         tarjetasPeriodos.add(tarjeta("Tiempo importando de la red", lecturas == 0 ? "-" : String.format(Locale.ROOT, "%.0f %%", tomando * 100.0 / lecturas),
                 (lecturas == 0 ? "" : tomando + " de " + lecturas + " minutos") + (pico == null ? "" : String.format(Locale.ROOT, "; pico %.0f kW", pico))));
         tarjetasPeriodos.add(tarjeta("Exportada a la red", kwh(exp), "excedente mientras el generador estaba encendido"));
@@ -681,14 +685,119 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         if (tabs.getSelectedTab() == tabPeriodos) getElement().executeJs(scriptPeriodos);
     }
 
+    // ================= Meta cero importación: todos los períodos y el seleccionado =================
+
     /**
-     * Meta "consumo cero de la red" del período elegido: el porcentaje importado, una barra sobre las zonas del
-     * semáforo (como en el reporte de generadores) y cuántos arranques quedaron en verde y en rojo.
+     * Meta "cero importación de la red" arriba de la pestaña (pedido del usuario el 2026-10-23): dos tarjetas con su gauge
+     * de semáforo, a la izquierda todos los períodos del rango elegido y a la derecha el período seleccionado en la lista
+     * (al abrir, el que está en marcha o el último). Arriba a la derecha, los límites del semáforo (solo el administrador).
      */
-    private void pintarMeta(Double pct, Double imp, Double cons) {
-        kpiMeta.removeAll();
-        kpiMeta.setVisible(pct != null);
-        if (pct == null) return;
+    private Div crearIndicador() {
+        Span titulo = new Span("Meta: cero importacion de la red");
+        titulo.getStyle().set("font-size", "16px").set("font-weight", "700").set("color", TEXTO);
+        Div cabecera = new Div(titulo);
+        cabecera.getStyle().set("display", "flex").set("align-items", "center").set("justify-content", "space-between")
+                .set("flex-wrap", "wrap").set("gap", "8px").set("width", "100%");
+        // Límites del semáforo: solo el administrador los cambia (se guardan en generador-config.json).
+        if (lineaAccessService.esAdmin()) {
+            Button limites = new Button("Limites del semaforo", VaadinIcon.COG.create(), e -> abrirDialogoLimites());
+            limites.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+            cabecera.add(limites);
+        }
+        Div tarjetas = new Div(tarjetaIndicador(chartIndicadorTodos, CHART_INDICADOR_TODOS, indicadorTodosTexto),
+                tarjetaIndicador(chartIndicador, CHART_INDICADOR, indicadorTexto));
+        tarjetas.getStyle().set("display", "flex").set("flex-wrap", "wrap").set("gap", "16px").set("width", "100%");
+        bloqueIndicador.add(cabecera, tarjetas);
+        bloqueIndicador.setWidthFull();
+        bloqueIndicador.getStyle().set("display", "flex").set("flex-direction", "column").set("gap", "10px")
+                .set("box-sizing", "border-box").set("scroll-margin-top", "12px");
+        return bloqueIndicador;
+    }
+
+    /** Tarjeta de un indicador: el gauge y, al lado (o debajo si no entra), su texto. */
+    private static Div tarjetaIndicador(Div chart, String id, Div texto) {
+        chart.setId(id);
+        chart.setWidth("280px");
+        chart.setHeight("240px");
+        Div gauge = new Div(chart);
+        gauge.getStyle().set("flex", "0 0 280px");
+        texto.getStyle().set("flex", "1 1 220px").set("min-width", "220px").set("color", TEXTO);
+        Div t = new Div(gauge, texto);
+        t.getStyle().set("flex", "1 1 520px").set("min-width", "320px").set("display", "flex").set("flex-wrap", "wrap")
+                .set("align-items", "center").set("gap", "4px 20px").set("border", "1px solid " + BORDE)
+                .set("border-radius", "12px").set("padding", "14px 18px").set("background-color", "#ffffff")
+                .set("box-shadow", "0 1px 3px rgba(30,30,44,0.06)").set("box-sizing", "border-box");
+        return t;
+    }
+
+    /** Cabecera del texto de un indicador: qué es (en mayúsculas chicas), el título y debajo un detalle. */
+    private static void cabeceraIndicador(StringBuilder h, String etiqueta, String titulo, String detalle) {
+        h.append("<span style='font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:")
+                .append(TEXTO_SUAVE).append("'>").append(etiqueta).append("</span>")
+                .append("<span style='font-size:20px;font-weight:700'>").append(esc(titulo)).append("</span>")
+                .append("<span style='font-size:13px;color:").append(TEXTO_SUAVE).append("'>").append(detalle).append("</span>");
+    }
+
+    /**
+     * Lo que dice cada indicador sobre la meta: zona, cuánto se importó de la red y qué tan lejos de la meta cero quedó
+     * (y cuántos kWh menos para quedar en verde); al final, lo exportado.
+     */
+    private void textoMeta(StringBuilder h, Double pct, Double imp, Double cons, Double exp) {
+        if (pct == null) {
+            h.append("<span style='color:").append(TEXTO_SUAVE).append("'>Sin lecturas del medidor principal: no se puede calcular "
+                    + "cuanto se importo de la red.</span>");
+        } else {
+            String[] c = tonos(semaforoRed(pct));
+            MetaImportacionRed.Zona zona = meta.zona(pct);
+            String nombreZona = switch (zona) {
+                case VERDE -> "Zona verde: hasta " + pctUmbral(meta.verdeHasta());
+                case AMARILLO -> "Zona amarilla: de " + pctUmbral(meta.verdeHasta()) + " a " + pctUmbral(meta.amarilloHasta());
+                case ROJO -> "Zona roja: mas de " + pctUmbral(meta.amarilloHasta());
+            };
+            h.append("<span style='padding:3px 10px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;"
+                            + "justify-self:start;background:").append(c[1]).append(";color:").append(c[2]).append("'>")
+                    .append(nombreZona).append("</span>")
+                    .append("<span>Se importo de la red el <b>").append(String.format(Locale.ROOT, "%.1f %%", pct))
+                    .append("</b> del consumo de la planta 1: ").append(kwh(imp)).append(" de ").append(kwh(cons))
+                    .append(". Meta: 0 %.</span>");
+            if (zona == MetaImportacionRed.Zona.VERDE) {
+                h.append("<span>Dentro de la zona verde, a ").append(String.format(Locale.ROOT, "%.1f", pct))
+                        .append(" puntos de la meta cero.</span>");
+            } else {
+                // Lo que sobró de la red para quedar en verde: lo importado menos el límite verde del consumo.
+                double deMas = imp - cons * meta.verdeHasta() / 100;
+                h.append("<span>A <b>").append(String.format(Locale.ROOT, "%.1f puntos", pct)).append("</b> de la meta cero. Para quedar en verde (hasta ")
+                        .append(pctUmbral(meta.verdeHasta())).append(") se debieron importar unos <b>").append(kwh(deMas))
+                        .append("</b> menos.</span>");
+            }
+        }
+        if (exp != null) {
+            h.append("<span style='font-size:13px;color:").append(TEXTO_SUAVE).append("'>Exportada a la red: ").append(kwh(exp))
+                    .append("</span>");
+        }
+    }
+
+    /** Colores del gauge: zonas verde, amarilla y roja, la aguja y el número (del color de su zona). */
+    private String[] coloresGauge(Double pct) {
+        return new String[]{am(tonos(Estado.OK)[0]), am(tonos(Estado.AVISO)[0]), am(tonos(Estado.FUERA)[0]), NOCHE,
+                am(tonos(semaforoRed(pct))[2])};
+    }
+
+    /** Gauge de la izquierda: todos los períodos en marcha del rango elegido, con cuántos quedaron en verde y en rojo. */
+    private void pintarIndicadorTodos(Double pct, Double imp, Double cons, Double exp) {
+        indicadorTodosTexto.removeAll();
+        StringBuilder h = new StringBuilder("<div style='display:grid;gap:6px;font-size:14px'>");
+        String rango = "Del " + desde.format(DIA) + " al " + hasta.format(DIA) + ", "
+                + gensVistos.stream().map(Generador::nombre).reduce((x, y) -> x + " + " + y).orElse("");
+        cabeceraIndicador(h, "Todos los periodos", periodos.size() + (periodos.size() == 1 ? " periodo en marcha" : " periodos en marcha"), rango);
+        if (periodos.isEmpty()) {
+            h.append("<span style='color:").append(TEXTO_SUAVE).append("'>Sin periodos en marcha en el rango elegido.</span></div>");
+            indicadorTodosTexto.add(new Html(h.toString()));
+            chartIndicadorTodos.setVisible(false);
+            scriptIndicadorTodos = null;
+            return;
+        }
+        textoMeta(h, pct, imp, cons, exp);
         int verdes = 0, rojos = 0, n = 0;
         for (PeriodoMarcha p : periodos) {
             Double x = p.porcentajeDeRed();
@@ -697,62 +806,18 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             if (meta.zona(x) == MetaImportacionRed.Zona.VERDE) verdes++;
             else if (meta.zona(x) == MetaImportacionRed.Zona.ROJO) rojos++;
         }
-        double tope = Math.max(meta.amarilloHasta() * 2, Math.ceil(pct + 5));
-        Function<Double, String> ancho = v -> String.format(Locale.ROOT, "%.2f%%", Math.min(v, tope) / tope * 100);
-        Function<Double, String> marca = v -> "<span style='position:absolute;left:" + ancho.apply(v) + ";transform:translateX("
-                + (v == 0 ? "0" : v >= tope ? "-100%" : "-50%") + ")'>" + pctUmbral(v) + "</span>";
-        String chip = "padding:2px 10px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;";
-        String[] verde = tonos(Estado.OK), amarillo = tonos(Estado.AVISO), rojo = tonos(Estado.FUERA);
-        kpiMeta.add(new Html("<div style='display:grid;gap:6px;max-width:820px;color:" + TEXTO + "'>"
-                + "<div style='font-weight:600'>Meta: cero importacion de la red (todos los arranques del periodo)</div>"
-                + "<div style='display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px'>"
-                + "<span style='font-size:28px;font-weight:700'>" + String.format(Locale.ROOT, "%.1f %%", pct) + "</span>"
-                + "<span style='color:" + TEXTO_SUAVE + "'>del consumo se importo de la red (" + kwh(imp) + " de " + kwh(cons) + "); meta 0 %</span>"
-                + "<span style='" + chip + "background:" + verde[1] + ";color:" + verde[2] + "'>" + verdes + " de " + n + " arranques hasta "
-                + pctUmbral(meta.verdeHasta()) + "</span>"
-                + "<span style='" + chip + "background:" + rojo[1] + ";color:" + rojo[2] + "'>" + rojos + " con mas de " + pctUmbral(meta.amarilloHasta()) + "</span></div>"
-                + "<div style='position:relative;height:30px;display:flex;border-radius:6px;overflow:hidden'>"
-                + "<div style='width:" + ancho.apply(meta.verdeHasta()) + ";background:" + verde[0] + "'></div>"
-                + "<div style='width:" + ancho.apply(meta.amarilloHasta() - meta.verdeHasta()) + ";background:" + amarillo[0] + "'></div>"
-                + "<div style='flex:1;background:" + rojo[0] + "'></div>"
-                + "<div style='position:absolute;left:0;top:9px;height:12px;border-radius:0 6px 6px 0;width:" + ancho.apply(pct) + ";background:" + TEXTO + "'></div></div>"
-                + "<div style='position:relative;height:16px;font-size:12px;color:" + TEXTO_SUAVE + "'>" + marca.apply(0.0) + marca.apply(meta.verdeHasta())
-                + marca.apply(meta.amarilloHasta()) + marca.apply(tope) + "</div>"
-                + "<div style='font-size:12px;color:" + TEXTO_SUAVE + "'>Barra oscura = importacion de la red del periodo, en % del consumo. Fondo: verde hasta "
-                + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
-                + ", rojo por encima (el administrador lo cambia con \"Limites del semaforo\", arriba). Cada arranque, en la columna "
-                + "\"% importado de la red\".</div></div>"));
-    }
-
-    // ================= Indicador de la meta de un arranque =================
-
-    /**
-     * Indicador de la meta "cero importación de la red" de un arranque (pedido del usuario el 2026-10-23): gauge de
-     * semáforo con el % del consumo importado y, al lado, qué arranque es y qué tan lejos de la meta quedó. Al abrir, el
-     * arranque en marcha o el último; al elegir uno en la lista, ese.
-     */
-    private Div crearIndicador() {
-        chartIndicador.setId(CHART_INDICADOR);
-        chartIndicador.setWidth("300px");
-        chartIndicador.setHeight("250px");
-        Div gauge = new Div(chartIndicador);
-        gauge.getStyle().set("flex", "0 0 300px");
-        indicadorTexto.getStyle().set("flex", "1 1 320px").set("min-width", "260px").set("color", TEXTO);
-        bloqueIndicador.add(gauge, indicadorTexto);
-        bloqueIndicador.setWidthFull();
-        bloqueIndicador.getStyle().set("display", "flex").set("flex-wrap", "wrap").set("align-items", "center").set("gap", "8px 32px")
-                .set("border", "1px solid " + BORDE).set("border-radius", "12px").set("padding", "14px 20px")
-                .set("background-color", "#ffffff").set("box-shadow", "0 1px 3px rgba(30,30,44,0.06)")
-                .set("box-sizing", "border-box").set("scroll-margin-top", "12px").set("position", "relative");
-        // Límites del semáforo: solo el administrador los cambia (se guardan en generador-config.json).
-        if (lineaAccessService.esAdmin()) {
-            bloqueIndicador.getStyle().set("padding-top", "40px"); // lugar para el botón, sin tapar el texto
-            Button limites = new Button("Limites del semaforo", VaadinIcon.COG.create(), e -> abrirDialogoLimites());
-            limites.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
-            limites.getStyle().set("position", "absolute").set("top", "8px").set("right", "10px");
-            bloqueIndicador.add(limites);
-        }
-        return bloqueIndicador;
+        String chip = "padding:3px 10px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;";
+        String[] verde = tonos(Estado.OK), rojo = tonos(Estado.FUERA);
+        h.append("<div style='display:flex;flex-wrap:wrap;gap:6px'>")
+                .append("<span style='").append(chip).append("background:").append(verde[1]).append(";color:").append(verde[2]).append("'>")
+                .append(verdes).append(" de ").append(n).append(" en verde</span>")
+                .append("<span style='").append(chip).append("background:").append(rojo[1]).append(";color:").append(rojo[2]).append("'>")
+                .append(rojos).append(" de ").append(n).append(" en rojo</span></div></div>");
+        indicadorTodosTexto.add(new Html(h.toString()));
+        chartIndicadorTodos.setVisible(true);
+        scriptIndicadorTodos = GraficaModel.getGaugeMetaScript(CHART_INDICADOR_TODOS, pct, meta.verdeHasta(), meta.amarilloHasta(),
+                coloresGauge(pct), "importado de la red");
+        if (tabs.getSelectedTab() == tabPeriodos) getElement().executeJs(scriptIndicadorTodos);
     }
 
     /**
@@ -846,66 +911,34 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         return null;
     }
 
-    /** Pinta el indicador de un arranque; elegido = lo eligió el usuario en la lista (si no, es el del arranque inicial). */
+    /**
+     * Gauge de la derecha: un período en marcha. elegido = lo seleccionó el usuario en la lista; si no, es el del arranque
+     * inicial (el que está en marcha o el último).
+     */
     private void pintarIndicador(PeriodoMarcha p, boolean elegido) {
         indicadorTexto.removeAll();
         if (p == null) {
             chartIndicador.setVisible(false);
             scriptIndicador = null;
-            indicadorTexto.add(new Html("<div style='color:" + TEXTO_SUAVE + "'>Todavia no hay arranques para mostrar el indicador.</div>"));
+            indicadorTexto.add(new Html("<div style='color:" + TEXTO_SUAVE + "'>Todavia no hay periodos en marcha para mostrar.</div>"));
             return;
         }
         Double pct = p.porcentajeDeRed();
-        String[] c = tonos(semaforoRed(pct));
-        String etiqueta = elegido ? "Arranque elegido en la lista" : p.enCurso() ? "Arranque en marcha"
-                : inicialFueraDelPeriodo ? "Ultimo arranque (antes del periodo elegido)" : "Ultimo arranque";
+        String etiqueta = elegido ? "Periodo seleccionado" : p.enCurso() ? "Periodo en marcha ahora"
+                : inicialFueraDelPeriodo ? "Ultimo periodo en marcha (antes del rango elegido)" : "Ultimo periodo en marcha";
         String cuando = p.enCurso()
                 ? "Desde el " + p.inicio().format(CORTA) + (p.inicioEstimado() ? " (aprox.)" : "") + ", sigue en marcha ("
                 + duracion(p.horas()) + "; cifras hasta las " + p.fin().format(DateTimeFormatter.ofPattern("HH:mm")) + ", toque Ver para actualizar)"
                 : "Del " + p.inicio().format(CORTA) + (p.inicioEstimado() ? " (aprox.)" : "") + " al " + p.fin().format(CORTA)
                 + " (" + duracion(p.horas()) + ")";
-        String chip = "padding:3px 10px;border-radius:10px;font-weight:600;font-size:13px;white-space:nowrap;justify-self:start;";
-        StringBuilder h = new StringBuilder("<div style='display:grid;gap:6px;font-size:14px'>")
-                .append("<span style='font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:")
-                .append(TEXTO_SUAVE).append("'>").append(etiqueta).append("</span>")
-                .append("<span style='font-size:20px;font-weight:700'>").append(esc(p.generador())).append("</span>")
-                .append("<span style='font-size:13px;color:").append(TEXTO_SUAVE).append("'>").append(cuando).append("</span>");
-        if (pct == null) {
-            h.append("<span style='color:").append(TEXTO_SUAVE).append("'>Sin lecturas del medidor principal en este arranque: no se "
-                    + "puede calcular cuanto se importo de la red.</span>");
-        } else {
-            MetaImportacionRed.Zona zona = meta.zona(pct);
-            String nombreZona = switch (zona) {
-                case VERDE -> "Zona verde: hasta " + pctUmbral(meta.verdeHasta());
-                case AMARILLO -> "Zona amarilla: de " + pctUmbral(meta.verdeHasta()) + " a " + pctUmbral(meta.amarilloHasta());
-                case ROJO -> "Zona roja: mas de " + pctUmbral(meta.amarilloHasta());
-            };
-            h.append("<span style='").append(chip).append("background:").append(c[1]).append(";color:").append(c[2]).append("'>")
-                    .append(nombreZona).append("</span>")
-                    .append("<span>Se importo de la red el <b>").append(String.format(Locale.ROOT, "%.1f %%", pct))
-                    .append("</b> del consumo de la planta 1: ").append(kwh(p.kwhRedImportada())).append(" de ").append(kwh(p.consumo()))
-                    .append(". Meta: 0 %.</span>");
-            if (zona == MetaImportacionRed.Zona.VERDE) {
-                h.append("<span>Dentro de la zona verde, a ").append(String.format(Locale.ROOT, "%.1f", pct))
-                        .append(" puntos de la meta cero.</span>");
-            } else {
-                // Lo que sobró de la red para quedar en verde: lo importado menos el límite verde del consumo.
-                double deMas = p.kwhRedImportada() - p.consumo() * meta.verdeHasta() / 100;
-                h.append("<span>A <b>").append(String.format(Locale.ROOT, "%.1f puntos", pct)).append("</b> de la meta cero. Para quedar en verde (hasta ")
-                        .append(pctUmbral(meta.verdeHasta())).append(") se debieron importar unos <b>").append(kwh(deMas))
-                        .append("</b> menos.</span>");
-            }
-        }
-        if (p.kwhRedExportada() != null) {
-            h.append("<span style='font-size:13px;color:").append(TEXTO_SUAVE).append("'>Exportada a la red: ").append(kwh(p.kwhRedExportada()))
-                    .append("</span>");
-        }
+        StringBuilder h = new StringBuilder("<div style='display:grid;gap:6px;font-size:14px'>");
+        cabeceraIndicador(h, etiqueta, p.generador(), cuando);
+        textoMeta(h, pct, p.kwhRedImportada(), p.consumo(), p.kwhRedExportada());
         h.append("</div>");
         indicadorTexto.add(new Html(h.toString()));
         chartIndicador.setVisible(true);
         scriptIndicador = GraficaModel.getGaugeMetaScript(CHART_INDICADOR, pct, meta.verdeHasta(), meta.amarilloHasta(),
-                new String[]{am(tonos(Estado.OK)[0]), am(tonos(Estado.AVISO)[0]), am(tonos(Estado.FUERA)[0]), NOCHE, am(c[2])},
-                "importado de la red");
+                coloresGauge(pct), "importado de la red");
         if (tabs.getSelectedTab() == tabPeriodos) getElement().executeJs(scriptIndicador);
     }
 
@@ -1321,58 +1354,29 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         d.open();
     }
 
-    // ================= Máquinas de un período en marcha =================
+    // ================= Detalle del período en marcha seleccionado =================
 
-    private VerticalLayout crearDetalleMaquinas() {
-        maquinasTitulo.getStyle().set("margin", "16px 0 0 0");
-        maquinasResumen.getStyle().set("font-size", "14px").set("display", "block");
-        maquinasGrid.addColumn(ConsumoMedidor::medidor).setHeader("Maquina").setAutoWidth(true).setFlexGrow(0);
-        maquinasGrid.addColumn(c -> c.dentroDe() == null ? "" : "dentro de " + c.dentroDe()).setHeader("Submedidor")
-                .setAutoWidth(true).setFlexGrow(0);
-        maquinasGrid.addColumn(ConsumoMedidor::zona).setHeader("Zona / grupo").setAutoWidth(true).setFlexGrow(0);
-        maquinasGrid.addComponentColumn(GeneradorAnalisisView::badgeEstado).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
-        columna(maquinasGrid, "Energia consumida (kWh)", c -> c.kwh() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwh()));
-        columna(maquinasGrid, "Sin produccion (desperdicio kWh)", c -> c.kwhEnEspera() == null || c.kwhEnEspera() < 0.05 ? "-"
-                : String.format(Locale.ROOT, "%,.1f", c.kwhEnEspera()));
-        columna(maquinasGrid, "Potencia media (kW)", c -> c.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.kwMedio()));
-        columna(maquinasGrid, "Tiempo encendido", c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS ? "-" : duracion(c.horasEncendida()));
-        columna(maquinasGrid, "Tiempo sin produccion", c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS ? "-" : duracion(c.horasSinProduccion()));
-        columna(maquinasGrid, "Umbral de encendido", c -> String.format(Locale.ROOT, "%.0f", c.umbral()));
-        columna(maquinasGrid, "Sin produccion tras", c -> c.lecturasConfirmacion() + " min bajo el umbral");
-        maquinasGrid.setWidthFull();
-        maquinasGrid.setAllRowsVisible(true);
-        Span nota = nota("No se mide un porcentaje de carga: la carga de una linea depende del producto. Sin produccion = paso los "
-                + "minutos indicados seguidos por debajo de su umbral de encendido, el mismo del horometro (Horometro > Ajustar "
-                + "umbrales): 5 minutos para las lineas y demas maquinas. Los compresores paran y arrancan solos en su ciclo normal "
-                + "(paradas de 10 a 30 minutos), asi que cuentan sin produccion recien despues de "
-                + ConsumoMedidoresService.MINUTOS_COMPRESOR_APAGADO + " minutos seguidos sin carga; una parada del ciclo cuenta como "
-                + "encendido. Encendido = todo el arranque. Energizado y sin produccion = encendido una parte del arranque y sin "
-                + "produccion otra (ver los tiempos). Apagado, consumo minimo = no produjo en todo el arranque pero consumio (ej. "
-                + "Linea05: su transformador de aislamiento, ~1,7 kW). Apagado (en cero) = todas sus lecturas fueron cero y su "
-                + "contador no subio. Lo que se consume sin produccion es desperdicio: lo entrega igual el generador o la red. Sin "
-                + "datos = su medidor no tiene lecturas en ese horario. Se listan solo las maquinas del transformador del generador "
-                + "(Configuracion de hardware); no entran los transformadores ni el medidor general (bajan su carga porque el "
-                + "generador esta en marcha, no es desperdicio), los sensores ni MotorL3 / MotorL4. Los submedidores (por ejemplo "
-                + "GA752 dentro de Inyeccion) se muestran pero no se suman dos veces en el balance ni en el desperdicio.");
+    /** Detalle del período seleccionado en la lista: tarjetas, balance y minuto a minuto (sin la lista de máquinas). */
+    private VerticalLayout crearDetalle() {
+        detalleTitulo.getStyle().set("margin", "16px 0 0 0").set("color", TEXTO);
+        detalleAyuda.getStyle().set("font-size", "14px").set("color", TEXTO_SUAVE).set("display", "block");
         kpisDetalle.setWidthFull();
         kpisDetalle.getStyle().set("flex-wrap", "wrap");
         balance.setWidthFull();
         chartMinutos.setId(CHART_MINUTOS);
         chartMinutos.setWidthFull();
         chartMinutos.setHeight("340px");
-        VerticalLayout v = new VerticalLayout(maquinasTitulo, kpisDetalle, balance, chartMinutos, maquinasResumen, maquinasGrid, nota);
+        VerticalLayout v = new VerticalLayout(detalleTitulo, detalleAyuda, kpisDetalle, balance, chartMinutos);
         v.setPadding(false);
         v.setWidthFull();
-        limpiarDetalleMaquinas();
+        limpiarDetalle();
         return v;
     }
 
-    private void limpiarDetalleMaquinas() {
-        maquinasTitulo.setText("Detalle del arranque");
-        maquinasResumen.setText("Haga clic en un arranque de la lista (mas abajo, en Todos los arranques del periodo) para ver "
-                + "aqui su detalle minuto a minuto y con que maquinas trabajo el generador.");
-        maquinasGrid.setItems(List.of());
-        maquinasGrid.setVisible(false);
+    private void limpiarDetalle() {
+        detalleTitulo.setText("Detalle del periodo seleccionado");
+        detalleAyuda.setText("Haga clic en un periodo de la lista (mas abajo) para ver aqui su detalle minuto a minuto.");
+        detalleAyuda.setVisible(true);
         kpisDetalle.removeAll();
         balance.removeAll();
         balance.setVisible(false);
@@ -1482,17 +1486,17 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 "Consumo " + GeneradorView.deRed(p.red()), NARANJA, AZUL, AQUA, NOCHE)));
     }
 
-    private void mostrarMaquinas(PeriodoMarcha p) {
+    private void mostrarDetalle(PeriodoMarcha p) {
         if (p == null) {
-            limpiarDetalleMaquinas();
+            limpiarDetalle();
             return;
         }
+        // Las máquinas del transformador se calculan solo para el balance (consumido por las máquinas); no se listan.
         List<ConsumoMedidor> lista = consumoMedidores.calcular(p.inicio(), p.fin(), p.red());
-        maquinasGrid.setItems(lista);
-        maquinasGrid.setVisible(true);
-        maquinasTitulo.setText(p.generador() + " trabajo desde el " + p.inicio().format(CORTA)
-                + (p.enCurso() ? " hasta ahora (sigue en marcha)" : " hasta el " + p.fin().format(CORTA))
-                + " (" + duracion(p.horas()) + ") con las maquinas " + GeneradorView.deRed(p.red()));
+        detalleAyuda.setVisible(false);
+        detalleTitulo.setText("Detalle del periodo seleccionado: " + p.generador() + ", "
+                + (p.enCurso() ? "desde el " + p.inicio().format(CORTA) + " (sigue en marcha)"
+                : "del " + p.inicio().format(CORTA) + " al " + p.fin().format(CORTA)) + " (" + duracion(p.horas()) + ")");
         kpisDetalle.removeAll();
         // El % importado de la red de este arranque está en el indicador, justo arriba.
         kpisDetalle.add(tarjetaBalance(p.balanceNeto()));
@@ -1505,59 +1509,6 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 : String.format(Locale.ROOT, "%.0f kW medio", p.kwMedio())));
         mostrarBalance(p, lista);
         mostrarGraficoMinutos(p);
-
-        Double consumo = p.consumo();
-        StringBuilder r = new StringBuilder();
-        if (consumo != null && p.porcentajeDeRed() != null) {
-            r.append(String.format(Locale.ROOT, "La planta 1 consumio %,.0f kWh: el generador aporto el %.1f%% y de la red se importo el %.1f%% "
-                    + "(%,.0f kWh)", consumo, p.aporteGenerador(), p.porcentajeDeRed(), p.kwhRedImportada()));
-            if (p.porcentajeTiempoTomando() != null && p.kwhRedImportada() >= 0.5) {
-                r.append(String.format(Locale.ROOT, ", en el %.0f%% del tiempo", p.porcentajeTiempoTomando()));
-            }
-            if (p.kwhRedExportada() != null && p.kwhRedExportada() >= 0.5) {
-                r.append(String.format(Locale.ROOT, ". Ademas se exportaron %,.0f kWh de excedente a la red", p.kwhRedExportada()));
-                if (p.balanceNeto() != null) {
-                    r.append(p.balanceNeto() <= 0
-                            ? String.format(Locale.ROOT, ": en neto se exportaron %,.0f kWh mas de los que se importaron", -p.balanceNeto())
-                            : String.format(Locale.ROOT, "; en neto se importaron %,.0f kWh de la red", p.balanceNeto()));
-                }
-            }
-            r.append(". ");
-        }
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.ENCENDIDO, "Encendido todo el arranque", false));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.ENERGIZADO_Y_SIN_PRODUCCION, "Energizado y sin produccion", true));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.APAGADO_CONSUMO_MINIMO, "Apagado, consumo minimo", true));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.APAGADO_CERO, "Apagado (en cero)", true));
-        r.append(grupo(lista, ConsumoMedidoresService.Estado.SIN_DATOS, "Sin datos", true));
-        double desperdicio = ConsumoMedidoresService.sumaEnEspera(lista);
-        if (desperdicio >= 0.05) {
-            List<String> detalle = lista.stream().filter(c -> c.dentroDe() == null && c.kwhEnEspera() != null && c.kwhEnEspera() >= 0.5)
-                    .sorted((x, y) -> Double.compare(y.kwhEnEspera(), x.kwhEnEspera()))
-                    .map(c -> String.format(Locale.ROOT, "%s %,.1f", c.medidor(), c.kwhEnEspera())).toList();
-            r.append(String.format(Locale.ROOT, "Desperdicio: las maquinas sin produccion consumieron %,.1f kWh mientras el generador "
-                    + "estaba en marcha, energia que aporto el generador o la red sin producir%s.", desperdicio,
-                    detalle.isEmpty() ? "" : " (" + String.join(", ", detalle) + " kWh)"));
-        }
-        maquinasResumen.setText(r.toString().trim());
-    }
-
-    /** "Apagado, consumo minimo: 2 (Linea05, Mixer01). " o vacío si no hay. */
-    private static String grupo(List<ConsumoMedidor> lista, ConsumoMedidoresService.Estado estado, String titulo, boolean nombres) {
-        List<String> m = lista.stream().filter(c -> c.estado() == estado).map(ConsumoMedidor::medidor).toList();
-        if (m.isEmpty()) return "";
-        return titulo + ": " + m.size() + (nombres ? " (" + String.join(", ", m) + ")" : " maquinas") + ". ";
-    }
-
-    private static Span badgeEstado(ConsumoMedidor c) {
-        Span s = new Span();
-        Estado e = switch (c.estado()) {
-            case ENCENDIDO -> Estado.OK;
-            case ENERGIZADO_Y_SIN_PRODUCCION -> Estado.AVISO;
-            case APAGADO_CONSUMO_MINIMO -> Estado.FUERA;
-            case APAGADO_CERO, SIN_DATOS -> Estado.SIN_DATO;
-        };
-        badge(s, c.estado().etiqueta(), e);
-        return s;
     }
 
     // ================= Utilidades =================
