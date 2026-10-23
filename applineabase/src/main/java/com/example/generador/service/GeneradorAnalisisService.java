@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -488,6 +489,107 @@ public class GeneradorAnalisisService {
     }
 
     /**
+     * Un período en marcha de la planta (pedido del usuario el 2026-10-23): el tiempo en que uno o más generadores
+     * estuvieron en marcha, con los arranques que se pisan juntos (ej. GenPower y Caterpillar de 18:01 a 20:04). Lo
+     * importado y lo exportado son la suma de las partes de cada arranque, o sea lo de la planta 1 en ese tiempo, y el
+     * consumo es el de toda la planta.
+     */
+    public record PeriodoPlanta(LocalDateTime inicio, LocalDateTime fin, List<PeriodoMarcha> arranques) {
+
+        public boolean enCurso() {
+            return arranques.stream().anyMatch(PeriodoMarcha::enCurso);
+        }
+
+        /** El comienzo es estimado si lo es el del arranque que empezó primero. */
+        public boolean inicioEstimado() {
+            return arranques.stream().anyMatch(a -> a.inicio().equals(inicio) && a.inicioEstimado());
+        }
+
+        /** "GenPower + Caterpillar", en el orden en que arrancaron. */
+        public String generadores() {
+            return String.join(" + ", arranques.stream().sorted(Comparator.comparing(PeriodoMarcha::inicio))
+                    .map(PeriodoMarcha::generador).distinct().toList());
+        }
+
+        public Double generado() {
+            return sumar(arranques, PeriodoMarcha::kwhGenerado);
+        }
+
+        public Double importada() {
+            return sumar(arranques, PeriodoMarcha::kwhRedImportada);
+        }
+
+        public Double exportada() {
+            return sumar(arranques, PeriodoMarcha::kwhRedExportada);
+        }
+
+        /** Consumo de la planta 1: lo importado + lo que pusieron los generadores (generado - exportado). */
+        public Double consumo() {
+            Double imp = importada(), gen = generado();
+            if (imp == null && gen == null) return null;
+            return Math.max(0, nz(imp) + nz(gen) - nz(exportada()));
+        }
+
+        /** Parte del consumo de la planta que se importó de la red (%): la meta, cero. */
+        public Double porcentajeDeRed() {
+            Double c = consumo(), imp = importada();
+            return c == null || c <= 0 || imp == null ? null : Math.min(100, imp / c * 100);
+        }
+
+        public double horas() {
+            return Duration.between(inicio, fin).toSeconds() / 3600.0;
+        }
+
+        /** Lo que generó un generador en el período; null si no trabajó en él. */
+        public Double generadoPor(String generador) {
+            return sumar(de(generador), PeriodoMarcha::kwhGenerado);
+        }
+
+        /** Lo que puso un generador en la planta (lo generado menos su parte de lo exportado); null si no trabajó. */
+        public Double aporte(String generador) {
+            return sumar(de(generador), PeriodoMarcha::generadorUsado);
+        }
+
+        /** Horas en marcha de un generador dentro del período. */
+        public double horasDe(String generador) {
+            return de(generador).stream().mapToDouble(PeriodoMarcha::horas).sum();
+        }
+
+        private List<PeriodoMarcha> de(String generador) {
+            return arranques.stream().filter(a -> a.generador().equals(generador)).toList();
+        }
+
+        private static Double sumar(List<PeriodoMarcha> lista, Function<PeriodoMarcha, Double> valor) {
+            Double total = null;
+            for (PeriodoMarcha a : lista) total = suma(total, valor.apply(a));
+            return total;
+        }
+    }
+
+    /** Junta los arranques que se pisan en períodos de la planta, del más reciente al más viejo. */
+    public static List<PeriodoPlanta> periodosPlanta(List<PeriodoMarcha> arranques) {
+        List<PeriodoMarcha> orden = new ArrayList<>(arranques);
+        orden.sort(Comparator.comparing(PeriodoMarcha::inicio));
+        List<PeriodoPlanta> lista = new ArrayList<>();
+        LocalDateTime ini = null, fin = null;
+        List<PeriodoMarcha> grupo = new ArrayList<>();
+        for (PeriodoMarcha a : orden) {
+            if (fin != null && !a.inicio().isAfter(fin)) {
+                grupo.add(a);
+                if (a.fin().isAfter(fin)) fin = a.fin();
+                continue;
+            }
+            if (!grupo.isEmpty()) lista.add(new PeriodoPlanta(ini, fin, List.copyOf(grupo)));
+            grupo = new ArrayList<>(List.of(a));
+            ini = a.inicio();
+            fin = a.fin();
+        }
+        if (!grupo.isEmpty()) lista.add(new PeriodoPlanta(ini, fin, List.copyOf(grupo)));
+        lista.sort((x, y) -> y.inicio().compareTo(x.inicio()));
+        return lista;
+    }
+
+    /**
      * Minuto a minuto de un período en marcha: potencia del generador (lo guardado del controlador), la de los demás
      * generadores y la del medidor principal en la lectura más cercana anterior (hasta 90 s), para graficar cuándo
      * la planta tomó de la red y cuándo le entregó.
@@ -508,28 +610,6 @@ public class GeneradorAnalisisService {
             Double redKw = red != null && Duration.between(red.getKey(), l.fecha()).toSeconds() <= 90 ? red.getValue() : null;
             double otrosKw = otros.stream().mapToDouble(o -> kwGenerador(o, l.fecha())).sum();
             lista.add(new MinutoMarcha(l.fecha(), l.kw(), otrosKw, redKw));
-        }
-        return lista;
-    }
-
-    /**
-     * Minuto a minuto de un período en marcha contra el transformador del generador (pedido del usuario el 2026-10-21 para
-     * el gráfico del detalle del arranque): potencia del generador y la del medidor de su transformador en la lectura más
-     * cercana anterior (hasta 90 s; + importa de la red, - exporta). Consumo = generador + transformador (otrosKw = 0).
-     */
-    public List<MinutoMarcha> minutosMarchaTransformador(PeriodoMarcha p) {
-        List<MinutoMarcha> lista = new ArrayList<>();
-        Generador g = generadorService.generadores().stream().filter(x -> x.nombre().equals(p.generador())).findFirst().orElse(null);
-        if (g == null || g.redAsociada() == null || !PLCDataQueryService.esNombreMaquinaValido(g.redAsociada())) return lista;
-        LocalDate desde = p.inicio().toLocalDate(), hasta = p.fin().toLocalDate();
-        Consulta c = new Consulta();
-        TreeMap<LocalDateTime, LecturaGuardada> lecturas = lecturasGenerador(c, g, desde, hasta);
-        TreeMap<LocalDateTime, Double> trafo = seriePotencia(c, g.redAsociada(), desde, hasta);
-        for (LecturaGuardada l : lecturas.subMap(p.inicio(), true, p.fin(), true).values()) {
-            if (!l.marcha()) continue;
-            Map.Entry<LocalDateTime, Double> t = trafo.floorEntry(l.fecha());
-            Double redKw = t != null && Duration.between(t.getKey(), l.fecha()).toSeconds() <= 90 ? t.getValue() : null;
-            lista.add(new MinutoMarcha(l.fecha(), l.kw(), 0, redKw));
         }
         return lista;
     }

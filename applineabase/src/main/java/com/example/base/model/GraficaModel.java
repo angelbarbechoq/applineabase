@@ -1099,57 +1099,6 @@ public class GraficaModel {
     }
 
     /**
-     * Minuto a minuto de un período en marcha de un generador: línea del generador, línea del consumo del
-     * transformador y columnas de la red (positivas = tomado de la red, en azul; negativas = entregado a la
-     * red, en verde agua). Donde la línea del generador va por encima de la del consumo, sobra y se entrega.
-     *
-     * @param nombreConsumo nombre de la línea de consumo, ej. "Consumo del Transformador 1"
-     */
-    public static String getMarchaMinutoScript(String containerId, List<Long> tiempos, List<Double> generador,
-                                               List<Double> consumo, List<Double> red, String nombreConsumo,
-                                               String colorGenerador, String colorRed, String colorEntregado,
-                                               String colorConsumo) {
-        StringBuilder datos = new StringBuilder("[");
-        for (int i = 0; i < tiempos.size(); i++) {
-            if (i > 0) datos.append(",");
-            datos.append("{t:").append(tiempos.get(i))
-                    .append(",g:").append(numeroJs(generador.get(i)))
-                    .append(",c:").append(numeroJs(consumo.get(i)))
-                    .append(",r:").append(numeroJs(red.get(i))).append("}");
-        }
-        datos.append("]");
-        return scriptInicializarRoot(containerId)
-                + "var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: true, panY: false, wheelX: 'panX', wheelY: 'zoomX', layout: root.verticalLayout, paddingTop: 10 }));"
-                + "var datos = " + datos + ";"
-                + "var xAxis = chart.xAxes.push(am5xy.DateAxis.new(root, { baseInterval: { timeUnit: 'minute', count: 1 }, renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 70 }), tooltip: am5.Tooltip.new(root, {}) }));"
-                + "xAxis.get('renderer').labels.template.setAll({ fontSize: '11px', fill: am5.color(0x52514e) });"
-                + "xAxis.get('renderer').grid.template.setAll({ strokeOpacity: 0 });"
-                + "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));"
-                + "yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x52514e), fontSize: '11px' });"
-                + "yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });"
-                + "yAxis.children.unshift(am5.Label.new(root, { rotation: -90, text: 'kW', y: am5.p50, centerX: am5.p50, fontSize: '11px', fill: am5.color(0x52514e) }));"
-                + "var red = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Red (azul = importada, verde = exportada)', xAxis: xAxis, yAxis: yAxis, valueYField: 'r', valueXField: 't', fill: am5.color(" + colorRed + "), tooltip: am5.Tooltip.new(root, { labelText: 'Red: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
-                + "red.columns.template.setAll({ width: am5.percent(100), strokeOpacity: 0 });"
-                + "red.columns.template.adapters.add('fill', function(fill, target) { var v = target.dataItem && target.dataItem.get('valueY'); return v < 0 ? am5.color(" + colorEntregado + ") : am5.color(" + colorRed + "); });"
-                + "red.data.setAll(datos);"
-                + "var gen = chart.series.push(am5xy.LineSeries.new(root, { name: 'Generador', xAxis: xAxis, yAxis: yAxis, valueYField: 'g', valueXField: 't', stroke: am5.color(" + colorGenerador + "), fill: am5.color(" + colorGenerador + "), tooltip: am5.Tooltip.new(root, { labelText: 'Generador: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
-                + "gen.strokes.template.setAll({ strokeWidth: 2 });"
-                + "gen.data.setAll(datos);"
-                + "var cons = chart.series.push(am5xy.LineSeries.new(root, { name: '" + nombreConsumo.replace("'", "") + "', xAxis: xAxis, yAxis: yAxis, valueYField: 'c', valueXField: 't', stroke: am5.color(" + colorConsumo + "), fill: am5.color(" + colorConsumo + "), tooltip: am5.Tooltip.new(root, { labelText: 'Consumo: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
-                + "cons.strokes.template.setAll({ strokeWidth: 2 });"
-                + "cons.data.setAll(datos);"
-                + "var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));"
-                + "legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x0b0b0b) });"
-                + "legend.data.setAll([gen, cons, red]);"
-                + "chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'zoomX', xAxis: xAxis }));"
-                + "chart.get('cursor').lineY.set('visible', false);"
-                + "chart.set('scrollbarX', am5.Scrollbar.new(root, { orientation: 'horizontal' }));"
-                + scriptMarcadoresDeClic()
-                + "window.am5Charts[id] = { root: root, chart: chart };"
-                + "chart.appear(800, 100);";
-    }
-
-    /**
      * Marcadores al hacer clic, como en las gráficas de Tiempo Real (pedido del usuario el 2026-10-22 para el minuto a
      * minuto de un arranque): cada clic deja una línea roja punteada con la fecha y la hora; desde el segundo, también
      * el tiempo desde el marcador anterior (Δ hh:mm:ss). Doble clic los borra. Usa las variables chart y xAxis del script.
@@ -1194,16 +1143,17 @@ public class GraficaModel {
     }
 
     /**
-     * Consumo de la planta en el tiempo, con el mismo estilo que el minuto a minuto de un arranque
-     * (getMarchaMinutoScript): una línea por generador con lo que genera, la línea del consumo de la planta y
+     * Consumo de la planta en el tiempo (también el minuto a minuto de un período en marcha en Análisis): una línea por
+     * generador con lo que genera, la línea del consumo de la planta y
      * columnas de la red (hacia arriba lo tomado, en azul; hacia abajo lo entregado, en verde agua).
      * {@code valores.get(i)} = {generado del generador 1, ..., del generador n, consumo, importada, exportada (positiva)}.
      * Los colores van como "0xRRGGBB". soloDatos: si el gráfico ya está dibujado en ese contenedor, solo le cambia
-     * los datos (no pierde el zoom); si no, lo arma.
+     * los datos (no pierde el zoom); si no, lo arma. marcadores: clic = línea con fecha y hora (ver
+     * {@link #scriptMarcadoresDeClic}), para el minuto a minuto de un período en marcha.
      */
     public static String getConsumoPlantaScript(String containerId, List<Long> tiempos, String[] generadores, String[] coloresGen,
                                                 List<double[]> valores, int minutosPorPunto, boolean soloDatos,
-                                                String colorConsumo, String colorRed, String colorEntregado) {
+                                                String colorConsumo, String colorRed, String colorEntregado, boolean marcadores) {
         int n = generadores.length;
         StringBuilder datos = new StringBuilder("[");
         for (int i = 0; i < tiempos.size(); i++) {
@@ -1260,6 +1210,7 @@ public class GraficaModel {
                 .append("chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'zoomX', xAxis: xAxis }));")
                 .append("chart.get('cursor').lineY.set('visible', false);")
                 .append("chart.set('scrollbarX', am5.Scrollbar.new(root, { orientation: 'horizontal' }));")
+                .append(marcadores ? scriptMarcadoresDeClic() : "")
                 .append("window.am5Charts[id] = { root: root, chart: chart };")
                 .append("chart.appear(800, 100);")
                 .append("})();");
@@ -1312,13 +1263,15 @@ public class GraficaModel {
                     .append("item.animate({ key: 'value', to: ").append(Math.max(0, Math.min(100, valor)))
                     .append(", duration: 900, easing: am5.ease.out(am5.ease.cubic) });");
         }
-        // Valor grande y leyenda dentro del dial, debajo del eje de la aguja (como en ComAp).
-        js.append("chart.radarContainer.children.push(am5.Label.new(root, { text: ")
+        // Valor grande y leyenda dentro del dial, debajo del eje de la aguja (como en ComAp); posiciones y letra según el
+        // alto del gráfico, así sirve grande (250 px) y chico (190 px).
+        js.append("var alto = document.getElementById(id).offsetHeight || 250;")
+                .append("chart.radarContainer.children.push(am5.Label.new(root, { text: ")
                 .append(jsString(valor == null ? "-" : String.format(java.util.Locale.ROOT, "%.1f %%", valor)))
-                .append(", fontSize: '30px', fontWeight: '700', fill: am5.color(").append(colores[4])
-                .append("), centerX: am5.p50, centerY: am5.p50, y: 52 }));")
+                .append(", fontSize: Math.round(alto * 0.12) + 'px', fontWeight: '700', fill: am5.color(").append(colores[4])
+                .append("), centerX: am5.p50, centerY: am5.p50, y: Math.round(alto * 0.21) }));")
                 .append("chart.radarContainer.children.push(am5.Label.new(root, { text: ").append(jsString(leyenda))
-                .append(", fontSize: '12px', fill: am5.color(0x6c7383), centerX: am5.p50, centerY: am5.p50, y: 80 }));")
+                .append(", fontSize: (alto < 220 ? 11 : 12) + 'px', fill: am5.color(0x6c7383), centerX: am5.p50, centerY: am5.p50, y: Math.round(alto * 0.32) }));")
                 .append("window.am5Charts[id] = { root: root, chart: chart };")
                 .append("chart.appear(800, 100);")
                 .append("}")
