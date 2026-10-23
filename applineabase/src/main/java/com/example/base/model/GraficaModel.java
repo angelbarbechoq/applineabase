@@ -1105,11 +1105,13 @@ public class GraficaModel {
      * y se entrega.
      *
      * @param nombreConsumo nombre de la línea de consumo, ej. "Consumo del Transformador 1"
+     * @param soloDatos     si el gráfico ya está dibujado en ese contenedor, solo le cambia los datos (no pierde el zoom ni
+     *                      los marcadores); si no, lo arma
      */
     public static String getMarchaMinutoScript(String containerId, List<Long> tiempos, List<Double> generador,
                                                List<Double> consumo, List<Double> red, String nombreConsumo,
                                                String colorGenerador, String colorRed, String colorEntregado,
-                                               String colorConsumo) {
+                                               String colorConsumo, boolean soloDatos) {
         StringBuilder datos = new StringBuilder("[");
         for (int i = 0; i < tiempos.size(); i++) {
             if (i > 0) datos.append(",");
@@ -1119,7 +1121,11 @@ public class GraficaModel {
                     .append(",r:").append(numeroJs(red.get(i))).append("}");
         }
         datos.append("]");
-        return scriptInicializarRoot(containerId)
+        String previo = !soloDatos ? "" : "var previo = window.am5Charts && window.am5Charts[" + jsString(containerId) + "];"
+                + "if (previo && previo.chart && previo.root && !previo.root.isDisposed()) {"
+                + "  var nuevos = " + datos + "; previo.chart.series.each(function(s) { s.data.setAll(nuevos); }); return;"
+                + "}";
+        return "(function() {" + previo + scriptInicializarRoot(containerId)
                 + "var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: true, panY: false, wheelX: 'panX', wheelY: 'zoomX', layout: root.verticalLayout, paddingTop: 10 }));"
                 + "var datos = " + datos + ";"
                 + "var xAxis = chart.xAxes.push(am5xy.DateAxis.new(root, { baseInterval: { timeUnit: 'minute', count: 1 }, renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 70 }), tooltip: am5.Tooltip.new(root, {}) }));"
@@ -1147,7 +1153,8 @@ public class GraficaModel {
                 + "chart.set('scrollbarX', am5.Scrollbar.new(root, { orientation: 'horizontal' }));"
                 + scriptMarcadoresDeClic()
                 + "window.am5Charts[id] = { root: root, chart: chart };"
-                + "chart.appear(800, 100);";
+                + "chart.appear(800, 100);"
+                + "})();";
     }
 
     /**
