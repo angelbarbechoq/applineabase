@@ -180,5 +180,3 @@ Encontrado el 2026-10-13 con un barrido de 40001-49999 (registros con valor: 410
   otro). Si se mantienen hasta un reset, una lectura por minuto podria ver una ROCOF que duro menos de 1 s.
 - **Estado de los interruptores en una isla:** confirmar en el proximo corte de red que 41327 pasa a MainsFlt / ValidFlt
   / IslOper / MainsRet y que MCB Feedback (41058 bit 1) y MCB Status (41400 bit 10) quedan en 0.
-- La descripcion del modelo `InteliGen500` en `generador-modelos.json` todavia habla de 41281/41383 como PF y de 41298
-  como potencia de red (no cambia lo que se lee).

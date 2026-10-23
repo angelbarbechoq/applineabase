@@ -46,7 +46,7 @@
     ]
   }, {
     "modelo" : "InteliGen500",
-    "descripcion" : "ComAp InteliGen 500 (generador Caterpillar, junto a TR1). Confirmado el 2026-10-09 contra la pantalla del controlador (fotos Home, Power, Generator, Mains y Statistics) y con 4 lecturas seguidas (docs/ig500/MAPA-REGISTROS.md). Distinto del InteliGen 200. Bateria 41052 (pantalla Analog Inputs 27.9 V). PF sin registro propio: se calcula kW / kVA (en paralelo regula a 1.000 y los candidatos 41281/41383 no se distinguen). Aceite y temperatura: este controlador no los mide (solo Ubat y D+). Potencia de red 41298 no sigue a la carga: no se usa. Contesta 0x04 en los registros que no existen: maxHueco 0.",
+    "descripcion" : "ComAp InteliGen 500 G2, firmware 2.4.3.6 (generador Caterpillar, junto a TR1). Mapa cotejado el 2026-10-22 con la lista Modbus exportada de InteliConfig (docs/ig500/lista-modbus-inteliconfig-2026-10-22.txt; registro = 40001 + direccion de la lista) y antes con la pantalla del controlador (docs/ig500/MAPA-REGISTROS.md). Distinto del InteliGen 200. Bateria 41052 (pantalla Analog Inputs 27.9 V). PF: la lista no tiene registro de PF del generador, se calcula kW / kVA. Aceite y temperatura: este controlador no los mide (solo Ubat y D+). Potencia de red del controlador 41041 (Mains Import P): no se usa, mide la corriente de red en una sola fase. Contesta 0x04 en los registros que no existen: maxHueco 0.",
     "confirmado" : true,
     "maxHueco" : 0,
     "noDisponible8000" : true,
