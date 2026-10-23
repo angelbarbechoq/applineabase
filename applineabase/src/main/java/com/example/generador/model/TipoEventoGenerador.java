@@ -24,10 +24,19 @@ public enum TipoEventoGenerador {
     COMUNICACION_RECUPERADA("Comunicacion recuperada", Nivel.BUENO),
     /**
      * Se abrió el interruptor de la planta (MCB) y el generador quedó solo con su parte de la planta, aunque el
-     * controlador siga viendo tensión de red. Lo detecta IslaService con lo guardado (medidor del transformador en 0).
+     * controlador siga viendo tensión de red. Con señales de red en el modelo lo dice el controlador
+     * (RedControladorService); si no, lo detecta IslaService con lo guardado (medidor del transformador en 0).
      */
     ISLA("Paso a isla", Nivel.FALLA),
     FIN_ISLA("Vuelve a paralelo", Nivel.BUENO),
+    // Señales de red del controlador (modelos con "red" en generador-modelos.json, RedControladorService).
+    /** El interruptor de la planta (MCB) según la entrada MCB Feedback del controlador. */
+    INTERRUPTOR_RED_ABIERTO("Se abre el interruptor de la planta", Nivel.FALLA),
+    INTERRUPTOR_RED_CERRADO("Se cierra el interruptor de la planta", Nivel.BUENO),
+    /** ROCOF o salto de vector vistos activos en una lectura (actúan en menos de 1 s: casi nunca se ven). */
+    PROTECCION_RED("Proteccion de red", Nivel.FALLA),
+    /** Subió el máximo de ROCOF o de salto de vector que guarda el controlador. */
+    MAXIMO_RED("Maximo de ROCOF o salto de vector", Nivel.AVISO),
     // Copiados del historial interno del controlador (pantalla History; no se lee por Modbus sin escribirle).
     // Fecha = hora real (la del controlador corregida por el desfase de su reloj); la descripción lleva el
     // motivo de ComAp y la hora del controlador. Primera carga: docs/ig500/historial-controlador-2026-10-12.csv.

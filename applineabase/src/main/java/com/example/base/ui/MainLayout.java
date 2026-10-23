@@ -147,7 +147,7 @@ public final class MainLayout extends AppLayout {
         boolean alarmasGenerador = lineaAccessService.puedeVerGeneradores();
         List<AlarmaEvento> nuevas = alarmaEventoRepository.findByFechaInicioAfterOrderByFechaInicioDesc(desde);
         for (AlarmaEvento alarma : nuevas) {
-            boolean deGenerador = alarma.getTipoAlarma() == com.example.alarmas.model.TipoAlarma.ALARMA_GENERADOR;
+            boolean deGenerador = alarma.getTipoAlarma() != null && alarma.getTipoAlarma().deGenerador();
             if (deGenerador ? !alarmasGenerador : !alarmasPlanta) {
                 continue;
             }

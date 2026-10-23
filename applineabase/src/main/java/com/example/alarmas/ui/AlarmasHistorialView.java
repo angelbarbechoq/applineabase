@@ -79,7 +79,7 @@ public class AlarmasHistorialView extends VerticalLayout implements BeforeEnterO
         // Las alarmas de los generadores solo para quien tiene "Ver Generadores" (ADMIN siempre).
         boolean generadores = lineaAccessService.puedeVerGeneradores();
         grid.setItems(eventoRepository.findByActivaTrueOrderByFechaInicioDesc().stream()
-                .filter(e -> generadores || e.getTipoAlarma() != com.example.alarmas.model.TipoAlarma.ALARMA_GENERADOR)
+                .filter(e -> generadores || e.getTipoAlarma() == null || !e.getTipoAlarma().deGenerador())
                 .toList());
     }
 }

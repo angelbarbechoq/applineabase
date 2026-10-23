@@ -36,6 +36,7 @@ public class GeneradorReaderService {
     private final HistorialEventosService historial;
     private final GeneradorAlarmasService alarmas;
     private final IslaService islas;
+    private final RedControladorService red;
 
     /** Último estado conocido (true = en marcha) y última lectura guardada estando parado. */
     private final Map<String, Boolean> enMarchaAnterior = new ConcurrentHashMap<>();
@@ -45,12 +46,13 @@ public class GeneradorReaderService {
     private final Set<String> avisados = ConcurrentHashMap.newKeySet();
 
     public GeneradorReaderService(GeneradoresConfigService config, GeneradorAlmacen almacen, HistorialEventosService historial,
-                                  GeneradorAlarmasService alarmas, IslaService islas) {
+                                  GeneradorAlarmasService alarmas, IslaService islas, RedControladorService red) {
         this.config = config;
         this.almacen = almacen;
         this.historial = historial;
         this.alarmas = alarmas;
         this.islas = islas;
+        this.red = red;
     }
 
     public void leerGeneradores() {
@@ -99,8 +101,16 @@ public class GeneradorReaderService {
             } catch (Exception e) {
                 logger.error("Generador {}: error pasando sus alarmas a Alarmas Activas: {}", g.nombre(), e.getMessage(), e);
             }
+            if (modelo.get().red() != null) {
+                try {
+                    red.procesar(g.nombre(), modelo.get().red(), l);
+                } catch (Exception e) {
+                    logger.error("Generador {}: error con las senales de red del controlador: {}", g.nombre(), e.getMessage(), e);
+                }
+            }
         }
-        // Isla (interruptor de la planta abierto con el controlador viendo red): se busca en lo recién guardado.
+        // Isla (interruptor de la planta abierto con el controlador viendo red): se busca en lo recién guardado. En los
+        // modelos con señales de red sus eventos ya los registró RedControladorService.
         try {
             islas.revisar();
         } catch (Exception e) {

@@ -223,6 +223,11 @@ public class HistorialEventosService {
 
     // ================= Almacenamiento =================
 
+    /** Guarda eventos detectados fuera de esta clase (señales de red del controlador, RedControladorService). */
+    public void registrar(String generador, List<EventoGenerador> eventos) {
+        guardar(generador, eventos);
+    }
+
     private void guardar(String generador, List<EventoGenerador> eventos) {
         if (eventos.isEmpty()) return;
         try {

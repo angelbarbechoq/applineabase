@@ -236,6 +236,16 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       alarmas estuvo vacia en todas las lecturas; ROCOF, VectorShift, baja tension/frecuencia de red y la apertura del MCB
       duran menos de 1 s y quedan solo en el historial interno, no en la lista esperando reset (el GenPower si tuvo
       alarmas en la lista: E-STOP y Wrn Stop fail).
+- [x] G22. (2026-10-22) Red e interruptores segun el propio controlador, con la lista Modbus de InteliConfig del
+      Caterpillar (InteliGen 500 G2, `docs/ig500/`). Campo `red` del modelo en generador-modelos.json (codigos del estado
+      de los interruptores y bits de MCB, GCB, falla de red, proteccion de red, ROCOF y salto de vector) y 7 registros
+      nuevos: estado de los interruptores 41327, entradas binarias 41058, avisos de red 41394, protecciones activas 41403,
+      ROCOF 41045, ROCOF maxima 41046 y salto de vector maximo 41044 (tipo BITS16 para las palabras de bits). Eventos:
+      falla de red, paso a isla, retorno de red, vuelve a paralelo, se abre / se cierra el interruptor de la planta,
+      proteccion de red vista activa y suba de los maximos. Alarma urgente "Perdida de red" (`TipoAlarma.PERDIDA_RED`)
+      mientras dure. La isla del Caterpillar ya no se busca con el medidor del transformador desde que se guarda el estado
+      (las de antes, 11-10 y 21-10, quedan como estaban). El GenPower sigue con la comparacion hasta tener su propia
+      lista. Falta: confirmar en el primer corte real los codigos y cuando se reinician los maximos.
 - [x] G20. (2026-10-12) Alarmas de los generadores en Alarmas Activas y avisos del navegador, y permiso propio.
       Nuevo `TipoAlarma.ALARMA_GENERADOR` (no se configura; fuera del selector de Configuracion de alarmas).
       `GeneradorAlarmasService` (lectura de fondo cada minuto): un `AlarmaEvento` por alarma mientras este en la lista

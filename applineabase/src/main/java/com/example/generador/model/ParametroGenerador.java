@@ -45,7 +45,15 @@ public enum ParametroGenerador {
     RED_KWH("red_kwh", "Energia de red (contador del controlador)", "kWh", true),
     RED_KVARH("red_kvarh", "Energia reactiva de red (contador del controlador)", "kVArh", true),
     HORAS_MARCHA("horas_marcha", "Horas de marcha", "h", false),
-    ARRANQUES("arranques", "Cantidad de arranques", "", true);
+    ARRANQUES("arranques", "Cantidad de arranques", "", true),
+    // Red e interruptores según el propio controlador (qué significa cada código o bit: SenalesRed del modelo).
+    ESTADO_INTERRUPTORES("estado_interruptores", "Estado de los interruptores (codigo del controlador)", "", true),
+    ENTRADAS_BINARIAS("entradas_binarias", "Entradas binarias del controlador", "", true),
+    AVISOS_RED("avisos_red", "Avisos de red del controlador", "", true),
+    PROTECCIONES_RED("protecciones_red", "Protecciones de red activas", "", true),
+    ROCOF("rocof", "ROCOF", "Hz/s", false),
+    ROCOF_MAX("rocof_max", "ROCOF maxima registrada por el controlador", "Hz/s", false),
+    SALTO_VECTOR_MAX("salto_vector_max", "Salto de vector maximo registrado por el controlador", "grados", false);
 
     private final String columna;
     private final String etiqueta;

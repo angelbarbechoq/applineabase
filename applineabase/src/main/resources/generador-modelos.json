@@ -83,7 +83,29 @@
       { "parametro" : "RED_KWH", "registro" : 41288, "tipo" : "UINT32", "divisor" : 1 },
       { "parametro" : "RED_KVARH", "registro" : 41290, "tipo" : "UINT32", "divisor" : 1 },
       { "parametro" : "HORAS_MARCHA", "registro" : 41292, "tipo" : "UINT32", "divisor" : 10 },
-      { "parametro" : "ARRANQUES", "registro" : 41294, "tipo" : "UINT16", "divisor" : 1 }
-    ]
+      { "parametro" : "ARRANQUES", "registro" : 41294, "tipo" : "UINT16", "divisor" : 1 },
+      { "parametro" : "SALTO_VECTOR_MAX", "registro" : 41044, "tipo" : "UINT16", "divisor" : 10 },
+      { "parametro" : "ROCOF", "registro" : 41045, "tipo" : "INT16", "divisor" : 100 },
+      { "parametro" : "ROCOF_MAX", "registro" : 41046, "tipo" : "INT16", "divisor" : 100 },
+      { "parametro" : "ENTRADAS_BINARIAS", "registro" : 41058, "tipo" : "BITS16", "divisor" : 1 },
+      { "parametro" : "ESTADO_INTERRUPTORES", "registro" : 41327, "tipo" : "UINT16", "divisor" : 1 },
+      { "parametro" : "AVISOS_RED", "registro" : 41394, "tipo" : "BITS16", "divisor" : 1 },
+      { "parametro" : "PROTECCIONES_RED", "registro" : 41403, "tipo" : "BITS16", "divisor" : 1 }
+    ],
+    "red" : {
+      "estado" : {
+        "paralelo" : [ 4, 11 ],
+        "isla" : [ 2, 10 ],
+        "fallaRed" : [ 7, 8 ],
+        "retornoRed" : [ 5, 9 ],
+        "nombres" : [ "Init", "BrksOff", "IslOper", "MainsOper", "ParalOper", "RevSync", "Synchro", "MainsFlt", "ValidFlt", "MainsRet", "MultIslOp", "MultParOp", "EmergMan", "StrUpSync" ]
+      },
+      "mcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 1 },
+      "gcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 2 },
+      "avisoFallaRed" : { "parametro" : "AVISOS_RED", "bit" : 4 },
+      "proteccionRed" : { "parametro" : "AVISOS_RED", "bit" : 15 },
+      "saltoVector" : { "parametro" : "PROTECCIONES_RED", "bit" : 0 },
+      "rocof" : { "parametro" : "PROTECCIONES_RED", "bit" : 1 }
+    }
   } ]
 }

@@ -5,6 +5,7 @@ import com.example.generador.model.Generador;
 import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.ParametroGenerador;
+import com.example.generador.model.SenalesRed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -98,9 +99,45 @@ public class GeneradoresConfigService {
                     m.get("maxHueco") instanceof Number n ? Math.max(0, n.intValue()) : 0,
                     !Boolean.FALSE.equals(m.get("noDisponible8000")),
                     List.copyOf(registros), alarmas,
-                    m.get("reloj") instanceof Number reloj ? reloj.intValue() : null));
+                    m.get("reloj") instanceof Number reloj ? reloj.intValue() : null,
+                    m.get("red") instanceof Map<?, ?> red ? senalesRed(modelo, red) : null));
         }
         return lista;
+    }
+
+    /**
+     * Campo "red" del modelo: "estado" con los códigos de cada caso (paralelo, isla, fallaRed, retornoRed) y sus
+     * "nombres", y los bits mcbCerrado, gcbCerrado, avisoFallaRed, proteccionRed, saltoVector y rocof como
+     * {"parametro": ..., "bit": ...}. Lo que falte o esté mal queda vacío (con aviso en el log).
+     */
+    private SenalesRed senalesRed(String modelo, Map<?, ?> r) {
+        Map<?, ?> estado = r.get("estado") instanceof Map<?, ?> e ? e : Map.of();
+        List<String> nombres = new ArrayList<>();
+        if (estado.get("nombres") instanceof List<?> l) for (Object o : l) nombres.add(String.valueOf(o));
+        return new SenalesRed(codigos(estado.get("paralelo")), codigos(estado.get("isla")), codigos(estado.get("fallaRed")),
+                codigos(estado.get("retornoRed")), List.copyOf(nombres), bit(modelo, r, "mcbCerrado"), bit(modelo, r, "gcbCerrado"),
+                bit(modelo, r, "avisoFallaRed"), bit(modelo, r, "proteccionRed"), bit(modelo, r, "saltoVector"), bit(modelo, r, "rocof"));
+    }
+
+    private static Set<Integer> codigos(Object o) {
+        Set<Integer> s = new java.util.HashSet<>();
+        if (o instanceof List<?> l) for (Object x : l) if (x instanceof Number n) s.add(n.intValue());
+        return Set.copyOf(s);
+    }
+
+    private SenalesRed.Bit bit(String modelo, Map<?, ?> r, String nombre) {
+        if (!(r.get(nombre) instanceof Map<?, ?> b)) return null;
+        try {
+            ParametroGenerador p = ParametroGenerador.valueOf(String.valueOf(b.get("parametro")).trim().toUpperCase(Locale.ROOT));
+            int bit = ((Number) b.get("bit")).intValue();
+            if (bit < 0 || bit > 31) throw new IllegalArgumentException("bit " + bit + " fuera de 0-31");
+            return new SenalesRed.Bit(p, bit);
+        } catch (Exception e) {
+            if (avisados.add(modelo + "|red|" + nombre)) {
+                logger.warn("generador-modelos.json, modelo {}: senal de red {} ignorada {} ({})", modelo, nombre, b, e.getMessage());
+            }
+            return null;
+        }
     }
 
     private ModeloControlador.Registro registro(String modelo, Map<?, ?> r) {

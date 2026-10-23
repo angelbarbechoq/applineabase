@@ -15,5 +15,15 @@ public enum TipoAlarma {
      * Alarma de la lista de alarmas del controlador de un generador (ComAp). No se configura: la define el
      * controlador. Un evento por alarma mientras esté en la lista (GeneradorAlarmasService).
      */
-    ALARMA_GENERADOR
+    ALARMA_GENERADOR,
+    /**
+     * Pérdida de red según el controlador de un generador: falla de red, isla o retorno de red
+     * (RedControladorService). No se configura; urgente, abierta mientras dure.
+     */
+    PERDIDA_RED;
+
+    /** Alarmas de los generadores: no se configuran y las ve quien tiene "Ver Generadores". */
+    public boolean deGenerador() {
+        return this == ALARMA_GENERADOR || this == PERDIDA_RED;
+    }
 }

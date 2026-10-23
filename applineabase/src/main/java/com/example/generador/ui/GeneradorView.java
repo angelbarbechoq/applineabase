@@ -16,6 +16,8 @@ import com.example.generador.model.TipoEventoGenerador;
 import com.example.generador.service.AlarmaComap;
 import com.example.generador.service.HistorialEventosService;
 import com.example.generador.service.IslaService;
+import com.example.generador.service.RedControladorService;
+import com.example.generador.model.SenalesRed;
 import com.example.generador.service.PlantaEnVivoService;
 import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.ParametroGenerador;
@@ -94,6 +96,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final LineaAccessService lineaAccessService;
     private final PlantaEnVivoService plantaService;
     private final IslaService islaService;
+    private final RedControladorService redControlador;
     private Generador generador;
     private final TabSheet tabs = new TabSheet();
     private Tab tabPlanta;
@@ -129,13 +132,15 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private Registration pollRegistration;
 
     public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService,
-                         HistorialEventosService historial, PlantaEnVivoService plantaService, IslaService islaService) {
+                         HistorialEventosService historial, PlantaEnVivoService plantaService, IslaService islaService,
+                         RedControladorService redControlador) {
         this.service = service;
         this.calidad = calidad;
         this.lineaAccessService = lineaAccessService;
         this.historial = historial;
         this.plantaService = plantaService;
         this.islaService = islaService;
+        this.redControlador = redControlador;
         List<Generador> lista = service.generadores();
         this.generador = lista.isEmpty() ? null : lista.get(0);
 
@@ -805,7 +810,25 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 calidad.evaluar(Indicador.TENSION, prom(l.vL1L2(), l.vL2L3(), l.vL3L1()), nomGen, cfg))
                 : tres(l.vL1L2(), l.vL2L3(), l.vL3L1(), "V", Estado.SIN_DATO)));
         panelGen.add(fila("Corriente L1 / L2 / L3", tres(l.iL1(), l.iL2(), l.iL3(), "A", Estado.SIN_DATO)));
-        if (marcha && l.kw() != null && l.redVL1L2() != null) {
+        SenalesRed senales = service.modelo(gen).map(ModeloControlador::red).orElse(null);
+        Integer codigoRed = senales == null ? null : SenalesRed.codigo(l);
+        if (codigoRed != null) {
+            // El controlador dice el estado de los interruptores: paralelo, isla, falla o retorno de red.
+            SenalesRed.Estado est = senales.estado(codigoRed);
+            RedControladorService.EstadoActual previo = redControlador.estadoActual(gen.nombre());
+            String desde = previo != null && previo.estado() == est && previo.desde() != null
+                    ? " desde las " + previo.desde().format(DateTimeFormatter.ofPattern("HH:mm")) : "";
+            String modo = switch (est) {
+                case PARALELO -> "En paralelo con la red";
+                case ISLA -> "En isla" + desde + " (interruptor de la planta abierto, el generador alimenta solo su parte de la planta)";
+                case FALLA_RED -> "Falla de red" + desde + " segun el controlador";
+                case RETORNO_RED -> "Retorno de red" + desde + ": el controlador espera para volver a paralelo";
+                default -> marcha && l.kw() != null && l.kw() < com.example.generador.service.GeneradorAnalisisService.KW_VACIO
+                        ? "En vacio" : "Interruptores: " + senales.nombre(codigoRed);
+            };
+            if (SenalesRed.sinRed(est)) panelGen.add(fila("Modo", badgeNuevo(modo, Estado.AVISO)));
+            else if (marcha) panelGen.add(fila("Modo", texto(modo)));
+        } else if (marcha && l.kw() != null && l.redVL1L2() != null) {
             boolean conRed = prom(l.redVL1L2(), l.redVL2L3(), l.redVL3L1()) != null
                     && prom(l.redVL1L2(), l.redVL2L3(), l.redVL3L1()) >= com.example.generador.service.GeneradorAnalisisService.V_RED_PRESENTE;
             // Isla con el controlador viendo red (interruptor de la planta abierto): la detecta IslaService cada minuto.

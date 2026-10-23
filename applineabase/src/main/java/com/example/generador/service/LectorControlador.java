@@ -183,6 +183,9 @@ public final class LectorControlador {
             case INT16 -> {
                 return noDisponible8000 && a == 0x8000 ? null : (short) a / r.divisor();
             }
+            case BITS16 -> {
+                return (double) a;
+            }
             default -> {
                 int hi = r.palabraBajaPrimero() ? regs[off + 1] : regs[off];
                 int lo = r.palabraBajaPrimero() ? regs[off] : regs[off + 1];

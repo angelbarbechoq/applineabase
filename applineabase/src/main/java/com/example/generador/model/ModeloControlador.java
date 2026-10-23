@@ -16,13 +16,16 @@ import java.util.Optional;
  * @param listaAlarmas dónde está la lista de alarmas activas del controlador (null = no se lee).
  * @param reloj        primer registro (4xxxx) del reloj del controlador (null = no se lee). ComAp:
  *                     4 registros en BCD desde 44201: hh mm | ss 00 | dd MM | aa 00.
+ * @param red          señales de red e interruptores que da el controlador (null = el modelo no las tiene: la isla
+ *                     se detecta comparando con el medidor del transformador, ver IslaService).
  */
 public record ModeloControlador(String modelo, String descripcion, boolean confirmado, int maxHueco,
                                boolean noDisponible8000, List<Registro> registros, ListaAlarmas listaAlarmas,
-                               Integer reloj) {
+                               Integer reloj, SenalesRed red) {
 
+    /** BITS16: palabra de bits; nunca es "no disponible" (0x8000 = solo el bit 15 activo). */
     public enum Tipo {
-        UINT16(1), INT16(1), UINT32(2), INT32(2), FLOAT32(2);
+        UINT16(1), INT16(1), BITS16(1), UINT32(2), INT32(2), FLOAT32(2);
 
         private final int cantidad;
 

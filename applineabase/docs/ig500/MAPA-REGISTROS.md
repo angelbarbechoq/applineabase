@@ -55,6 +55,11 @@ Power, Generator, Mains, Statistics) y 4 lecturas seguidas cada 20 s, con el gen
 | 41292-41293 | Horas de marcha | Int32 | 0.1 | 124.9-125.0 h / 1250-1251 |
 | 41294 | Cantidad de arranques | UInt16 | 1 | 121 / 121 |
 
+**Senales de red (desde el 2026-10-22, G22):** ademas la app lee 41327 (estado de los interruptores), 41058 (entradas
+binarias, tipo BITS16), 41394 y 41403 (palabras de avisos y protecciones de red, BITS16), 41045 (ROCOF), 41046 (ROCOF
+maxima) y 41044 (salto de vector maximo). Que significa cada codigo y bit esta en el campo `red` del modelo en
+`generador-modelos.json` (ver la tabla de bits mas abajo). Con eso salen los eventos de red y la alarma "Perdida de red".
+
 **PF del generador:** la lista no tiene registro de PF. La app lo **calcula** con kW / kVA: 599 / 601 = 0.997.
 
 **Aceite y temperatura del motor:** el controlador no los mide (41054-41056 son entradas analogicas sin usar; la pantalla
@@ -62,7 +67,7 @@ Power, Generator, Mains, Statistics) y 4 lecturas seguidas cada 20 s, con el gen
 haria falta conectar la computadora del motor al controlador por CAN J1939; si se hace, se agregan al mapa sin recompilar.
 La pantalla del generador muestra "no lo mide este controlador".
 
-## Otros registros de la lista (la app no los lee)
+## Otros registros de la lista (la app no los lee, salvo las senales de red de arriba)
 Lectura del 2026-10-22 19:13, en paralelo con 595 kW (solo lectura, una vez).
 
 | Registro | Dato | Tipo | Escala | Lectura |
