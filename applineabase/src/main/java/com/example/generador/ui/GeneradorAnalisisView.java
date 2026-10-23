@@ -8,6 +8,8 @@ import com.example.generador.model.CostoCombustible;
 import com.example.generador.model.Generador;
 import com.example.franjahoraria.model.Franja;
 import com.example.generador.model.MetaImportacionRed;
+import com.example.generador.service.ConsumoMedidoresService;
+import com.example.generador.service.ConsumoMedidoresService.ConsumoMedidor;
 import com.example.generador.service.CostoCombustibleService;
 import com.example.generador.service.GeneradorAnalisisService;
 import com.example.generador.service.GeneradorAnalisisService.Agrupacion;
@@ -107,6 +109,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     private final GeneradorService generadorService;
     private final GeneradorAnalisisService analisis;
+    private final ConsumoMedidoresService consumoMedidores;
     private final CostoCombustibleService costos;
     private final ReporteGeneradoresService reporte;
     private final LineaAccessService lineaAccessService;
@@ -152,6 +155,14 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final Div generadoresPeriodo = new Div();
     private final Div chartMinutos = new Div();
     private String scriptMinutos;
+    /** Abajo de todo, un gráfico por generador contra su transformador y sus máquinas encendidas (Transformador 1 a la izquierda). */
+    private final Div generadoresDetalle = new Div();
+    private List<String> scriptsGenerador = List.of();
+    /**
+     * Período cuyo minuto a minuto y gráficos por generador faltan calcular: lo pesado se hace con la pestaña visible (la
+     * ventana abre en Resumen de energía, así no se demora).
+     */
+    private PeriodoPlanta detallePendiente;
     private PeriodoPlanta periodoInicial;
     /** El rango elegido no tiene períodos: el del indicador es el último de antes. */
     private boolean inicialFueraDelPeriodo;
@@ -187,10 +198,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private List<Generador> gensVistos = List.of();
 
     public GeneradorAnalisisView(GeneradorService generadorService, GeneradorAnalisisService analisis,
-                                 CostoCombustibleService costos, ReporteGeneradoresService reporte,
-                                 LineaAccessService lineaAccessService) {
+                                 ConsumoMedidoresService consumoMedidores, CostoCombustibleService costos,
+                                 ReporteGeneradoresService reporte, LineaAccessService lineaAccessService) {
         this.generadorService = generadorService;
         this.analisis = analisis;
+        this.consumoMedidores = consumoMedidores;
         this.costos = costos;
         this.reporte = reporte;
         this.lineaAccessService = lineaAccessService;
@@ -269,7 +281,12 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             if (e.getSelectedTab() == tabEnergia && scriptPlanta != null) getElement().executeJs(scriptPlanta);
             if (e.getSelectedTab() == tabPeriodos && scriptIndicadorTodos != null) getElement().executeJs(scriptIndicadorTodos);
             if (e.getSelectedTab() == tabPeriodos && scriptIndicador != null) getElement().executeJs(scriptIndicador);
-            if (e.getSelectedTab() == tabPeriodos && scriptMinutos != null) getElement().executeJs(scriptMinutos);
+            if (e.getSelectedTab() == tabPeriodos && detallePendiente != null) {
+                pintarDetalle(detallePendiente);
+            } else if (e.getSelectedTab() == tabPeriodos) {
+                if (scriptMinutos != null) getElement().executeJs(scriptMinutos);
+                scriptsGenerador.forEach(s -> getElement().executeJs(s));
+            }
             if (e.getSelectedTab() == tabCostos && scriptCostos != null) getElement().executeJs(scriptCostos);
             // Tendencias tiene su propio período (lecturas de cada minuto): el de arriba, Ver y el reporte no le aplican.
             boolean tendencias = e.getSelectedTab() == tabTendencias;
@@ -590,7 +607,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         chartMinutos.setHeight("300px");
         Div fila2 = new Div(caja("Periodos en marcha", periodosGrid), caja("Minuto a minuto del periodo seleccionado", chartMinutos));
         fila2.getStyle().set("display", "flex").set("flex-wrap", "wrap").set("gap", "12px").set("width", "100%");
-        VerticalLayout v = new VerticalLayout(crearIndicador(), fila2);
+        generadoresDetalle.getStyle().set("display", "flex").set("flex-wrap", "wrap").set("gap", "12px").set("width", "100%");
+        VerticalLayout v = new VerticalLayout(crearIndicador(), fila2, generadoresDetalle);
         v.setPadding(false);
         v.setSpacing(false);
         v.getStyle().set("gap", "12px");
@@ -845,8 +863,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         if (p == null) {
             chartIndicador.setVisible(false);
             chartMinutos.setVisible(false);
+            generadoresDetalle.removeAll();
             scriptIndicador = null;
             scriptMinutos = null;
+            scriptsGenerador = List.of();
+            detallePendiente = null;
             indicadorTexto.add(new Html("<div style='color:" + TEXTO_SUAVE + "'>Todavia no hay periodos en marcha para mostrar.</div>"));
             return;
         }
@@ -873,7 +894,106 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 coloresGauge(pct), "importado de la red");
         if (tabs.getSelectedTab() == tabPeriodos) getElement().executeJs(scriptIndicador);
         pintarGeneradores(p);
+        // Lo pesado (minuto a minuto de la planta y de cada generador, máquinas) solo con la pestaña visible.
+        if (tabs.getSelectedTab() == tabPeriodos) {
+            pintarDetalle(p);
+        } else {
+            detallePendiente = p;
+        }
+    }
+
+    /** Minuto a minuto de la planta y, abajo, el de cada generador contra su transformador con sus máquinas encendidas. */
+    private void pintarDetalle(PeriodoPlanta p) {
+        detallePendiente = null;
         mostrarMinutos(p);
+        pintarDetalleGeneradores(p);
+    }
+
+    /**
+     * Abajo de todo (pedido del usuario el 2026-10-23): un recuadro por generador, Transformador 1 a la izquierda, con su
+     * minuto a minuto contra su transformador (lo generado, la red y el consumo total del transformador) y debajo las
+     * máquinas de su transformador que estuvieron encendidas, en verde y con su potencia media.
+     */
+    private void pintarDetalleGeneradores(PeriodoPlanta p) {
+        generadoresDetalle.removeAll();
+        List<String> scripts = new ArrayList<>();
+        List<Generador> orden = generadorService.generadores().stream()
+                .sorted(java.util.Comparator.comparing((Generador g) -> g.redAsociada() == null ? "~" : g.redAsociada())).toList();
+        int i = 0;
+        for (Generador g : orden) {
+            String titulo = g.nombre() + " · " + GeneradorView.nombreRed(g.redAsociada());
+            List<PeriodoMarcha> suyos = p.arranques().stream().filter(a -> a.generador().equals(g.nombre()))
+                    .sorted(java.util.Comparator.comparing(PeriodoMarcha::inicio)).toList();
+            if (suyos.isEmpty()) {
+                Span no = new Span("No trabajo en este periodo");
+                no.getStyle().set("font-size", "13px").set("color", TEXTO_SUAVE);
+                generadoresDetalle.add(caja(titulo, no));
+                continue;
+            }
+            LocalDateTime ini = suyos.get(0).inicio();
+            LocalDateTime fin = suyos.stream().map(PeriodoMarcha::fin).max(LocalDateTime::compareTo).orElse(p.fin());
+            Div chart = new Div();
+            String id = "chartdiv_generador_transformador_" + i++;
+            chart.setId(id);
+            chart.setWidthFull();
+            chart.setHeight("280px");
+            List<GeneradorAnalisisService.MinutoMarcha> minutos = analisis.minutosTransformador(g, ini, fin);
+            if (minutos.isEmpty()) {
+                chart.setVisible(false);
+            } else {
+                List<Long> t = new ArrayList<>();
+                List<Double> gen = new ArrayList<>(), consumo = new ArrayList<>(), red = new ArrayList<>();
+                for (GeneradorAnalisisService.MinutoMarcha m : minutos) {
+                    t.add(m.fecha().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+                    gen.add(m.generadorKw());
+                    consumo.add(m.consumoKw());
+                    red.add(m.redKw());
+                }
+                scripts.add(GraficaModel.conTooltipsTransparentes(GraficaModel.getMarchaMinutoScript(id, t, gen, consumo, red,
+                        "Consumo " + GeneradorView.deRed(g.redAsociada()), colorGenerador(g.nombre()), AZUL, AQUA, NOCHE)));
+            }
+            Div maquinas = new Div(new Html(textoMaquinas(consumoMedidores.calcular(ini, fin, g.redAsociada()), g.redAsociada())));
+            Div contenido = new Div(chart, maquinas);
+            contenido.getStyle().set("display", "flex").set("flex-direction", "column").set("gap", "6px");
+            generadoresDetalle.add(caja(titulo, contenido));
+        }
+        scriptsGenerador = scripts;
+        if (tabs.getSelectedTab() == tabPeriodos) scripts.forEach(s -> getElement().executeJs(s));
+    }
+
+    /**
+     * Las máquinas del transformador en el tiempo en que trabajó el generador, como texto: las encendidas en verde con su
+     * potencia media (de mayor a menor) y, en gris, las apagadas y las sin datos.
+     */
+    private static String textoMaquinas(List<ConsumoMedidor> lista, String transformador) {
+        List<ConsumoMedidor> encendidas = lista.stream()
+                .filter(c -> c.estado() == ConsumoMedidoresService.Estado.ENCENDIDO
+                        || c.estado() == ConsumoMedidoresService.Estado.ENERGIZADO_Y_SIN_PRODUCCION)
+                .sorted((x, y) -> Double.compare(y.kwMedio() == null ? 0 : y.kwMedio(), x.kwMedio() == null ? 0 : x.kwMedio())).toList();
+        List<String> apagadas = lista.stream().filter(c -> c.estado() == ConsumoMedidoresService.Estado.APAGADO_CONSUMO_MINIMO
+                || c.estado() == ConsumoMedidoresService.Estado.APAGADO_CERO).map(ConsumoMedidor::medidor).toList();
+        List<String> sinDatos = lista.stream().filter(c -> c.estado() == ConsumoMedidoresService.Estado.SIN_DATOS)
+                .map(ConsumoMedidor::medidor).toList();
+        String verde = tonos(Estado.OK)[2];
+        StringBuilder h = new StringBuilder("<div style='display:grid;gap:5px;font-size:13px'>")
+                .append("<span style='font-size:12px;color:").append(TEXTO_SUAVE).append("'>Maquinas encendidas ")
+                .append(esc(GeneradorView.deRed(transformador))).append(" (").append(encendidas.size()).append(")</span>")
+                .append("<div style='display:flex;flex-wrap:wrap;gap:4px 14px'>");
+        for (ConsumoMedidor c : encendidas) {
+            h.append("<span style='color:").append(verde).append(";font-weight:600;white-space:nowrap'>").append(esc(c.medidor()))
+                    .append(" <span style='font-weight:400'>").append(c.kwMedio() == null ? "-" : String.format(Locale.ROOT, "%,.1f kW", c.kwMedio()))
+                    .append("</span></span>");
+        }
+        h.append("</div>");
+        if (!apagadas.isEmpty()) {
+            h.append("<span style='font-size:12px;color:").append(TEXTO_SUAVE).append("'>Apagadas: ")
+                    .append(esc(String.join(", ", apagadas))).append("</span>");
+        }
+        if (!sinDatos.isEmpty()) {
+            h.append("<span style='font-size:12px;color:").append(TEXTO_SUAVE).append("'>Sin datos: ")
+                    .append(esc(String.join(", ", sinDatos))).append("</span>");
+        }
+        return h.append("</div>").toString();
     }
 
     /**

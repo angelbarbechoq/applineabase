@@ -1099,6 +1099,58 @@ public class GraficaModel {
     }
 
     /**
+     * Minuto a minuto de un generador contra su transformador: línea del generador, línea del consumo del
+     * transformador (el total) y columnas de la red (positivas = tomado de la red, en azul; negativas = entregado a la
+     * red, en verde agua), con marcadores de clic. Donde la línea del generador va por encima de la del consumo, sobra
+     * y se entrega.
+     *
+     * @param nombreConsumo nombre de la línea de consumo, ej. "Consumo del Transformador 1"
+     */
+    public static String getMarchaMinutoScript(String containerId, List<Long> tiempos, List<Double> generador,
+                                               List<Double> consumo, List<Double> red, String nombreConsumo,
+                                               String colorGenerador, String colorRed, String colorEntregado,
+                                               String colorConsumo) {
+        StringBuilder datos = new StringBuilder("[");
+        for (int i = 0; i < tiempos.size(); i++) {
+            if (i > 0) datos.append(",");
+            datos.append("{t:").append(tiempos.get(i))
+                    .append(",g:").append(numeroJs(generador.get(i)))
+                    .append(",c:").append(numeroJs(consumo.get(i)))
+                    .append(",r:").append(numeroJs(red.get(i))).append("}");
+        }
+        datos.append("]");
+        return scriptInicializarRoot(containerId)
+                + "var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: true, panY: false, wheelX: 'panX', wheelY: 'zoomX', layout: root.verticalLayout, paddingTop: 10 }));"
+                + "var datos = " + datos + ";"
+                + "var xAxis = chart.xAxes.push(am5xy.DateAxis.new(root, { baseInterval: { timeUnit: 'minute', count: 1 }, renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 70 }), tooltip: am5.Tooltip.new(root, {}) }));"
+                + "xAxis.get('renderer').labels.template.setAll({ fontSize: '11px', fill: am5.color(0x52514e) });"
+                + "xAxis.get('renderer').grid.template.setAll({ strokeOpacity: 0 });"
+                + "var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}) }));"
+                + "yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x52514e), fontSize: '11px' });"
+                + "yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });"
+                + "yAxis.children.unshift(am5.Label.new(root, { rotation: -90, text: 'kW', y: am5.p50, centerX: am5.p50, fontSize: '11px', fill: am5.color(0x52514e) }));"
+                + "var red = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Red (azul = importada, verde = exportada)', xAxis: xAxis, yAxis: yAxis, valueYField: 'r', valueXField: 't', fill: am5.color(" + colorRed + "), tooltip: am5.Tooltip.new(root, { labelText: 'Red: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
+                + "red.columns.template.setAll({ width: am5.percent(100), strokeOpacity: 0 });"
+                + "red.columns.template.adapters.add('fill', function(fill, target) { var v = target.dataItem && target.dataItem.get('valueY'); return v < 0 ? am5.color(" + colorEntregado + ") : am5.color(" + colorRed + "); });"
+                + "red.data.setAll(datos);"
+                + "var gen = chart.series.push(am5xy.LineSeries.new(root, { name: 'Generado', xAxis: xAxis, yAxis: yAxis, valueYField: 'g', valueXField: 't', stroke: am5.color(" + colorGenerador + "), fill: am5.color(" + colorGenerador + "), tooltip: am5.Tooltip.new(root, { labelText: 'Generado: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
+                + "gen.strokes.template.setAll({ strokeWidth: 2 });"
+                + "gen.data.setAll(datos);"
+                + "var cons = chart.series.push(am5xy.LineSeries.new(root, { name: '" + nombreConsumo.replace("'", "") + "', xAxis: xAxis, yAxis: yAxis, valueYField: 'c', valueXField: 't', stroke: am5.color(" + colorConsumo + "), fill: am5.color(" + colorConsumo + "), tooltip: am5.Tooltip.new(root, { labelText: 'Consumo: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
+                + "cons.strokes.template.setAll({ strokeWidth: 2 });"
+                + "cons.data.setAll(datos);"
+                + "var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));"
+                + "legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x0b0b0b) });"
+                + "legend.data.setAll([gen, cons, red]);"
+                + "chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'zoomX', xAxis: xAxis }));"
+                + "chart.get('cursor').lineY.set('visible', false);"
+                + "chart.set('scrollbarX', am5.Scrollbar.new(root, { orientation: 'horizontal' }));"
+                + scriptMarcadoresDeClic()
+                + "window.am5Charts[id] = { root: root, chart: chart };"
+                + "chart.appear(800, 100);";
+    }
+
+    /**
      * Marcadores al hacer clic, como en las gráficas de Tiempo Real (pedido del usuario el 2026-10-22 para el minuto a
      * minuto de un arranque): cada clic deja una línea roja punteada con la fecha y la hora; desde el segundo, también
      * el tiempo desde el marcador anterior (Δ hh:mm:ss). Doble clic los borra. Usa las variables chart y xAxis del script.
