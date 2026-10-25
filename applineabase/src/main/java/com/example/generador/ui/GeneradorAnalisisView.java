@@ -503,7 +503,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
         Span nota = nota("% importado de la red = parte del consumo de la planta 1 que vino de la red (meta en estiaje: 0; verde hasta "
                 + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
-                + ", rojo por encima; el administrador lo cambia con \"Limites del semaforo\" en Periodos en marcha). "
+                + ", rojo por encima; el administrador lo cambia con \"Limite de indicador\" en Periodos en marcha). "
                 + "% aportado por el generador = su parte del consumo. "
                 + "Balance neto = importada - exportada por la planta (negativo = se exporto mas de lo que se importo). Importada y "
                 + "exportada = contadores de energia del medidor principal de la planta 1 (transformadores 1 y 2 juntos), el que "
@@ -771,7 +771,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 .set("flex-wrap", "wrap").set("gap", "8px").set("width", "100%");
         // Límites del semáforo: solo el administrador los cambia (se guardan en generador-config.json).
         if (lineaAccessService.esAdmin()) {
-            Button limites = new Button("Limites del semaforo", VaadinIcon.COG.create(), e -> abrirDialogoLimites());
+            Button limites = new Button("Limite de indicador", VaadinIcon.COG.create(), e -> abrirDialogoLimites());
             limites.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
             cabecera.add(limites);
         }
@@ -888,7 +888,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         if (!lineaAccessService.esAdmin()) return;
         MetaImportacionRed actual = generadorService.metaImportacionRed();
         Dialog d = new Dialog();
-        d.setHeaderTitle("Limites del semaforo: meta cero importacion de la red");
+        d.setHeaderTitle("Limite de indicador: meta cero importacion de la red");
         Span explicacion = new Span("En % del consumo de la planta importado de la red. Verde: de 0 hasta el primer limite; "
                 + "amarillo: hasta el segundo; rojo: por encima. Valen para Analisis y el reporte de generadores.");
         explicacion.getStyle().set("font-size", "13px").set("color", TEXTO_SUAVE);
@@ -1032,9 +1032,14 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
      * minuto a minuto contra su transformador (lo generado, la red y el consumo total del transformador) y debajo las
      * máquinas de su transformador que estuvieron encendidas, en verde y con su potencia media.
      */
-    private void pintarDetalleGeneradores(PeriodoPlanta p) {
-        List<Generador> orden = generadorService.generadores().stream()
+    /** Generadores en el orden de sus transformadores: Transformador 1 primero (pedido del usuario el 2026-10-25). */
+    private List<Generador> porTransformador() {
+        return generadorService.generadores().stream()
                 .sorted(java.util.Comparator.comparing((Generador g) -> g.redAsociada() == null ? "~" : g.redAsociada())).toList();
+    }
+
+    private void pintarDetalleGeneradores(PeriodoPlanta p) {
+        List<Generador> orden = porTransformador();
         // En la actualización del mismo período (en marcha) los recuadros quedan: el gráfico recibe solo los datos nuevos
         // (no pierde el zoom ni los marcadores) y se reescriben las máquinas.
         String estructura = p.inicio() + "|" + p.generadores();
@@ -1169,9 +1174,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
      */
     private void pintarGeneradores(PeriodoPlanta p) {
         Double consumo = p.consumo();
-        List<Generador> todos = generadorService.generadores();
         StringBuilder barra = new StringBuilder();
-        for (Generador g : todos) {
+        for (Generador g : porTransformador()) {
             String color = css(colorGenerador(g.nombre()));
             Double aporte = p.aporte(g.nombre()), generado = p.generadoPor(g.nombre());
             double horas = p.horasDe(g.nombre());
@@ -1185,10 +1189,17 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             } else {
                 double pct = consumo == null || consumo <= 0 || aporte == null ? 0 : Math.min(100, aporte / consumo * 100);
                 String carga = generado == null || horas <= 0 ? "-" : String.format(Locale.ROOT, "%,.0f kW", generado / horas);
-                // Horómetro del controlador al arrancar (su primer arranque del período) y al parar (el último).
+                // Horómetro del controlador al arrancar (su primer arranque del período) y al parar (el último), y las horas
+                // que trabajó: lo que avanzó el horómetro en cada arranque (si sigue en marcha, el tiempo transcurrido).
                 List<PeriodoMarcha> suyos = p.arranques().stream().filter(a -> a.generador().equals(g.nombre()))
                         .sorted(java.util.Comparator.comparing(PeriodoMarcha::inicio)).toList();
-                String horo = horometro(suyos.get(0).horometroInicio()) + " -> " + horometro(suyos.get(suyos.size() - 1).horometroFin()) + " h";
+                double trabajadas = 0;
+                for (PeriodoMarcha a : suyos) {
+                    trabajadas += a.horometroInicio() != null && a.horometroFin() != null
+                            ? Math.max(0, a.horometroFin() - a.horometroInicio()) : a.horas();
+                }
+                String horo = "<b>" + String.format(Locale.ROOT, "%,.1f h", trabajadas) + "</b> trabajadas ("
+                        + horometro(suyos.get(0).horometroInicio()) + " -> " + horometro(suyos.get(suyos.size() - 1).horometroFin()) + ")";
                 t.add(new Html("<div style='display:grid;gap:3px'>"
                         + "<div style='display:flex;justify-content:space-between;align-items:baseline'><span style='font-weight:700;font-size:14px'>"
                         + esc(g.nombre()) + "</span><span style='font-size:20px;font-weight:700'>" + String.format(Locale.ROOT, "%.1f %%", pct) + "</span></div>"
@@ -1196,7 +1207,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                         + String.format(Locale.ROOT, "%.2f%%", pct) + ";background:" + color + "'></div></div>"
                         + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>del consumo de la planta</span>"
                         + "<span style='font-size:12px'>Genero <b>" + kwh(generado) + "</b> · carga media <b>" + carga + "</b></span>"
-                        + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>Horometro " + horo + "</span></div>"));
+                        + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>Horometro: " + horo + "</span></div>"));
                 if (pct > 0) barra.append(segmentoHtml(pct, color, esc(g.nombre())));
             }
             generadoresPeriodo.add(t);
