@@ -493,8 +493,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         chart.setWidthFull();
         chart.setHeight("340px");
         tablaEnergia.setWidthFull();
-        VerticalLayout v = new VerticalLayout(tarjetasEnergia, caja("Como se cubrio el consumo de la planta", barraEnergia),
-                caja(tituloGraficoEnergia, chart), caja(tituloDetalleEnergia, tablaEnergia));
+        Div[] cajas = {caja("Como se cubrio el consumo de la planta", barraEnergia), caja(tituloGraficoEnergia, chart),
+                caja(tituloDetalleEnergia, tablaEnergia)};
+        // caja() está pensada para ir una al lado de la otra (flex 1 1 520px); acá van una debajo de la otra, a todo el ancho.
+        for (Div c : cajas) c.getStyle().set("flex", "0 0 auto").set("width", "100%");
+        VerticalLayout v = new VerticalLayout(tarjetasEnergia, cajas[0], cajas[1], cajas[2]);
         v.setPadding(false);
         v.setSpacing(false);
         v.getStyle().set("gap", "12px");
