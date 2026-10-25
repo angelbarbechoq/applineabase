@@ -1249,6 +1249,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 .append(th).append(";text-align:right'>Aporte del generador (kWh)</th>").append(th).append(";text-align:right'>De la red (kWh)</th>")
                 .append(th).append(";text-align:right'>Consumo planta (kWh)</th>").append(th).append(";text-align:right'>Exportada (kWh)</th></tr>");
         long aporte = 0, red = 0, consumo = 0, exportada = 0;
+        // El % de cada fila es sobre el consumo de toda la planta (el total), el mismo de las tarjetas y del indicador.
+        long total = 0;
+        for (PeriodoMarcha a : filas) total += redondo(a.generadorUsado()) + redondo(a.kwhRedImportada());
         for (PeriodoMarcha a : filas) {
             long ap = redondo(a.generadorUsado()), r = redondo(a.kwhRedImportada()), e = redondo(a.kwhRedExportada());
             // Consumo de la fila = aporte + red ya redondeados: así la fila cuadra a la vista.
@@ -1262,9 +1265,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                     .append(td).append("'><span style='display:inline-flex;align-items:center;gap:6px'><span style='width:10px;height:10px;border-radius:50%;background:")
                     .append(css(colorGenerador(a.generador()))).append("'></span>").append(esc(a.generador())).append("</span></td>")
                     .append(td).append(num).append(horasMinutos(a.inicio(), a.fin())).append("</td>")
-                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", ap)).append("</td>")
-                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", r)).append("</td>")
-                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", c)).append("</td>")
+                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", ap)).append(pctDe(ap, total)).append("</td>")
+                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", r)).append(pctDe(r, total)).append("</td>")
+                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", c)).append(pctDe(c, total)).append("</td>")
                     .append(td).append(num).append(String.format(Locale.ROOT, "%,d", e)).append("</td></tr>");
         }
         String tt = "<td style='padding:6px 8px;font-weight:700;border-top:2px solid " + TEXTO + ";background:" + FONDO_SUAVE;
@@ -1272,11 +1275,17 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 .append(tt).append("'>").append(p.enCurso() ? "en marcha" : p.fin().format(CORTO)).append("</td>")
                 .append(tt).append("'>Total</td>")
                 .append(tt).append(num).append(horasMinutos(p.inicio(), p.fin())).append("</td>")
-                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", aporte)).append("</td>")
-                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", red)).append("</td>")
-                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", consumo)).append("</td>")
+                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", aporte)).append(pctDe(aporte, total)).append("</td>")
+                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", red)).append(pctDe(red, total)).append("</td>")
+                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", consumo)).append(pctDe(consumo, total)).append("</td>")
                 .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", exportada)).append("</td></tr></table></div>");
         resumenPeriodo.add(caja("Resumen del periodo seleccionado", new Html(h.toString())));
+    }
+
+    /** " 39.9 %" chico y en gris al lado del kWh: parte del consumo de toda la planta. */
+    private static String pctDe(long kwh, long total) {
+        return total <= 0 ? "" : "<span style='display:inline-block;min-width:52px;font-size:11px;font-weight:400;color:" + TEXTO_SUAVE
+                + "'>" + String.format(Locale.ROOT, "%.1f %%", kwh * 100.0 / total) + "</span>";
     }
 
     private static long redondo(Double v) {
