@@ -164,6 +164,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private String scriptMinutos;
     /** Abajo de todo, un gráfico por generador contra su transformador y sus máquinas encendidas (Transformador 1 a la izquierda). */
     private final Div generadoresDetalle = new Div();
+    /** Al final de todo, la tabla de cuentas del período seleccionado: una fila por arranque y el total. */
+    private final Div resumenPeriodo = new Div();
     /** Script de cada generador (por nombre), su gráfico y sus máquinas, para actualizarlos sin rearmar los recuadros. */
     private Map<String, String> scriptsGenerador = Map.of();
     private final Map<String, Div> chartDe = new HashMap<>(), maquinasDe = new HashMap<>();
@@ -711,7 +713,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Div fila2 = new Div(caja("Periodos en marcha", periodosGrid), caja("Minuto a minuto del periodo seleccionado", chartMinutos));
         fila2.getStyle().set("display", "flex").set("flex-wrap", "wrap").set("gap", "12px").set("width", "100%");
         generadoresDetalle.getStyle().set("display", "flex").set("flex-wrap", "wrap").set("gap", "12px").set("width", "100%");
-        VerticalLayout v = new VerticalLayout(crearIndicador(), fila2, generadoresDetalle);
+        resumenPeriodo.setWidthFull();
+        VerticalLayout v = new VerticalLayout(crearIndicador(), fila2, generadoresDetalle, resumenPeriodo);
         v.setPadding(false);
         v.setSpacing(false);
         v.getStyle().set("gap", "12px");
@@ -971,6 +974,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private void pintarSeleccionado(PeriodoPlanta p, boolean elegido) {
         indicadorTexto.removeAll();
         generadoresPeriodo.removeAll();
+        resumenPeriodo.removeAll();
         if (p == null) {
             chartIndicador.setVisible(false);
             chartMinutos.setVisible(false);
@@ -1008,6 +1012,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 coloresGauge(pct), "importado de la red");
         if (tabs.getSelectedTab() == tabPeriodos) dibujar(scriptIndicador, antes);
         pintarGeneradores(p);
+        pintarResumen(p);
         // Lo pesado (minuto a minuto de la planta y de cada generador, máquinas) solo con la pestaña visible.
         if (tabs.getSelectedTab() == tabPeriodos) {
             pintarDetalle(p);
@@ -1223,6 +1228,67 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
     }
 
+    /**
+     * Tabla de cuentas del período seleccionado, al final de todo (pedido del usuario el 2026-10-25): una fila por arranque
+     * (Transformador 1 primero) y el total. Por fila, aporte del generador + de la red = consumo de la planta; con dos
+     * generadores a la vez, el consumo y la red se reparten entre los dos según lo que generaba cada uno, así nada se
+     * cuenta dos veces. El total es la suma de los números redondeados de las filas, para que cuadre con calculadora.
+     */
+    private void pintarResumen(PeriodoPlanta p) {
+        List<String> orden = porTransformador().stream().map(Generador::nombre).toList();
+        List<PeriodoMarcha> filas = p.arranques().stream()
+                .sorted(java.util.Comparator.comparing((PeriodoMarcha a) -> orden.indexOf(a.generador())).thenComparing(PeriodoMarcha::inicio))
+                .toList();
+        String th = "<th style='padding:6px 8px;border-bottom:1px solid " + BORDE + ";font-weight:600;font-size:12px;color:" + TEXTO_SUAVE;
+        String td = "<td style='padding:6px 8px;border-bottom:1px solid #EEF0F4";
+        String num = ";text-align:right;font-variant-numeric:tabular-nums'>";
+        StringBuilder h = new StringBuilder("<div style='overflow-x:auto'><table style='border-collapse:collapse;width:100%;font-size:13px;color:")
+                .append(TEXTO).append("'><tr>")
+                .append(th).append(";text-align:left'>Inicio</th>").append(th).append(";text-align:left'>Fin</th>")
+                .append(th).append(";text-align:left'>Generador</th>").append(th).append(";text-align:right'>Duracion</th>")
+                .append(th).append(";text-align:right'>Aporte del generador (kWh)</th>").append(th).append(";text-align:right'>De la red (kWh)</th>")
+                .append(th).append(";text-align:right'>Consumo planta (kWh)</th>").append(th).append(";text-align:right'>Exportada (kWh)</th></tr>");
+        long aporte = 0, red = 0, consumo = 0, exportada = 0;
+        for (PeriodoMarcha a : filas) {
+            long ap = redondo(a.generadorUsado()), r = redondo(a.kwhRedImportada()), e = redondo(a.kwhRedExportada());
+            // Consumo de la fila = aporte + red ya redondeados: así la fila cuadra a la vista.
+            long c = ap + r;
+            aporte += ap;
+            red += r;
+            consumo += c;
+            exportada += e;
+            h.append("<tr>").append(td).append("'>").append(a.inicio().format(CORTO)).append("</td>")
+                    .append(td).append("'>").append(a.enCurso() ? "en marcha" : a.fin().format(CORTO)).append("</td>")
+                    .append(td).append("'><span style='display:inline-flex;align-items:center;gap:6px'><span style='width:10px;height:10px;border-radius:50%;background:")
+                    .append(css(colorGenerador(a.generador()))).append("'></span>").append(esc(a.generador())).append("</span></td>")
+                    .append(td).append(num).append(horasMinutos(a.inicio(), a.fin())).append("</td>")
+                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", ap)).append("</td>")
+                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", r)).append("</td>")
+                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", c)).append("</td>")
+                    .append(td).append(num).append(String.format(Locale.ROOT, "%,d", e)).append("</td></tr>");
+        }
+        String tt = "<td style='padding:6px 8px;font-weight:700;border-top:2px solid " + TEXTO + ";background:" + FONDO_SUAVE;
+        h.append("<tr>").append(tt).append("'>").append(p.inicio().format(CORTO)).append("</td>")
+                .append(tt).append("'>").append(p.enCurso() ? "en marcha" : p.fin().format(CORTO)).append("</td>")
+                .append(tt).append("'>Total</td>")
+                .append(tt).append(num).append(horasMinutos(p.inicio(), p.fin())).append("</td>")
+                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", aporte)).append("</td>")
+                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", red)).append("</td>")
+                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", consumo)).append("</td>")
+                .append(tt).append(num).append(String.format(Locale.ROOT, "%,d", exportada)).append("</td></tr></table></div>");
+        resumenPeriodo.add(caja("Resumen del periodo seleccionado", new Html(h.toString())));
+    }
+
+    private static long redondo(Double v) {
+        return v == null ? 0 : Math.round(v);
+    }
+
+    /** Duración en horas:minutos, ej. "96:03". */
+    private static String horasMinutos(LocalDateTime desde, LocalDateTime hasta) {
+        long min = Math.max(0, Duration.between(desde, hasta).toMinutes());
+        return String.format(Locale.ROOT, "%d:%02d", min / 60, min % 60);
+    }
+
     /** Tramo de la barra de reparto; el texto (nombre y %) solo si entra. Texto oscuro sobre el naranja claro. */
     private static String segmentoHtml(double pct, String color, String nombre) {
         String texto = color.equalsIgnoreCase(css(NARANJA)) ? TEXTO : "#ffffff";
@@ -1232,8 +1298,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     }
 
     /**
-     * Minuto a minuto del período: lo que generó cada generador, el consumo de toda la planta y la red por el medidor
-     * principal (+ importada / - exportada), con marcadores de clic (fecha, hora y tiempo desde el anterior).
+     * Minuto a minuto del período: lo que aportaron entre todos los generadores a la planta (lo generado menos lo
+     * exportado; desde el 2026-10-25 una sola línea, pedido del usuario), el consumo de toda la planta y la red por el
+     * medidor principal (+ importada / - exportada), con marcadores de clic (fecha, hora y tiempo desde el anterior).
      */
     private void mostrarMinutos(PeriodoPlanta p) {
         List<Generador> gens = generadorService.generadores();
@@ -1243,19 +1310,15 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             scriptMinutos = null;
             return;
         }
-        String[] nombres = gens.stream().map(Generador::nombre).toArray(String[]::new);
-        String[] colores = new String[nombres.length];
-        for (int i = 0; i < nombres.length; i++) colores[i] = colorGenerador(nombres[i]);
+        String[] nombres = {"Aporte de los generadores"};
+        String[] colores = {NARANJA};
         List<Long> tiempos = new ArrayList<>();
         List<double[]> valores = new ArrayList<>();
         for (GeneradorAnalisisService.PuntoPlanta pt : puntos) {
             tiempos.add(pt.fecha().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-            double[] v = new double[nombres.length + 3];
-            System.arraycopy(pt.generado(), 0, v, 0, nombres.length);
-            v[nombres.length] = pt.consumo();
-            v[nombres.length + 1] = pt.importada();
-            v[nombres.length + 2] = pt.exportada();
-            valores.add(v);
+            double generado = 0;
+            for (double g : pt.generado()) generado += g;
+            valores.add(new double[]{Math.max(0, generado - pt.exportada()), pt.consumo(), pt.importada(), pt.exportada()});
         }
         chartMinutos.setVisible(true);
         // Tooltips semitransparentes en esta pestaña (pedido del usuario: tapaban el gráfico).
