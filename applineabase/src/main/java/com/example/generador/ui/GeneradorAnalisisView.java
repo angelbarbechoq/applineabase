@@ -38,7 +38,6 @@ import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.AttachmentType;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
-import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
@@ -135,19 +134,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private static final String CHART_COSTOS = "chartdiv_costos_red";
     private static final String CHART_MINUTOS = "chartdiv_marcha_minutos";
 
-    // Energía
-    private final HorizontalLayout tarjetasEnergia = new HorizontalLayout();
-    private final Grid<Fila> grid = new Grid<>();
-    /** Con un solo generador elegido: lo que pusieron en la planta los demás (para que el consumo sea el de la planta). */
-    private Grid.Column<Fila> colOtros;
-    // Con "Todos": lo que puso cada generador por período (nombre -> período -> kWh) y el consumo de toda la planta.
-    private Map<String, Map<String, Double>> usadoPorGenerador = new LinkedHashMap<>();
-    private final Map<String, Grid.Column<Fila>> colPorGenerador = new LinkedHashMap<>();
-    private static final String CHART_PLANTA = "chartdiv_analisis_planta";
-    private final H4 tituloPlanta = new H4("Consumo de toda la planta");
-    private final Span resumenPlanta = new Span();
-    private final Div chartPlanta = new Div();
-    private String scriptPlanta;
+    // Energía (rediseño del 2026-10-25): tarjetas, barra de reparto, columnas y tabla del detalle.
+    private final Div tarjetasEnergia = new Div();
+    private final Div barraEnergia = new Div();
+    private final Span tituloGraficoEnergia = new Span(), tituloDetalleEnergia = new Span();
+    private final Div tablaEnergia = new Div();
     // Períodos en marcha (de la planta: los arranques que se pisan van juntos), todo en una pantalla: arriba la meta de todos
     // los períodos, la del seleccionado y lo que puso cada generador; abajo la lista y el minuto a minuto del seleccionado.
     private List<PeriodoPlanta> periodosPlanta = List.of();
@@ -213,6 +204,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     // datos nuevos, lo mismo que el último "Ver", sin perder el período seleccionado ni el zoom de los gráficos.
     private static final int POLL_MS = 15000, POLL_MS_APP = 30000;
     private Registration pollRegistration;
+    private final GeneradorAlmacen almacen;
+    /** Había algún generador en marcha en la revisión anterior (para hacer una última actualización cuando para). */
+    private boolean habiaMarcha;
     /** Agrupación y fin del rango del último "Ver" (sin recortar a hoy: un rango que sigue abierto crece con los días). */
     private Agrupacion agrupacionVista = Agrupacion.DIA;
     private LocalDate hastaRango;
@@ -229,8 +223,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     public GeneradorAnalisisView(GeneradorService generadorService, GeneradorAnalisisService analisis,
                                  ConsumoMedidoresService consumoMedidores, CostoCombustibleService costos,
-                                 ReporteGeneradoresService reporte, LineaAccessService lineaAccessService) {
+                                 ReporteGeneradoresService reporte, LineaAccessService lineaAccessService,
+                                 GeneradorAlmacen almacen) {
         this.generadorService = generadorService;
+        this.almacen = almacen;
         this.analisis = analisis;
         this.consumoMedidores = consumoMedidores;
         this.costos = costos;
@@ -302,14 +298,14 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         mensaje.getStyle().set("font-size", "12px").set("color", "#555");
 
         tabs.setWidthFull();
-        tabEnergia = tabs.add("Resumen de energia", crearEnergia());
+        // Períodos en marcha primero (pedido del usuario el 2026-10-25): es la más usada y la que se actualiza sola.
         tabPeriodos = tabs.add("Periodos en marcha", crearPeriodos());
+        tabEnergia = tabs.add("Resumen de energia", crearEnergia());
         tabTendencias = tabs.add("Tendencias", crearTendencias());
         tabCostos = tabs.add("Costos", crearCostos());
         // El gráfico se arma con la pestaña visible (con display:none amCharts lo dibuja sin tamaño).
         tabs.addSelectedChangeListener(e -> {
             if (e.getSelectedTab() == tabEnergia && scriptGrafico != null) getElement().executeJs(scriptGrafico);
-            if (e.getSelectedTab() == tabEnergia && scriptPlanta != null) getElement().executeJs(scriptPlanta);
             if (e.getSelectedTab() == tabPeriodos && scriptIndicadorTodos != null) getElement().executeJs(scriptIndicadorTodos);
             if (e.getSelectedTab() == tabPeriodos && scriptIndicador != null) getElement().executeJs(scriptIndicador);
             if (e.getSelectedTab() == tabPeriodos && detallePendiente != null) {
@@ -344,7 +340,20 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     protected void onAttach(AttachEvent e) {
         UI ui = e.getUI();
         ui.setPollInterval(POLL_MS);
-        pollRegistration = ui.addPollListener(p -> actualizar(true));
+        pollRegistration = ui.addPollListener(p -> revisarActualizacion());
+    }
+
+    /**
+     * Revisión de cada 15 s: solo con la pestaña Períodos en marcha abierta y algún generador en marcha (pedido del
+     * usuario el 2026-10-25; los datos del generador se toman cada minuto solo en marcha). En marcha = su arranque está
+     * abierto, la misma marca que usa la lectura. Cuando para el último se hace una revisión más, para que el período
+     * quede cerrado en pantalla.
+     */
+    private void revisarActualizacion() {
+        if (tabs.getSelectedTab() != tabPeriodos) return;
+        boolean marcha = generadorService.generadores().stream().anyMatch(g -> almacen.hayArranqueAbierto(g.nombre()));
+        if (marcha || habiaMarcha) actualizar(true);
+        habiaMarcha = marcha;
     }
 
     @Override
@@ -452,10 +461,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         meta = generadorService.metaImportacionRed();
         // Una sola consulta para todo el "Ver": cada archivo se lee una vez y la isla se detecta una vez por generador.
         GeneradorAnalisisService.Consulta consulta = new GeneradorAnalisisService.Consulta();
-        verEnergia(consulta, gens, agrupacionVista);
         periodos = analisis.periodosEnMarcha(consulta, gens, desde, hasta);
         periodosPlanta = GeneradorAnalisisService.periodosPlanta(periodos);
         periodoInicial = periodoDelIndicador(consulta, gens);
+        // Después de los períodos: sus tarjetas "con generadores en marcha" los usan.
+        verEnergia(consulta, agrupacionVista);
         verPeriodos();
         verCostos();
         datosCalculados = modificacion;
@@ -468,153 +478,228 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     // ================= Energía =================
 
+    /**
+     * Resumen de energía (rediseño del 2026-10-25 sobre la maqueta aprobada por el usuario): arriba, todo el período
+     * elegido (consumo de la planta, aporte de los generadores, red y exportada) y debajo lo mismo solo con generadores en
+     * marcha, que es lo que se compara con la meta de Períodos en marcha; la barra de cómo se cubrió el consumo; columnas
+     * por día, semana o mes (aporte de cada generador + red = consumo) y la tabla del detalle, que cuadra con calculadora.
+     */
     private VerticalLayout crearEnergia() {
         tarjetasEnergia.setWidthFull();
-        tarjetasEnergia.getStyle().set("flex-wrap", "wrap");
+        tarjetasEnergia.getStyle().set("display", "flex").set("flex-direction", "column").set("gap", "6px");
+        barraEnergia.setWidthFull();
         Div chart = new Div();
         chart.setId(CHART_ID);
         chart.setWidthFull();
-        chart.setHeight("380px");
-
-        grid.addColumn(Fila::periodo).setHeader("Periodo").setAutoWidth(true).setFlexGrow(0).setFrozen(true);
-        columna(grid, "Importada de la red (kWh)", f -> kwhNum(f.redImportada()));
-        columna(grid, "Exportada a la red (kWh)", f -> kwhNum(f.redExportada()));
-        columna(grid, "Generado (kWh)", f -> kwhNum(f.generado()));
-        // Con "Todos": lo que puso cada generador en la planta (generado - su parte de lo exportado).
-        for (Generador g : generadorService.generadores()) {
-            Grid.Column<Fila> c = columna(grid, "Aporte de " + g.nombre() + " (kWh)",
-                    f -> kwhNum(usadoPorGenerador.getOrDefault(g.nombre(), Map.of()).get(f.periodo())));
-            c.setVisible(false);
-            colPorGenerador.put(g.nombre(), c);
-        }
-        columna(grid, "En paralelo (kWh)", f -> kwhNum(f.generadoParalelo()));
-        columna(grid, "En isla (kWh)", f -> kwhNum(f.generadoIsla()));
-        colOtros = columna(grid, "Aporte de otros generadores (kWh)", f -> kwhNum(f.aporteOtros()));
-        columna(grid, "Consumo de la planta 1 (kWh)", f -> kwhNum(f.consumo()));
-        grid.addComponentColumn(f -> badgeRed(f.porcentajeDeRed())).setHeader("% importado de la red (meta 0)").setAutoWidth(true).setFlexGrow(0);
-        columna(grid, "% aportado por el generador", f -> porcentaje(f.aporteGenerador()));
-        columna(grid, "Balance neto red (kWh)", f -> kwhNum(f.balanceNeto()));
-        columna(grid, "Horas marcha", f -> horas(f.horasMarcha()));
-        columna(grid, "En paralelo (h)", f -> horas(f.horasParalelo()));
-        columna(grid, "En isla (h)", f -> horas(f.horasIsla()));
-        columna(grid, "En vacio (h)", f -> horas(f.horasVacio()));
-        columna(grid, "Arranques", f -> f.arranques() == null ? "-" : String.valueOf(f.arranques()));
-        columna(grid, "Carga max (kW)", f -> f.kwMax() == null ? "-" : String.format(Locale.ROOT, "%.0f", f.kwMax()));
-        grid.setWidthFull();
-        grid.setHeight("420px");
-
-        Span nota = nota("% importado de la red = parte del consumo de la planta 1 que vino de la red (meta en estiaje: 0; verde hasta "
-                + pctUmbral(meta.verdeHasta()) + ", amarillo hasta " + pctUmbral(meta.amarilloHasta())
-                + ", rojo por encima; el administrador lo cambia con \"Limite de indicador\" en Periodos en marcha). "
-                + "% aportado por el generador = su parte del consumo. "
-                + "Balance neto = importada - exportada por la planta (negativo = se exporto mas de lo que se importo). Importada y "
-                + "exportada = contadores de energia del medidor principal de la planta 1 (transformadores 1 y 2 juntos), el que "
-                + "coincide con el de la empresa electrica. La importada es de todo el dia; la exportada solo cuenta con algun "
-                + "generador en marcha y, con dos en marcha, se reparte entre ellos segun lo que generaba cada uno. Generado = "
-                + "contador del controlador del generador. Consumo de la planta 1 = importada + lo que pusieron en la planta los "
-                + "generadores (generado - su parte de lo exportado); con un solo generador elegido, los demas entran como "
-                + "\"Aporte de otros generadores\". En paralelo = el generador tenia carga y habia tension de red; en isla = con carga y "
-                + "sin tension de red, o con el interruptor de la planta abierto (el medidor de su transformador en 0 tres minutos o mas, "
-                + "con el cambio de carga, kVAr o frecuencia que lo confirma; desde el 11-10-2026); en vacio = en marcha con menos de " + (int) GeneradorAnalisisService.KW_VACIO + " kW. "
-                + "Datos del generador: GenPower desde el 08-10-2026, Caterpillar desde el 09-10-2026 09:19. "
-                + "La separacion paralelo / isla existe desde el 09-10-2026. Lo exportado se dibuja por debajo de cero. \"-\" = sin datos. "
-                + "El aporte de cada generador y, abajo, el consumo de la planta 1 en el tiempo, calculado con la "
-                + "potencia (kW) del medidor principal y de cada generador tomada de la base de datos (aprox.).");
-        tituloPlanta.getStyle().set("margin", "8px 0 0 0");
-        resumenPlanta.getStyle().set("font-size", "13px").set("color", "#333");
-        chartPlanta.setId(CHART_PLANTA);
-        chartPlanta.setWidthFull();
-        chartPlanta.setHeight("380px");
-        tituloPlanta.setVisible(false);
-        resumenPlanta.setVisible(false);
-        chartPlanta.setVisible(false);
-        VerticalLayout v = new VerticalLayout(descripcion("Todo el periodo elegido: por cada dia, semana o mes, cuanta energia se "
-                + "importo de la red, cuanta aporto el generador, cuanta se exporto a la red mientras el generador estaba en marcha, "
-                + "y cuanto consumio la planta 1 en total."), tarjetasEnergia, chart, grid, tituloPlanta, resumenPlanta, chartPlanta, nota);
+        chart.setHeight("340px");
+        tablaEnergia.setWidthFull();
+        VerticalLayout v = new VerticalLayout(tarjetasEnergia, caja("Como se cubrio el consumo de la planta", barraEnergia),
+                caja(tituloGraficoEnergia, chart), caja(tituloDetalleEnergia, tablaEnergia));
         v.setPadding(false);
+        v.setSpacing(false);
+        v.getStyle().set("gap", "12px");
         v.setWidthFull();
         return v;
     }
 
-    private void verEnergia(GeneradorAnalisisService.Consulta consulta, List<Generador> gens, Agrupacion a) {
-        List<Fila> filas = analisis.analizar(consulta, gens, a, desde, hasta);
-        Fila t = analisis.total(filas);
-        // Con "Todos": lo que puso cada generador, de su propio análisis (su generado y su parte de lo exportado).
-        boolean todos = gens.size() > 1;
-        boolean conOtros = !todos && t.aporteOtros() != null && t.aporteOtros() >= 0.5;
-        usadoPorGenerador = new LinkedHashMap<>();
-        Map<String, Double> totalPorGenerador = new LinkedHashMap<>();
-        if (todos) {
-            for (Generador g : gens) {
-                List<Fila> delGenerador = analisis.analizar(consulta, List.of(g), a, desde, hasta);
-                Map<String, Double> porPeriodo = new HashMap<>();
-                delGenerador.forEach(f -> porPeriodo.put(f.periodo(), f.generadorUsado()));
-                usadoPorGenerador.put(g.nombre(), porPeriodo);
-                totalPorGenerador.put(g.nombre(), analisis.total(delGenerador).generadorUsado());
-            }
+    /** Una fila del detalle, en kWh redondeados: el consumo es la suma de lo redondeado, así cuadra a la vista. */
+    private record RenglonEnergia(String etiqueta, long[] aporte, double[] horas, long red, long consumo, long exportada,
+                                  boolean sinDatos) {
+        long aporteGeneradores() {
+            return java.util.Arrays.stream(aporte).sum();
         }
-        colPorGenerador.forEach((nombre, c) -> c.setVisible(todos && usadoPorGenerador.containsKey(nombre)));
-        colOtros.setVisible(conOtros);
-        grid.setItems(filas);
-        tarjetasEnergia.removeAll();
-        tarjetasEnergia.add(kpiTomadoDeRed(t.porcentajeDeRed(), t.redImportada(), t.consumo()));
-        tarjetasEnergia.add(kpiBalance(t.balanceNeto(), t.consumo()));
-        StringBuilder origen = new StringBuilder();
-        if (todos) totalPorGenerador.forEach((nombre, usado) -> origen.append(nombre).append(' ').append(kwh(usado)).append(" + "));
-        else origen.append(gens.get(0).nombre()).append(' ').append(kwh(t.generadorUsado())).append(" + ");
-        if (conOtros) origen.append("otros generadores ").append(kwh(t.aporteOtros())).append(" + ");
-        tarjetasEnergia.add(tarjeta("Consumo de la planta 1", kwh(t.consumo()), origen + "red " + kwh(t.redImportada())));
-        if (todos) {
-            totalPorGenerador.forEach((nombre, usado) -> tarjetasEnergia.add(tarjeta("Aporte de " + nombre, kwh(usado),
-                    usado == null || t.consumo() == null || t.consumo() <= 0 ? null
-                            : String.format(Locale.ROOT, "%.1f %% del consumo", usado / t.consumo() * 100))));
-        }
-        tarjetasEnergia.add(tarjeta("Generado", kwh(t.generado()),
-                t.generadoParalelo() == null && t.generadoIsla() == null ? null
-                        : "en paralelo " + kwh(t.generadoParalelo()) + " / en isla " + kwh(t.generadoIsla())));
-        tarjetasEnergia.add(tarjeta("Exportada a la red", kwh(t.redExportada()), "excedente, con el generador en marcha"));
-        tarjetasEnergia.add(tarjeta("Horas de marcha", horas(t.horasMarcha()),
-                "paralelo " + horas(t.horasParalelo()) + " / isla " + horas(t.horasIsla()) + " / vacio " + horas(t.horasVacio())));
-        tarjetasEnergia.add(tarjeta("Arranques", t.arranques() == null ? "-" : String.valueOf(t.arranques()), null));
-        tarjetasEnergia.add(tarjeta("Carga maxima", t.kwMax() == null ? "-" : String.format(Locale.ROOT, "%.0f kW", t.kwMax()), null));
+    }
 
+    private void verEnergia(GeneradorAnalisisService.Consulta consulta, Agrupacion a) {
+        List<Generador> gens = porTransformador();
+        int n = gens.size();
+        List<Fila> filas = analisis.analizar(consulta, gens, a, desde, hasta);
+        // Lo de cada generador (lo que puso en la planta = generado menos su parte de lo exportado, y sus horas) sale de su
+        // propio análisis, por período.
+        List<Map<String, Fila>> porGenerador = new ArrayList<>();
+        for (Generador g : gens) {
+            Map<String, Fila> m = new HashMap<>();
+            analisis.analizar(consulta, List.of(g), a, desde, hasta).forEach(f -> m.put(f.periodo(), f));
+            porGenerador.add(m);
+        }
+        List<RenglonEnergia> renglones = new ArrayList<>();
+        for (Fila f : filas) {
+            long[] aporte = new long[n];
+            double[] horas = new double[n];
+            for (int i = 0; i < n; i++) {
+                Fila fg = porGenerador.get(i).get(f.periodo());
+                aporte[i] = fg == null ? 0 : redondo(fg.generadorUsado());
+                horas[i] = fg == null || fg.horasMarcha() == null ? 0 : fg.horasMarcha();
+            }
+            long red = redondo(f.redImportada());
+            long consumo = red + java.util.Arrays.stream(aporte).sum();
+            renglones.add(new RenglonEnergia(a == Agrupacion.DIA ? f.periodo().substring(0, 5) : f.periodo(), aporte, horas, red,
+                    consumo, redondo(f.redExportada()), f.consumo() == null));
+        }
+        long[] totalAporte = new long[n];
+        double[] totalHoras = new double[n];
+        long totalRed = 0, totalConsumo = 0, totalExp = 0;
+        for (RenglonEnergia r : renglones) {
+            if (r.sinDatos()) continue;
+            for (int i = 0; i < n; i++) {
+                totalAporte[i] += r.aporte()[i];
+                totalHoras[i] += r.horas()[i];
+            }
+            totalRed += r.red();
+            totalConsumo += r.consumo();
+            totalExp += r.exportada();
+        }
+        RenglonEnergia total = new RenglonEnergia("Total", totalAporte, totalHoras, totalRed, totalConsumo, totalExp, false);
+
+        String unidad = a == Agrupacion.DIA ? "dia" : a == Agrupacion.SEMANA ? "semana" : "mes";
+        tituloGraficoEnergia.setText("Consumo de la planta por " + unidad);
+        tituloDetalleEnergia.setText("Detalle por " + unidad);
+        pintarTarjetasEnergia(total);
+        pintarBarraEnergia(gens, total);
+        tablaEnergia.removeAll();
+        tablaEnergia.add(new Html(htmlTablaEnergia(gens, renglones, total, a == Agrupacion.DIA ? "Dia" : a == Agrupacion.SEMANA ? "Semana" : "Mes")));
+
+        // Columnas apiladas: lo que puso cada generador + la red; la altura es el consumo de la planta.
         List<String> categorias = new ArrayList<>();
         List<Double[]> valores = new ArrayList<>();
-        List<String> series = new ArrayList<>();
-        List<String> colores = new ArrayList<>();
-        if (todos) {
-            for (String nombre : usadoPorGenerador.keySet()) {
-                series.add("Aporte de " + nombre);
-                colores.add(colorGenerador(nombre));
-            }
-        } else {
-            series.add("Aporte del " + gens.get(0).nombre());
-            colores.add(colorGenerador(gens.get(0).nombre()));
-            if (conOtros) {
-                series.add("Aporte de otros generadores");
-                colores.add(GRIS);
-            }
+        String[] series = new String[n + 1];
+        String[] colores = new String[n + 1];
+        for (int i = 0; i < n; i++) {
+            series[i] = gens.get(i).nombre();
+            colores[i] = colorGenerador(gens.get(i).nombre());
         }
-        series.add("Importada de la red");
-        series.add("Exportada a la red (excedente)");
-        colores.add(AZUL);
-        colores.add(AQUA);
-        for (Fila f : filas) {
-            categorias.add(a == Agrupacion.DIA ? f.periodo().substring(0, 5) : f.periodo());
-            List<Double> v = new ArrayList<>();
-            if (todos) usadoPorGenerador.values().forEach(m -> v.add(m.get(f.periodo())));
-            else v.add(f.generadorUsado());
-            if (conOtros) v.add(f.aporteOtros());
-            v.add(f.redImportada());
-            v.add(f.redExportada() == null || f.redExportada() == 0 ? null : -f.redExportada());
-            valores.add(v.toArray(new Double[0]));
+        series[n] = "De la red";
+        colores[n] = AZUL;
+        for (RenglonEnergia r : renglones) {
+            categorias.add(r.etiqueta());
+            Double[] v = new Double[n + 1];
+            for (int i = 0; i < n; i++) v[i] = r.sinDatos() || r.aporte()[i] == 0 ? null : (double) r.aporte()[i];
+            v[n] = r.sinDatos() ? null : (double) r.red();
+            valores.add(v);
         }
-        // Arriba de cero, el consumo partido en lo que puso cada generador + red; abajo, el excedente entregado.
         String antes = scriptGrafico;
-        scriptGrafico = GraficaModel.getBarrasApiladasScript(CHART_ID, categorias, series.toArray(new String[0]),
-                colores.toArray(new String[0]), valores, "kWh");
+        scriptGrafico = GraficaModel.getBarrasApiladasScript(CHART_ID, categorias, series, colores, valores, "kWh");
         if (tabs.getSelectedTab() == tabEnergia) dibujar(scriptGrafico, antes);
-        verConsumoPlanta(consulta, gens, todos);
+    }
+
+    /**
+     * Dos grupos de tarjetas (opción B elegida por el usuario): todo el período y solo con generadores en marcha (los
+     * períodos de la planta del rango, los mismos del gauge de todos los períodos).
+     */
+    private void pintarTarjetasEnergia(RenglonEnergia total) {
+        tarjetasEnergia.removeAll();
+        long aporte = total.aporteGeneradores();
+        tarjetasEnergia.add(grupoEnergia("Todo el periodo", "del " + desde.format(DIA_MES) + " al " + hasta.format(DIA_MES)));
+        tarjetasEnergia.add(filaTarjetas(
+                tarjetaEnergia("Consumo de la planta", total.consumo(), null, null),
+                tarjetaEnergia("Aporte de los generadores", aporte, pctDelConsumo(aporte, total.consumo()), css(NARANJA)),
+                tarjetaEnergia("De la red", total.red(), pctDelConsumo(total.red(), total.consumo()), css(AZUL)),
+                tarjetaEnergia("Exportada a la red", total.exportada(), null, css(AQUA))));
+        Double imp = null, cons = null;
+        double horas = 0;
+        for (PeriodoPlanta p : periodosPlanta) {
+            imp = suma(imp, p.importada());
+            cons = suma(cons, p.consumo());
+            horas += p.horas();
+        }
+        if (periodosPlanta.isEmpty() || cons == null) {
+            tarjetasEnergia.add(grupoEnergia("Con generadores en marcha", "no hubo en el periodo"));
+            return;
+        }
+        long consumoMarcha = redondo(cons), redMarcha = redondo(imp), aporteMarcha = consumoMarcha - redMarcha;
+        tarjetasEnergia.add(grupoEnergia("Con generadores en marcha", periodosPlanta.size()
+                + (periodosPlanta.size() == 1 ? " periodo, " : " periodos, ") + String.format(Locale.ROOT, "%,.1f h", horas)));
+        String pctRed = pctDelConsumo(redMarcha, consumoMarcha);
+        tarjetasEnergia.add(filaTarjetas(
+                tarjetaEnergia("Consumo de la planta", consumoMarcha, null, null),
+                tarjetaEnergia("Aporte de los generadores", aporteMarcha, pctDelConsumo(aporteMarcha, consumoMarcha), css(NARANJA)),
+                tarjetaEnergia("De la red", redMarcha, pctRed == null ? null : pctRed + " · meta 0", css(AZUL)),
+                new Div()));
+    }
+
+    private static final DateTimeFormatter DIA_MES = DateTimeFormatter.ofPattern("dd-MM");
+
+    private static String pctDelConsumo(long kwh, long consumo) {
+        return consumo <= 0 ? null : String.format(Locale.ROOT, "%.1f %% del consumo", kwh * 100.0 / consumo);
+    }
+
+    private static Html grupoEnergia(String titulo, String detalle) {
+        return new Html("<div style='font-size:13px;font-weight:600;color:" + TEXTO + ";margin-top:4px'>" + esc(titulo)
+                + " <span style='font-weight:400;color:" + TEXTO_SUAVE + "'>· " + esc(detalle) + "</span></div>");
+    }
+
+    private static Div filaTarjetas(Component... tarjetas) {
+        for (Component t : tarjetas) ((Div) t).getStyle().set("flex", "1 1 190px").set("min-width", "0");
+        Div fila = new Div(tarjetas);
+        fila.getStyle().set("display", "flex").set("flex-wrap", "wrap").set("gap", "12px").set("width", "100%");
+        return fila;
+    }
+
+    /** Tarjeta blanca con el valor grande en kWh; borde izquierdo de color si se da. */
+    private static Div tarjetaEnergia(String titulo, long kwh, String detalle, String borde) {
+        Div t = new Div(new Html("<div style='display:grid;gap:2px'><span style='font-size:12px;color:" + TEXTO_SUAVE + "'>"
+                + esc(titulo) + "</span><span style='font-size:22px;font-weight:700;color:" + TEXTO + "'>"
+                + String.format(Locale.ROOT, "%,d kWh", kwh) + "</span>"
+                + (detalle == null ? "" : "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>" + esc(detalle) + "</span>") + "</div>"));
+        t.getStyle().set("border", "1px solid " + BORDE).set("border-radius", "12px").set("padding", "10px 14px")
+                .set("background-color", "#ffffff").set("box-sizing", "border-box");
+        if (borde != null) t.getStyle().set("border-left", "5px solid " + borde);
+        return t;
+    }
+
+    /** Barra de cómo se cubrió el consumo de todo el período: cada generador + la red = 100 %. */
+    private void pintarBarraEnergia(List<Generador> gens, RenglonEnergia total) {
+        barraEnergia.removeAll();
+        if (total.consumo() <= 0) {
+            barraEnergia.add(new Span("Sin datos en el periodo."));
+            return;
+        }
+        StringBuilder barra = new StringBuilder("<div style='display:flex;height:24px;border-radius:6px;overflow:hidden;font-size:11px;font-weight:600'>");
+        for (int i = 0; i < gens.size(); i++) {
+            double pct = total.aporte()[i] * 100.0 / total.consumo();
+            if (pct > 0) barra.append(segmentoHtml(pct, css(colorGenerador(gens.get(i).nombre())), esc(gens.get(i).nombre()), 8));
+        }
+        double pctRed = total.red() * 100.0 / total.consumo();
+        if (pctRed > 0) barra.append(segmentoHtml(pctRed, css(AZUL), "Red", 8));
+        barraEnergia.add(new Html(barra.append("</div>").toString()));
+    }
+
+    /**
+     * Detalle por día, semana o mes: lo que puso cada generador, la red (con su % del consumo de esa fila), el consumo de la
+     * planta, lo exportado y las horas en marcha de cada generador; los días sin generador en gris; la fila Total cuadra.
+     */
+    private String htmlTablaEnergia(List<Generador> gens, List<RenglonEnergia> renglones, RenglonEnergia total, String primera) {
+        String th = "<th style='padding:6px 8px;border-bottom:1px solid " + BORDE + ";font-weight:600;font-size:12px;color:" + TEXTO_SUAVE
+                + ";text-align:right;white-space:nowrap'>";
+        StringBuilder h = new StringBuilder("<div style='overflow-x:auto'><table style='border-collapse:collapse;width:100%;font-size:13px;color:")
+                .append(TEXTO).append("'><tr><th style='padding:6px 8px;border-bottom:1px solid ").append(BORDE)
+                .append(";font-weight:600;font-size:12px;color:").append(TEXTO_SUAVE).append(";text-align:left'>").append(primera).append("</th>");
+        for (Generador g : gens) h.append(th).append("<span style='display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:").append(css(colorGenerador(g.nombre()))).append("'></span>").append(esc(g.nombre())).append(" (kWh)</th>");
+        h.append(th).append("De la red (kWh)</th>").append(th).append("Consumo planta (kWh)</th>").append(th).append("Exportada (kWh)</th>");
+        for (Generador g : gens) h.append(th).append("Horas ").append(esc(g.nombre())).append("</th>");
+        h.append("</tr>");
+        for (RenglonEnergia r : renglones) h.append(renglonHtml(r, false));
+        h.append(renglonHtml(total, true));
+        return h.append("</table></div>").toString();
+    }
+
+    private static String renglonHtml(RenglonEnergia r, boolean esTotal) {
+        String estilo = esTotal
+                ? "padding:6px 8px;font-weight:700;border-top:2px solid " + TEXTO + ";background:" + FONDO_SUAVE
+                : "padding:5px 8px;border-bottom:1px solid #EEF0F4" + (r.sinDatos() || r.aporteGeneradores() == 0 ? ";color:#A0A6B4" : "");
+        String td = "<td style='" + estilo + ";text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap'>";
+        StringBuilder h = new StringBuilder("<tr><td style='").append(estilo).append(";white-space:nowrap'>").append(esc(r.etiqueta())).append("</td>");
+        int n = r.aporte().length;
+        if (r.sinDatos()) {
+            for (int i = 0; i < 2 * n + 3; i++) h.append(td).append("-</td>");
+            return h.append("</tr>").toString();
+        }
+        for (int i = 0; i < n; i++) h.append(td).append(String.format(Locale.ROOT, "%,d", r.aporte()[i])).append(pctDe(r.aporte()[i], r.consumo())).append("</td>");
+        h.append(td).append(String.format(Locale.ROOT, "%,d", r.red())).append(pctDe(r.red(), r.consumo())).append("</td>")
+                .append(td).append(String.format(Locale.ROOT, "%,d", r.consumo())).append("</td>")
+                .append(td).append(String.format(Locale.ROOT, "%,d", r.exportada())).append("</td>");
+        for (int i = 0; i < n; i++) h.append(td).append(r.horas()[i] > 0 ? String.format(Locale.ROOT, "%,.1f h", r.horas()[i]) : "-").append("</td>");
+        return h.append("</tr>").toString();
     }
 
     /** Color de un generador en esta ventana (según su lugar en generador-config.json). */
@@ -624,54 +709,6 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             if (todos.get(i).nombre().equals(nombre)) return COLORES_GEN[i % COLORES_GEN.length];
         }
         return NARANJA;
-    }
-
-    /**
-     * Con "Todos": consumo de toda la planta en el tiempo durante el período (mismo gráfico que Balance energético P1),
-     * en puntos de 1 min (hasta 2 días), 15 min (hasta 8), 1 h (hasta 62) o 1 día.
-     */
-    private void verConsumoPlanta(GeneradorAnalisisService.Consulta consulta, List<Generador> gens, boolean todos) {
-        tituloPlanta.setVisible(todos);
-        resumenPlanta.setVisible(todos);
-        chartPlanta.setVisible(todos);
-        String antes = scriptPlanta;
-        scriptPlanta = null;
-        if (!todos) return;
-        LocalDateTime ini = desde.atStartOfDay();
-        LocalDateTime fin = hasta.plusDays(1).atStartOfDay();
-        if (fin.isAfter(LocalDateTime.now())) fin = LocalDateTime.now().withNano(0);
-        long dias = Duration.between(ini, fin).toDays();
-        int minutos = dias <= 2 ? 1 : dias <= 8 ? 15 : dias <= 62 ? 60 : 1440;
-        List<GeneradorAnalisisService.PuntoPlanta> puntos = analisis.consumoPlanta(consulta, gens, ini, fin, minutos);
-        String[] nombres = gens.stream().map(Generador::nombre).toArray(String[]::new);
-        String[] colores = new String[nombres.length];
-        for (int i = 0; i < nombres.length; i++) colores[i] = colorGenerador(nombres[i]);
-        List<Long> tiempos = new ArrayList<>();
-        List<double[]> valores = new ArrayList<>();
-        double consumo = 0, importada = 0, exportada = 0;
-        for (GeneradorAnalisisService.PuntoPlanta p : puntos) {
-            tiempos.add(p.fecha().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
-            double[] v = new double[nombres.length + 3];
-            System.arraycopy(p.generado(), 0, v, 0, nombres.length);
-            v[nombres.length] = p.consumo();
-            v[nombres.length + 1] = p.importada();
-            v[nombres.length + 2] = p.exportada();
-            valores.add(v);
-            consumo += p.consumo() * minutos / 60.0;
-            importada += p.importada() * minutos / 60.0;
-            exportada += p.exportada() * minutos / 60.0;
-        }
-        String cada = minutos == 1 ? "cada minuto" : minutos == 1440 ? "promedio de cada dia" : "promedio de " + (minutos == 60 ? "cada hora" : minutos + " min");
-        resumenPlanta.setText(puntos.isEmpty() ? "Sin lecturas del medidor principal en el periodo."
-                : String.format(Locale.ROOT, "Planta 1 (medidor principal y generadores; %s): consumo aprox. %,.0f kWh, de la red "
-                        + "%,.0f kWh (%.1f %%), exportada %,.0f kWh. Lineas = lo que genero cada generador.", cada, consumo, importada,
-                        consumo > 0 ? importada / consumo * 100 : 0, exportada));
-        scriptPlanta = GraficaModel.getConsumoPlantaScript(CHART_PLANTA, tiempos, nombres, colores, valores, minutos, false,
-                NOCHE, AZUL, AQUA, false);
-        if (tabs.getSelectedTab() == tabEnergia) {
-            dibujar(GraficaModel.getConsumoPlantaScript(CHART_PLANTA, tiempos, nombres, colores, valores, minutos, true,
-                    NOCHE, AZUL, AQUA, false), scriptPlanta, antes);
-        }
     }
 
     // ================= Períodos en marcha =================
@@ -724,7 +761,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     /** Caja blanca con título chico arriba (lista y minuto a minuto). */
     private static Div caja(String titulo, Component contenido) {
-        Span t = new Span(titulo);
+        return caja(new Span(titulo), contenido);
+    }
+
+    /** Igual, con el título como Span para cambiarle el texto después (ej. "por dia" / "por mes"). */
+    private static Div caja(Span t, Component contenido) {
         t.getStyle().set("font-size", "14px").set("font-weight", "700").set("color", TEXTO);
         Div c = new Div(t, contenido);
         c.getStyle().set("flex", "1 1 520px").set("min-width", "0").set("display", "flex").set("flex-direction", "column")
@@ -1300,10 +1341,15 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     /** Tramo de la barra de reparto; el texto (nombre y %) solo si entra. Texto oscuro sobre el naranja claro. */
     private static String segmentoHtml(double pct, String color, String nombre) {
+        return segmentoHtml(pct, color, nombre, 18);
+    }
+
+    /** Igual, con el texto desde {@code minimo} % (la barra de Resumen de energia es ancha: 8). */
+    private static String segmentoHtml(double pct, String color, String nombre, double minimo) {
         String texto = color.equalsIgnoreCase(css(NARANJA)) ? TEXTO : "#ffffff";
         return "<div style='width:" + String.format(Locale.ROOT, "%.2f%%", pct) + ";background:" + color + ";color:" + texto
                 + ";display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden'>"
-                + (pct >= 18 ? nombre + " " + String.format(Locale.ROOT, "%.1f %%", pct) : "") + "</div>";
+                + (pct >= minimo ? nombre + " " + String.format(Locale.ROOT, "%.1f %%", pct) : "") + "</div>";
     }
 
     /**
@@ -1343,21 +1389,6 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     /** 2 -> "2 %", 2.5 -> "2.5 %". */
     private static String pctUmbral(double v) {
         return v == Math.rint(v) ? String.format(Locale.ROOT, "%.0f %%", v) : String.format(Locale.ROOT, "%.1f %%", v);
-    }
-
-    /** Indicador principal de estiaje: parte del consumo tomada de la red, con semáforo (meta 0). */
-    private Component kpiTomadoDeRed(Double pct, Double kwhRed, Double consumo) {
-        String detalle = kwhRed == null ? "meta: 0" : kwh(kwhRed) + (consumo == null ? "" : " de " + kwh(consumo)) + " consumidos; meta 0";
-        return tarjetaKpi("Importada de la red", pct == null ? "-" : String.format(Locale.ROOT, "%.1f %%", pct), detalle, semaforoRed(pct));
-    }
-
-    /** Balance neto con la red (tomado - entregado): verde si se entregó más de lo que se tomó. */
-    private Component kpiBalance(Double balance, Double consumo) {
-        if (balance == null) return tarjeta("Balance neto con la red", "-", null);
-        Estado e = balance <= 0 ? Estado.OK : semaforoRed(consumo == null || consumo <= 0 ? null : balance / consumo * 100);
-        String detalle = Math.abs(balance) < 0.5 ? "sin intercambio neto con la red"
-                : balance < 0 ? "se exporto a la red mas de lo que se importo" : "se importo de la red mas de lo que se exporto";
-        return tarjetaKpi("Balance neto con la red", String.format(Locale.ROOT, "%,.0f kWh", balance), detalle, e);
     }
 
     /** Semáforo de la meta "consumo cero de la red", con los porcentajes de generador-config.json. */
@@ -1860,10 +1891,6 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private static String duracion(double horas) {
         long min = Math.round(horas * 60);
         return min < 60 ? min + " min" : String.format(Locale.ROOT, "%d h %02d min", min / 60, min % 60);
-    }
-
-    private static String porcentaje(Double v) {
-        return v == null ? "-" : String.format(Locale.ROOT, "%.1f %%", v);
     }
 
     private static String dinero(double v) {
