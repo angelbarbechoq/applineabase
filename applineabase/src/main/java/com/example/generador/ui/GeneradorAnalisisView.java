@@ -1169,7 +1169,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     }
 
     /**
-     * Una tarjeta chica por generador con lo que puso en la planta en el período (en % del consumo), lo que generó y su
+     * Una tarjeta chica por generador con lo que puso en la planta en el período (en % del consumo y en kWh) y su
      * carga media; el que no trabajó, en gris. Debajo, la barra de cómo se repartió el consumo: cada generador y la red.
      */
     private void pintarGeneradores(PeriodoPlanta p) {
@@ -1206,7 +1206,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                         + "<div style='height:6px;border-radius:3px;background:#EEF0F4'><div style='height:6px;border-radius:3px;width:"
                         + String.format(Locale.ROOT, "%.2f%%", pct) + ";background:" + color + "'></div></div>"
                         + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>del consumo de la planta</span>"
-                        + "<span style='font-size:12px'>Genero <b>" + kwh(generado) + "</b> · carga media <b>" + carga + "</b></span>"
+                        // Lo que puso en la planta (sin lo que salió a la red), el mismo número del %.
+                        + "<span style='font-size:12px'>Aporto <b>" + kwh(aporte) + "</b> · carga media <b>" + carga + "</b></span>"
                         + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>Horometro: " + horo + "</span></div>"));
                 if (pct > 0) barra.append(segmentoHtml(pct, color, esc(g.nombre())));
             }
