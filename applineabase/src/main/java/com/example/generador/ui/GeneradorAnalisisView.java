@@ -194,6 +194,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final Div chartCostos = new Div();
     private final Grid<PeriodoMarcha> costosGrid = new Grid<>();
     private Map<String, CostoCombustible> combustible = Map.of();
+    /** Rendimiento (kWh/gal) y precio medio del galón de los arranques del rango con diesel cargado; 0 = sin datos. */
+    private double kwhPorGalon, precioGalon;
     /** Arranques del período elegido, uno por generador (Costos va por arranque: el diésel se carga por generador). */
     private List<PeriodoMarcha> periodos = List.of();
 
@@ -465,6 +467,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         periodosPlanta = GeneradorAnalisisService.periodosPlanta(periodos);
         periodoInicial = periodoDelIndicador(consulta, gens);
         // Después de los períodos: sus tarjetas "con generadores en marcha" los usan.
+        combustible = costos.porPeriodo(periodos);
+        calcularRendimientoDiesel();
         verEnergia(consulta, agrupacionVista);
         verPeriodos();
         verCostos();
@@ -597,7 +601,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 tarjetaEnergia("Consumo de la planta", total.consumo(), null, null),
                 tarjetaEnergia("Aporte de los generadores", aporte, pctDelConsumo(aporte, total.consumo()), css(NARANJA)),
                 tarjetaEnergia("De la red", total.red(), pctDelConsumo(total.red(), total.consumo()), css(AZUL)),
-                tarjetaEnergia("Exportada a la red", total.exportada(), null, css(AQUA))));
+                tarjetaEnergia("Exportada a la red", total.exportada(),
+                        informeExportada(total.exportada(), total.aporteGeneradores() + total.exportada()), css(AQUA))));
         Double imp = null, cons = null;
         double horas = 0;
         for (PeriodoPlanta p : periodosPlanta) {
@@ -712,6 +717,45 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         return h.append("</tr>").toString();
     }
 
+    /**
+     * Lo exportado a la red, solo como información (pedido del usuario el 2026-10-25: no es una meta ni lleva semáforo):
+     * su parte de lo generado y, si hay arranques del rango con diesel cargado, el diesel y el costo aproximados que llevó.
+     */
+    private void calcularRendimientoDiesel() {
+        double kwh = 0, galones = 0, costo = 0;
+        for (PeriodoMarcha p : periodos) {
+            CostoCombustible cc = c(p);
+            if (cc == null || p.kwhGenerado() == null || p.kwhGenerado() <= 0) continue;
+            kwh += p.kwhGenerado();
+            galones += cc.getGalones();
+            costo += cc.costo();
+        }
+        kwhPorGalon = galones > 0 ? kwh / galones : 0;
+        precioGalon = galones > 0 ? costo / galones : 0;
+    }
+
+    /** "3.3 % de lo generado · aprox. 530 gal de diesel ($ 1,900.00)"; null si no se exportó nada. */
+    private String informeExportada(double kwhExportada, double kwhGenerado) {
+        if (kwhExportada < 0.5) return null;
+        StringBuilder s = new StringBuilder();
+        if (kwhGenerado > 0) s.append(String.format(Locale.ROOT, "%.1f %% de lo generado", kwhExportada * 100 / kwhGenerado));
+        if (kwhPorGalon > 0) {
+            double gal = kwhExportada / kwhPorGalon;
+            if (s.length() > 0) s.append(" · ");
+            s.append(String.format(Locale.ROOT, "aprox. %,.0f gal de diesel (%s)", gal, dinero(gal * precioGalon)));
+        }
+        return s.length() == 0 ? null : s.toString();
+    }
+
+    /** Línea chica gris con lo exportado en el texto de un gauge de Períodos en marcha. */
+    private void lineaExportada(StringBuilder h, Double exportada, Double generado) {
+        if (exportada == null) return;
+        // Con los kWh redondeados, como en las tarjetas: así el diesel y el costo coinciden en las dos pestañas.
+        String info = informeExportada(Math.round(exportada), generado == null ? 0 : generado);
+        h.append("<span style='font-size:12px;color:").append(TEXTO_SUAVE).append("'>Exportada a la red: ").append(kwh(exportada))
+                .append(info == null ? "" : " · " + esc(info)).append("</span>");
+    }
+
     /** Color de un generador en esta ventana (según su lugar en generador-config.json). */
     private String colorGenerador(String nombre) {
         List<Generador> todos = generadorService.generadores();
@@ -798,14 +842,15 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         } finally {
             cargandoLista = false;
         }
-        Double imp = null, exp = null, cons = null;
+        Double imp = null, exp = null, cons = null, gen = null;
         for (PeriodoPlanta p : periodosPlanta) {
             imp = suma(imp, p.importada());
             exp = suma(exp, p.exportada());
             cons = suma(cons, p.consumo());
+            gen = suma(gen, p.generado());
         }
         Double pctRed = cons == null || cons <= 0 || imp == null ? null : Math.min(100, imp / cons * 100);
-        pintarIndicadorTodos(pctRed, imp, cons);
+        pintarIndicadorTodos(pctRed, imp, cons, exp, gen);
         pintarSeleccionado(aSeleccionar != null ? aSeleccionar : periodoInicial, inicioElegido != null);
     }
 
@@ -897,7 +942,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     }
 
     /** Gauge de la izquierda: todos los períodos en marcha del rango elegido, con cuántos quedaron en verde y en rojo. */
-    private void pintarIndicadorTodos(Double pct, Double imp, Double cons) {
+    private void pintarIndicadorTodos(Double pct, Double imp, Double cons, Double exp, Double gen) {
         indicadorTodosTexto.removeAll();
         StringBuilder h = new StringBuilder("<div style='display:grid;gap:5px;font-size:13px'>");
         int cuantos = periodosPlanta.size();
@@ -911,6 +956,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             return;
         }
         textoMeta(h, pct, imp, cons);
+        lineaExportada(h, exp, gen);
         int verdes = 0, rojos = 0;
         for (PeriodoPlanta p : periodosPlanta) {
             Double x = p.porcentajeDeRed();
@@ -1051,10 +1097,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         StringBuilder h = new StringBuilder("<div style='display:grid;gap:5px;font-size:13px'>");
         cabeceraIndicador(h, etiqueta, p.generadores(), cuando);
         textoMeta(h, pct, p.importada(), p.consumo());
-        if (p.exportada() != null) {
-            h.append("<span style='font-size:12px;color:").append(TEXTO_SUAVE).append("'>Exportada a la red: ").append(kwh(p.exportada()))
-                    .append("</span>");
-        }
+        lineaExportada(h, p.exportada(), p.generado());
         h.append("</div>");
         indicadorTexto.add(new Html(h.toString()));
         chartIndicador.setVisible(true);
