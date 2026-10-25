@@ -1140,10 +1140,10 @@ public class GraficaModel {
                 + "red.columns.template.adapters.add('fill', function(fill, target) { var v = target.dataItem && target.dataItem.get('valueY'); return v < 0 ? am5.color(" + colorEntregado + ") : am5.color(" + colorRed + "); });"
                 + "red.data.setAll(datos);"
                 + "var gen = chart.series.push(am5xy.LineSeries.new(root, { name: 'Generado', xAxis: xAxis, yAxis: yAxis, valueYField: 'g', valueXField: 't', stroke: am5.color(" + colorGenerador + "), fill: am5.color(" + colorGenerador + "), tooltip: am5.Tooltip.new(root, { labelText: 'Generado: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
-                + "gen.strokes.template.setAll({ strokeWidth: 2 });"
+                + "gen.strokes.template.setAll({ strokeWidth: 1 });"
                 + "gen.data.setAll(datos);"
                 + "var cons = chart.series.push(am5xy.LineSeries.new(root, { name: '" + nombreConsumo.replace("'", "") + "', xAxis: xAxis, yAxis: yAxis, valueYField: 'c', valueXField: 't', stroke: am5.color(" + colorConsumo + "), fill: am5.color(" + colorConsumo + "), tooltip: am5.Tooltip.new(root, { labelText: 'Consumo: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
-                + "cons.strokes.template.setAll({ strokeWidth: 2 });"
+                + "cons.strokes.template.setAll({ strokeWidth: 1 });"
                 + "cons.data.setAll(datos);"
                 + "var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));"
                 + "legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x0b0b0b) });"
@@ -1251,7 +1251,7 @@ public class GraficaModel {
                 .append("}")
                 .append("function linea(nombre, campo, color) {")
                 .append("  var s = chart.series.push(am5xy.LineSeries.new(root, { name: nombre, xAxis: xAxis, yAxis: yAxis, valueYField: campo, valueXField: 't', stroke: am5.color(color), fill: am5.color(color), tooltip: am5.Tooltip.new(root, { labelText: nombre + ': {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));")
-                .append("  s.strokes.template.setAll({ strokeWidth: 2 });")
+                .append("  s.strokes.template.setAll({ strokeWidth: 1 });")
                 .append("  s.data.setAll(datos); return s;")
                 .append("}")
                 .append("var leyenda = [];")

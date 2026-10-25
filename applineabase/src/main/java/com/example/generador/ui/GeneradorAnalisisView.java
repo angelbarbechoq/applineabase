@@ -686,6 +686,13 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         return h.append("</table></div>").toString();
     }
 
+    /** Debajo del consumo, en chico: de qué está hecho el 100 %, generadores (G) + red (R). */
+    private static String composicion(RenglonEnergia r) {
+        if (r.consumo() <= 0) return "";
+        return "<div style='font-size:10px;font-weight:400;color:" + TEXTO_SUAVE + "'>" + String.format(Locale.ROOT, "G %.1f %% + R %.1f %%",
+                r.aporteGeneradores() * 100.0 / r.consumo(), r.red() * 100.0 / r.consumo()) + "</div>";
+    }
+
     private static String renglonHtml(RenglonEnergia r, boolean esTotal) {
         String estilo = esTotal
                 ? "padding:6px 8px;font-weight:700;border-top:2px solid " + TEXTO + ";background:" + FONDO_SUAVE
@@ -699,7 +706,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         for (int i = 0; i < n; i++) h.append(td).append(String.format(Locale.ROOT, "%,d", r.aporte()[i])).append(pctDe(r.aporte()[i], r.consumo())).append("</td>");
         h.append(td).append(String.format(Locale.ROOT, "%,d", r.red())).append(pctDe(r.red(), r.consumo())).append("</td>")
-                .append(td).append(String.format(Locale.ROOT, "%,d", r.consumo())).append("</td>")
+                .append(td).append(String.format(Locale.ROOT, "%,d", r.consumo())).append(composicion(r)).append("</td>")
                 .append(td).append(String.format(Locale.ROOT, "%,d", r.exportada())).append("</td>");
         for (int i = 0; i < n; i++) h.append(td).append(r.horas()[i] > 0 ? String.format(Locale.ROOT, "%,.1f h", r.horas()[i]) : "-").append("</td>");
         return h.append("</tr>").toString();
