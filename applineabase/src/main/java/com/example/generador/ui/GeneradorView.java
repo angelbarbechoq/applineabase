@@ -14,6 +14,7 @@ import com.example.generador.model.LecturaGenerador;
 import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.TipoEventoGenerador;
 import com.example.generador.service.AlarmaComap;
+import com.example.generador.service.GeneradorAlmacen;
 import com.example.generador.service.HistorialEventosService;
 import com.example.generador.service.RedControladorService;
 import com.example.generador.model.SenalesRed;
@@ -98,6 +99,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final LineaAccessService lineaAccessService;
     private final PlantaEnVivoService plantaService;
     private final RedControladorService redControlador;
+    private final GeneradorAlmacen almacen;
+    /** Generadores en el orden de las pestañas: Transformador 1 primero. */
+    private List<Generador> generadores = List.of();
+    /** Generador de la pestaña elegida (el último elegido si la pestaña es otra sección). */
     private Generador generador;
     private final TabSheet tabs = new TabSheet();
     private Tab tabPlanta;
@@ -105,23 +110,19 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final Div plantaDetalle = new Div();
     private final Span plantaHora = new Span();
 
-    private final Span descripcion = new Span();
     private final Span avisoMapa = new Span();
-    /** Aviso de alarmas del controlador, arriba de las pestañas (se ve en todas). */
+    /** Aviso rojo de alarmas arriba de las pestañas: solo para un generador sin comunicación (su tablero no las muestra). */
     private final Div alertaAlarmas = new Div();
-    private final ComboBox<Generador> selector = new ComboBox<>();
-    /** Opción "Todos" del selector: los generadores juntos (no es un generador real). */
-    private static final Generador TODOS = new Generador("Todos", "", "", 0, null, "");
+    /** Una pestaña por generador (su tablero, lo que antes era Estado actual), con sus marcas de marcha y alarmas. */
+    private final Map<Tab, Generador> tabGenerador = new LinkedHashMap<>();
+    private final Map<Generador, Div> tableros = new HashMap<>();
+    private final Map<Generador, Span> marcasTab = new HashMap<>();
     private Tab tabRegistros;
-    private Tab tabEstado;
-    // Última lectura de alarmas, para rearmar el aviso rojo al cambiar de pestaña sin volver a leer los controladores.
-    private Map<Generador, List<String>> ultimasAlarmas = Map.of();
-    private java.util.Set<Generador> ultimosSinComunicacion = java.util.Set.of();
-    /** Estado actual: el tablero de cada generador elegido (los dos con "Todos", Transformador 1 primero). */
-    private final Div estadoContenido = new Div();
-    /** Generador de cada fila del Historial de eventos (sus registros no lo traen); se ve con "Todos". */
+    /** Generador de cada fila del Historial de eventos (sus registros no lo traen). */
     private final Map<EventoGenerador, String> generadorDeEvento = new IdentityHashMap<>();
     private Grid.Column<EventoGenerador> colEventoGenerador;
+    /** Registros es de a un controlador: lo elige su propio selector. */
+    private final ComboBox<Generador> registrosGenerador = new ComboBox<>("Generador");
     private final Grid<FilaRegistro> registrosGrid = new Grid<>();
     private final HistorialEventosService historial;
     private final Grid<EventoGenerador> eventosGrid = new Grid<>();
@@ -138,15 +139,17 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService,
                          HistorialEventosService historial, PlantaEnVivoService plantaService,
-                         RedControladorService redControlador) {
+                         RedControladorService redControlador, GeneradorAlmacen almacen) {
         this.service = service;
         this.calidad = calidad;
         this.lineaAccessService = lineaAccessService;
         this.historial = historial;
         this.plantaService = plantaService;
         this.redControlador = redControlador;
-        List<Generador> lista = service.generadores();
-        this.generador = lista.isEmpty() ? null : lista.get(0);
+        this.almacen = almacen;
+        generadores = service.generadores().stream()
+                .sorted(java.util.Comparator.comparing((Generador x) -> nombreRed(x.redAsociada()))).toList();
+        this.generador = generadores.isEmpty() ? null : generadores.get(0);
 
         setSizeFull();
         setPadding(true);
@@ -155,60 +158,79 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             add(new H3("Generadores"), new Span("No hay generadores en C:\\LineaBaseX\\config\\generador-config.json"));
             return;
         }
-
-        // Con más de un generador, primero "Todos": Estado actual e Historial de eventos de todos juntos.
-        List<Generador> opciones = new ArrayList<>();
-        if (lista.size() > 1) opciones.add(TODOS);
-        opciones.addAll(lista);
-        selector.setItems(opciones);
-        // El que tiene alarmas en el controlador se marca en la lista, para verlo desde la pantalla de otro.
-        selector.setItemLabelGenerator(g -> g == TODOS
-                ? (lista.stream().anyMatch(x -> !historial.alarmasActivas(x.nombre()).isEmpty()) ? "Todos (ALARMA)" : "Todos")
-                : historial.alarmasActivas(g.nombre()).isEmpty() ? g.nombre() : g.nombre() + " (ALARMA)");
-        selector.setValue(generador);
-        selector.setWidth("220px");
-        selector.addValueChangeListener(e -> {
-            if (e.getValue() != null && e.isFromClient()) {
-                generador = e.getValue();
-                cambiarGenerador();
-            }
-        });
-        H3 titulo = new H3("Generadores");
-        titulo.getStyle().set("margin", "0");
-        descripcion.getStyle().set("font-size", "12px").set("color", "#555");
-        HorizontalLayout cabecera = new HorizontalLayout(titulo, selector, descripcion);
-        cabecera.setAlignItems(Alignment.CENTER);
         avisoMapa.getStyle().set("background-color", "#fff3cd").set("color", "#856404").set("padding", "6px 10px")
                 .set("border-radius", "6px").set("font-size", "13px");
 
+        // Sin selector: una pestaña por generador (su tablero), después lo de todos los generadores juntos.
         tabs.setSizeFull();
-        // Primero lo global: la planta completa en vivo (todos los generadores y la red), después cada generador.
+        for (Generador g : generadores) {
+            Tab t = tabs.add(pestanaGenerador(g), crearEstado(g));
+            tabGenerador.put(t, g);
+        }
         tabPlanta = tabs.add("Balance energetico P1", crearPlanta());
-        tabEstado = tabs.add("Estado actual", crearEstado());
+        tabPlanta.getStyle().set("margin-left", "14px");
         tabs.add("Historial de eventos", crearEventos());
         if (lineaAccessService.esAdmin()) {
             tabRegistros = tabs.add("Registros", crearRegistros());
         }
         tabs.addSelectedChangeListener(e -> {
+            Generador g = tabGenerador.get(e.getSelectedTab());
+            if (g != null) generador = g;
             if (e.getSelectedTab() == tabPlanta) refrescarPlanta();
-            if (e.getSelectedTab() == tabEstado) refrescar();
-            else mostrarAlarmas(ultimasAlarmas, ultimosSinComunicacion);
-            mostrarSelector();
+            refrescar();
         });
         alertaAlarmas.setWidthFull();
         alertaAlarmas.setVisible(false);
-        add(cabecera, avisoMapa, alertaAlarmas, tabs);
+        add(avisoMapa, alertaAlarmas, tabs);
         setFlexGrow(1, tabs);
-        cambiarGenerador();
+        cargarEventos();
+        refrescar();
         refrescarPlanta();
-        mostrarSelector();
     }
 
-    /** Balance energético P1 muestra siempre todos los generadores: ahí el selector no cambia nada y se oculta. */
-    private void mostrarSelector() {
-        boolean visible = tabs.getSelectedTab() != tabPlanta;
-        selector.setVisible(visible);
-        descripcion.setVisible(visible);
+    /**
+     * Pestaña de un generador: su nombre, debajo su transformador y modelo, y a la derecha un punto verde si está en
+     * marcha y la cantidad de alarmas de su controlador en rojo (las actualiza marcarPestanas).
+     */
+    private Component pestanaGenerador(Generador g) {
+        Span nombre = new Span(g.nombre());
+        nombre.getStyle().set("display", "block").set("font-size", "16px").set("font-weight", "700");
+        Span sub = new Span(nombreRed(g.redAsociada()) + " · " + g.modelo().replaceFirst("(?<=[A-Za-z])(?=\\d)", " "));
+        sub.getStyle().set("display", "block").set("font-size", "12px").set("color", "#6b7080").set("font-weight", "400");
+        Div textos = new Div(nombre, sub);
+        textos.getStyle().set("line-height", "1.25").set("text-align", "left");
+        Span marcas = new Span();
+        marcas.getStyle().set("display", "inline-flex").set("align-items", "center").set("gap", "8px");
+        marcasTab.put(g, marcas);
+        Div d = new Div(textos, marcas);
+        d.getStyle().set("display", "flex").set("align-items", "center").set("gap", "10px").set("padding", "2px 0");
+        d.getElement().setAttribute("title", g.descripcion() + " IP " + g.ip() + ", modelo " + g.modelo() + ".");
+        return d;
+    }
+
+    /** Punto verde (en marcha) y cantidad de alarmas del controlador en cada pestaña de generador. */
+    private void marcarPestanas(Map<Generador, List<String>> alarmasEnVivo) {
+        for (Generador g : generadores) {
+            Span marcas = marcasTab.get(g);
+            if (marcas == null) continue;
+            marcas.removeAll();
+            if (almacen.hayArranqueAbierto(g.nombre())) {
+                Span punto = new Span();
+                punto.getStyle().set("width", "9px").set("height", "9px").set("border-radius", "50%").set("background", "#3BB273");
+                punto.getElement().setAttribute("title", "En marcha");
+                marcas.add(punto);
+            }
+            List<String> alarmas = alarmasEnVivo.getOrDefault(g, historial.alarmasActivas(g.nombre()));
+            if (alarmas != null && !alarmas.isEmpty()) {
+                Span n = new Span(String.valueOf(alarmas.size()));
+                n.getStyle().set("min-width", "20px").set("height", "20px").set("padding", "0 6px").set("border-radius", "10px")
+                        .set("background", "#E8505B").set("color", "#fff").set("font-size", "12px").set("font-weight", "700")
+                        .set("display", "inline-flex").set("align-items", "center").set("justify-content", "center")
+                        .set("box-sizing", "border-box");
+                n.getElement().setAttribute("title", alarmas.size() + " alarmas en el controlador");
+                marcas.add(n);
+            }
+        }
     }
 
     @Override
@@ -234,27 +256,18 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         e.getUI().setPollInterval(POLL_MS_APP);
     }
 
-    private boolean todos() {
-        return generador == TODOS;
+    /** Generador de la pestaña elegida; null si la pestaña es otra sección. */
+    private Generador generadorDePestana() {
+        return tabGenerador.get(tabs.getSelectedTab());
     }
 
-    /** El generador elegido, o todos con "Todos". */
-    private List<Generador> elegidos() {
-        return todos() ? service.generadores() : List.of(generador);
-    }
-
-    private void cambiarGenerador() {
-        if (todos()) {
-            descripcion.setText("Todos los generadores: " + service.generadores().stream().map(g -> g.nombre() + " (" + g.modelo()
-                    + (g.redAsociada() == null ? "" : ", red " + g.redAsociada()) + ")").collect(Collectors.joining(", ")) + ".");
-        } else {
-            descripcion.setText(generador.descripcion() + " IP " + generador.ip() + ", modelo " + generador.modelo()
-                    + (generador.redAsociada() == null ? "" : ", red " + generador.redAsociada()) + ".");
-        }
+    /** Aviso amarillo si el modelo de un generador falta o su mapa no está confirmado: el de la pestaña, o de todos. */
+    private void avisarMapas() {
+        Generador elegido = generadorDePestana();
         List<String> avisos = new ArrayList<>();
-        for (Generador g : elegidos()) {
+        for (Generador g : elegido == null ? generadores : List.of(elegido)) {
             ModeloControlador m = service.modelo(g).orElse(null);
-            String de = todos() ? g.nombre() + ": " : "";
+            String de = elegido == null ? g.nombre() + ": " : "";
             if (m == null) {
                 avisos.add(de + "el modelo " + g.modelo() + " no esta en C:\\LineaBaseX\\config\\generador-modelos.json: no se lee.");
             } else if (!m.confirmado()) {
@@ -264,18 +277,6 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         }
         avisoMapa.setText(String.join("   |   ", avisos));
         avisoMapa.setVisible(!avisos.isEmpty());
-        // Registros (exploración del mapa) es de a un controlador: con "Todos" se oculta.
-        if (tabRegistros != null) {
-            if (todos() && tabs.getSelectedTab() == tabRegistros) tabs.setSelectedTab(tabPlanta);
-            tabRegistros.setVisible(!todos());
-        }
-        colEventoGenerador.setVisible(todos());
-        registrosGrid.setItems(List.of());
-        ultimaExploracion = List.of();
-        exploracionAnterior = Map.of();
-        registrosMensaje.setText("");
-        cargarEventos();
-        refrescar();
     }
 
     // ================= Historial de eventos =================
@@ -299,7 +300,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
         colEventoGenerador = eventosGrid.addColumn(ev -> generadorDeEvento.getOrDefault(ev, "")).setHeader("Generador")
                 .setAutoWidth(true).setFlexGrow(0);
-        colEventoGenerador.setVisible(false);
+        colEventoGenerador.setVisible(generadores.size() > 1);
         eventosGrid.addColumn(ev -> ev.id() == null ? "" : String.valueOf(ev.id())).setHeader("Nro").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> ev.fecha().format(HORA)).setHeader("Fecha y hora").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addComponentColumn(ev -> badgeNuevo(ev.tipo().etiqueta(), estadoDe(ev.tipo()))).setHeader("Evento").setAutoWidth(true).setFlexGrow(0);
@@ -336,13 +337,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         return v;
     }
 
-    /** Último evento guardado de los generadores elegidos (si cambia, hay eventos nuevos y se recarga la grilla). */
+    /** Último evento guardado de los generadores (si cambia, hay eventos nuevos y se recarga la grilla). */
     private long ultimoIdEventos() {
         long suma = 0;
-        for (Generador g : elegidos()) suma += historial.ultimoId(g.nombre());
+        for (Generador g : generadores) suma += historial.ultimoId(g.nombre());
         return suma;
     }
 
+    /** Los eventos de todos los generadores juntos, del más nuevo al más viejo, con la columna Generador. */
     private void cargarEventos() {
         if (generador == null) return;
         int dias = eventosPeriodo.getValue() == null ? 30 : eventosPeriodo.getValue();
@@ -350,17 +352,16 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         ultimoEventoMostrado = ultimoIdEventos();
         generadorDeEvento.clear();
         List<EventoGenerador> lista = new ArrayList<>();
-        for (Generador g : elegidos()) {
+        for (Generador g : generadores) {
             for (EventoGenerador ev : historial.listar(g.nombre(), hasta.minusDays(dias), hasta, eventosTipo.getValue())) {
                 lista.add(ev);
                 generadorDeEvento.put(ev, g.nombre());
             }
         }
-        // Con "Todos", los de todos los generadores juntos, del más nuevo al más viejo.
-        if (todos()) lista.sort(java.util.Comparator.comparing(EventoGenerador::fecha).reversed());
+        if (generadores.size() > 1) lista.sort(java.util.Comparator.comparing(EventoGenerador::fecha).reversed());
         eventos = lista;
         eventosGrid.setItems(eventos);
-        eventosMensaje.setText(eventos.size() + " eventos de " + (todos() ? "todos los generadores" : generador.nombre())
+        eventosMensaje.setText(eventos.size() + " eventos de " + (generadores.size() > 1 ? "todos los generadores" : generador.nombre())
                 + (eventos.isEmpty() ? ". El historial empieza a llenarse desde que se activo esta version." : "."));
     }
 
@@ -396,26 +397,16 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     // ================= Alarmas del controlador =================
 
     /**
-     * Aviso rojo con las alarmas de la lista del controlador de cada generador elegido (texto tal como lo envía, desde
-     * cuándo y qué significa). En Estado
-     * actual no va el de los generadores con comunicación: su tablero ya tiene la lista de alarmas.
+     * Aviso rojo con las alarmas de la lista del controlador (texto tal como lo envía, desde cuándo y qué significa), solo
+     * para el generador de la pestaña elegida cuando no hay comunicación: con comunicación su tablero ya tiene la lista de
+     * alarmas, y en las otras pestañas la cantidad de alarmas se ve en la pestaña de cada generador.
      *
-     * @param alarmas por generador; ultimaConocida = los que no tuvieron comunicación (se muestra la última lectura de fondo)
+     * @param g          generador sin comunicación, o null para quitar el aviso
+     * @param alarmas    las de la última lectura de fondo
      */
-    private void mostrarAlarmas(Map<Generador, List<String>> alarmas, java.util.Set<Generador> ultimaConocida) {
-        ultimasAlarmas = alarmas;
-        ultimosSinComunicacion = ultimaConocida;
+    private void mostrarAlarmas(Generador g, List<String> alarmas) {
         alertaAlarmas.removeAll();
-        selector.getDataProvider().refreshAll();
-        boolean enTablero = tabs.getSelectedTab() == tabEstado;
-        boolean hay = false;
-        for (Map.Entry<Generador, List<String>> e : alarmas.entrySet()) {
-            boolean sinComunicacion = ultimaConocida.contains(e.getKey());
-            if (enTablero && !sinComunicacion) continue;
-            hay |= agregarAlarmas(e.getKey(), e.getValue(), sinComunicacion);
-        }
-        // El otro generador con alarmas se ve marcado "(ALARMA)" en la lista de generadores (sin aviso aparte).
-        alertaAlarmas.setVisible(hay);
+        alertaAlarmas.setVisible(g != null && agregarAlarmas(g, alarmas, true));
     }
 
     /** Agrega la caja roja con las alarmas de un generador; false si no tiene ninguna. */
@@ -683,52 +674,57 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     // ================= Estado actual =================
 
-    private VerticalLayout crearEstado() {
-        estadoContenido.setWidthFull();
+    /** Contenido de la pestaña de un generador: su tablero (lo que antes era Estado actual) y la nota. */
+    private VerticalLayout crearEstado(Generador g) {
+        Div tablero = new Div();
+        tablero.setWidthFull();
         // Actualizar = clic en el nombre del generador, en la barra de su tablero.
-        estadoContenido.getElement().addEventListener("tg-actualizar", e -> refrescar());
+        tablero.getElement().addEventListener("tg-actualizar", e -> refrescar());
+        tableros.put(g, tablero);
         Span nota = new Span("Leido en vivo del controlador cada 15 s (solo lectura: el modo se muestra, no se cambia desde la app; "
                 + "clic en el nombre del generador para actualizar ya). "
                 + "Red, planta, corrientes y PF del transformador segun su medidor (ultimo minuto); planta = generador + red. "
                 + "Lineas de limite de tension y color de la frecuencia con los limites de Calidad de Energia; bateria, aceite y "
-                + "temperatura con limites provisorios (sistema de 24 V). Con Todos, un tablero por generador.");
+                + "temperatura con limites provisorios (sistema de 24 V).");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
-        VerticalLayout v = new VerticalLayout(estadoContenido, nota);
+        VerticalLayout v = new VerticalLayout(tablero, nota);
         v.setPadding(false);
         return v;
     }
 
+    /**
+     * Cada 15 s y al cambiar de pestaña: lee en vivo solo el generador de la pestaña elegida y dibuja su tablero; las
+     * marcas de las pestañas de los demás salen de la lectura de fondo (cada minuto).
+     */
     private void refrescar() {
         if (generador == null) return;
-        List<Generador> gens = elegidos();
         // El historial se recarga solo cuando la lectura de fondo (cada minuto) guardó un evento nuevo.
         if (ultimoIdEventos() != ultimoEventoMostrado) cargarEventos();
-        Map<Generador, List<String>> alarmas = new LinkedHashMap<>();
-        java.util.Set<Generador> sinComunicacion = new java.util.HashSet<>();
-        List<Map<String, Object>> tableros = new ArrayList<>();
-        // Transformador 1 primero.
-        for (Generador g : gens.stream().sorted(java.util.Comparator.comparing((Generador x) -> nombreRed(x.redAsociada()))).toList()) {
+        avisarMapas();
+        Generador g = generadorDePestana();
+        Map<Generador, List<String>> alarmasEnVivo = new HashMap<>();
+        if (g == null) {
+            mostrarAlarmas(null, null);
+        } else {
             LecturaGenerador l = null;
             String error = null;
             try {
                 l = service.leerEnVivo(g);
+                alarmasEnVivo.put(g, l.alarmas());
             } catch (Exception ex) {
                 error = ex.getMessage();
-                sinComunicacion.add(g);
             }
-            alarmas.put(g, l == null ? historial.alarmasActivas(g.nombre()) : l.alarmas());
-            tableros.add(datosTablero(g, l, error));
-        }
-        mostrarAlarmas(alarmas, sinComunicacion);
-        // El navegador dibuja el tablero; solo con la pestaña a la vista (al elegirla se dibuja de nuevo).
-        if (tabs.getSelectedTab() == tabEstado) {
+            mostrarAlarmas(l == null ? g : null, historial.alarmasActivas(g.nombre()));
+            // El navegador dibuja el tablero.
+            Div tablero = tableros.get(g);
             try {
-                estadoContenido.getElement().executeJs(SCRIPT_TABLERO + "\nwindow.TableroGeneradores.render(this, JSON.parse($0));",
-                        JSON.writeValueAsString(tableros));
+                tablero.getElement().executeJs(SCRIPT_TABLERO + "\nwindow.TableroGeneradores.render(this, JSON.parse($0));",
+                        JSON.writeValueAsString(List.of(datosTablero(g, l, error))));
             } catch (Exception ex) {
-                estadoContenido.getElement().setText("No se pudo armar el tablero: " + ex.getMessage());
+                tablero.getElement().setText("No se pudo armar el tablero: " + ex.getMessage());
             }
         }
+        marcarPestanas(alarmasEnVivo);
     }
 
     private static String leerRecurso(String ruta) {
@@ -860,6 +856,17 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     // ================= Registros (ADMIN) =================
 
     private VerticalLayout crearRegistros() {
+        registrosGenerador.setItems(generadores);
+        registrosGenerador.setItemLabelGenerator(Generador::nombre);
+        registrosGenerador.setValue(generadores.get(0));
+        registrosGenerador.setWidth("180px");
+        registrosGenerador.addValueChangeListener(e -> {
+            // Otro controlador: se empieza de cero (sin comparar con la lectura del anterior).
+            registrosGrid.setItems(List.of());
+            ultimaExploracion = List.of();
+            exploracionAnterior = Map.of();
+            registrosMensaje.setText("");
+        });
         IntegerField desde = new IntegerField("Desde registro");
         desde.setMin(40001);
         desde.setMax(105536);
@@ -877,6 +884,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         guardar.setEnabled(false);
         Button leer = new Button("Leer (solo lectura)", VaadinIcon.DOWNLOAD_ALT.create(), e -> {
             Integer d = desde.getValue(), n = cantidad.getValue();
+            Generador g = registrosGenerador.getValue();
+            if (g == null) {
+                registrosMensaje.setText("Elegir el generador.");
+                return;
+            }
             if (d == null || n == null || d < 40001 || n < 1 || n > 300) {
                 registrosMensaje.setText("Registro desde 40001 y cantidad entre 1 y 300.");
                 return;
@@ -886,7 +898,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 Map<Integer, Integer> previo = new HashMap<>();
                 for (FilaRegistro f : ultimaExploracion) previo.put(f.celda().registro(), f.celda().valor());
                 exploracionAnterior = previo;
-                ultimaExploracion = service.explorar(generador, d, n);
+                ultimaExploracion = service.explorar(g, d, n);
                 registrosGrid.setItems(ultimaExploracion);
                 long sinDato = ultimaExploracion.stream().filter(f -> f.celda().valor() == null).count();
                 long cambiaron = ultimaExploracion.stream().filter(this::cambio).count();
@@ -895,13 +907,13 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                         + (exploracionAnterior.isEmpty() ? "" : "; " + cambiaron + " cambiaron desde la lectura anterior (amarillo)") + ".");
                 guardar.setEnabled(true);
             } catch (Exception ex) {
-                registrosMensaje.setText("Sin comunicacion con " + generador.ip() + ": " + ex.getMessage());
+                registrosMensaje.setText("Sin comunicacion con " + g.ip() + ": " + ex.getMessage());
             }
         });
         leer.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         guardar.addClickListener(e -> {
             try {
-                Path p = service.guardarFoto(generador, ultimaExploracion, comentario.getValue());
+                Path p = service.guardarFoto(registrosGenerador.getValue(), ultimaExploracion, comentario.getValue());
                 Notification.show("Foto guardada en " + p, 5000, Notification.Position.BOTTOM_START)
                         .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             } catch (Exception ex) {
@@ -909,7 +921,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });
-        HorizontalLayout filtros = new HorizontalLayout(desde, cantidad, leer, comentario, guardar);
+        HorizontalLayout filtros = new HorizontalLayout(registrosGenerador, desde, cantidad, leer, comentario, guardar);
         filtros.setAlignItems(Alignment.END);
         filtros.getStyle().set("flex-wrap", "wrap");
 
