@@ -90,6 +90,8 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       ValidFlt: "falla de red confirmada", MainsRet: "retorno de red", MultIslOp: "isla con varios generadores",
       MultParOp: "paralelo con varios generadores", EmergMan: "manual de emergencia", StrUpSync: "sincronizando al arrancar" };
     const VERDE = "#3BB273", APAG = "#d8dbe2", ROJO = "#E8505B", AMARILLO = "#E0B50F";
+    // Estados del motor que son falla (parado por falla o no puede arrancar): la G del esquema en rojo.
+    const FALLA_MOTOR = ["Shutdown", "NotReady", "SDVentil"];
     const fmt = (v, d = 0) => v == null ? "-" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
     const esc = s => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -133,6 +135,10 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       const mcb = g.mcb === true, gcb = g.gcb === true;
       const planta = red == null ? null : red + gen;
       const vivoPlanta = (mcb && hayRed) || (gcb && genTension);
+      // Colores de la torre, la planta y el generador: verde ok / funcionando, rojo falla, gris sin dato o parado listo.
+      const colorTorre = v.RED_V_L1L2 == null ? APAG : g.fallaRed || !hayRed ? ROJO : VERDE;
+      const colorPlanta = vivoPlanta ? VERDE : g.mcb == null && g.gcb == null ? APAG : ROJO;
+      const colorGen = FALLA_MOTOR.includes(g.estadoMotor) ? ROJO : genTension || g.marcha ? VERDE : APAG;
       const linea = (x1, x2, vivo) => `<line x1="${x1}" y1="112" x2="${x2}" y2="112" stroke="${vivo ? VERDE : APAG}" stroke-width="12" stroke-linecap="round"/>`;
       const interruptor = (x, cerrado, nombre) => cerrado == null
         ? `<rect x="${x}" y="90" width="44" height="44" rx="6" fill="#555b69"/><text x="${x + 22}" y="117" text-anchor="middle" fill="#fff" font-size="13">?</text>
@@ -155,13 +161,13 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       const exporta = red != null && red < 0;
       return `<svg viewBox="0 0 760 185" role="img" aria-label="Esquema de red, planta y generador">
         ${kw(14, red == null ? null : Math.abs(red), "#7fb6f7", exporta ? "exportando a la red" : "de la red · " + g.trafo, "start")}
-        ${torre(60, hayRed ? VERDE : APAG)}
+        ${torre(60, colorTorre)}
         ${linea(96, 218, hayRed)}${interruptor(218, g.mcb, "MCB")}${linea(262, 342, vivoPlanta)}
         ${kw(385, planta, "#ffffff", "planta (" + g.trafo.toLowerCase() + ")")}
-        ${fabrica(385, vivoPlanta ? VERDE : APAG)}
+        ${fabrica(385, colorPlanta)}
         ${linea(428, 520, vivoPlanta)}${interruptor(520, g.gcb, "GCB")}${linea(564, 640, genTension && gcb)}
         ${kw(690, gen, "#F29F67", "generador")}
-        ${motorG(690, genTension ? VERDE : "#ffffff")}
+        ${motorG(690, colorGen)}
       </svg>`;
     }
 

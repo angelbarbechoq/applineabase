@@ -778,7 +778,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         if (red != null) {
             d.put("mcb", SenalesRed.valor(red.mcbCerrado(), l));
             d.put("gcb", SenalesRed.valor(red.gcbCerrado(), l));
+            // Falla de red según el controlador (estado de los interruptores o su aviso de falla de red): torre en rojo.
             Integer codigo = SenalesRed.codigo(l);
+            d.put("fallaRed", (codigo != null && red.estado(codigo) == SenalesRed.Estado.FALLA_RED)
+                    || Boolean.TRUE.equals(SenalesRed.valor(red.avisoFallaRed(), l)));
             if (codigo != null) {
                 SenalesRed.Estado est = red.estado(codigo);
                 d.put("estadoInterruptores", codigo >= 0 && codigo < red.nombres().size() ? red.nombres().get(codigo) : "codigo " + codigo);
