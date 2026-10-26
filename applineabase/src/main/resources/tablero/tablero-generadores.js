@@ -97,6 +97,8 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
     const VERDE = "#3BB273", APAG = "#d8dbe2", ROJO = "#E8505B", AMARILLO = "#E0B50F";
     // Estados del motor que son falla (parado por falla o no puede arrancar): la G del esquema en rojo.
     const FALLA_MOTOR = ["Shutdown", "NotReady", "SDVentil"];
+    // Lo minimo que se achica el tablero para entrar en la pantalla (ver ajustar).
+    const ZOOM_MIN = 0.75;
     const ICONO_ACTUALIZAR = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>`;
     const fmt = (v, d = 0) => v == null ? "-" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -320,9 +322,34 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
             el.querySelectorAll(".tg-nombre").forEach(b => b.classList.add("tg-girando"));
             el.dispatchEvent(new CustomEvent("tg-actualizar"));
           });
+          // Al cambiar el tamano de la ventana, la escala de Windows o el zoom del navegador, se vuelve a ajustar.
+          let espera;
+          window.addEventListener("resize", () => { clearTimeout(espera); espera = setTimeout(() => ajustar(el), 150); });
         }
-        el.innerHTML = `<div class="tg">${lista.map(tablero).join("")}</div>`;
+        el.innerHTML = `<div class="tg-escala"><div class="tg">${lista.map(tablero).join("")}</div></div>`;
+        ajustar(el);
       }
     };
+
+    /*
+     * Achica el tablero lo justo para que un generador entre entero en lo que se ve de la ventana (por ejemplo con
+     * Windows al 125 %), de a 5 % y hasta ZOOM_MIN; por debajo de eso queda la barra de desplazamiento. Con zoom el
+     * tablero tiene mas ancho util, asi que tambien puede pasar al arreglo en dos filas.
+     */
+    function ajustar(el) {
+      const caja = el.querySelector(".tg-escala");
+      if (!caja || !el.isConnected) return;
+      caja.style.zoom = "";
+      // Desde donde empieza el tablero (sin lo desplazado) hasta el borde de abajo de la ventana.
+      let desplazado = 0;
+      for (let n = el; n; n = n.assignedSlot || n.parentNode || n.host) desplazado += n.scrollTop || 0;
+      const disponible = window.innerHeight - (el.getBoundingClientRect().top + desplazado) - 16;
+      if (disponible <= 0) return;
+      const alto = () => Math.max(0, ...Array.from(caja.querySelectorAll(".tg-tablero"), s => s.getBoundingClientRect().height));
+      for (let z = 1; z >= ZOOM_MIN; z = Math.round((z - 0.05) * 100) / 100) {
+        caja.style.zoom = z === 1 ? "" : String(z);
+        if (alto() <= disponible) return;
+      }
+    }
   })();
 }
