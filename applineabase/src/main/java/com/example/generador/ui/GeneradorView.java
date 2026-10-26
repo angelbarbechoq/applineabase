@@ -674,22 +674,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     // ================= Estado actual =================
 
-    /** Contenido de la pestaña de un generador: su tablero (lo que antes era Estado actual) y la nota. */
-    private VerticalLayout crearEstado(Generador g) {
+    /** Contenido de la pestaña de un generador: solo su tablero (lo que antes era Estado actual), sin nota al pie. */
+    private Div crearEstado(Generador g) {
         Div tablero = new Div();
         tablero.setWidthFull();
         // Actualizar = clic en el nombre del generador, en la barra de su tablero.
         tablero.getElement().addEventListener("tg-actualizar", e -> refrescar());
         tableros.put(g, tablero);
-        Span nota = new Span("Leido en vivo del controlador cada 15 s (solo lectura: el modo se muestra, no se cambia desde la app; "
-                + "clic en el nombre del generador para actualizar ya). "
-                + "Red, planta, corrientes y PF del transformador segun su medidor (ultimo minuto); planta = generador + red. "
-                + "Lineas de limite de tension y color de la frecuencia con los limites de Calidad de Energia; bateria, aceite y "
-                + "temperatura con limites provisorios (sistema de 24 V).");
-        nota.getStyle().set("font-size", "12px").set("color", "#555");
-        VerticalLayout v = new VerticalLayout(tablero, nota);
-        v.setPadding(false);
-        return v;
+        return tablero;
     }
 
     /**
