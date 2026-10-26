@@ -345,10 +345,13 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       let desplazado = 0, abajo = window.innerHeight;
       for (let n = el; n; n = n.assignedSlot || n.parentNode || n.host) {
         if (!(n instanceof Element)) continue;
-        desplazado += n.scrollTop || 0;
+        // scrollTop, clientHeight y el relleno van en la medida propia del elemento; con la pagina achicada (escala de
+        // Windows) se pasan a la medida de la pantalla con su zoom.
+        const zn = n.currentCSSZoom || 1;
+        desplazado += (n.scrollTop || 0) * zn;
         const st = getComputedStyle(n);
         if (n !== el && n !== document.documentElement && n !== document.body && /auto|scroll/.test(st.overflowY)) {
-          abajo = Math.min(abajo, n.getBoundingClientRect().top + n.clientTop + n.clientHeight - parseFloat(st.paddingBottom || 0));
+          abajo = Math.min(abajo, n.getBoundingClientRect().top + (n.clientTop + n.clientHeight - parseFloat(st.paddingBottom || 0)) * zn);
         }
       }
       const disponible = abajo - (el.getBoundingClientRect().top + desplazado) - 6;

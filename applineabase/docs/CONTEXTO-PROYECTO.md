@@ -285,6 +285,14 @@ taxonomia (Mezcla, Casa Fuerza) usan el nombre de la linea como TAG.
 - Regla practica: si un modulo nuevo usa un componente Vaadin que ninguna vista usaba antes,
   agregar su `@Uses` y regenerar el bundle en el mismo cambio.
 
+**Escala de Windows (desde el 2026-10-26):** `src/main/resources/escala/escala-windows.js`, cargado en todas las paginas
+por `Application.configurePage` (no toca el bundle), achica toda la pagina con zoom CSS en `html` para compensar la
+escala de Windows (125 % -> 0,8) en pantallas de 1900 px reales o mas; el zoom del navegador (Ctrl +/-) se respeta
+(estimado con outerWidth/innerWidth). Trampas del zoom CSS: un `100vh` queda al 80 % de la pantalla (usar `100%`); las
+listas desplegables, calendarios y tooltips de Vaadin (popover) calculan su posicion por pasos y quedaban corridos, por
+eso el mismo script repite `_updatePosition` (interno de Vaadin, revisar si cambia de version). amCharts 5 maneja bien
+el zoom (comprobado). Si en una PC se habia puesto el navegador en 80 % a mano, volver a 100 % (Ctrl 0).
+
 **Tema Aura, no Lumo:** los theme variants de Lumo (`badge`, `success`, `error`) no se pintan.
 Para estados con color usar `Span` con estilo inline. Paleta usada: verde `#d4edda`/`#155724`,
 amarillo `#fff3cd`/`#856404`, rojo `#f8d7da`/`#721c24`, gris `#e2e3e5`/`#383d41`.

@@ -14,6 +14,8 @@ import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.page.AppShellConfigurator;
+import com.vaadin.flow.component.page.Inline;
+import com.vaadin.flow.server.AppShellSettings;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.NumberField;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -46,6 +48,19 @@ public class Application implements AppShellConfigurator {
 
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
+    }
+
+    /** En todas las páginas: compensa la escala de Windows en pantallas grandes (ver escala/escala-windows.js). */
+    @Override
+    public void configurePage(AppShellSettings settings) {
+        try (java.io.InputStream in = Application.class.getResourceAsStream("/escala/escala-windows.js")) {
+            if (in != null) {
+                settings.addInlineWithContents(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8),
+                        Inline.Wrapping.JAVASCRIPT);
+            }
+        } catch (java.io.IOException e) {
+            // Sin el ajuste la app se ve igual que antes.
+        }
     }
 
     @Bean
