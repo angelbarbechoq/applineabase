@@ -1,8 +1,8 @@
 {
-  "_ayuda" : "Mapa de registros Modbus por modelo de controlador de generador. Solo lectura (funcion 03). registro = numero 4xxxx de la lista del fabricante (base 0 = registro - 40001). tipo: UINT16, INT16, UINT32, INT32, FLOAT32 (32 bits: palabra alta primero; ordenPalabras BAJA_PRIMERO para invertir). divisor: el valor leido se divide por este numero. parametro: uno de la lista cerrada (RPM, FRECUENCIA, V_L1N.., V_L1L2.., I_L1.., KW, KW_L1.., KVAR, KVA, PF, RED_FRECUENCIA, RED_V_L1N.., RED_V_L1L2.., RED_KW, CARGA_KW, BATERIA, PRESION_ACEITE, TEMP_REFRIGERANTE, TEMP_ACEITE, NIVEL_COMBUSTIBLE, CONSUMO_COMBUSTIBLE, KWH, KVARH, RED_KWH, RED_KVARH, HORAS_MARCHA, ARRANQUES). confirmado false = se ve en vivo pero no se guarda historial. listaAlarmas = lista de alarmas activas del controlador (ComAp: cantidad en 44215 y una alarma cada 27 registros desde 44216, solo lectura); la usa el historial de eventos. reloj = primer registro del reloj del controlador (ComAp: 4 registros BCD desde 44201: hh mm, ss, dd mm, aa; solo lectura); muestra cuanto va adelantado o atrasado. maxHueco = registros sin mapear que se aceptan dentro de un pedido (ComAp contesta 0x02 si el pedido incluye un registro que no existe). Los cambios valen desde el ciclo siguiente, sin reiniciar.",
+  "_ayuda" : "Mapa de registros Modbus por modelo de controlador de generador. Solo lectura (funcion 03). registro = numero 4xxxx de la lista del fabricante (base 0 = registro - 40001). tipo: UINT16, INT16, UINT32, INT32, FLOAT32 (32 bits: palabra alta primero; ordenPalabras BAJA_PRIMERO para invertir). divisor: el valor leido se divide por este numero. parametro: uno de la lista cerrada (RPM, FRECUENCIA, V_L1N.., V_L1L2.., I_L1.., KW, KW_L1.., KVAR, KVA, PF, RED_FRECUENCIA, RED_V_L1N.., RED_V_L1L2.., RED_KW, CARGA_KW, BATERIA, PRESION_ACEITE, TEMP_REFRIGERANTE, TEMP_ACEITE, NIVEL_COMBUSTIBLE, CONSUMO_COMBUSTIBLE, KWH, KVARH, RED_KWH, RED_KVARH, HORAS_MARCHA, ARRANQUES, ESTADO_INTERRUPTORES, ENTRADAS_BINARIAS, AVISOS_RED, PROTECCIONES_RED, ROCOF, ROCOF_MAX, SALTO_VECTOR_MAX, MODO_CONTROLADOR). BITS16 = palabra de bits. red = senales de red e interruptores del controlador (codigos del estado de los interruptores y bits de MCB, GCB y avisos). modos = nombre de cada codigo de MODO_CONTROLADOR (ComAp: OFF, MAN, AUTO, TEST). confirmado false = se ve en vivo pero no se guarda historial. listaAlarmas = lista de alarmas activas del controlador (ComAp: cantidad en 44215 y una alarma cada 27 registros desde 44216, solo lectura); la usa el historial de eventos. reloj = primer registro del reloj del controlador (ComAp: 4 registros BCD desde 44201: hh mm, ss, dd mm, aa; solo lectura); muestra cuanto va adelantado o atrasado. maxHueco = registros sin mapear que se aceptan dentro de un pedido (ComAp contesta 0x02 si el pedido incluye un registro que no existe). Los cambios valen desde el ciclo siguiente, sin reiniciar.",
   "modelos" : [ {
     "modelo" : "InteliGen200",
-    "descripcion" : "ComAp InteliGen 200, aplicacion Standard GC. Confirmado el 2026-10-08 contra la pantalla del controlador, TR2 y el contador de energia (docs/ig200/MAPA-REGISTROS.md).",
+    "descripcion" : "ComAp InteliGen 200, aplicacion Standard GC. Confirmado el 2026-10-08 contra la pantalla del controlador, TR2 y el contador de energia, y el 2026-10-26 con la lista Modbus exportada de InteliConfig (docs/ig200/lista-modbus-inteliconfig-2026-10-26.txt; registro = 40001 + direccion de la lista). Estado de los interruptores 41260 (mismos codigos que el InteliGen 500), entradas binarias 41090 (bit 0 GCB Feedback, bit 1 MCB Feedback), Log Bout 4 41301 (bit 8 AL Mains Fail), modo 41344. No tiene medida de ROCOF ni de salto de vector.",
     "confirmado" : true,
     "maxHueco" : 2,
     "noDisponible8000" : true,
@@ -42,8 +42,25 @@
       { "parametro" : "RED_KWH", "registro" : 41235, "tipo" : "UINT32", "divisor" : 1 },
       { "parametro" : "RED_KVARH", "registro" : 41237, "tipo" : "UINT32", "divisor" : 1 },
       { "parametro" : "HORAS_MARCHA", "registro" : 41239, "tipo" : "UINT32", "divisor" : 10 },
-      { "parametro" : "ARRANQUES", "registro" : 41241, "tipo" : "UINT16", "divisor" : 1 }
-    ]
+      { "parametro" : "ARRANQUES", "registro" : 41241, "tipo" : "UINT16", "divisor" : 1 },
+      { "parametro" : "ENTRADAS_BINARIAS", "registro" : 41090, "tipo" : "BITS16", "divisor" : 1 },
+      { "parametro" : "ESTADO_INTERRUPTORES", "registro" : 41260, "tipo" : "UINT16", "divisor" : 1 },
+      { "parametro" : "AVISOS_RED", "registro" : 41301, "tipo" : "BITS16", "divisor" : 1 },
+      { "parametro" : "MODO_CONTROLADOR", "registro" : 41344, "tipo" : "UINT16", "divisor" : 1 }
+    ],
+    "red" : {
+      "estado" : {
+        "paralelo" : [ 4, 11 ],
+        "isla" : [ 2, 10 ],
+        "fallaRed" : [ 7, 8 ],
+        "retornoRed" : [ 5, 9 ],
+        "nombres" : [ "Init", "BrksOff", "IslOper", "MainsOper", "ParalOper", "RevSync", "Synchro", "MainsFlt", "ValidFlt", "MainsRet", "MultIslOp", "MultParOp", "EmergMan" ]
+      },
+      "mcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 1 },
+      "gcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 0 },
+      "avisoFallaRed" : { "parametro" : "AVISOS_RED", "bit" : 8 }
+    },
+    "modos" : [ "OFF", "MAN", "AUTO", "TEST" ]
   }, {
     "modelo" : "InteliGen500",
     "descripcion" : "ComAp InteliGen 500 G2, firmware 2.4.3.6 (generador Caterpillar, junto a TR1). Mapa cotejado el 2026-10-22 con la lista Modbus exportada de InteliConfig (docs/ig500/lista-modbus-inteliconfig-2026-10-22.txt; registro = 40001 + direccion de la lista) y antes con la pantalla del controlador (docs/ig500/MAPA-REGISTROS.md). Distinto del InteliGen 200. Bateria 41052 (pantalla Analog Inputs 27.9 V). PF: la lista no tiene registro de PF del generador, se calcula kW / kVA. Aceite y temperatura: este controlador no los mide (solo Ubat y D+). Potencia de red del controlador 41041 (Mains Import P): no se usa, mide la corriente de red en una sola fase. Contesta 0x04 en los registros que no existen: maxHueco 0.",
@@ -90,7 +107,8 @@
       { "parametro" : "ENTRADAS_BINARIAS", "registro" : 41058, "tipo" : "BITS16", "divisor" : 1 },
       { "parametro" : "ESTADO_INTERRUPTORES", "registro" : 41327, "tipo" : "UINT16", "divisor" : 1 },
       { "parametro" : "AVISOS_RED", "registro" : 41394, "tipo" : "BITS16", "divisor" : 1 },
-      { "parametro" : "PROTECCIONES_RED", "registro" : 41403, "tipo" : "BITS16", "divisor" : 1 }
+      { "parametro" : "PROTECCIONES_RED", "registro" : 41403, "tipo" : "BITS16", "divisor" : 1 },
+      { "parametro" : "MODO_CONTROLADOR", "registro" : 41324, "tipo" : "UINT16", "divisor" : 1 }
     ],
     "red" : {
       "estado" : {
@@ -106,6 +124,7 @@
       "proteccionRed" : { "parametro" : "AVISOS_RED", "bit" : 15 },
       "saltoVector" : { "parametro" : "PROTECCIONES_RED", "bit" : 0 },
       "rocof" : { "parametro" : "PROTECCIONES_RED", "bit" : 1 }
-    }
+    },
+    "modos" : [ "OFF", "MAN", "AUTO", "TEST" ]
   } ]
 }

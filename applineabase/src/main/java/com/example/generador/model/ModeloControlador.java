@@ -18,10 +18,20 @@ import java.util.Optional;
  *                     4 registros en BCD desde 44201: hh mm | ss 00 | dd MM | aa 00.
  * @param red          señales de red e interruptores que da el controlador (null = el modelo no las tiene: la isla
  *                     se detecta comparando con el medidor del transformador, ver IslaService).
+ * @param modos        nombre de cada código de {@link ParametroGenerador#MODO_CONTROLADOR} (índice = código; ComAp:
+ *                     OFF, MAN, AUTO, TEST). Vacía = solo se muestra el código.
  */
 public record ModeloControlador(String modelo, String descripcion, boolean confirmado, int maxHueco,
                                boolean noDisponible8000, List<Registro> registros, ListaAlarmas listaAlarmas,
-                               Integer reloj, SenalesRed red) {
+                               Integer reloj, SenalesRed red, List<String> modos) {
+
+    /** Modo del controlador en la lectura ("AUTO"); null si el modelo no lo da o no se leyó. */
+    public String modo(LecturaGenerador l) {
+        Double v = l.valor(ParametroGenerador.MODO_CONTROLADOR);
+        if (v == null) return null;
+        int codigo = (int) Math.round(v);
+        return codigo >= 0 && codigo < modos.size() ? modos.get(codigo) : "codigo " + codigo;
+    }
 
     /** BITS16: palabra de bits; nunca es "no disponible" (0x8000 = solo el bit 15 activo). */
     public enum Tipo {

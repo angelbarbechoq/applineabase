@@ -53,17 +53,26 @@ Con carga: RPM 1800, 60,0 Hz, V L-L 458/456/458, kWh +2 en el momento de la foto
 Igual que el InteliGen 500 (ver `docs/ig500/MAPA-REGISTROS.md`): 44201 = hh mm, 44202 = ss 00, 44203 = dd MM,
 44204 = aa 00. El 2026-10-13 iba **3 min 53 s adelantado** respecto de la PC. Campo `reloj` del modelo.
 
+## Lista Modbus de InteliConfig (2026-10-26)
+`lista-modbus-inteliconfig-2026-10-26.txt` (exportada por el usuario; registro = 40001 + direccion de la lista).
+Los 33 registros de arriba coinciden uno a uno. Agregados al modelo (lectura del 26-10, generador parado, red
+normal, modo AUTO): 41090 entradas binarias (bit 0 GCB Feedback, bit 1 MCB Feedback; leido 0x122: MCB cerrado, GCB
+abierto, presion de aceite), 41260 estado de los interruptores (List#4, mismos codigos que el InteliGen 500; leido
+3 = MainsOper), 41301 Log Bout 4 (bit 8 AL Mains Fail), 41344 modo del controlador (0 OFF, 1 MAN, 2 AUTO, 3 TEST;
+leido 2). Disponibles sin usar: 41259 estado del motor (List#3: Ready, NotReady, Running, Loaded, Cooling,
+Shutdown...; leido 2 = NotReady, con E-STOP activo), 41092 salidas binarias, 41298-41308 Log Bout 1-11 (Ready To
+AMF, Not In Auto, Mains Healthy, alarmas AL ...), 41253-41254 consumo total de combustible (L; leido 0: el motor no
+lo informa), 41242-41244 contadores de mantenimiento, 41249 paradas de emergencia, 41251 shutdowns. No tiene medida
+de ROCOF ni de salto de vector (solo los ajustes de esas protecciones, 43167-43172).
+
 ## Pendientes
-- 41047 (base 0 1046): cambia mucho entre lecturas (980, 64399, 65423...); quiza angulo de
-  sincronismo. 41055-41057: cambian con la carga de la red (1022-1250 / 777-921 / 207-267) pero
-  no coinciden con corrientes ni potencia de TR2. 41058 = 96-97 (¿PF de red x100?). 41082 = -104.
-  41242-41244 = 10000 (probables contadores de mantenimiento; pantalla "Maintenance Timer 1 = 10000 h").
-  41083 = 494-503. Sin evidencia: no usar.
+- Aclarados con la lista: 41047 = angulo de deslizamiento (Slip Angle); 41055 = corriente de red L1 (una sola
+  fase), 41056 = kW importados de la red, 41057 = kVAr de red, 41058 = PF de red (x100); 41082 = salida del
+  regulador de tension (V x1000), 41083 = pedido de tension (% x10); 41242-41244 = contadores de mantenimiento.
+  La potencia de red del controlador sigue sin usarse (no coincide con TR2).
 - Kilovatios de red (pantalla 645-687 kW): no se encontraron en 16 ni 32 bits. 2026-10-16: barrido completo de
   40001-49999 (784 registros con valor: 41001-41095, 41104, 41145-41151, 41160, 41169, 41226-41393, 43001-43283, 43316,
   43373-43380, 43437-43440, 43505, 43522-43723, 44201-44215) con 4 fotos cada 60 s contra TR2 (635-834 kW): ninguno lo
   sigue, asi que el GenPower no tiene "consumo del transformador segun el controlador" (en el Caterpillar se retiro por
   no coincidir). 41055-41057 (repetidos en 41280-41282) cambian con la carga (749/567/174 ... 965/714/207): parecen
   corrientes de red con una fase muy baja, como el TC de red del Caterpillar. 41058 = 96-98.
-- Estado del motor/interruptores y alarmas: probablemente 41002-41003 y registros de bits; falta
-  evidencia.

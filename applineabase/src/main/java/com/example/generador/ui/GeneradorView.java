@@ -752,6 +752,12 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         badge(estadoBadge, l.rpm() == null ? "SIN RPM" : marcha ? "EN MARCHA" : "PARADO",
                 l.rpm() == null ? Estado.AVISO : marcha ? Estado.OK : Estado.SIN_DATO);
         estadoHora.setText("Leido " + l.fecha().format(HORA));
+        // Modo del controlador: fuera de AUTO no arranca solo.
+        String modoControlador = service.modelo(gen).map(m -> m.modo(l)).orElse(null);
+        if (modoControlador != null) {
+            barra.addComponentAtIndex(barra.indexOf(estadoBadge) + 1, badgeNuevo("Modo " + modoControlador,
+                    "AUTO".equals(modoControlador) ? Estado.OK : "OFF".equals(modoControlador) ? Estado.FUERA : Estado.AVISO));
+        }
         erroresLectura.setText(l.errores().isEmpty() ? "" : "Sin respuesta del controlador en: "
                 + l.errores().entrySet().stream().map(e -> e.getKey().etiqueta() + " (" + e.getValue() + ")")
                 .collect(Collectors.joining(", ")));

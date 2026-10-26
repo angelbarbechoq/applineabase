@@ -54,6 +54,7 @@ public class HistorialEventosService {
         Boolean carga, red;
         Integer arranques;
         Set<String> alarmas;
+        String modo;
     }
 
     private final Map<String, Estado> estados = new ConcurrentHashMap<>();
@@ -62,8 +63,12 @@ public class HistorialEventosService {
         return RutaArchivosEnergia.BASE_PATH + "\\generador\\eventos";
     }
 
-    /** Compara la lectura con el estado anterior y guarda los eventos que correspondan. */
-    public void registrarLectura(String generador, LecturaGenerador l) {
+    /**
+     * Compara la lectura con el estado anterior y guarda los eventos que correspondan.
+     *
+     * @param modo modo del controlador en la lectura (OFF, MAN, AUTO, TEST); null si el modelo no lo da
+     */
+    public void registrarLectura(String generador, LecturaGenerador l, String modo) {
         List<EventoGenerador> nuevos = new ArrayList<>();
         LocalDateTime t = l.fecha();
         boolean marcha = l.enMarcha();
@@ -76,6 +81,7 @@ public class HistorialEventosService {
             nuevos.add(EventoGenerador.de(t, INICIO_LECTURA, "La app empezo a leer el controlador; el generador estaba "
                     + (marcha ? "en marcha" + (Boolean.TRUE.equals(carga) ? " con carga" : " en vacio") : "parado")
                     + (red == null ? "" : red ? ", con red" : ", sin red")
+                    + (modo == null ? "" : ", modo " + modo)
                     + (l.desfaseReloj() == null ? "" : "; reloj del controlador " + LecturaGenerador.textoDesfase(l.desfaseReloj())), l));
             if (l.alarmas() != null) {
                 for (String a : l.alarmas()) {
@@ -107,7 +113,13 @@ public class HistorialEventosService {
             if (l.alarmas() != null && e.alarmas != null) {
                 nuevos.addAll(cambiosAlarmas(t, e.alarmas, l.alarmas(), l));
             }
+            if (modo != null && e.modo != null && !modo.equals(e.modo)) {
+                nuevos.add("AUTO".equals(modo)
+                        ? EventoGenerador.de(t, MODO_AUTO, "El controlador vuelve a AUTO (estaba en " + e.modo + ")", l)
+                        : EventoGenerador.de(t, CAMBIO_MODO, "El controlador pasa de " + e.modo + " a " + modo, l));
+            }
         }
+        if (modo != null) e.modo = modo;
         e.comunicando = true;
         e.marcha = marcha;
         e.carga = carga;

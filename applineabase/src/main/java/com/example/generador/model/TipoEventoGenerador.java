@@ -37,6 +37,9 @@ public enum TipoEventoGenerador {
     PROTECCION_RED("Proteccion de red", Nivel.FALLA),
     /** Subió el máximo de ROCOF o de salto de vector que guarda el controlador. */
     MAXIMO_RED("Maximo de ROCOF o salto de vector", Nivel.AVISO),
+    /** Modo del controlador (OFF, MAN, AUTO, TEST): fuera de AUTO no arranca solo. */
+    CAMBIO_MODO("Cambio de modo del controlador", Nivel.AVISO),
+    MODO_AUTO("Vuelve a AUTO", Nivel.BUENO),
     // Copiados del historial interno del controlador (pantalla History; no se lee por Modbus sin escribirle).
     // Fecha = hora real (la del controlador corregida por el desfase de su reloj); la descripción lleva el
     // motivo de ComAp y la hora del controlador. Primera carga: docs/ig500/historial-controlador-2026-10-12.csv.

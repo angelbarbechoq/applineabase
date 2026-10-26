@@ -53,7 +53,9 @@ public enum ParametroGenerador {
     PROTECCIONES_RED("protecciones_red", "Protecciones de red activas", "", true),
     ROCOF("rocof", "ROCOF", "Hz/s", false),
     ROCOF_MAX("rocof_max", "ROCOF maxima registrada por el controlador", "Hz/s", false),
-    SALTO_VECTOR_MAX("salto_vector_max", "Salto de vector maximo registrado por el controlador", "grados", false);
+    SALTO_VECTOR_MAX("salto_vector_max", "Salto de vector maximo registrado por el controlador", "grados", false),
+    /** OFF, MAN, AUTO o TEST según el código (nombres en "modos" del modelo). */
+    MODO_CONTROLADOR("modo_controlador", "Modo del controlador (codigo)", "", true);
 
     private final String columna;
     private final String etiqueta;

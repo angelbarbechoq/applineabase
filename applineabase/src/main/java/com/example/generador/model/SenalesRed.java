@@ -6,7 +6,8 @@ import java.util.Set;
 /**
  * Señales de red e interruptores que da el propio controlador (campo "red" del modelo en generador-modelos.json). Con
  * ellas la falla de red, la isla y el retorno de red salen de lo que dice el controlador, sin compararlo con el medidor
- * del transformador (IslaService). InteliGen 500 G2: lista Modbus de InteliConfig en docs/ig500/.
+ * del transformador (IslaService). Listas Modbus de InteliConfig en docs/ig500/ (InteliGen 500 G2) y docs/ig200/
+ * (InteliGen 200).
  *
  * @param paralelo   códigos del estado de los interruptores ({@link ParametroGenerador#ESTADO_INTERRUPTORES}) en
  *                   paralelo con la red; {@code isla}, {@code fallaRed} y {@code retornoRed}, los de cada caso sin red

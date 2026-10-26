@@ -25,7 +25,7 @@ import static com.example.generador.model.TipoEventoGenerador.*;
 
 /**
  * Red e interruptores según el propio controlador (modelos con "red" en generador-modelos.json; hoy el InteliGen 500
- * G2 del Caterpillar). Cada lectura de fondo (1 por minuto) se compara con la anterior:
+ * G2 del Caterpillar y el InteliGen 200 del GenPower, este sin ROCOF ni salto de vector). Cada lectura de fondo (1 por minuto) se compara con la anterior:
  * - historial de eventos: falla de red, paso a isla, retorno de red y vuelta a paralelo (estado de los interruptores),
  *   apertura y cierre del interruptor de la planta (MCB Feedback), ROCOF o salto de vector vistos activos y la suba
  *   de los máximos que guarda el controlador;
