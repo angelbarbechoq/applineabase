@@ -321,16 +321,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         eventosGrid.setSizeFull();
 
         eventosMensaje.getStyle().set("font-size", "12px").set("color", "#555");
-        Span nota = nota("Historial armado por la app, como el historial del controlador ComAp: cada evento con los valores de ese momento. "
-                + "Se detecta leyendo el controlador cada minuto (solo lectura): arranque y parada (un arranque de menos de 1 minuto "
-                + "se detecta por el contador de arranques), toma de carga y vacio (" + (int) com.example.generador.service.GeneradorAnalisisService.KW_VACIO
-                + " kW), falla y retorno de red (tension de red del controlador), alarmas de la lista de alarmas del controlador, y "
-                + "comunicacion perdida o recuperada. \"Inicio de lectura\" marca cuando arranco la app (antes de eso, hueco). "
-                + "El historial interno del controlador (350 eventos) no se puede leer por Modbus sin escribirle: se ve en el controlador o con InteliConfig. "
-                + "Los eventos \"Controlador: ...\" se copiaron de ese historial (pantalla History): la descripcion lleva el motivo de ComAp y la "
-                + "hora del controlador, y la fecha es la hora real (la del controlador corregida por el desfase de su reloj, aprox.). "
-                + "Protecciones de red, aperturas de interruptor y la isla quedan ahi aunque duren menos de un segundo.");
-        VerticalLayout v = new VerticalLayout(filtros, eventosMensaje, eventosGrid, nota);
+        VerticalLayout v = new VerticalLayout(filtros, eventosMensaje, eventosGrid);
         v.setSizeFull();
         v.setPadding(false);
         v.setFlexGrow(1, eventosGrid);
@@ -467,15 +458,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         barra.setAlignItems(Alignment.CENTER);
         plantaContenido.setWidthFull();
         plantaDetalle.setWidthFull();
-
-        Span nota = new Span("Cada generador se lee en vivo de su controlador (solo lectura); la red es el medidor principal de la "
-                + "planta 1 (de la fabrica, mide en paralelo con el de la empresa electrica; PLC, ultima lectura de la base de datos), "
-                + "asi que entre uno y otro puede haber hasta un minuto. Consumo de la planta = lo que los generadores pusieron en la "
-                + "planta + lo importado de la red (suman 100 %); lo exportado a la red es el excedente de los generadores y va aparte, "
-                + "repartido entre los generadores segun lo que genera cada uno. En la tabla, aporte y % del consumo de la planta "
-                + "(con la fila Red) suman el 100 %. Todo en kW. Se actualiza cada 15 s.");
-        nota.getStyle().set("font-size", "12px").set("color", "#555");
-        VerticalLayout v = new VerticalLayout(barra, plantaContenido, plantaDetalle, nota);
+        VerticalLayout v = new VerticalLayout(barra, plantaContenido, plantaDetalle);
         v.setPadding(false);
         return v;
     }
@@ -933,10 +916,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         registrosGrid.setSizeFull();
 
         registrosMensaje.getStyle().set("font-size", "12px").set("color", "#555");
-        Span nota = nota("Solo lectura (funcion 03). Sirve para verificar o armar el mapa de un controlador nuevo: leer con el "
-                + "generador parado, en marcha y con carga, comparar con la pantalla del controlador y guardar una foto de cada estado "
-                + "(C:\\LineaBaseX\\generador\\fotos). El mapa se edita en C:\\LineaBaseX\\config\\generador-modelos.json, sin recompilar.");
-        VerticalLayout v = new VerticalLayout(filtros, registrosMensaje, nota, registrosGrid);
+        VerticalLayout v = new VerticalLayout(filtros, registrosMensaje, registrosGrid);
         v.setSizeFull();
         v.setPadding(false);
         v.setFlexGrow(1, registrosGrid);
@@ -958,12 +938,6 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     }
 
     // ================= Utilidades =================
-
-    private static Span nota(String t) {
-        Span s = new Span(t);
-        s.getStyle().set("font-size", "11px").set("color", "#777");
-        return s;
-    }
 
     private static String fmt(Double v, String f) {
         return v == null ? "-" : String.format(Locale.ROOT, f, v);
