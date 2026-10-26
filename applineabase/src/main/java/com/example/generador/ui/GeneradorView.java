@@ -6,7 +6,6 @@ import com.example.calidad.model.ConfiguracionCalidad;
 import com.example.calidad.model.Indicador;
 import com.example.calidad.service.CalidadEnergiaService;
 import com.example.calidad.service.CalidadEnergiaService.Estado;
-import com.example.dataacquisition.FactorPotenciaUtil;
 import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.generador.model.EventoGenerador;
 import com.example.generador.model.Generador;
@@ -15,7 +14,6 @@ import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.TipoEventoGenerador;
 import com.example.generador.service.AlarmaComap;
 import com.example.generador.service.HistorialEventosService;
-import com.example.generador.service.IslaService;
 import com.example.generador.service.RedControladorService;
 import com.example.generador.model.SenalesRed;
 import com.example.generador.service.PlantaEnVivoService;
@@ -35,13 +33,11 @@ import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
-import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
-import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.Tab;
@@ -82,6 +78,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
     private static final DateTimeFormatter CORTA = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+    private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter HHMMSS = DateTimeFormatter.ofPattern("HH:mm:ss");
+    /** Dibujo del tablero de Estado actual (se define una sola vez en el navegador) y el JSON de sus datos. */
+    private static final String SCRIPT_TABLERO = leerRecurso("/tablero/tablero-generadores.js");
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
     private static final int POLL_MS = 15000;
     private static final int POLL_MS_APP = 30000;
 
@@ -95,7 +96,6 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final CalidadEnergiaService calidad;
     private final LineaAccessService lineaAccessService;
     private final PlantaEnVivoService plantaService;
-    private final IslaService islaService;
     private final RedControladorService redControlador;
     private Generador generador;
     private final TabSheet tabs = new TabSheet();
@@ -112,7 +112,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     /** Opción "Todos" del selector: los generadores juntos (no es un generador real). */
     private static final Generador TODOS = new Generador("Todos", "", "", 0, null, "");
     private Tab tabRegistros;
-    /** Estado actual: un bloque por generador elegido (los dos con "Todos"). */
+    private Tab tabEstado;
+    /** Estado actual: el tablero de cada generador elegido (los dos con "Todos", Transformador 1 primero). */
     private final Div estadoContenido = new Div();
     /** Generador de cada fila del Historial de eventos (sus registros no lo traen); se ve con "Todos". */
     private final Map<EventoGenerador, String> generadorDeEvento = new IdentityHashMap<>();
@@ -132,14 +133,13 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private Registration pollRegistration;
 
     public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService,
-                         HistorialEventosService historial, PlantaEnVivoService plantaService, IslaService islaService,
+                         HistorialEventosService historial, PlantaEnVivoService plantaService,
                          RedControladorService redControlador) {
         this.service = service;
         this.calidad = calidad;
         this.lineaAccessService = lineaAccessService;
         this.historial = historial;
         this.plantaService = plantaService;
-        this.islaService = islaService;
         this.redControlador = redControlador;
         List<Generador> lista = service.generadores();
         this.generador = lista.isEmpty() ? null : lista.get(0);
@@ -180,13 +180,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         tabs.setSizeFull();
         // Primero lo global: la planta completa en vivo (todos los generadores y la red), después cada generador.
         tabPlanta = tabs.add("Balance energetico P1", crearPlanta());
-        tabs.add("Estado actual", crearEstado());
+        tabEstado = tabs.add("Estado actual", crearEstado());
         tabs.add("Historial de eventos", crearEventos());
         if (lineaAccessService.esAdmin()) {
             tabRegistros = tabs.add("Registros", crearRegistros());
         }
         tabs.addSelectedChangeListener(e -> {
             if (e.getSelectedTab() == tabPlanta) refrescarPlanta();
+            if (e.getSelectedTab() == tabEstado) refrescar();
             mostrarSelector();
         });
         alertaAlarmas.setWidthFull();
@@ -683,10 +684,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private VerticalLayout crearEstado() {
         Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> refrescar());
         estadoContenido.setWidthFull();
-        Span nota = new Span("Leido en vivo del controlador cada 15 s (solo lectura). La red es el medidor del transformador "
-                + "asociado (PLC, ultimo minuto); potencia negativa = exportacion a la red. "
-                + "Tension, frecuencia y PF usan los limites de Calidad de Energia; bateria, aceite y temperatura tienen "
-                + "limites provisorios (sistema de 24 V) hasta configurar las alarmas. Con Todos, un bloque por generador.");
+        Span nota = new Span("Leido en vivo del controlador cada 15 s (solo lectura: el modo se muestra, no se cambia desde la app). "
+                + "Red y planta segun el medidor del transformador (ultimo minuto); planta = generador + red. "
+                + "Lineas de limite de tension y color de la frecuencia con los limites de Calidad de Energia; bateria, aceite y "
+                + "temperatura con limites provisorios (sistema de 24 V). Con Todos, un tablero por generador.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
         VerticalLayout v = new VerticalLayout(actualizar, estadoContenido, nota);
         v.setPadding(false);
@@ -698,10 +699,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         List<Generador> gens = elegidos();
         // El historial se recarga solo cuando la lectura de fondo (cada minuto) guardó un evento nuevo.
         if (ultimoIdEventos() != ultimoEventoMostrado) cargarEventos();
-        estadoContenido.removeAll();
         Map<Generador, List<String>> alarmas = new LinkedHashMap<>();
         java.util.Set<Generador> sinComunicacion = new java.util.HashSet<>();
-        for (Generador g : gens) {
+        List<Map<String, Object>> tableros = new ArrayList<>();
+        // Transformador 1 primero.
+        for (Generador g : gens.stream().sorted(java.util.Comparator.comparing((Generador x) -> nombreRed(x.redAsociada()))).toList()) {
             LecturaGenerador l = null;
             String error = null;
             try {
@@ -711,191 +713,127 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 sinComunicacion.add(g);
             }
             alarmas.put(g, l == null ? historial.alarmasActivas(g.nombre()) : l.alarmas());
-            estadoContenido.add(estadoDe(g, l, error));
+            tableros.add(datosTablero(g, l, error));
         }
         mostrarAlarmas(alarmas, sinComunicacion);
+        // El navegador dibuja el tablero; solo con la pestaña a la vista (al elegirla se dibuja de nuevo).
+        if (tabs.getSelectedTab() == tabEstado) {
+            try {
+                estadoContenido.getElement().executeJs(SCRIPT_TABLERO + "\nwindow.TableroGeneradores.render(this, JSON.parse($0));",
+                        JSON.writeValueAsString(tableros));
+            } catch (Exception ex) {
+                estadoContenido.getElement().setText("No se pudo armar el tablero: " + ex.getMessage());
+            }
+        }
+    }
+
+    private static String leerRecurso(String ruta) {
+        try (java.io.InputStream in = GeneradorView.class.getResourceAsStream(ruta)) {
+            return in == null ? "" : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            return "";
+        }
     }
 
     /**
-     * Estado actual de un generador: estado y hora de lectura (con su nombre si se ven todos) y los paneles de red,
-     * generador y motor. l == null = sin comunicación (error = el motivo).
+     * Datos de un generador para el tablero de Estado actual (los dibuja tablero-generadores.js). La red y la planta
+     * salen del medidor del transformador (planta = generador + red); nombres de estados, entradas y salidas, del modelo.
+     * l == null = sin comunicación (error = el motivo).
      */
-    private VerticalLayout estadoDe(Generador gen, LecturaGenerador l, String error) {
-        Span estadoBadge = new Span();
-        Span estadoHora = new Span();
-        estadoHora.getStyle().set("font-size", "12px").set("color", "#555");
-        Span erroresLectura = new Span();
-        erroresLectura.getStyle().set("font-size", "12px").set("color", "#721c24");
-        HorizontalLayout barra = new HorizontalLayout();
-        if (todos()) {
-            H4 nombre = titulo(gen.nombre());
-            nombre.getStyle().set("margin", "0");
-            barra.add(nombre);
-        }
-        barra.add(estadoBadge, estadoHora);
-        barra.setAlignItems(Alignment.CENTER);
-        VerticalLayout panelRed = panel(), panelGen = panel(), panelMotor = panel();
-        HorizontalLayout paneles = new HorizontalLayout(panelRed, panelGen, panelMotor);
-        paneles.setWidthFull();
-        paneles.getStyle().set("flex-wrap", "wrap");
-        VerticalLayout v = new VerticalLayout(barra, paneles, erroresLectura);
-        v.setPadding(false);
-        v.setSpacing(false);
-        v.getStyle().set("gap", "6px").set("margin-bottom", "14px");
+    private Map<String, Object> datosTablero(Generador g, LecturaGenerador l, String error) {
+        Map<String, Object> d = new LinkedHashMap<>();
+        ModeloControlador m = service.modelo(g).orElse(null);
+        d.put("nombre", g.nombre());
+        d.put("modelo", g.modelo().replaceFirst("(?<=[A-Za-z])(?=\\d)", " "));
+        d.put("trafo", nombreRed(g.redAsociada()));
         if (l == null) {
-            badge(estadoBadge, "SIN COMUNICACION", Estado.FUERA);
-            estadoHora.setText(error);
-            paneles.setVisible(false);
-            return v;
+            d.put("sinComunicacion", error == null ? "" : error);
+            return d;
         }
         boolean marcha = l.enMarcha();
-        badge(estadoBadge, l.rpm() == null ? "SIN RPM" : marcha ? "EN MARCHA" : "PARADO",
-                l.rpm() == null ? Estado.AVISO : marcha ? Estado.OK : Estado.SIN_DATO);
-        estadoHora.setText("Leido " + l.fecha().format(HORA));
-        // Modo del controlador: fuera de AUTO no arranca solo.
-        String modoControlador = service.modelo(gen).map(m -> m.modo(l)).orElse(null);
-        if (modoControlador != null) {
-            barra.addComponentAtIndex(barra.indexOf(estadoBadge) + 1, badgeNuevo("Modo " + modoControlador,
-                    "AUTO".equals(modoControlador) ? Estado.OK : "OFF".equals(modoControlador) ? Estado.FUERA : Estado.AVISO));
-        }
-        erroresLectura.setText(l.errores().isEmpty() ? "" : "Sin respuesta del controlador en: "
-                + l.errores().entrySet().stream().map(e -> e.getKey().etiqueta() + " (" + e.getValue() + ")")
-                .collect(Collectors.joining(", ")));
-        ConfiguracionCalidad cfg = calidad.configuracion();
-
-        // Red: tensiones y frecuencia del controlador; potencia/corrientes/PF del medidor del transformador (PLC).
-        String red = gen.redAsociada();
-        panelRed.removeAll();
-        panelRed.add(titulo("Red (" + nombreRed(red) + ")"));
-        double nomRed = calidad.tensionNominal(red == null ? "" : red);
-        panelRed.add(fila("Frecuencia", valor(l.redFrecuencia(), "%.1f Hz",
-                calidad.evaluar(Indicador.FRECUENCIA, l.redFrecuencia(), nomRed, cfg))));
-        panelRed.add(fila("Tension L1-L2 / L2-L3 / L3-L1", tres(l.redVL1L2(), l.redVL2L3(), l.redVL3L1(), "V",
-                calidad.evaluar(Indicador.TENSION, prom(l.redVL1L2(), l.redVL2L3(), l.redVL3L1()), nomRed, cfg))));
-        if (l.redKw() != null) {
-            HorizontalLayout p = new HorizontalLayout(texto(String.format(Locale.ROOT, "%.0f kW", l.redKw())));
-            if (l.redKw() < 0) p.add(badgeNuevo("Exportando a la red", Estado.AVISO));
-            p.setAlignItems(Alignment.CENTER);
-            panelRed.add(fila("Importada de la red (controlador)", p));
-        }
-        if (l.cargaKw() != null) {
-            panelRed.add(fila("Consumo " + deRed(red) + " (controlador)", texto(String.format(Locale.ROOT, "%.0f kW", l.cargaKw()))));
-        }
-        Map<String, Object> medidor = service.ultimaRed(gen);
-        if (!medidor.isEmpty()) {
-            Double pw = num(medidor.get("PW"));
-            Double pf = num(medidor.get("PF")) == null ? null : FactorPotenciaUtil.normalizarAbs(Math.abs(num(medidor.get("PF"))));
-            if (pw != null && pw < 0) {
-                HorizontalLayout p = new HorizontalLayout(grande(String.format(Locale.ROOT, "%.0f kW", pw)),
-                        badgeNuevo("Exportando a la red", Estado.AVISO));
-                p.setAlignItems(Alignment.CENTER);
-                panelRed.add(fila("Potencia", p));
-            } else {
-                panelRed.add(fila("Potencia", grande(pw == null ? "-" : String.format(Locale.ROOT, "%.0f kW", pw))));
-            }
-            panelRed.add(fila("Corriente A / B / C", tres(num(medidor.get("IA")), num(medidor.get("IB")), num(medidor.get("IC")), "A", Estado.SIN_DATO)));
-            panelRed.add(fila("PF", valor(pf, "%.3f", calidad.evaluar(Indicador.FACTOR_POTENCIA, pf, nomRed, cfg))));
-            panelRed.add(nota("Medidor " + red + " (PLC) " + medidor.getOrDefault("fecha", "")));
-        } else if (red != null) {
-            panelRed.add(nota("Sin datos recientes del medidor " + red));
-        }
-
-        // Generador.
-        panelGen.removeAll();
-        panelGen.add(titulo("Generador"));
-        double nomGen = calidad.tensionNominal(gen.nombre());
-        panelGen.add(fila("Potencia", grande(l.kw() == null ? "-" : String.format(Locale.ROOT, "%.0f kW", l.kw()))));
-        panelGen.add(fila("kVAr / kVA", texto(fmt(l.kvar(), "%.0f") + " kVAr / " + fmt(l.kva(), "%.0f") + " kVA")));
-        panelGen.add(fila("PF", marcha ? valor(l.pf(), "%.2f", calidad.evaluar(Indicador.FACTOR_POTENCIA, l.pf() == null ? null : Math.abs(l.pf()), nomGen, cfg))
-                : texto(fmt(l.pf(), "%.2f"))));
-        panelGen.add(fila("Frecuencia", marcha ? valor(l.frecuencia(), "%.1f Hz", calidad.evaluar(Indicador.FRECUENCIA, l.frecuencia(), nomGen, cfg))
-                : texto(fmt(l.frecuencia(), "%.1f") + " Hz")));
-        panelGen.add(fila("RPM", texto(fmt(l.rpm(), "%.0f"))));
-        panelGen.add(fila("Tension L-N", tres(l.vL1N(), l.vL2N(), l.vL3N(), "V", Estado.SIN_DATO)));
-        panelGen.add(fila("Tension L-L", marcha ? tres(l.vL1L2(), l.vL2L3(), l.vL3L1(), "V",
-                calidad.evaluar(Indicador.TENSION, prom(l.vL1L2(), l.vL2L3(), l.vL3L1()), nomGen, cfg))
-                : tres(l.vL1L2(), l.vL2L3(), l.vL3L1(), "V", Estado.SIN_DATO)));
-        panelGen.add(fila("Corriente L1 / L2 / L3", tres(l.iL1(), l.iL2(), l.iL3(), "A", Estado.SIN_DATO)));
-        SenalesRed senales = service.modelo(gen).map(ModeloControlador::red).orElse(null);
-        Integer codigoRed = senales == null ? null : SenalesRed.codigo(l);
-        if (codigoRed != null) {
-            // El controlador dice el estado de los interruptores: paralelo, isla, falla o retorno de red.
-            SenalesRed.Estado est = senales.estado(codigoRed);
-            RedControladorService.EstadoActual previo = redControlador.estadoActual(gen.nombre());
-            String desde = previo != null && previo.estado() == est && previo.desde() != null
-                    ? " desde las " + previo.desde().format(DateTimeFormatter.ofPattern("HH:mm")) : "";
-            String modo = switch (est) {
-                case PARALELO -> "En paralelo con la red";
-                case ISLA -> "En isla" + desde + " (interruptor de la planta abierto, el generador alimenta solo su parte de la planta)";
-                case FALLA_RED -> "Falla de red" + desde + " segun el controlador";
-                case RETORNO_RED -> "Retorno de red" + desde + ": el controlador espera para volver a paralelo";
-                default -> marcha && l.kw() != null && l.kw() < com.example.generador.service.GeneradorAnalisisService.KW_VACIO
-                        ? "En vacio" : "Interruptores: " + senales.nombre(codigoRed);
-            };
-            if (SenalesRed.sinRed(est)) panelGen.add(fila("Modo", badgeNuevo(modo, Estado.AVISO)));
-            else if (marcha) panelGen.add(fila("Modo", texto(modo)));
-        } else if (marcha && l.kw() != null && l.redVL1L2() != null) {
-            boolean conRed = prom(l.redVL1L2(), l.redVL2L3(), l.redVL3L1()) != null
-                    && prom(l.redVL1L2(), l.redVL2L3(), l.redVL3L1()) >= com.example.generador.service.GeneradorAnalisisService.V_RED_PRESENTE;
-            // Isla con el controlador viendo red (interruptor de la planta abierto): la detecta IslaService cada minuto.
-            LocalDateTime islaDesde = islaService.enIslaDesde(gen.nombre());
-            String modo = l.kw() < com.example.generador.service.GeneradorAnalisisService.KW_VACIO ? "En vacio"
-                    : islaDesde != null ? "En isla desde las " + islaDesde.format(DateTimeFormatter.ofPattern("HH:mm"))
-                            + " (interruptor de la planta abierto, esperando el retorno de red)"
-                    : conRed ? "En paralelo con la red" : "En isla (sin red)";
-            if (islaDesde != null) panelGen.add(fila("Modo", badgeNuevo(modo, Estado.AVISO)));
-            else panelGen.add(fila("Modo", texto(modo)));
-        }
-
-        // Motor.
-        panelMotor.removeAll();
-        panelMotor.add(titulo("Motor"));
-        ModeloControlador modelo = service.modelo(gen).orElse(null);
-        panelMotor.add(fila("Bateria", valor(l.bateria(), "%.1f V", estadoBateria(l.bateria(), marcha))));
-        if (modelo != null && modelo.registro(ParametroGenerador.PRESION_ACEITE).isEmpty()) {
-            panelMotor.add(fila("Presion de aceite", nota("no lo mide este controlador")));
-        } else {
-            panelMotor.add(fila("Presion de aceite", marcha ? valor(l.presionAceite(), "%.1f bar", estadoAceite(l.presionAceite()))
-                    : texto(fmt(l.presionAceite(), "%.1f") + " bar")));
-        }
-        if (modelo != null && modelo.registro(ParametroGenerador.TEMP_REFRIGERANTE).isEmpty()) {
-            panelMotor.add(fila("Temperatura refrigerante", nota("no lo mide este controlador")));
-        } else {
-            panelMotor.add(fila("Temperatura refrigerante", marcha ? valor(l.tempRefrigerante(), "%.0f C", estadoTemp(l.tempRefrigerante()))
-                    : texto(fmt(l.tempRefrigerante(), "%.0f") + " C")));
-        }
-        if (l.tempAceite() != null) panelMotor.add(fila("Temperatura de aceite", texto(fmt(l.tempAceite(), "%.0f") + " C")));
-        if (l.nivelCombustible() != null) panelMotor.add(fila("Nivel de combustible", texto(fmt(l.nivelCombustible(), "%.0f") + " %")));
-        if (l.consumoCombustible() != null) panelMotor.add(fila("Consumo de combustible", texto(fmt(l.consumoCombustible(), "%.1f") + " L/h")));
-        panelMotor.add(fila("Horas de marcha", texto(fmt(l.horasMarcha(), "%.1f") + " h")));
-        panelMotor.add(fila("Arranques", texto(l.arranques() == null ? "-" : String.valueOf(l.arranques()))));
-        panelMotor.add(fila("Energia generada", texto(l.kwh() == null ? "-" : String.format(Locale.ROOT, "%,d kWh", l.kwh()))));
-        panelMotor.add(fila("Energia reactiva", texto(l.kvarh() == null ? "-" : String.format(Locale.ROOT, "%,d kVArh", l.kvarh()))));
+        d.put("marcha", marcha);
+        d.put("leido", l.fecha().format(HHMMSS));
         if (l.relojControlador() != null) {
-            // Su historial interno (pantalla History) usa esta hora: si no esta en hora, sus eventos no coinciden con los de la planta.
             long desfase = l.desfaseReloj();
-            HorizontalLayout p = new HorizontalLayout(texto(l.relojControlador().format(HORA)),
-                    badgeNuevo(LecturaGenerador.textoDesfase(desfase), Math.abs(desfase) < 60 ? Estado.OK : Estado.AVISO));
-            p.setAlignItems(Alignment.CENTER);
-            panelMotor.add(fila("Reloj del controlador", p));
+            d.put("reloj", l.relojControlador().format(HHMM));
+            d.put("desfase", LecturaGenerador.textoDesfase(desfase));
+            d.put("desfaseAlto", Math.abs(desfase) >= 60);
         }
-        return v;
+        d.put("modo", m == null ? null : m.modo(l));
+        Map<String, Double> v = new LinkedHashMap<>();
+        l.valores().forEach((p, x) -> v.put(p.name(), x));
+        d.put("v", v);
+        d.put("alarmas", l.alarmas() == null ? List.of() : l.alarmas().stream().map(a -> Map.of("nombre", AlarmaComap.nombre(a),
+                "activa", AlarmaComap.activa(a), "sinReset", AlarmaComap.sinConfirmar(a))).toList());
+        d.put("redKw", num(service.ultimaRed(g).get("PW")));
+        SenalesRed red = m == null ? null : m.red();
+        if (red != null) {
+            d.put("mcb", SenalesRed.valor(red.mcbCerrado(), l));
+            d.put("gcb", SenalesRed.valor(red.gcbCerrado(), l));
+            Integer codigo = SenalesRed.codigo(l);
+            if (codigo != null) {
+                SenalesRed.Estado est = red.estado(codigo);
+                d.put("estadoInterruptores", codigo >= 0 && codigo < red.nombres().size() ? red.nombres().get(codigo) : "codigo " + codigo);
+                d.put("sinRed", SenalesRed.sinRed(est));
+                RedControladorService.EstadoActual previo = redControlador.estadoActual(g.nombre());
+                if (SenalesRed.sinRed(est) && previo != null && previo.estado() == est && previo.desde() != null) {
+                    d.put("interruptoresDesde", previo.desde().format(HHMM));
+                }
+            }
+        }
+        d.put("estadoMotor", m == null ? null : m.estadoMotor(l));
+        d.put("entradas", bits(m == null ? List.of() : m.entradas(), l.valor(ParametroGenerador.ENTRADAS_BINARIAS)));
+        d.put("salidas", bits(m == null ? List.of() : m.salidas(), l.valor(ParametroGenerador.SALIDAS_BINARIAS)));
+        // Líneas de límite y colores de frecuencia con la tensión nominal y los límites de Calidad de Energía.
+        ConfiguracionCalidad cfg = calidad.configuracion();
+        double nomRed = calidad.tensionNominal(g.redAsociada() == null ? "" : g.redAsociada()), nomGen = calidad.tensionNominal(g.nombre());
+        Map<String, Object> nom = new HashMap<>();
+        nom.put("redLL", nomRed);
+        nom.put("redLN", nomRed / Math.sqrt(3));
+        nom.put("genLL", nomGen);
+        nom.put("genLN", nomGen / Math.sqrt(3));
+        nom.put("i", l.valor(ParametroGenerador.CORRIENTE_NOMINAL));
+        nom.put("kw", l.valor(ParametroGenerador.POTENCIA_NOMINAL));
+        d.put("nom", nom);
+        d.put("fueraPct", cfg.getTensionFueraPct());
+        d.put("hzRed", clase(calidad.evaluar(Indicador.FRECUENCIA, l.redFrecuencia(), nomRed, cfg)));
+        d.put("hzGen", marcha ? clase(calidad.evaluar(Indicador.FRECUENCIA, l.frecuencia(), nomGen, cfg)) : "gris");
+        d.put("mideAceite", m == null || m.registro(ParametroGenerador.PRESION_ACEITE).isPresent());
+        d.put("mideTemp", m == null || m.registro(ParametroGenerador.TEMP_REFRIGERANTE).isPresent());
+        d.put("umbrales", Map.of("aceiteAviso", ACEITE_AVISO, "aceiteFuera", ACEITE_FUERA, "tempAviso", TEMP_AVISO, "tempFuera", TEMP_FUERA));
+        d.put("bateria", clase(estadoBateria(l.bateria(), marcha)));
+        Double pf = l.pf() != null ? Double.valueOf(Math.abs(l.pf()))
+                : l.kw() != null && l.kva() != null && l.kva() > 0 ? l.kw() / l.kva() : null;
+        d.put("pf", marcha ? pf : null);
+        return d;
+    }
+
+    /** Nombre y valor (0/1) de cada bit de una palabra; valor null si no se leyó. */
+    private static List<Map<String, Object>> bits(List<String> nombres, Double palabra) {
+        List<Map<String, Object>> l = new ArrayList<>();
+        for (int i = 0; i < nombres.size(); i++) {
+            Map<String, Object> b = new HashMap<>();
+            b.put("n", nombres.get(i));
+            b.put("v", palabra == null ? null : (int) ((palabra.longValue() >> i) & 1));
+            l.add(b);
+        }
+        return l;
+    }
+
+    /** Clase de color del tablero para un estado de Calidad de Energía. */
+    private static String clase(Estado e) {
+        return switch (e) {
+            case OK -> "ok";
+            case AVISO -> "aviso";
+            case FUERA -> "fuera";
+            case SIN_DATO -> "gris";
+        };
     }
 
     private static Estado estadoBateria(Double v, boolean marcha) {
         if (v == null) return Estado.SIN_DATO;
         if (marcha) return v < BAT_MARCHA_MIN || v > BAT_MARCHA_MAX ? Estado.AVISO : Estado.OK;
         return v < BAT_PARADO_FUERA ? Estado.FUERA : v < BAT_PARADO_AVISO ? Estado.AVISO : Estado.OK;
-    }
-
-    private static Estado estadoAceite(Double v) {
-        if (v == null) return Estado.SIN_DATO;
-        return v < ACEITE_FUERA ? Estado.FUERA : v < ACEITE_AVISO ? Estado.AVISO : Estado.OK;
-    }
-
-    private static Estado estadoTemp(Double v) {
-        if (v == null) return Estado.SIN_DATO;
-        return v > TEMP_FUERA ? Estado.FUERA : v > TEMP_AVISO ? Estado.AVISO : Estado.OK;
     }
 
     // ================= Registros (ADMIN) =================
@@ -996,59 +934,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     // ================= Utilidades =================
 
-    private static VerticalLayout panel() {
-        VerticalLayout p = new VerticalLayout();
-        p.setSpacing(false);
-        p.setWidth("360px");
-        p.getStyle().set("border", "1px solid #ddd").set("border-radius", "8px").set("padding", "10px 14px");
-        return p;
-    }
-
-    private static H4 titulo(String t) {
-        H4 h = new H4(t);
-        h.getStyle().set("margin", "0 0 6px 0");
-        return h;
-    }
-
-    private static HorizontalLayout fila(String etiqueta, Component valor) {
-        Span e = new Span(etiqueta);
-        e.getStyle().set("color", "#555").set("font-size", "13px");
-        HorizontalLayout h = new HorizontalLayout(e, valor);
-        h.setWidthFull();
-        h.setJustifyContentMode(JustifyContentMode.BETWEEN);
-        h.setAlignItems(Alignment.CENTER);
-        return h;
-    }
-
-    private static Span texto(String t) {
-        Span s = new Span(t);
-        s.getStyle().set("font-weight", "600");
-        return s;
-    }
-
-    private static Span grande(String t) {
-        Span s = new Span(t);
-        s.getStyle().set("font-weight", "700").set("font-size", "22px");
-        return s;
-    }
-
     private static Span nota(String t) {
         Span s = new Span(t);
         s.getStyle().set("font-size", "11px").set("color", "#777");
         return s;
-    }
-
-    private static Span valor(Double v, String formato, Estado e) {
-        return badgeNuevo(v == null ? "-" : String.format(Locale.ROOT, formato, v), v == null ? Estado.SIN_DATO : e);
-    }
-
-    private static Span tres(Double a, Double b, Double c, String unidad, Estado e) {
-        String t = fmt(a, "%.0f") + " / " + fmt(b, "%.0f") + " / " + fmt(c, "%.0f") + " " + unidad;
-        return e == Estado.SIN_DATO ? texto(t) : badgeNuevo(t, e);
-    }
-
-    private static Double prom(Double a, Double b, Double c) {
-        return a == null || b == null || c == null ? null : (a + b + c) / 3.0;
     }
 
     private static String fmt(Double v, String f) {

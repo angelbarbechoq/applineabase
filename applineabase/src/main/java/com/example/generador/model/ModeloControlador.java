@@ -20,17 +20,30 @@ import java.util.Optional;
  *                     se detecta comparando con el medidor del transformador, ver IslaService).
  * @param modos        nombre de cada código de {@link ParametroGenerador#MODO_CONTROLADOR} (índice = código; ComAp:
  *                     OFF, MAN, AUTO, TEST). Vacía = solo se muestra el código.
+ * @param estadosMotor nombre de cada código de {@link ParametroGenerador#ESTADO_MOTOR} (Ready, NotReady, Loaded...)
+ * @param entradas     nombre de cada bit de {@link ParametroGenerador#ENTRADAS_BINARIAS} (bit 0 primero), para el tablero
+ * @param salidas      ídem de {@link ParametroGenerador#SALIDAS_BINARIAS}
  */
 public record ModeloControlador(String modelo, String descripcion, boolean confirmado, int maxHueco,
                                boolean noDisponible8000, List<Registro> registros, ListaAlarmas listaAlarmas,
-                               Integer reloj, SenalesRed red, List<String> modos) {
+                               Integer reloj, SenalesRed red, List<String> modos, List<String> estadosMotor,
+                               List<String> entradas, List<String> salidas) {
 
     /** Modo del controlador en la lectura ("AUTO"); null si el modelo no lo da o no se leyó. */
     public String modo(LecturaGenerador l) {
-        Double v = l.valor(ParametroGenerador.MODO_CONTROLADOR);
+        return nombre(modos, l.valor(ParametroGenerador.MODO_CONTROLADOR));
+    }
+
+    /** Estado del motor en la lectura ("Ready"); null si el modelo no lo da o no se leyó. */
+    public String estadoMotor(LecturaGenerador l) {
+        return nombre(estadosMotor, l.valor(ParametroGenerador.ESTADO_MOTOR));
+    }
+
+    /** Nombre del código en la lista (índice = código); "codigo N" si no tiene nombre; null sin valor. */
+    private static String nombre(List<String> nombres, Double v) {
         if (v == null) return null;
         int codigo = (int) Math.round(v);
-        return codigo >= 0 && codigo < modos.size() ? modos.get(codigo) : "codigo " + codigo;
+        return codigo >= 0 && codigo < nombres.size() ? nombres.get(codigo) : "codigo " + codigo;
     }
 
     /** BITS16: palabra de bits; nunca es "no disponible" (0x8000 = solo el bit 15 activo). */

@@ -55,7 +55,13 @@ public enum ParametroGenerador {
     ROCOF_MAX("rocof_max", "ROCOF maxima registrada por el controlador", "Hz/s", false),
     SALTO_VECTOR_MAX("salto_vector_max", "Salto de vector maximo registrado por el controlador", "grados", false),
     /** OFF, MAN, AUTO o TEST según el código (nombres en "modos" del modelo). */
-    MODO_CONTROLADOR("modo_controlador", "Modo del controlador (codigo)", "", true);
+    MODO_CONTROLADOR("modo_controlador", "Modo del controlador (codigo)", "", true),
+    // Para el tablero de Estado actual (nombres de códigos y bits en "estadosMotor", "entradas" y "salidas" del modelo).
+    ESTADO_MOTOR("estado_motor", "Estado del motor (codigo del controlador)", "", true),
+    SALIDAS_BINARIAS("salidas_binarias", "Salidas binarias del controlador", "", true),
+    MANTENIMIENTO("mantenimiento", "Contador de mantenimiento 1", "h", true),
+    POTENCIA_NOMINAL("potencia_nominal", "Potencia nominal", "kW", true),
+    CORRIENTE_NOMINAL("corriente_nominal", "Corriente nominal", "A", true);
 
     private final String columna;
     private final String etiqueta;

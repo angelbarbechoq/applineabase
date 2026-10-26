@@ -105,17 +105,23 @@ public class GeneradoresConfigService {
                 int maximo = la.get("maximo") instanceof Number mx ? mx.intValue() : 16;
                 alarmas = new ModeloControlador.ListaAlarmas(cant.intValue(), primero.intValue(), largo, maximo);
             }
-            List<String> modos = new ArrayList<>();
-            if (m.get("modos") instanceof List<?> l) for (Object o : l) modos.add(String.valueOf(o));
             lista.add(new ModeloControlador(modelo, texto(m.get("descripcion")),
                     Boolean.TRUE.equals(m.get("confirmado")),
                     m.get("maxHueco") instanceof Number n ? Math.max(0, n.intValue()) : 0,
                     !Boolean.FALSE.equals(m.get("noDisponible8000")),
                     List.copyOf(registros), alarmas,
                     m.get("reloj") instanceof Number reloj ? reloj.intValue() : null,
-                    m.get("red") instanceof Map<?, ?> red ? senalesRed(modelo, red) : null, List.copyOf(modos)));
+                    m.get("red") instanceof Map<?, ?> red ? senalesRed(modelo, red) : null, textos(m.get("modos")),
+                    textos(m.get("estadosMotor")), textos(m.get("entradas")), textos(m.get("salidas"))));
         }
         return lista;
+    }
+
+    /** Lista de nombres del JSON (vacía si falta). */
+    private static List<String> textos(Object o) {
+        List<String> l = new ArrayList<>();
+        if (o instanceof List<?> lista) for (Object x : lista) l.add(String.valueOf(x));
+        return List.copyOf(l);
     }
 
     /**
