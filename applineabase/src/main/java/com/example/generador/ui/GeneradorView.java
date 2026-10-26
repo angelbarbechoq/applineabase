@@ -397,7 +397,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     /**
      * Aviso rojo con las alarmas de la lista del controlador de cada generador elegido (texto tal como lo envía, desde
-     * cuándo y qué significa) y, con un solo generador elegido, una línea con los otros que tengan alarmas. En Estado
+     * cuándo y qué significa). En Estado
      * actual no va el de los generadores con comunicación: su tablero ya tiene la lista de alarmas.
      *
      * @param alarmas por generador; ultimaConocida = los que no tuvieron comunicación (se muestra la última lectura de fondo)
@@ -414,17 +414,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             if (enTablero && !sinComunicacion) continue;
             hay |= agregarAlarmas(e.getKey(), e.getValue(), sinComunicacion);
         }
-        List<String> otros = todos() ? List.of() : service.generadores().stream()
-                .filter(g -> !g.nombre().equals(generador.nombre()) && !historial.alarmasActivas(g.nombre()).isEmpty())
-                .map(g -> g.nombre() + ": " + historial.alarmasActivas(g.nombre()).stream()
-                        .map(AlarmaComap::nombre).collect(Collectors.joining(", "))).toList();
-        if (!otros.isEmpty()) {
-            Span s = new Span("Otro generador con alarma: " + String.join("   |   ", otros) + " (elijalo en la lista para ver el detalle).");
-            s.getStyle().set("background-color", "#fff3cd").set("color", "#856404").set("padding", "6px 10px").set("border-radius", "6px")
-                    .set("font-size", "13px").set("display", "block").set("margin-top", hay ? "6px" : "0");
-            alertaAlarmas.add(s);
-        }
-        alertaAlarmas.setVisible(hay || !otros.isEmpty());
+        // El otro generador con alarmas se ve marcado "(ALARMA)" en la lista de generadores (sin aviso aparte).
+        alertaAlarmas.setVisible(hay);
     }
 
     /** Agrega la caja roja con las alarmas de un generador; false si no tiene ninguna. */
