@@ -332,21 +332,29 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
     };
 
     /*
-     * Achica el tablero lo justo para que un generador entre entero en lo que se ve de la ventana (por ejemplo con
-     * Windows al 125 %), de a 5 % y hasta ZOOM_MIN; por debajo de eso queda la barra de desplazamiento. Con zoom el
-     * tablero tiene mas ancho util, asi que tambien puede pasar al arreglo en dos filas.
+     * Achica el tablero lo justo para que un generador entre entero en lo que se ve (por ejemplo con Windows al 125 %),
+     * de a 2 % y hasta ZOOM_MIN; por debajo de eso queda la barra de desplazamiento. Con zoom el tablero tiene mas
+     * ancho util, asi que tambien puede pasar al arreglo en dos filas.
      */
     function ajustar(el) {
       const caja = el.querySelector(".tg-escala");
       if (!caja || !el.isConnected) return;
       caja.style.zoom = "";
-      // Desde donde empieza el tablero (sin lo desplazado) hasta el borde de abajo de la ventana.
-      let desplazado = 0;
-      for (let n = el; n; n = n.assignedSlot || n.parentNode || n.host) desplazado += n.scrollTop || 0;
-      const disponible = window.innerHeight - (el.getBoundingClientRect().top + desplazado) - 16;
+      // Desde donde empieza el tablero (sin lo desplazado) hasta el borde de abajo del area visible: la ventana o el
+      // panel con barra de desplazamiento que lo contiene (la pestana), sin su relleno de abajo.
+      let desplazado = 0, abajo = window.innerHeight;
+      for (let n = el; n; n = n.assignedSlot || n.parentNode || n.host) {
+        if (!(n instanceof Element)) continue;
+        desplazado += n.scrollTop || 0;
+        const st = getComputedStyle(n);
+        if (n !== el && n !== document.documentElement && n !== document.body && /auto|scroll/.test(st.overflowY)) {
+          abajo = Math.min(abajo, n.getBoundingClientRect().top + n.clientTop + n.clientHeight - parseFloat(st.paddingBottom || 0));
+        }
+      }
+      const disponible = abajo - (el.getBoundingClientRect().top + desplazado) - 6;
       if (disponible <= 0) return;
       const alto = () => Math.max(0, ...Array.from(caja.querySelectorAll(".tg-tablero"), s => s.getBoundingClientRect().height));
-      for (let z = 1; z >= ZOOM_MIN; z = Math.round((z - 0.05) * 100) / 100) {
+      for (let z = 1; z >= ZOOM_MIN; z = Math.round((z - 0.02) * 100) / 100) {
         caja.style.zoom = z === 1 ? "" : String(z);
         if (alto() <= disponible) return;
       }
