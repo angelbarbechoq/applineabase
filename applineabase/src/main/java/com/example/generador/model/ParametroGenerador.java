@@ -65,7 +65,10 @@ public enum ParametroGenerador {
     /** Log Bout 2 de ComAp, palabra de bits (bit 5 = Ready To AMF, ver "listoAmf" del modelo). */
     LOG_BOUT_2("log_bout_2", "Log Bout 2 del controlador (Ready To AMF...)", "", true),
     PARADAS_EMERGENCIA("paradas_emergencia", "Paradas de emergencia (contador)", "", true),
-    PARADAS_FALLA("paradas_falla", "Paradas por falla (Shutdowns, contador)", "", true);
+    PARADAS_FALLA("paradas_falla", "Paradas por falla (Shutdowns, contador)", "", true),
+    /** Cuenta regresiva de la pantalla del controlador: cuál corre (código, nombres en "temporizadores" del modelo). */
+    TEMPORIZADOR("temporizador", "Temporizador en curso (codigo)", "", true),
+    TEMPORIZADOR_VALOR("temporizador_valor", "Tiempo que falta del temporizador", "s", true);
 
     private final String columna;
     private final String etiqueta;

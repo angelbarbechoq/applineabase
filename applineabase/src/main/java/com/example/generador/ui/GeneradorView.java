@@ -736,6 +736,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         }
         d.put("modo", m == null ? null : m.modo(l));
         d.put("listoAmf", m == null ? null : m.listoAmf(l));
+        d.put("temporizador", m == null ? null : m.temporizador(l));
         Map<String, Double> v = new LinkedHashMap<>();
         l.valores().forEach((p, x) -> v.put(p.name(), x));
         d.put("v", v);

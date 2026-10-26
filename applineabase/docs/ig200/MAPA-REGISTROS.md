@@ -67,7 +67,7 @@ Bout 2 (bit 5 Ready To AMF = campo `listoAmf` del modelo; leido 0x2038: Ready, R
 Disponibles sin usar: resto de Log Bout 1-11 (41298-41308: bit 7 Not In Auto, bit 12 Generator Healthy, bit 13
 Mains Healthy de Log Bout 2; alarmas AL ...), 41243-41244 contadores de mantenimiento 2 y 3, 41253-41254 consumo total
 de combustible (L; leido 0: el motor no lo informa). Temporizadores (cuenta regresiva de la pantalla del
-controlador): 41261 Timer text (List#5: 0 No Timer, 4 Cooling, 11 MCB Close, 13 ReturnDelay, 14 Start Delay...) y
+controlador, en el tablero desde el 2026-10-26 como TEMPORIZADOR y TEMPORIZADOR_VALOR): 41261 Timer text (List#5: 0 No Timer, 4 Cooling, 11 MCB Close, 13 ReturnDelay, 14 Start Delay...) y
 41265 Timer Value (s); ajustes 43070 Cooling Time (leido 180 s), 43152 Emergency Start Delay (15 s), 43153 Mains
 Return Delay (60 s), 43154 MCB Close Delay (x10, 1,0 s). No tiene medida de ROCOF ni de salto de vector (solo los
 ajustes de esas protecciones, 43167-43172).

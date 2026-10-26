@@ -25,11 +25,19 @@ import java.util.Optional;
  * @param salidas      ídem de {@link ParametroGenerador#SALIDAS_BINARIAS}
  * @param listoAmf     bit "Ready To AMF" de ComAp: si se corta la red, el generador entra solo (en AUTO y sin alarma que
  *                     le impida arrancar, o ya en marcha en AUTO). null = el modelo no lo tiene.
+ * @param temporizadores nombre de cada código de {@link ParametroGenerador#TEMPORIZADOR} (ComAp: No Timer, Cooling,
+ *                     ReturnDelay...), la cuenta regresiva de la pantalla del controlador
  */
 public record ModeloControlador(String modelo, String descripcion, boolean confirmado, int maxHueco,
                                boolean noDisponible8000, List<Registro> registros, ListaAlarmas listaAlarmas,
                                Integer reloj, SenalesRed red, List<String> modos, List<String> estadosMotor,
-                               List<String> entradas, List<String> salidas, SenalesRed.Bit listoAmf) {
+                               List<String> entradas, List<String> salidas, SenalesRed.Bit listoAmf,
+                               List<String> temporizadores) {
+
+    /** Temporizador que corre en la lectura ("ReturnDelay", "No Timer"); null si el modelo no lo da o no se leyó. */
+    public String temporizador(LecturaGenerador l) {
+        return nombre(temporizadores, l.valor(ParametroGenerador.TEMPORIZADOR));
+    }
 
     /** Listo para AMF en la lectura; null si el modelo no lo da o no se leyó. */
     public Boolean listoAmf(LecturaGenerador l) {

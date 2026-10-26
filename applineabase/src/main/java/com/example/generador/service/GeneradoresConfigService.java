@@ -113,7 +113,7 @@ public class GeneradoresConfigService {
                     m.get("reloj") instanceof Number reloj ? reloj.intValue() : null,
                     m.get("red") instanceof Map<?, ?> red ? senalesRed(modelo, red) : null, textos(m.get("modos")),
                     textos(m.get("estadosMotor")), textos(m.get("entradas")), textos(m.get("salidas")),
-                    bit(modelo, m, "listoAmf")));
+                    bit(modelo, m, "listoAmf"), textos(m.get("temporizadores"))));
         }
         return lista;
     }

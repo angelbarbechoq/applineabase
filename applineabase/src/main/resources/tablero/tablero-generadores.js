@@ -57,6 +57,12 @@ if (!window.TableroGeneradores) {
 .tg-estados .tg-ev { font-size: 18px; font-weight: 700; text-align: center; }
 .tg-estados .tg-eg { font-size: 12px; text-align: center; color: #e2e4ea; }
 .tg-estados hr { border: 0; border-top: 1px solid #5a6070; margin: 0; }
+.tg-timer { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.tg-anillo { flex: none; width: 58px; height: 58px; border-radius: 50%; border: 5px solid #d8dbe2; display: flex; align-items: center;
+  justify-content: center; font: 700 15px Consolas, "Courier New", monospace; color: #1E1E2C; }
+.tg-anillo.tg-corre { border-color: #E0B50F; }
+.tg-timer b { display: block; font-size: 14px; }
+.tg-timer small { display: block; font-size: 12px; color: #6b7080; }
 table.tg-io { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.tg-io td { padding: 2px 6px; border-bottom: 1px solid #eef0f4; }
 table.tg-io td:first-child { width: 18px; color: #6b7080; }
@@ -94,7 +100,17 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       ParalOper: "en paralelo con la red", RevSync: "sincronizando para volver a la red", Synchro: "sincronizando", MainsFlt: "falla de red",
       ValidFlt: "falla de red confirmada", MainsRet: "retorno de red", MultIslOp: "isla con varios generadores",
       MultParOp: "paralelo con varios generadores", EmergMan: "manual de emergencia", StrUpSync: "sincronizando al arrancar" };
+    const TIMER_ES = { "No Timer": "sin cuenta regresiva", Prestart: "prearranque", Cranking: "arrancando", "Idle Run": "marcha en vacio",
+      Cooling: "enfriamiento", "Stop Valve": "valvula de parada", AfterCool: "postenfriamiento", Pause: "pausa entre intentos",
+      VentilGas: "ventilacion", MinStabTO: "estabilizacion minima", MaxStabTO: "estabilizacion maxima", "MCB Close": "cierre del MCB",
+      TransferDel: "demora de transferencia", ReturnDelay: "espera al volver la red", "Start Delay": "demora de arranque por falla de red",
+      "V Detect": "deteccion de tension", "GCB Delay": "demora del GCB", "GCB Open": "apertura del GCB", SyncTOut: "tiempo de sincronizacion",
+      "GCB Close": "cierre del GCB", "MCB Open": "apertura del MCB", WaitToStp: "espera para parar", "Syst Start": "arranque del sistema",
+      "Syst Stop": "parada del sistema", "Next Start": "proximo arranque", "Next Stop": "proxima parada", Warming: "calentamiento" };
     const VERDE = "#3BB273", APAG = "#d8dbe2", ROJO = "#E8505B", AMARILLO = "#E0B50F";
+    // Segundos como m:ss (h:mm:ss desde una hora), igual que la pantalla del controlador.
+    const mmss = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, "0");
+      return h ? `${h}:${String(m).padStart(2, "0")}:${x}` : `${m}:${x}`; };
     // Estados del motor que son falla (parado por falla o no puede arrancar): la G del esquema en rojo.
     const FALLA_MOTOR = ["Shutdown", "NotReady", "SDVentil"];
     // Lo minimo que se achica el tablero para entrar en la pantalla (ver ajustar).
@@ -237,7 +253,29 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       const bloque = (titulo, valor, glosa, color) => `<div><div class="tg-et">${titulo}</div>
         <div class="tg-ev" style="color:${color}">${valor == null ? "-" : esc(valor)}</div><div class="tg-eg">${esc(glosa || "")}</div></div>`;
       return `<div class="tg-estados">${bloque("Estado del motor", m, MOTOR_ES[m], colorMotor)}<hr>
-        ${bloque("Estado de interruptores", i, (INTERR_ES[i] || "") + (g.interruptoresDesde ? " desde las " + g.interruptoresDesde : ""), g.sinRed ? "#ffb3b8" : "#fff")}</div>`;
+        ${bloque("Estado de interruptores", i, (INTERR_ES[i] || "") + (g.interruptoresDesde ? " desde las " + g.interruptoresDesde : ""), g.sinRed ? "#ffb3b8" : "#fff")}</div>
+        ${temporizador(g)}`;
+    }
+
+    /* Cuenta regresiva del controlador (como el círculo de la pantalla ComAp): cuál corre y cuánto le falta. Entre
+       lecturas (cada 15 s) el navegador la sigue bajando de a un segundo (ver contar). */
+    function temporizador(g) {
+      if (g.temporizador == null) return "";
+      const t = g.temporizador, seg = g.v.TEMPORIZADOR_VALOR, corre = t !== "No Timer";
+      const reloj = !corre ? "0:00" : seg == null ? "-:--" : mmss(seg);
+      return `<div class="tg-timer"><div class="tg-anillo${corre ? " tg-corre" : ""}"${corre && seg > 0 ? ` data-seg="${seg}"` : ""}>${reloj}</div>
+        <div><b>${esc(t)}</b><small>${esc(TIMER_ES[t] || "")}</small></div></div>`;
+    }
+
+    function contar(el) {
+      clearInterval(el.tgReloj);
+      const anillos = Array.from(el.querySelectorAll(".tg-anillo[data-seg]"));
+      if (!anillos.length) return;
+      const inicio = Date.now();
+      el.tgReloj = setInterval(() => {
+        const pasados = (Date.now() - inicio) / 1000;
+        anillos.forEach(a => a.textContent = mmss(Number(a.dataset.seg) - pasados));
+      }, 1000);
     }
 
     function io(lista, g, entradas) {
@@ -331,6 +369,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
           window.addEventListener("resize", () => { clearTimeout(espera); espera = setTimeout(() => ajustar(el), 150); });
         }
         el.innerHTML = `<div class="tg-escala"><div class="tg">${lista.map(tablero).join("")}</div></div>`;
+        contar(el);
         ajustar(el);
       }
     };
