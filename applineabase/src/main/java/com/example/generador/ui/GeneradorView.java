@@ -114,6 +114,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private static final Generador TODOS = new Generador("Todos", "", "", 0, null, "");
     private Tab tabRegistros;
     private Tab tabEstado;
+    // Última lectura de alarmas, para rearmar el aviso rojo al cambiar de pestaña sin volver a leer los controladores.
+    private Map<Generador, List<String>> ultimasAlarmas = Map.of();
+    private java.util.Set<Generador> ultimosSinComunicacion = java.util.Set.of();
     /** Estado actual: el tablero de cada generador elegido (los dos con "Todos", Transformador 1 primero). */
     private final Div estadoContenido = new Div();
     /** Generador de cada fila del Historial de eventos (sus registros no lo traen); se ve con "Todos". */
@@ -189,6 +192,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         tabs.addSelectedChangeListener(e -> {
             if (e.getSelectedTab() == tabPlanta) refrescarPlanta();
             if (e.getSelectedTab() == tabEstado) refrescar();
+            else mostrarAlarmas(ultimasAlarmas, ultimosSinComunicacion);
             mostrarSelector();
         });
         alertaAlarmas.setWidthFull();
@@ -393,16 +397,22 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     /**
      * Aviso rojo con las alarmas de la lista del controlador de cada generador elegido (texto tal como lo envía, desde
-     * cuándo y qué significa) y, con un solo generador elegido, una línea con los otros que tengan alarmas.
+     * cuándo y qué significa) y, con un solo generador elegido, una línea con los otros que tengan alarmas. En Estado
+     * actual no va el de los generadores con comunicación: su tablero ya tiene la lista de alarmas.
      *
      * @param alarmas por generador; ultimaConocida = los que no tuvieron comunicación (se muestra la última lectura de fondo)
      */
     private void mostrarAlarmas(Map<Generador, List<String>> alarmas, java.util.Set<Generador> ultimaConocida) {
+        ultimasAlarmas = alarmas;
+        ultimosSinComunicacion = ultimaConocida;
         alertaAlarmas.removeAll();
         selector.getDataProvider().refreshAll();
+        boolean enTablero = tabs.getSelectedTab() == tabEstado;
         boolean hay = false;
         for (Map.Entry<Generador, List<String>> e : alarmas.entrySet()) {
-            hay |= agregarAlarmas(e.getKey(), e.getValue(), ultimaConocida.contains(e.getKey()));
+            boolean sinComunicacion = ultimaConocida.contains(e.getKey());
+            if (enTablero && !sinComunicacion) continue;
+            hay |= agregarAlarmas(e.getKey(), e.getValue(), sinComunicacion);
         }
         List<String> otros = todos() ? List.of() : service.generadores().stream()
                 .filter(g -> !g.nombre().equals(generador.nombre()) && !historial.alarmasActivas(g.nombre()).isEmpty())
@@ -765,7 +775,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         l.valores().forEach((p, x) -> v.put(p.name(), x));
         d.put("v", v);
         d.put("alarmas", l.alarmas() == null ? List.of() : l.alarmas().stream().map(a -> Map.of("nombre", AlarmaComap.nombre(a),
-                "activa", AlarmaComap.activa(a), "sinReset", AlarmaComap.sinConfirmar(a))).toList());
+                "activa", AlarmaComap.activa(a), "sinReset", AlarmaComap.sinConfirmar(a), "desde", desdeAlarma(g, a))).toList());
         Map<String, Object> medidor = service.ultimaRed(g);
         d.put("redKw", num(medidor.get("PW")));
         // Corrientes y PF del medidor del transformador (PF con color según los límites de Calidad de Energía).
@@ -817,6 +827,13 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 : l.kw() != null && l.kva() != null && l.kva() > 0 ? l.kw() / l.kva() : null;
         d.put("pf", marcha ? pf : null);
         return d;
+    }
+
+    /** Desde cuándo está la alarma en la lista del controlador, según el historial ("" si no se sabe). */
+    private String desdeAlarma(Generador g, String alarma) {
+        HistorialEventosService.Aparicion ap = historial.aparicion(g.nombre(), alarma);
+        if (ap == null) return "";
+        return (ap.inicioLectura() ? "desde antes del " : "desde el ") + ap.fecha().format(CORTA);
     }
 
     /** Nombre y valor (0/1) de cada bit de una palabra; valor null si no se leyó. */

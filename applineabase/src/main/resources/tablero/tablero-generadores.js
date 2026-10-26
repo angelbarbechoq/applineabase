@@ -174,7 +174,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
     function alarmas(g) {
       const lista = g.alarmas || [], color = lista.length ? ROJO : "#9fe0bb";
       const fila = a => `<div class="tg-alarma${a.activa ? "" : " tg-inactiva"}">${a.sinReset ? "*" : ""}${esc(a.nombre)}
-        <small>${a.activa ? "activa" : "ya no activa"}${a.sinReset ? ", sin reset" : ""}</small></div>`;
+        <small>${a.activa ? "activa" : "ya no activa"}${a.sinReset ? ", sin reset" : ""}${a.desde ? " · " + esc(a.desde) : ""}</small></div>`;
       return `<div class="tg-alarmas"><div class="tg-tit"><svg width="22" height="20" viewBox="0 0 22 20"><path d="M11 1 L21 19 H1 Z" fill="none" stroke="${color}" stroke-width="2"/>
         <rect x="10" y="7" width="2" height="6" fill="${color}"/><rect x="10" y="15" width="2" height="2" fill="${color}"/></svg>Lista de alarmas</div>
         ${lista.length ? lista.map(fila).join("") : `<div class="tg-sin-alarmas">Sin alarmas en el controlador</div>`}</div>`;
