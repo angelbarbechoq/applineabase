@@ -61,7 +61,11 @@ public enum ParametroGenerador {
     SALIDAS_BINARIAS("salidas_binarias", "Salidas binarias del controlador", "", true),
     MANTENIMIENTO("mantenimiento", "Contador de mantenimiento 1", "h", true),
     POTENCIA_NOMINAL("potencia_nominal", "Potencia nominal", "kW", true),
-    CORRIENTE_NOMINAL("corriente_nominal", "Corriente nominal", "A", true);
+    CORRIENTE_NOMINAL("corriente_nominal", "Corriente nominal", "A", true),
+    /** Log Bout 2 de ComAp, palabra de bits (bit 5 = Ready To AMF, ver "listoAmf" del modelo). */
+    LOG_BOUT_2("log_bout_2", "Log Bout 2 del controlador (Ready To AMF...)", "", true),
+    PARADAS_EMERGENCIA("paradas_emergencia", "Paradas de emergencia (contador)", "", true),
+    PARADAS_FALLA("paradas_falla", "Paradas por falla (Shutdowns, contador)", "", true);
 
     private final String columna;
     private final String etiqueta;

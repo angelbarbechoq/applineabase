@@ -61,11 +61,16 @@ abierto, presion de aceite), 41260 estado de los interruptores (List#4, mismos c
 3 = MainsOper), 41301 Log Bout 4 (bit 8 AL Mains Fail), 41344 modo del controlador (0 OFF, 1 MAN, 2 AUTO, 3 TEST;
 leido 2). Para el tablero de Estado actual (2026-10-26) tambien se leen 41259 estado del motor (List#3: Ready,
 NotReady, Running, Loaded, Cooling, Shutdown...; leido 2 = NotReady, con E-STOP activo), 41092 salidas binarias,
-41242 contador de mantenimiento 1, 41228 potencia nominal y 41230 corriente nominal. Disponibles sin usar:
-41298-41308 Log Bout 1-11 (Log Bout 2 = 41299: bit 5 Ready To AMF, bit 7 Not In Auto, bit 12 Generator Healthy,
-bit 13 Mains Healthy; alarmas AL ...), 41249-41250 paradas de emergencia y 41251-41252 shutdowns (UInt32),
-41243-41244 contadores de mantenimiento 2 y 3, 41253-41254 consumo total de combustible (L; leido 0: el motor no
-lo informa). No tiene medida de ROCOF ni de salto de vector (solo los ajustes de esas protecciones, 43167-43172).
+41242 contador de mantenimiento 1, 41228 potencia nominal y 41230 corriente nominal; y desde el mismo dia 41299 Log
+Bout 2 (bit 5 Ready To AMF = campo `listoAmf` del modelo; leido 0x2038: Ready, Ready To AMF, Mains Healthy),
+41249-41250 paradas de emergencia y 41251-41252 paradas por falla (Shutdowns), UInt32 (leidos 6 y 21).
+Disponibles sin usar: resto de Log Bout 1-11 (41298-41308: bit 7 Not In Auto, bit 12 Generator Healthy, bit 13
+Mains Healthy de Log Bout 2; alarmas AL ...), 41243-41244 contadores de mantenimiento 2 y 3, 41253-41254 consumo total
+de combustible (L; leido 0: el motor no lo informa). Temporizadores (cuenta regresiva de la pantalla del
+controlador): 41261 Timer text (List#5: 0 No Timer, 4 Cooling, 11 MCB Close, 13 ReturnDelay, 14 Start Delay...) y
+41265 Timer Value (s); ajustes 43070 Cooling Time (leido 180 s), 43152 Emergency Start Delay (15 s), 43153 Mains
+Return Delay (60 s), 43154 MCB Close Delay (x10, 1,0 s). No tiene medida de ROCOF ni de salto de vector (solo los
+ajustes de esas protecciones, 43167-43172).
 
 ## Pendientes
 - Aclarados con la lista: 41047 = angulo de deslizamiento (Slip Angle); 41055 = corriente de red L1 (una sola

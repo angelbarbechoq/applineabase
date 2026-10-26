@@ -40,6 +40,9 @@ public enum TipoEventoGenerador {
     /** Modo del controlador (OFF, MAN, AUTO, TEST): fuera de AUTO no arranca solo. */
     CAMBIO_MODO("Cambio de modo del controlador", Nivel.AVISO),
     MODO_AUTO("Vuelve a AUTO", Nivel.BUENO),
+    /** Ready To AMF de ComAp: si se corta la red, el generador entra solo. */
+    NO_LISTO_AMF("Deja de estar listo para AMF", Nivel.FALLA),
+    LISTO_AMF("Vuelve a estar listo para AMF", Nivel.BUENO),
     // Copiados del historial interno del controlador (pantalla History; no se lee por Modbus sin escribirle).
     // Fecha = hora real (la del controlador corregida por el desfase de su reloj); la descripción lleva el
     // motivo de ComAp y la hora del controlador. Primera carga: docs/ig500/historial-controlador-2026-10-12.csv.

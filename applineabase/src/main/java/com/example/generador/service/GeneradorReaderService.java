@@ -92,7 +92,7 @@ public class GeneradorReaderService {
             }
             procesar(g.nombre(), l);
             try {
-                historial.registrarLectura(g.nombre(), l, modelo.get().modo(l));
+                historial.registrarLectura(g.nombre(), l, modelo.get().modo(l), modelo.get().listoAmf(l));
             } catch (Exception e) {
                 logger.error("Generador {}: error en el historial de eventos: {}", g.nombre(), e.getMessage(), e);
             }

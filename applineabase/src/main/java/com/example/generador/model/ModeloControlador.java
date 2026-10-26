@@ -23,11 +23,18 @@ import java.util.Optional;
  * @param estadosMotor nombre de cada código de {@link ParametroGenerador#ESTADO_MOTOR} (Ready, NotReady, Loaded...)
  * @param entradas     nombre de cada bit de {@link ParametroGenerador#ENTRADAS_BINARIAS} (bit 0 primero), para el tablero
  * @param salidas      ídem de {@link ParametroGenerador#SALIDAS_BINARIAS}
+ * @param listoAmf     bit "Ready To AMF" de ComAp: si se corta la red, el generador entra solo (en AUTO y sin alarma que
+ *                     le impida arrancar, o ya en marcha en AUTO). null = el modelo no lo tiene.
  */
 public record ModeloControlador(String modelo, String descripcion, boolean confirmado, int maxHueco,
                                boolean noDisponible8000, List<Registro> registros, ListaAlarmas listaAlarmas,
                                Integer reloj, SenalesRed red, List<String> modos, List<String> estadosMotor,
-                               List<String> entradas, List<String> salidas) {
+                               List<String> entradas, List<String> salidas, SenalesRed.Bit listoAmf) {
+
+    /** Listo para AMF en la lectura; null si el modelo no lo da o no se leyó. */
+    public Boolean listoAmf(LecturaGenerador l) {
+        return SenalesRed.valor(listoAmf, l);
+    }
 
     /** Modo del controlador en la lectura ("AUTO"); null si el modelo no lo da o no se leyó. */
     public String modo(LecturaGenerador l) {

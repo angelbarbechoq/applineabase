@@ -95,6 +95,8 @@ Lectura del 2026-10-22 19:13, en paralelo con 595 kW (solo lectura, una vez).
 | 41299-41306 | Maintenance Timer 1-4 Interval (dias) | Int32 | 1 | |
 | 41311-41312 | Paradas de emergencia (Num E-Stops) | UInt32 | 1 | |
 | 41313-41314 | Paradas por proteccion (Shutdowns) | UInt32 | 1 | |
+| 41392 | Log Bout 2 (bit 5 Ready To AMF, campo listoAmf del modelo; leido 0x1038 el 26-10) | Bits | 1 | |
+| 41328 | Timer text (List#12: 0 No Timer, 4 Cooling, 13 ReturnDelay...; el valor del temporizador no esta en la lista exportada) | Lista | 1 | |
 | 41315-41316 | Consumo total de combustible (l) | UInt32 | 0.1 | |
 | 41324 | Modo del controlador (List#8: 0 OFF, 1 MAN, 2 AUTO, 3 TEST) | UInt16 | - | 2 = AUTO |
 | 41325 | Estado del deslastre de carga (List#9) | UInt16 | - | 0 |

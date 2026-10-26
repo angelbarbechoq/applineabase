@@ -55,6 +55,7 @@ public class HistorialEventosService {
         Integer arranques;
         Set<String> alarmas;
         String modo;
+        Boolean listoAmf;
     }
 
     private final Map<String, Estado> estados = new ConcurrentHashMap<>();
@@ -66,9 +67,10 @@ public class HistorialEventosService {
     /**
      * Compara la lectura con el estado anterior y guarda los eventos que correspondan.
      *
-     * @param modo modo del controlador en la lectura (OFF, MAN, AUTO, TEST); null si el modelo no lo da
+     * @param modo     modo del controlador en la lectura (OFF, MAN, AUTO, TEST); null si el modelo no lo da
+     * @param listoAmf si entraría solo al cortarse la red (Ready To AMF); null si el modelo no lo da
      */
-    public void registrarLectura(String generador, LecturaGenerador l, String modo) {
+    public void registrarLectura(String generador, LecturaGenerador l, String modo, Boolean listoAmf) {
         List<EventoGenerador> nuevos = new ArrayList<>();
         LocalDateTime t = l.fecha();
         boolean marcha = l.enMarcha();
@@ -82,6 +84,7 @@ public class HistorialEventosService {
                     + (marcha ? "en marcha" + (Boolean.TRUE.equals(carga) ? " con carga" : " en vacio") : "parado")
                     + (red == null ? "" : red ? ", con red" : ", sin red")
                     + (modo == null ? "" : ", modo " + modo)
+                    + (listoAmf == null ? "" : listoAmf ? ", listo para AMF" : ", no listo para AMF")
                     + (l.desfaseReloj() == null ? "" : "; reloj del controlador " + LecturaGenerador.textoDesfase(l.desfaseReloj())), l));
             if (l.alarmas() != null) {
                 for (String a : l.alarmas()) {
@@ -118,8 +121,15 @@ public class HistorialEventosService {
                         ? EventoGenerador.de(t, MODO_AUTO, "El controlador vuelve a AUTO (estaba en " + e.modo + ")", l)
                         : EventoGenerador.de(t, CAMBIO_MODO, "El controlador pasa de " + e.modo + " a " + modo, l));
             }
+            if (listoAmf != null && e.listoAmf != null && !listoAmf.equals(e.listoAmf)) {
+                nuevos.add(listoAmf
+                        ? EventoGenerador.de(t, LISTO_AMF, "Si se corta la red, el generador vuelve a entrar solo", l)
+                        : EventoGenerador.de(t, NO_LISTO_AMF, "Si se corta la red, el generador no entraria solo"
+                                + (modo == null ? "" : " (modo " + modo + ")"), l));
+            }
         }
         if (modo != null) e.modo = modo;
+        if (listoAmf != null) e.listoAmf = listoAmf;
         e.comunicando = true;
         e.marcha = marcha;
         e.carga = carga;

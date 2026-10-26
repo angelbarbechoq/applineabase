@@ -119,6 +119,9 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
         ${g.sinComunicacion != null
           ? `<span class="tg-badge tg-fuera">SIN COMUNICACION</span><span class="tg-leido">${esc(g.sinComunicacion)}</span>`
           : `<span class="tg-badge ${g.marcha ? "tg-ok" : "tg-gris"}">${g.marcha ? "EN MARCHA" : "PARADO"}</span>
+             ${g.listoAmf == null ? "" : g.listoAmf
+               ? `<span class="tg-badge tg-ok" title="Si se corta la red, el generador entra solo">LISTO PARA AMF</span>`
+               : `<span class="tg-badge tg-fuera" title="Si se corta la red, el generador no entraria solo">NO LISTO PARA AMF</span>`}
              <span class="tg-leido">Leido ${esc(g.leido)}${g.reloj ? ` · reloj del controlador ${esc(g.reloj)} <span class="tg-badge ${g.desfaseAlto ? "tg-aviso" : "tg-ok"}">${esc(g.desfase)}</span>` : ""}</span>`}
         ${g.modo != null ? `<span class="tg-modos">${modos}</span>` : ""}</div>`;
       if (g.sinComunicacion != null) return `<section class="tg-tablero">${barra}</section>`;
@@ -305,7 +308,8 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
     function contadores(g) {
       const v = g.v;
       const filas = [["Horas de marcha", v.HORAS_MARCHA, 1, "h"], ["Contador de mantenimiento 1", v.MANTENIMIENTO, 0, "h"], ["Arranques", v.ARRANQUES, 0, ""],
-        ["Energia generada", v.KWH, 0, "kWh"], ["Energia reactiva", v.KVARH, 0, "kVArh"]]
+        ["Energia generada", v.KWH, 0, "kWh"], ["Energia reactiva", v.KVARH, 0, "kVArh"],
+        ["Paradas de emergencia", v.PARADAS_EMERGENCIA, 0, ""], ["Paradas por falla", v.PARADAS_FALLA, 0, ""]]
         .map(([t, val, d, u]) => `<div class="tg-contador"><div class="tg-ct">${t}</div>${digitos(val, d, u)}</div>`).join("");
       return `<div class="tg-contadores">${filas}</div>`;
     }
