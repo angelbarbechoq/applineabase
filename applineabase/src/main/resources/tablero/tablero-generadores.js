@@ -4,11 +4,11 @@
 if (!window.TableroGeneradores) {
   window.TableroGeneradores = (function () {
     const CSS = `
-.tg { display: grid; gap: 28px; color: #1E1E2C; font: 14px/1.4 "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.tg { display: grid; gap: 28px; color: #1E1E2C; font: 14px/1.4 "Segoe UI", Roboto, Helvetica, Arial, sans-serif; container-type: inline-size; }
 .tg * { box-sizing: border-box; }
-.tg-tablero { display: grid; gap: 10px; }
-.tg-card { background: #fff; border: 1px solid #E4E6EC; border-radius: 12px; padding: 12px 14px; min-width: 0; }
-.tg-card h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: #6b7080; text-transform: uppercase; letter-spacing: .04em; }
+.tg-tablero { display: grid; gap: 8px; }
+.tg-card { background: #fff; border: 1px solid #E4E6EC; border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.tg-card h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #6b7080; text-transform: uppercase; letter-spacing: .04em; }
 .tg-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .tg-nombre { font-size: 20px; font-weight: 700; }
 .tg-sub, .tg-leido { color: #6b7080; font-size: 13px; }
@@ -22,21 +22,30 @@ if (!window.TableroGeneradores) {
 .tg-modos span.tg-act.MAN, .tg-modos span.tg-act.TEST { background: #E0B50F; border-color: #E0B50F; color: #fff; }
 .tg-modos span.tg-act.OFF { background: #E8505B; border-color: #E8505B; color: #fff; }
 .tg-esquema { background: #2B2F3A; border-radius: 12px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(220px, 1fr); gap: 14px; color: #fff; }
-.tg-esquema > svg { width: 100%; height: auto; display: block; }
+.tg-esquema > svg { width: 100%; max-width: 860px; height: auto; display: block; margin: 0 auto; align-self: center; }
 .tg-alarmas { background: #20232c; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .tg-alarmas .tg-tit { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; }
 .tg-alarma { background: #E8505B; color: #fff; border-radius: 4px; padding: 5px 8px; font-weight: 600; }
 .tg-alarma.tg-inactiva { background: #7a6205; }
 .tg-alarma small { display: block; font-weight: 400; opacity: .9; }
 .tg-sin-alarmas { color: #9fe0bb; font-size: 13px; }
-.tg-fila2 { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(170px, .8fr) minmax(190px, .9fr); gap: 10px; }
-.tg-fila3 { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1fr) minmax(0, 1.15fr) minmax(190px, .9fr); gap: 10px; }
-@media (max-width: 1000px) { .tg-fila2, .tg-fila3, .tg-esquema { grid-template-columns: minmax(0, 1fr); } }
-.tg-barras { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-@media (max-width: 640px) { .tg-barras { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.tg-grupo .tg-gtit { font-size: 12px; font-weight: 600; text-align: center; min-height: 32px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; }
+.tg-fila2 { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(170px, .8fr) minmax(190px, .9fr); gap: 8px; }
+.tg-fila3 { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1fr) minmax(0, 1.15fr) minmax(190px, .9fr); gap: 8px; }
+/* Pantalla ancha: dos filas (esquema, potencia y contadores; barras, estado, motor, entradas y salidas) para que entre entero. */
+@container (min-width: 1500px) {
+  .tg-tablero { grid-template-columns: minmax(0, 1fr) 190px 270px 220px 220px;
+    grid-template-areas: "top top top top top" "esq esq kw cnt cnt" "bar est mot ent sal"; }
+  .tg-fila2, .tg-fila3 { display: contents; }
+  .tg-tablero .tg-grupo .tg-gtit { min-height: 40px; }
+  .tg-a-top { grid-area: top; } .tg-a-esq { grid-area: esq; } .tg-a-kw { grid-area: kw; } .tg-a-cnt { grid-area: cnt; }
+  .tg-a-bar { grid-area: bar; } .tg-a-est { grid-area: est; } .tg-a-mot { grid-area: mot; } .tg-a-ent { grid-area: ent; } .tg-a-sal { grid-area: sal; }
+}
+@container (max-width: 1000px) { .tg-fila2, .tg-fila3, .tg-esquema { grid-template-columns: minmax(0, 1fr); } }
+.tg-barras { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+@container (max-width: 640px) { .tg-barras { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tg-grupo .tg-gtit { font-size: 12px; font-weight: 600; text-align: center; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; }
 .tg-grupo .tg-hz { font-family: Consolas, "Courier New", monospace; }
-.tg-grupo svg { width: 100%; height: auto; }
+.tg-grupo svg { width: 100%; max-width: 170px; height: auto; display: block; margin: 0 auto; }
 .tg-sep { border-left: 1px solid #E4E6EC; }
 .tg-estados { background: #3A3F4C; color: #fff; border-radius: 10px; padding: 10px 12px; display: grid; gap: 10px; }
 .tg-estados .tg-et { font-size: 12px; color: #c9ccd6; }
@@ -44,7 +53,7 @@ if (!window.TableroGeneradores) {
 .tg-estados .tg-eg { font-size: 12px; text-align: center; color: #e2e4ea; }
 .tg-estados hr { border: 0; border-top: 1px solid #5a6070; margin: 0; }
 table.tg-io { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.tg-io td { padding: 3px 6px; border-bottom: 1px solid #eef0f4; }
+table.tg-io td { padding: 2px 6px; border-bottom: 1px solid #eef0f4; }
 table.tg-io td:first-child { width: 18px; color: #6b7080; }
 table.tg-io td:last-child { width: 26px; text-align: center; font-family: Consolas, "Courier New", monospace; }
 table.tg-io tr.tg-on td:last-child { background: #3BB273; color: #fff; }
@@ -56,13 +65,14 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
 .tg-medida svg { width: 100%; height: auto; }
 .tg-nota { color: #6b7080; font-size: 12px; }
 .tg-kw { display: grid; gap: 6px; }
-.tg-kw svg { width: 100%; max-width: 300px; height: auto; margin: 0 auto; display: block; }
+.tg-kw svg { width: 100%; max-width: 260px; height: auto; margin: 0 auto; display: block; }
 .tg-cajas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; }
 .tg-caja { display: flex; align-items: center; gap: 6px; font-size: 12px; justify-content: flex-end; }
 .tg-caja b { font-family: Consolas, "Courier New", monospace; font-size: 14px; border: 1px solid #E4E6EC; border-radius: 4px; padding: 2px 8px; min-width: 60px; text-align: right; }
 .tg-caja b.tg-ok { background: #3BB273; color: #fff; border-color: #3BB273; }
 .tg-caja b.tg-aviso { background: #E0B50F; color: #fff; border-color: #E0B50F; }
 .tg-caja b.tg-fuera { background: #E8505B; color: #fff; border-color: #E8505B; }
+.tg-contadores { display: grid; grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 0 12px; }
 .tg-contador { margin-bottom: 8px; }
 .tg-contador .tg-ct { font-size: 12px; color: #6b7080; }
 .tg-digitos { display: flex; align-items: center; gap: 2px; font-family: Consolas, "Courier New", monospace; font-size: 16px; font-weight: 600; }
@@ -93,7 +103,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
 
     function tablero(g) {
       const modos = ["OFF", "MAN", "AUTO", "TEST"].map(m => `<span class="${m}${m === g.modo ? " tg-act" : ""}">${m}</span>`).join("");
-      const barra = `<div class="tg-card tg-barra">
+      const barra = `<div class="tg-card tg-barra tg-a-top">
         <span class="tg-nombre">${esc(g.nombre)}</span><span class="tg-sub">${esc(g.modelo)} · ${esc(g.trafo)}</span>
         ${g.sinComunicacion != null
           ? `<span class="tg-badge tg-fuera">SIN COMUNICACION</span><span class="tg-leido">${esc(g.sinComunicacion)}</span>`
@@ -102,17 +112,17 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
         ${g.modo != null ? `<span class="tg-modos">${modos}</span>` : ""}</div>`;
       if (g.sinComunicacion != null) return `<section class="tg-tablero">${barra}</section>`;
       return `<section class="tg-tablero">${barra}
-        <div class="tg-esquema">${esquema(g)}${alarmas(g)}</div>
+        <div class="tg-esquema tg-a-esq">${esquema(g)}${alarmas(g)}</div>
         <div class="tg-fila2">
-          <div class="tg-card"><h3>Tensiones, corriente y frecuencia</h3>${barras(g)}</div>
-          <div class="tg-card"><h3>Estado</h3>${estados(g)}</div>
-          <div class="tg-card"><h3>Entradas binarias</h3>${io(g.entradas, g, true)}</div>
+          <div class="tg-card tg-a-bar"><h3>Tensiones, corrientes y frecuencia</h3>${barras(g)}</div>
+          <div class="tg-card tg-a-est"><h3>Estado</h3>${estados(g)}</div>
+          <div class="tg-card tg-a-ent"><h3>Entradas binarias</h3>${io(g.entradas, g, true)}</div>
         </div>
         <div class="tg-fila3">
-          <div class="tg-card"><h3>Motor</h3>${motor(g)}</div>
-          <div class="tg-card"><h3>Potencia del generador</h3>${indicador(g)}</div>
-          <div class="tg-card"><h3>Contadores</h3>${contadores(g)}</div>
-          <div class="tg-card"><h3>Salidas binarias</h3>${io(g.salidas, g, false)}</div>
+          <div class="tg-card tg-a-mot"><h3>Motor</h3>${motor(g)}</div>
+          <div class="tg-card tg-a-kw"><h3>Potencia del generador</h3>${indicador(g)}</div>
+          <div class="tg-card tg-a-cnt"><h3>Contadores</h3>${contadores(g)}</div>
+          <div class="tg-card tg-a-sal"><h3>Salidas binarias</h3>${io(g.salidas, g, false)}</div>
         </div></section>`;
     }
 
@@ -164,8 +174,9 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
         ${lista.length ? lista.map(fila).join("") : `<div class="tg-sin-alarmas">Sin alarmas en el controlador</div>`}</div>`;
     }
 
-    /* Grupo de 3 barras con escala, lineas de limite (fuera de rango de Calidad de energia, o la nominal) y valores debajo */
-    function grupo(titulo, hz, hzEstado, vals, etiquetas, max, limites, color) {
+    /* Grupo de 3 barras con escala, lineas de limite (fuera de rango de Calidad de energia, o la nominal) y valores debajo;
+       arriba, opcional, la frecuencia o el PF con su color */
+    function grupo(titulo, marca, marcaEstado, vals, etiquetas, max, limites, color) {
       const W = 150, H = 150, x0 = 30, y0 = 10, alto = 110;
       const y = val => y0 + alto - Math.min(Math.max(val, 0), max) / max * alto;
       let s = `<svg viewBox="0 0 ${W} ${H}">`;
@@ -181,19 +192,23 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
           <text x="${bx + 13}" y="${y0 + alto + 25}" text-anchor="middle" font-size="8" fill="#8a8f9c">${etiquetas[i]}</text>`;
       });
       s += "</svg>";
-      const hzTxt = hz === undefined ? "" : `<span class="tg-hz tg-badge tg-${hzEstado || "gris"}">${fmt(hz, 1)} Hz</span>`;
-      return `<div class="tg-grupo"><div class="tg-gtit">${hzTxt}<span>${titulo}</span></div>${s}</div>`;
+      const marcaTxt = marca === undefined ? "" : `<span class="tg-hz tg-badge tg-${marcaEstado || "gris"}">${esc(marca)}</span>`;
+      return `<div class="tg-grupo"><div class="tg-gtit">${marcaTxt}<span>${titulo}</span></div>${s}</div>`;
     }
 
     function barras(g) {
       const v = g.v, n = g.nom, f = 1 + g.fueraPct / 100, f2 = 1 - g.fueraPct / 100, RED = "#3B8FF3", GEN = "#F29F67";
       const escala = nominal => Math.ceil(nominal * 1.35 / 100) * 100;
       const imax = n.i ? Math.ceil(n.i * 1.25 / 500) * 500 : 2000;
+      // Corrientes del transformador (su medidor): misma escala que el generador, o mayor si la pasan.
+      const it = g.trafoI || [], imaxTrafo = Math.max(imax, Math.ceil(Math.max(0, ...it.map(x => x || 0)) * 1.15 / 500) * 500);
+      const hz = val => fmt(val, 1) + " Hz";
       return `<div class="tg-barras">
-        ${grupo("Red L-N [V]", v.RED_FRECUENCIA, g.hzRed, [v.RED_V_L1N, v.RED_V_L2N, v.RED_V_L3N], ["L1-N", "L2-N", "L3-N"], escala(n.redLN), [n.redLN * f, n.redLN * f2], RED)}
+        ${grupo("Red L-N [V]", hz(v.RED_FRECUENCIA), g.hzRed, [v.RED_V_L1N, v.RED_V_L2N, v.RED_V_L3N], ["L1-N", "L2-N", "L3-N"], escala(n.redLN), [n.redLN * f, n.redLN * f2], RED)}
         ${grupo("Red L-L [V]", undefined, null, [v.RED_V_L1L2, v.RED_V_L2L3, v.RED_V_L3L1], ["L1-L2", "L2-L3", "L3-L1"], escala(n.redLL), [n.redLL * f, n.redLL * f2], RED)}
-        <div class="tg-sep">${grupo("Generador corriente [A]", undefined, null, [v.I_L1, v.I_L2, v.I_L3], ["L1", "L2", "L3"], imax, [n.i || 0], GEN)}</div>
-        ${grupo("Generador L-N [V]", v.FRECUENCIA, g.hzGen, [v.V_L1N, v.V_L2N, v.V_L3N], ["L1-N", "L2-N", "L3-N"], escala(n.genLN), [n.genLN * f, n.genLN * f2], GEN)}
+        ${grupo("Transformador [A]", "PF " + (g.trafoPf == null ? "-" : fmt(g.trafoPf, 2)), g.trafoPfEstado, it, ["A", "B", "C"], imaxTrafo, [], RED)}
+        <div class="tg-sep">${grupo("Generador [A]", undefined, null, [v.I_L1, v.I_L2, v.I_L3], ["L1", "L2", "L3"], imax, [n.i || 0], GEN)}</div>
+        ${grupo("Generador L-N [V]", hz(v.FRECUENCIA), g.hzGen, [v.V_L1N, v.V_L2N, v.V_L3N], ["L1-N", "L2-N", "L3-N"], escala(n.genLN), [n.genLN * f, n.genLN * f2], GEN)}
         ${grupo("Generador L-L [V]", undefined, null, [v.V_L1L2, v.V_L2L3, v.V_L3L1], ["L1-L2", "L2-L3", "L3-L1"], escala(n.genLL), [n.genLL * f, n.genLL * f2], GEN)}
       </div>`;
     }
@@ -247,7 +262,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
         const [x1, y1] = p(v1, r), [x2, y2] = p(v2, r), grande = (a0 - a1) * (v2 - v1) / max > 180 ? 1 : 0;
         return `<path d="M${x1} ${y1} A${r} ${r} 0 ${grande} 1 ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="18"/>`;
       };
-      let s = `<svg viewBox="0 0 260 215">${arco(0, nom, VERDE)}${arco(nom, nom * 1.1, AMARILLO)}${arco(nom * 1.1, max, ROJO)}`;
+      let s = `<svg viewBox="0 0 260 198">${arco(0, nom, VERDE)}${arco(nom, nom * 1.1, AMARILLO)}${arco(nom * 1.1, max, ROJO)}`;
       for (let i = 0; i <= 10; i++) {
         const val = max / 10 * i, [tx, ty] = p(val, r + 22), [l1x, l1y] = p(val, r - 10), [l2x, l2y] = p(val, r + 10);
         s += `<line x1="${l1x}" y1="${l1y}" x2="${l2x}" y2="${l2y}" stroke="#fff" stroke-width="2"/><text x="${tx}" y="${ty + 3}" text-anchor="middle" font-size="9" fill="#555b69">${fmt(val)}</text>`;
@@ -274,9 +289,10 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
 
     function contadores(g) {
       const v = g.v;
-      return [["Horas de marcha", v.HORAS_MARCHA, 1, "h"], ["Contador de mantenimiento 1", v.MANTENIMIENTO, 0, "h"], ["Arranques", v.ARRANQUES, 0, ""],
+      const filas = [["Horas de marcha", v.HORAS_MARCHA, 1, "h"], ["Contador de mantenimiento 1", v.MANTENIMIENTO, 0, "h"], ["Arranques", v.ARRANQUES, 0, ""],
         ["Energia generada", v.KWH, 0, "kWh"], ["Energia reactiva", v.KVARH, 0, "kVArh"]]
         .map(([t, val, d, u]) => `<div class="tg-contador"><div class="tg-ct">${t}</div>${digitos(val, d, u)}</div>`).join("");
+      return `<div class="tg-contadores">${filas}</div>`;
     }
 
     return {

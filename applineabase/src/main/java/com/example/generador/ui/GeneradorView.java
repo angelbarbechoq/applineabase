@@ -6,6 +6,7 @@ import com.example.calidad.model.ConfiguracionCalidad;
 import com.example.calidad.model.Indicador;
 import com.example.calidad.service.CalidadEnergiaService;
 import com.example.calidad.service.CalidadEnergiaService.Estado;
+import com.example.dataacquisition.FactorPotenciaUtil;
 import com.example.dataacquisition.MaquinasVirtuales;
 import com.example.generador.model.EventoGenerador;
 import com.example.generador.model.Generador;
@@ -685,7 +686,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> refrescar());
         estadoContenido.setWidthFull();
         Span nota = new Span("Leido en vivo del controlador cada 15 s (solo lectura: el modo se muestra, no se cambia desde la app). "
-                + "Red y planta segun el medidor del transformador (ultimo minuto); planta = generador + red. "
+                + "Red, planta, corrientes y PF del transformador segun su medidor (ultimo minuto); planta = generador + red. "
                 + "Lineas de limite de tension y color de la frecuencia con los limites de Calidad de Energia; bateria, aceite y "
                 + "temperatura con limites provisorios (sistema de 24 V). Con Todos, un tablero por generador.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
@@ -765,7 +766,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         d.put("v", v);
         d.put("alarmas", l.alarmas() == null ? List.of() : l.alarmas().stream().map(a -> Map.of("nombre", AlarmaComap.nombre(a),
                 "activa", AlarmaComap.activa(a), "sinReset", AlarmaComap.sinConfirmar(a))).toList());
-        d.put("redKw", num(service.ultimaRed(g).get("PW")));
+        Map<String, Object> medidor = service.ultimaRed(g);
+        d.put("redKw", num(medidor.get("PW")));
+        // Corrientes y PF del medidor del transformador (PF con color según los límites de Calidad de Energía).
+        Double pfTrafo = num(medidor.get("PF")) == null ? null : FactorPotenciaUtil.normalizarAbs(Math.abs(num(medidor.get("PF"))));
+        d.put("trafoI", java.util.Arrays.asList(num(medidor.get("IA")), num(medidor.get("IB")), num(medidor.get("IC"))));
+        d.put("trafoPf", pfTrafo);
+        d.put("trafoPfEstado", clase(calidad.evaluar(Indicador.FACTOR_POTENCIA, pfTrafo,
+                calidad.tensionNominal(g.redAsociada() == null ? "" : g.redAsociada()), calidad.configuracion())));
         SenalesRed red = m == null ? null : m.red();
         if (red != null) {
             d.put("mcb", SenalesRed.valor(red.mcbCerrado(), l));
