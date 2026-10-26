@@ -68,7 +68,12 @@ public enum ParametroGenerador {
     PARADAS_FALLA("paradas_falla", "Paradas por falla (Shutdowns, contador)", "", true),
     /** Cuenta regresiva de la pantalla del controlador: cuál corre (código, nombres en "temporizadores" del modelo). */
     TEMPORIZADOR("temporizador", "Temporizador en curso (codigo)", "", true),
-    TEMPORIZADOR_VALOR("temporizador_valor", "Tiempo que falta del temporizador", "s", true);
+    TEMPORIZADOR_VALOR("temporizador_valor", "Tiempo que falta del temporizador", "s", true),
+    // Tiempos ajustados en el controlador (setpoints, solo lectura): el total de cada cuenta regresiva ("tiemposAjustados").
+    AJUSTE_DEMORA_ARRANQUE("ajuste_demora_arranque", "Demora de arranque por falla de red (Emergency Start Delay)", "s", false),
+    AJUSTE_RETORNO_RED("ajuste_retorno_red", "Espera al volver la red (Mains Return Delay)", "s", false),
+    AJUSTE_CIERRE_MCB("ajuste_cierre_mcb", "Demora de cierre del MCB (MCB Close Delay)", "s", false),
+    AJUSTE_ENFRIAMIENTO("ajuste_enfriamiento", "Tiempo de enfriamiento (Cooling Time)", "s", false);
 
     private final String columna;
     private final String etiqueta;

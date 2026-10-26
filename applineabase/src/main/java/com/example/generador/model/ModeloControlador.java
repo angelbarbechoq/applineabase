@@ -1,6 +1,7 @@
 package com.example.generador.model;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -27,16 +28,29 @@ import java.util.Optional;
  *                     le impida arrancar, o ya en marcha en AUTO). null = el modelo no lo tiene.
  * @param temporizadores nombre de cada código de {@link ParametroGenerador#TEMPORIZADOR} (ComAp: No Timer, Cooling,
  *                     ReturnDelay...), la cuenta regresiva de la pantalla del controlador
+ * @param tiemposAjustados tiempo total de cada cuenta (por nombre del temporizador): fijo en segundos, copiado de los
+ *                     ajustes del controlador, o leído de un registro de ajuste (parámetro AJUSTE_...)
  */
 public record ModeloControlador(String modelo, String descripcion, boolean confirmado, int maxHueco,
                                boolean noDisponible8000, List<Registro> registros, ListaAlarmas listaAlarmas,
                                Integer reloj, SenalesRed red, List<String> modos, List<String> estadosMotor,
                                List<String> entradas, List<String> salidas, SenalesRed.Bit listoAmf,
-                               List<String> temporizadores) {
+                               List<String> temporizadores, Map<String, TiempoAjustado> tiemposAjustados) {
 
     /** Temporizador que corre en la lectura ("ReturnDelay", "No Timer"); null si el modelo no lo da o no se leyó. */
     public String temporizador(LecturaGenerador l) {
         return nombre(temporizadores, l.valor(ParametroGenerador.TEMPORIZADOR));
+    }
+
+    /** Tiempo total ajustado del temporizador (s); null si no se conoce. */
+    public Double tiempoAjustado(String temporizador, LecturaGenerador l) {
+        TiempoAjustado t = temporizador == null ? null : tiemposAjustados.get(temporizador);
+        if (t == null) return null;
+        return t.parametro() != null ? l.valor(t.parametro()) : t.segundos();
+    }
+
+    /** Tiempo de una cuenta: fijo (segundos) o leído del controlador (parametro). */
+    public record TiempoAjustado(Double segundos, ParametroGenerador parametro) {
     }
 
     /** Listo para AMF en la lectura; null si el modelo no lo da o no se leyó. */

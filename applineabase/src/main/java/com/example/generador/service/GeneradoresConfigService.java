@@ -113,9 +113,34 @@ public class GeneradoresConfigService {
                     m.get("reloj") instanceof Number reloj ? reloj.intValue() : null,
                     m.get("red") instanceof Map<?, ?> red ? senalesRed(modelo, red) : null, textos(m.get("modos")),
                     textos(m.get("estadosMotor")), textos(m.get("entradas")), textos(m.get("salidas")),
-                    bit(modelo, m, "listoAmf"), textos(m.get("temporizadores"))));
+                    bit(modelo, m, "listoAmf"), textos(m.get("temporizadores")), tiempos(modelo, m.get("tiemposAjustados"))));
         }
         return lista;
+    }
+
+    /**
+     * Campo "tiemposAjustados": por nombre de temporizador, los segundos fijos (copiados de los ajustes del controlador)
+     * o {"parametro": "AJUSTE_..."} para leerlo del controlador. Lo que esté mal se ignora con aviso en el log.
+     */
+    private Map<String, ModeloControlador.TiempoAjustado> tiempos(String modelo, Object o) {
+        Map<String, ModeloControlador.TiempoAjustado> t = new java.util.HashMap<>();
+        if (!(o instanceof Map<?, ?> mapa)) return Map.of();
+        for (Map.Entry<?, ?> e : mapa.entrySet()) {
+            String nombre = String.valueOf(e.getKey());
+            try {
+                if (e.getValue() instanceof Number n) {
+                    t.put(nombre, new ModeloControlador.TiempoAjustado(n.doubleValue(), null));
+                } else if (e.getValue() instanceof Map<?, ?> r) {
+                    t.put(nombre, new ModeloControlador.TiempoAjustado(null,
+                            ParametroGenerador.valueOf(String.valueOf(r.get("parametro")).trim().toUpperCase(Locale.ROOT))));
+                }
+            } catch (Exception ex) {
+                if (avisados.add(modelo + "|tiempo|" + nombre)) {
+                    logger.warn("generador-modelos.json, modelo {}: tiempo ajustado {} ignorado ({})", modelo, nombre, ex.getMessage());
+                }
+            }
+        }
+        return Map.copyOf(t);
     }
 
     /** Lista de nombres del JSON (vacía si falta). */

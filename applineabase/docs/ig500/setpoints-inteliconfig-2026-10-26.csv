@@ -1,0 +1,606 @@
+﻿Name;FW Version;Application;Date;App. Ver.;Ser. Num.;Filename;;;;;;;;;;;;;;
+PLANTA 1;InteliGen500 G2-2.4.3.6;Standard GC;26/10/2026;2.4.3.6;243900D9;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;
+Group;Sub-group;Name;Value;Dimension;Com. Obj.;Low limit;High limit;Role 1 (Default);Role 2;Role 3;Role 4;Role 5;Role 6;Role 7;Administrator;SNMP;Modbus;Advanced only;Visible;Data type
+;;;;;;;;;;;;;;;;;;;;
+Process Control;Application Selector;Default Application Select;SPtM;;12157;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Load Control;Load Control PTM Mode;Baseload;;8638;;;RW;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Load Control;PF Control PTM Mode;Base PF;;10120;;;RW;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Load Control;#System Load Control PTM;IM Loadsharing;;8774;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;String list
+Process Control;Load Control;Baseload;600;kW;8639;0;1000;RW;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 16
+Process Control;Load Control;Base Power Factor;"1,00"; ;8640;"0,60";"1,20";RW;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 16
+Process Control;Load Control;Import Load;0;kW;8641;-32000;32000;RW;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 16
+Process Control;Load Control;Import Power Factor;"1,00"; ;8642;"0,60";"1,20";RW;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 16
+Process Control;Load Control;Import/Export Limitation;Disabled;;9592;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Load Control;#System Baseload;1000;kW;8775;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Process Control;Load Control;Local Baseload;0;kW;10118;0;1000;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;No;Unsigned 16
+Process Control;Load Control;#System Power Factor;"0,95"; ;8776;"0,60";"1,20";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Process Control;PF Control;#System PF Control PTM;Base PF;;8779;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;String list
+Process Control;Neutral Contactor;#Neutral Contactor control;Common;;9890;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;String list
+Process Control;Process Limitation;CB Control In MAN Mode;Full Ctrl;;14962;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Load Transfer;Close Transfer Max Duration;"60,0";s;8661;"0,1";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Process Control;Load Transfer;Open Transfer Min Break;"2,0";s;8303;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Process Control;Load Transfer;Transfer Mains To Gen;SoftTransf;;12969;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Load Transfer;Transfer Gen To Mains;SoftTransf;;14688;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Load Transfer;Generator Unload GCB Open Level;10;%;8547;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Process Control;Load Transfer;Mains Unload MCB Open Window;10;%;14694;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Process Control;Load Transfer;Load Ramp;60;s;8658;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Process Control;Mains Import Measurement;Mains Measurement P;Mains CT;;10599;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Mains Import Measurement;Mains Measurement Q;Mains CT;;10598;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Peak Shaving;Peak Shaving;Disabled;;11601;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Peak Shaving;Peak Shaving Start Level;1000;kW;8643;900;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Signed 16
+Process Control;Peak Shaving;Peak Shaving Stop Level;900;kW;8644;0;1000;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Signed 16
+Process Control;Peak Shaving;Peak Shaving Start/Stop Delay;600;s;9989;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 16
+Process Control;Breaker Control Mode;MCB Control Mode;Internal;;9873;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Breaker Control Mode;GCB Control Mode;Internal;;11771;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Process Control;Breaker Control Mode;Attempts To Close Breaker;3;;19885;1;5;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;Unsigned 8
+Process Control;Breaker Control Mode;Delay Between Closing Attempts;5;s;19883;2;60;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;Unsigned 8
+Process Control;Breaker Control Mode;Waiting For Breaker Feedback;2;s;19884;1;5;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;Unsigned 8
+Process Control;Bus Meas Error Protection;Bus Meas Error Delay;20;s;19001;20;60;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;No;Unsigned 8
+Process Control;Bank Controller;Inside Bank Application;Disable;;17881;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;No;String list
+;;;;;;;;;;;;;;;;;;;;
+Basic Settings;Name;Gen-Set Name;PLANTA 1;;8637;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Short string
+Basic Settings;Power Settings;Nominal Power;1000;kW;8276;1;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Basic Settings;Power Settings;Nominal Power Split Phase;200;kW;9977;1;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Basic Settings;Current Settings;Nominal Current;1570;A;8275;1;65000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Basic Settings;Current Settings;Gen CT Ratio Prim;2000;A;8274;1;10000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Basic Settings;Current Settings;Gen CT Ratio Sec;/5A;;10556;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Basic Settings;Current Settings;Mains/EFC CT Ratio Prim;2000;A;8566;1;10000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Basic Settings;Current Settings;Mains/EFC CT Ratio Sec;/5A;;10557;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Basic Settings;Voltage Settings;Connection Type;3Ph3Wire;;11628;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Basic Settings;Voltage Settings;Evaluated Voltage Protections;Both;;10647;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;No;String list
+Basic Settings;Voltage Settings;Generator Nominal Voltage Ph-N;266;V;8277;10;34641;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Basic Settings;Voltage Settings;Generator Nominal Voltage Ph-Ph;460;V;11657;10;60000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Basic Settings;Voltage Settings;Mains/Bus Nominal Voltage Ph-N;266;V;9888;10;34641;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Basic Settings;Voltage Settings;Mains/Bus Nominal Voltage Ph-Ph;460;V;9907;10;60000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Basic Settings;Voltage Settings;Nominal Voltage 3Ph Low Y;120;V;20811;10;34641;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Basic Settings;Voltage Settings;Nominal Voltage 3Ph High Y;277;V;20812;10;34641;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Basic Settings;Voltage Settings;Nominal Voltage High Leg D;120;V;20813;10;34641;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Basic Settings;Voltage Settings;Nominal Voltage SplitPhase;120;V;20814;10;34641;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Basic Settings;Voltage Settings;Nominal Voltage MonoPhase;120;V;20815;10;34641;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Basic Settings;Voltage Settings;Gen VT Ratio;"1,00";V/V;9579;"0,01";"500,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Basic Settings;Voltage Settings;Mains/Bus VT Ratio;"1,00";V/V;9580;"0,01";"500,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Basic Settings;Frequency Settings;Nominal Frequency;"60,0";Hz;8278;"30,0";"65,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Basic Settings;Frequency Settings;Gear Teeth;0;;8252;0;500;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Basic Settings;Frequency Settings;Nominal RPM;1800;RPM;8253;100;4000;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Basic Settings;Frequency Settings;Frequency Protection Reference;SetpNomFreq;;13220;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Basic Settings;Controller Settings;Controller Mode;AUTO;;8315;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;Yes;String list
+Basic Settings;Controller Settings;Power On Mode;Previous;;13000;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Basic Settings;Controller Settings;Fault Reset To Manual;Disabled;;9983;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Basic Settings;Controller Settings;Horn Timeout;10;s;8264;0;601;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Basic Settings;Controller Settings;Fail Safe Binary State;Last Valid State;;21215;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Basic Settings;Controller Settings;Run Hours Source;AUTO;;13345;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Basic Settings;Controller Settings;User Logging Record;Enabled;;23885;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Basic Settings;Controller Settings;Force Value Logging;Enabled;;18724;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;Yes;String list
+Basic Settings;Controller Settings;SW Key;;;24258;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Long string
+Basic Settings;Phase Rotation;Phase Rotation;Clockwise;;15122;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+Communication Settings;Controller Address;CAN Controller Address;1;;23999;1;32;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;Unsigned 8
+Communication Settings;Controller Address;Terminal Comm Address;1;;24019;1;32;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;Unsigned 8
+Communication Settings;Controller Address;CAN Address Autoallocation;Disabled;;11866;;;R;R;R;R;R;R;R;RW;R;R;No;Yes;String list
+Communication Settings;Modbus Server Address;Modbus Server Address;1;;24188;1;247;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;Unsigned 8
+Communication Settings;RS485 Settings;RS485 Mode;Direct;;24134;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Communication Settings;RS485 Settings;RS485 Communication Speed;57600;;24135;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Communication Settings;RS485 Settings;RS485 Modbus Speed;9600;;24141;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;String list
+Communication Settings;RS485 Settings;RS485 Modbus Mode;8N1;;24020;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;String list
+Communication Settings;Modbus/TCP Master Settings;Modbus/TCP Master Link;Ethernet;;23837;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Communication Settings;Intercontroller Settings;CAN Intercontroller Comm Mode;32C;;24499;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Communication Settings;Intercontroller Settings;#Number Of Units On CAN2 Check;Disabled;;17463;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;String list
+Communication Settings;Intercontroller Settings;#CAN2 Units Missing Protection;Wrn;;17503;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;String list
+Communication Settings;Intercontroller Settings;#Number Of Units On CAN2;1;;13953;1;32;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 8
+;;;;;;;;;;;;;;;;;;;;
+Engine Settings;Starting;Fuel Solenoid;Diesel;;9100;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Engine Settings;Starting;Dual Starter Sequence;Disabled;;16644;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Engine Settings;Starting;Cranking Attempts;1;;8255;1;20;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Engine Settings;Starting;Maximum Cranking Time;40;s;8256;1;255;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 8
+Engine Settings;Starting;Cranking Fail Pause;20;s;8257;5;60;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 8
+Engine Settings;Starting;Prestart Time;"2,0";s;8394;"0,0";"3600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;Starting;Starting RPM;25;%;8254;5;50;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 8
+Engine Settings;Starting;Starting Oil Pressure;"0,0";Bar;9681;"0,0";"10,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 16
+Engine Settings;Starting;Glow Plugs Time;"0,0";s;14412;"0,0";"2,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;Starting;Idle RPM;900;RPM;9946;100;4000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;Starting Timers;Fuel Solenoid Lead;"0,5";s;10525;"0,0";"25,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Engine Settings;Starting Timers;Idle Time;10;s;9097;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;Starting Timers;Minimal Stabilization Time;10;s;8259;1;60;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;Starting Timers;Maximal Stabilization Time;60;s;8313;10;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Engine Settings;Starting Timers;GCB Delay;2;s;20816;1;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Engine Settings;Starting Timers;Run Only Block Delay;"5,0";s;10023;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Engine Settings;Starting Timers;Sd Ventilation Time;5;s;9695;0;60;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Engine Settings;Aftertreatment;DPF Regeneration RPM;1500;RPM;19049;1000;2500;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;Yes;Unsigned 16
+Engine Settings;Prelubrication;Prelubrication Time;0;s;8780;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Engine Settings;Prelubrication;Prelubrication Pause;1;min;8781;1;3000;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 16
+Engine Settings;Warming;Warming Procedure;Disabled;;13956;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Engine Settings;Warming;Warming Load;20;%;9243;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Signed 16
+Engine Settings;Warming;Warming Temperature Limit;0;°C;9258;0;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Signed 16
+Engine Settings;Warming;Maximum Warming Time;0;s;8562;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 16
+Engine Settings;Stopping;Cooling Speed;Nominal;;10046;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Engine Settings;Stopping Timers;Cooling Time;120;s;8258;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;Stopping Timers;Stop Time;30;s;9815;0;1200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Engine Settings;Stopping Timers;After Cooling Time;0;s;8662;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;D+ Function;D+ Function;Disabled;;9683;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Engine Settings;D+ Function;D+ Additional Charge Time;0;s;17756;0;60;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;No;Unsigned 16
+Engine Settings;D+ Function;D+ Threshold;80;%;14959;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 8
+Engine Settings;D+ Function;D+ Delay;1;s;14960;1;255;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 8
+Engine Settings;D+ Function;D+ Alarm Type;Wrn;;15751;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;String list
+Engine Settings;Engine Protections;Overspeed Sd;115;%;8263;25;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;Engine Protections;Underspeed Sd;25;%;8260;0;115;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Engine Settings;Engine Protections;Starting Overspeed Sd;115;%;11033;100;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;Engine Protections;Starting Overspeed Time;5;s;14108;0;255;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Engine Settings;Engine Protections;Starting Overspeed Protection;OverSpd Sd;;15808;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Engine Settings;Engine Protections;Oil Pressure Delay;"3,0";s;65535;"0,0";"3600,0";R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Oil Pressure Wrn;"2,0";Bar;65534;"0,0";"10,0";R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Oil Pressure Sd;"1,0";Bar;65533;"0,0";"10,0";R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Coolant Temp Delay;"5,0";s;65532;"0,0";"3600,0";R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Coolant Temp Wrn;80;°C;65531;-16;120;R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Coolant Temp BOC;90;°C;65530;-16;120;R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Coolant Temp Low Delay;"0,0";s;65529;"0,0";"3600,0";R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Coolant Temp Low Wrn;5;°C;65528;-16;120;R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Fuel Level Delay;"10,0";s;65527;"0,0";"3600,0";R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Fuel Level Wrn;20;%;65526;0;100;R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Engine Protections;Fuel Level BOC;10;%;65525;0;100;R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+Engine Settings;Fuel Theft Protection;Fuel Tank Volume;200;l;11103;0;10000;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 16
+Engine Settings;Fuel Theft Protection;Maximal Fuel Drop;25;%/h;12373;0;50;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 8
+Engine Settings;Fuel Theft Protection;Maximal Fuel Drop Delay;5;s;14683;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 16
+Engine Settings;Fuel Pump;Fuel Pump On;20;%;10100;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Engine Settings;Fuel Pump;Fuel Pump Off;90;%;10101;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Engine Settings;Fuel Pump;Transfer Wrn Delay;0;s;10685;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Engine Settings;Battery Protection;Battery Undervoltage;"20,0";V;8387;"8,0";"30,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 16
+Engine Settings;Battery Protection;Battery Overvoltage;"30,0";V;9587;"20,0";"40,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 16
+Engine Settings;Battery Protection;Battery <> Voltage Delay;5;s;8383;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Engine Settings;Battery Protection;Battery Charger Fail Delay;5;min;11374;0;15;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 8
+Engine Settings;Pulse Counters;Conversion Coefficient Pulse 1;1; ;10994;0;65000;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 16
+Engine Settings;Pulse Counters;Conversion Coefficient Pulse 2;1; ;10995;0;65000;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 16
+Engine Settings;Ventilation;Ventilation Pulse Time;0;s;15767;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Engine Settings;ECU Settings;Open Param Governor Speed Adjust;"5,000";%;16617;"0,000";"10,000";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 16
+Engine Settings;ECU Settings;Manual ECU Activation Timeout;60;min;19707;0;300;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+SUS Control;SUS Control;SUS Sequence;Disabled;;10110;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+SUS Control;SUS Control;Dead Bus Limit;30;%;16390;0;70;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 8
+SUS Control;SUS Control;#SUS Min Power 1;100;kW;14013;1;65000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+SUS Control;SUS Control;#SUS Min Power 2;100;kW;16414;1;65000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+SUS Control;SUS Control;#SUS Min Power 3;100;kW;16415;1;65000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+SUS Control;SUS Control;Excitation Control;Internal;;10056;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;String list
+SUS Control;SUS Control;SUS RPM Window;"30,0";%;10193;"0,0";"100,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+SUS Control;SUS Control;SUS RPM Window Time Out;"30,0";s;10194;"2,0";"6000,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+SUS Control;SUS Control;#SUS Excitation Delay;10;s;14104;0;601;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+SUS Control;SUS Control;SUS Deexcitation Time Out;"10,0";s;17010;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+Maintenance Timers;Maintenance Timer 1;Maintenance Timer 1 RunHours;10000;h;13853;1;10000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Maintenance Timers;Maintenance Timer 1;Maintenance Timer 1 Interval;37;mo;20583;1;37;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Maintenance Timers;Maintenance Timer 1;Maintenance Timer 1 Protection;Warning;;20586;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Maintenance Timers;Maintenance Timer 2;Maintenance Timer 2 RunHours;10000;h;13854;1;10000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Maintenance Timers;Maintenance Timer 2;Maintenance Timer 2 Interval;37;mo;20584;1;37;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Maintenance Timers;Maintenance Timer 2;Maintenance Timer 2 Protection;Warning;;20587;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Maintenance Timers;Maintenance Timer 3;Maintenance Timer 3 RunHours;10000;h;13855;1;10000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Maintenance Timers;Maintenance Timer 3;Maintenance Timer 3 Interval;37;mo;20585;1;37;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Maintenance Timers;Maintenance Timer 3;Maintenance Timer 3 Protection;Warning;;20588;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Maintenance Timers;Maintenance Timer 4;Maintenance Timer 4 RunHours;10000;h;13856;1;10000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Maintenance Timers;Maintenance Timer 4;Maintenance Timer 4 Interval;37;mo;20291;1;37;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Maintenance Timers;Maintenance Timer 4;Maintenance Timer 4 Protection;Warning;;20290;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+Generator Settings;Overload Protection;Overload BOC;110;%;8280;105;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Overload Protection;Overload Wrn;105;%;9685;0;110;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Overload Protection;Overload Delay;"5,0";s;8281;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Underload Protection;Minimal Power PTM;5;%;9241;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Current Protection;Short Circuit;250;%;8282;100;500;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Current Protection;Short Circuit Delay;"0,40";s;9991;"0,00";"10,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Generator Settings;Current Protection;IDMT Generator >A Delay;"4,0";s;8283;"1,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Current Protection;Generator Current Unbalance;50;%;8284;1;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Generator Settings;Current Protection;Generator Current Unbalance Delay;"5,0";s;8285;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Generator Settings;Earth Fault Current Protection;IDMT Earth Fault Current Sd;10;A;20791;0;10000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Generator Settings;Earth Fault Current Protection;IDMT Earth Fault Current Delay;"5,0";s;20792;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Generator Settings;Voltage Protection;Generator Overvoltage Sd;112;%;8291;111;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Voltage Protection;Generator Overvoltage Wrn;111;%;9686;90;112;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Voltage Protection;Generator Undervoltage Wrn;90;%;9687;85;111;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Voltage Protection;Generator Undervoltage BOC;85;%;8293;0;90;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Voltage Protection;Generator <> Voltage Delay;"5,0";s;9103;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Voltage Protection;Generator V Unbalance;10;%;8288;1;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Generator Settings;Voltage Protection;Generator V Unbalance Delay;"5,0";s;8289;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Generator Settings;Frequency Protection;Generator Overfrequency BOC;"110,0";%;8296;"105,0";"200,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Frequency Protection;Generator Overfrequency Wrn;"105,0";%;9688;"95,0";"110,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Frequency Protection;Generator Underfrequency Wrn;"95,0";%;9689;"90,0";"105,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Frequency Protection;Generator Underfrequency BOC;"90,0";%;8298;"0,0";"95,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Frequency Protection;Generator <> Frequency Delay;"3,0";s;8297;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Generator Settings;Reverse Power Protection;IDMT Reverse Power Level;10;%;8486;0;50;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Generator Settings;Reverse Power Protection;IDMT Reverse Power Delay;"5,0";s;8552;"0,1";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Generator Settings;Excitation Loss Protection;Excitation Loss Level;30;%;12486;0;150;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 16
+Generator Settings;Excitation Loss Protection;Excitation Loss Delay;"5,0";s;12487;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+Protections;Overload Protection;Overload Protection;Enabled;;15664;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Current Protection;IDMT Generator >A Protection;Enabled;;15666;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Current Protection;Generator Current Unbalance Protection;Enabled;;15667;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Earth Fault Current Protection;IDMT Earth Fault Current Protection;Blocked;;20793;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Voltage Protection;Generator <> Voltage Protection;Enabled;;15668;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Voltage Protection;Generator V Unbalance Protection;Enabled;;15669;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Voltage Protection;Bus Measurement Error Protection;Blocked;;10558;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;String list
+Protections;Frequency Protection;Generator Frequency Protection;Enabled;;15670;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Reverse Power Protection;IDMT Reverse Power Protection;Enabled;;13230;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Excitation Loss Protection;Excitation Loss Protection;Enabled;;13269;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Speed Protection;Underspeed Protection;Enabled;;15671;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Protections;Loss of Mains Protection;Vector Shift Protection;Parallel Only;;10551;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Protections;Loss of Mains Protection;ROCOF Protection;Parallel Only;;9840;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Protections;Phase Rotation Protection;Phase Rotation Protection;Enabled;;19709;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+Loss of Mains Protections;Loss of Mains Protections;Vector Shift Limit;10;°;9843;1;45;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Loss of Mains Protections;Loss of Mains Protections;ROCOF Windows Length;5; ;9990;3;30;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Loss of Mains Protections;Loss of Mains Protections;ROCOF df/dt;"1,30";Hz/s;9844;"0,01";"10,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Loss of Mains Protections;Loss of Mains Protections;Vector Shift/ROCOF CB Selector;MCB;;10552;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+Mains Settings;AMF Timers;Emergency Start Delay;5;s;8301;0;6000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;AMF Timers;Mains Return Delay;300;s;8302;1;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;AMF Timers;MCB Close Delay;"5,0";s;8389;"0,0";"60,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;AMF Timers;AMF Start;Enabled;;9238;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Mains Settings;Mains Voltage Limits;Mains Overvoltage;110;%;8305;100;150;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Voltage Limits;Mains Overvoltage Delay;"2,0";s;8306;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Voltage Limits;Mains Overvoltage Hys;105;%;14132;100;110;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Voltage Limits;Mains Undervoltage;90;%;8307;50;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Voltage Limits;Mains Undervoltage Delay;"2,0";s;8308;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Voltage Limits;Mains Undervoltage Hys;92;%;14130;90;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Voltage Limits;Mains Voltage Unbalance;10;%;8446;1;150;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Mains Settings;Mains Voltage Limits;Mains Voltage Unbalance Delay;"2,0";s;8447;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Mains Settings;Mains Frequency Limits;Mains Overfrequency;"102,0";%;8310;"100,0";"150,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Frequency Limits;Mains Overfrequency Hys;"102,0";%;14134;"100,0";"102,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Frequency Limits;Mains Underfrequency;"98,0";%;8312;"50,0";"100,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Frequency Limits;Mains Underfrequency Hys;"98,0";%;14135;"98,0";"100,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;Mains Frequency Limits;Mains <> Frequency Delay;"2,0";s;8311;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Mains Settings;AMF Settings;Return From Island;Auto;;9590;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Mains Settings;AMF Settings;MCB Logic;Close-Off;;8444;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Mains Settings;AMF Settings;MCB Opens On;Gen Run;;9850;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+Load Management;Load Shedding Settings;Load Shedding Active;Disabled;;11001;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Load Management;Load Shedding Settings;Load Shedding Level;80;%;8884;20;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Load Management;Load Shedding Settings;Load Shedding Delay;"10,0";s;8887;"0,0";"600,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Load Management;Load Shedding Settings;Load Reconnection Level;20;%;8890;0;80;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Load Management;Load Shedding Settings;Load Reconnection Delay;10;s;8893;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Load Management;Load Shedding Settings;Auto Load Reconnection;Enabled;;9649;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;String list
+Load Management;Dummy Load Settings;Dummy Load Active;Disabled;;11776;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Load Management;Dummy Load Settings;Dummy Load On;20;%;11772;0;50;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Load Management;Dummy Load Settings;Dummy Load On Delay;15;s;14506;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Load Management;Dummy Load Settings;Dummy Load Off;50;%;11773;20;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Load Management;Dummy Load Settings;Dummy Load Off Delay;15;s;14508;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+Power Management;Power Management Control;Power Management;Enabled;;8551;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Power Management;Power Management Control;Power Management Delay;180;s;12488;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Power Management Control;#Power Management Mode;REL (%);;9874;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Power Management;Power Management Control;Dynamic Spinning Reserve;Enabled;;14126;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Power Management;Power Management Control;Priority;2; ;8488;1;32;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Power Management;Power Management Control;#Priority Auto Swap;RunHourEql;;10593;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Power Management;Power Management Control;#System Start Delay;5;s;8549;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Power Management Control;#System Stop Delay;30;s;8550;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Load Reserve Set 1;#Starting Load Reserve 1;60;kX;8489;0;110;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Power Management;Load Reserve Set 1;#Stopping Load Reserve 1;110;kX;8491;60;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Power Management;Load Reserve Set 1;#Starting Rel Load Reserve 1;30;%;10648;0;40;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Power Management;Load Reserve Set 1;#Stopping Rel Load Reserve 1;40;%;10652;30;110;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Power Management;Load Reserve Set 2;#Starting Load Reserve 2;410;kX;8490;0;460;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Power Management;Load Reserve Set 2;#Stopping Load Reserve 2;460;kX;8633;410;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Power Management;Load Reserve Set 2;#Starting Rel Load Reserve 2;60;%;10649;0;80;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Power Management;Load Reserve Set 2;#Stopping Rel Load Reserve 2;80;%;10653;60;110;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Power Management;Minimal Running Power;#Min Run Power 1;210;kW;9584;0;65000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Start/Stop Timing;#Next Engine Start Delay;5;s;8492;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Start/Stop Timing;#Next Engine Stop Delay;20;s;8494;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Start/Stop Timing;#Slow Stop Delay;60;s;8495;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Overload Next Start Protection;#Overload Next Start Protection;Enabled;;14942;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Power Management;Overload Next Start Protection;#Overload Next Start Level;80;%;14941;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Power Management;Overload Next Start Protection;#Overload Next Start Delay;1;s;8493;0;5;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Run Hours Equalization;Run Hours Base;"0,0";h;10600;"0,0";"200000,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 32
+Power Management;Run Hours Equalization;#Run Hours Max Difference;50;h;9919;0;65000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Efficient Mode Settings;#Power Band Change Up Delay;10;s;8896;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Efficient Mode Settings;#Power Band Change Down Delay;10;s;10795;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Power Management;Group Settings;Control Group;1; ;10589;1;32;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 8
+Power Management;Group Settings;Group Link L;1; ;10590;1;32;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 8
+Power Management;Group Settings;Group Link R;1; ;10591;1;32;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 8
+;;;;;;;;;;;;;;;;;;;;
+Speed/Load Control;Speed Control;Speed Regulator Character;Positive;;9054;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Speed/Load Control;Speed Control;Speed Governor Bias;"4,00";V;8656;"2,30";"5,70";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Speed/Load Control;Speed Control;Speed Governor Low Limit;"2,30";V;10115;"-10,00";"5,70";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Speed/Load Control;Speed Control;Speed Governor High Limit;"5,70";V;10559;"2,30";"10,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Speed/Load Control;Speed Control;Speed Governor PWM Rate;550;Hz;10911;500;2900;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Speed/Load Control;Speed Control;Tau Speed Governor Actuator;"10,0";s;10784;"1,0";"300,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Speed/Load Control;Regulation Loops;Frequency Regulation Loop;All The Time;;9891;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Speed/Load Control;Regulation Loops;Frequency Gain;"6,0";%;8715;"0,0";"200,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Speed/Load Control;Regulation Loops;Frequency Int;130;%;8716;0;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Speed/Load Control;Regulation Loops;Angle Gain;"2,0";%;8718;"0,0";"200,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Speed/Load Control;Regulation Loops;Load Gain;"4,5";%;8659;"0,0";"200,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Speed/Load Control;Regulation Loops;Load Int;80;%;8713;0;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Speed/Load Control;Regulation Loops;Load Sharing Gain;"5,0";%;8725;"0,0";"200,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Signed 16
+Speed/Load Control;Regulation Loops;Load Sharing Int;100;%;9035;0;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Signed 16
+Speed/Load Control;Regulation Loops;Freq Balancing Weight;"1,000"; ;18574;"0,000";"10,000";RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;No;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+Voltage/PF Control;Voltage Control;Voltage Regulator Character;Positive;;9055;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Voltage/PF Control;Voltage Control;Voltage Regulator Bias;"0,00";V;8500;"-6,00";"6,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Voltage/PF Control;Voltage Control;Voltage Regulator Low Limit;"-6,00";V;14792;"-10,00";"6,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Voltage/PF Control;Voltage Control;Voltage Regulator High Limit;"6,00";V;14793;"-6,00";"10,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Voltage/PF Control;Voltage Control;Tau Voltage Regulator Actuator;"10,0";s;10785;"1,0";"300,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Voltage/PF Control;Regulation Loops;Voltage Gain;"15,0";%;8501;"0,0";"200,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Voltage/PF Control;Regulation Loops;Voltage Int;180;%;8720;0;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Voltage/PF Control;Regulation Loops;PF Gain;"15,0";%;8503;"0,0";"200,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Voltage/PF Control;Regulation Loops;PF Int;120;%;8721;0;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Signed 16
+Voltage/PF Control;Regulation Loops;VAr Sharing Gain;"15,0";%;8777;"0,0";"200,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Signed 16
+Voltage/PF Control;Regulation Loops;VAr Sharing Int;120;%;9036;0;200;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;Signed 16
+Voltage/PF Control;Regulation Loops;Voltage Balancing Weight;"1,000"; ;18573;"0,000";"10,000";RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;No;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+Synchronization;Synchronization;Synchronization Type;PhaseMatch;;14802;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Synchronization;Synchronization;Synchronization Timeout;1801;s;8657;1;1801;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Synchronization;Synchronization;Voltage Window;"10,0";%;8650;"0,0";"100,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Synchronization;Synchronization;Gen to Mains/Bus Phase Shift;0;°;9578;-120;120;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 16
+Synchronization;Synchronization;Phase Window;12;°;8652;0;90;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Synchronization;Synchronization;Dwell Time;"0,7";s;8653;"0,0";"25,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Synchronization;Synchronization;Slip Frequency;"-0,25";Hz;14798;"-0,50";"0,50";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Synchronization;Synchronization;Slip Frequency Window;"0,15";Hz;14799;"0,01";"0,50";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Synchronization;Synchronization;GCB Latency;80;ms;14800;20;1000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Synchronization;Synchronization;MCB Latency;80;ms;14801;20;1000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+Droop Settings;Droop Settings;Load/Var Sharing Regulation Type;Isochron;;13212;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Droop Settings;Droop Settings;Dead Bus GCB Close Master;Disabled;;13952;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;String list
+Droop Settings;Frequency Droop;Frequency Droop Slope;"4,0";%;10032;"0,0";"20,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Droop Settings;Frequency Droop;Frequency Droop Offset;100;%;13213;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Droop Settings;Voltage Droop;Voltage Droop Slope;"4,0";%;10033;"0,0";"20,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Droop Settings;Voltage Droop;Voltage Droop Offset;100;%;13214;0;100;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Droop Settings;Emergency Droop Settings;#Number Of Units On CAN2;1;;13953;1;32;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 8
+Droop Settings;Emergency Droop Settings;#Emergency Droop On Delay;"10,0";s;13954;"0,0";"10,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+Droop Settings;Emergency Droop Settings;#Emergency Droop Off Delay;"10,0";s;13955;"0,0";"10,0";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+Sprinkler;Common;Cranking Attempts for Sprinkler;3;;18586;1;20;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;No;Unsigned 8
+Sprinkler;Common;Close GCB During Sprinkler;Disabled;;18589;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;No;String list
+Sprinkler;Common;Unload Genset Time;0;s;18587;0;60;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;No;Unsigned 16
+Sprinkler;Common;After Sprinkler Time;10;min;18585;0;60;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;No;Unsigned 16
+Sprinkler;Common;2nd Level Prot Block In AfSpTime;Disabled;;18588;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;No;String list
+;;;;;;;;;;;;;;;;;;;;
+User Buttons;User Buttons;User Button 1;COMMAND;;20826;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 2;COMMAND;;20827;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 3;COMMAND;;20828;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 4;COMMAND;;20829;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 5;COMMAND;;20830;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 6;COMMAND;;20831;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 7;COMMAND;;20832;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 8;COMMAND;;20833;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 9;COMMAND;;20834;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 10;COMMAND;;20835;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 11;COMMAND;;20836;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 12;COMMAND;;20837;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 13;COMMAND;;20838;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 14;COMMAND;;20839;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 15;COMMAND;;20840;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+User Buttons;User Buttons;User Button 16;COMMAND;;20841;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+User Setpoints;User Setpoints;GCB CAT FB Wrn Del;"1,0";s;65522;"0,0";"3600,0";R;R;R;R;R;R;R;RW;R;R;No;Yes;Signed 32
+;;;;;;;;;;;;;;;;;;;;
+Analog Switches;Analog Switch 1;AIN Switch01 On;0;;11407;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 1;AIN Switch01 Off;0;;11410;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 2;AIN Switch02 On;0;;11408;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 2;AIN Switch02 Off;0;;11411;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 3;AIN Switch03 On;0;;11409;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 3;AIN Switch03 Off;0;;11412;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 4;AIN Switch04 On;0;;14385;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 4;AIN Switch04 Off;0;;14386;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 5;AIN Switch05 On;0;;14963;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 5;AIN Switch05 Off;0;;14979;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 6;AIN Switch06 On;0;;14964;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 6;AIN Switch06 Off;0;;14980;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 7;AIN Switch07 On;0;;14965;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 7;AIN Switch07 Off;0;;14981;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 8;AIN Switch08 On;0;;14966;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 8;AIN Switch08 Off;0;;14982;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 9;AIN Switch09 On;0;;14967;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 9;AIN Switch09 Off;0;;14983;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 10;AIN Switch10 On;0;;14968;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+Analog Switches;Analog Switch 10;AIN Switch10 Off;0;;14984;0;32000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Signed 16
+;;;;;;;;;;;;;;;;;;;;
+Scheduler;Time & Date;Time;16:47:34;;24554;####;####;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;FTime
+Scheduler;Time & Date;Date;26/10/2026;;24553;####;####;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;FDate
+Scheduler;Time & Date;Time Stamp Act;Disabled;;10532;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;Yes;String list
+Scheduler;Time & Date;Time Stamp Period;60;min;8979;0;240;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Unsigned 8
+Scheduler;Time & Date;Time Stamp Period Off;0;min;17771;0;240;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;No;Unsigned 8
+Scheduler;Time & Date;Time Zone;GMT-5:00;;24366;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Scheduler;Time & Date;DST Switching Mode;Disabled;;20250;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;String list
+Scheduler;Time & Date;Time Mode;STD;;20249;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;String list
+Scheduler;Time & Date;DST Period Rule;Europe;;20251;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;No;String list
+Scheduler;Sunrise/Sunset;Sunrise/Sunset Function;Disabled;;20210;;;R;R;R;R;R;R;R;RW;R;R;No;Yes;String list
+Scheduler;Sunrise/Sunset;Sunrise/Sunset Latitude;"0,0000";° N;20214;"-90,0000";"90,0000";R;R;R;R;R;R;R;RW;R;R;No;No;Signed 32
+Scheduler;Sunrise/Sunset;Sunrise/Sunset Longitude;"0,0000";° E;20213;"-180,0000";"180,0000";R;R;R;R;R;R;R;RW;R;R;No;No;Signed 32
+Scheduler;Sunrise/Sunset;Sunrise Offset;0;min;20216;-300;300;R;R;R;R;R;R;R;RW;R;R;No;No;Signed 16
+Scheduler;Sunrise/Sunset;Sunset Offset;0;min;20215;-300;300;R;R;R;R;R;R;R;RW;R;R;No;No;Signed 16
+Scheduler;Timer1;Timer 1 Function;TEST;;15358;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Scheduler;Timer1;Timer 1 Setup;;;10969;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Timer
+Scheduler;Timer2;Timer 2 Function;Disabled;;15359;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Scheduler;Timer2;Timer 2 Setup;;;10970;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Timer
+Scheduler;Timer3;Timer 3 Function;Disabled;;15360;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Scheduler;Timer3;Timer 3 Setup;;;10971;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Timer
+Scheduler;Timer4;Timer 4 Function;Disabled;;15361;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Scheduler;Timer4;Timer 4 Setup;;;10973;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Timer
+Scheduler;Timer5;Timer 5 Function;Disabled;;15362;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Scheduler;Timer5;Timer 5 Setup;;;10974;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Timer
+Scheduler;Timer6;Timer 6 Function;Disabled;;15363;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Scheduler;Timer6;Timer 6 Setup;;;10975;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Timer
+Scheduler;Rental Timers;Rental Timer 1;0;h;14326;0;8760;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Scheduler;Rental Timers;Rental Timer 1 Wrn;0;h;14332;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+Scheduler;Rental Timers;Rental Timer 2;01/01/2015;;14367;####;####;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;FDate
+Scheduler;Rental Timers;Rental Timer 2 Wrn;01/01/2015;;14368;####;####;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;FDate
+Scheduler;Rental Timers;Rental Timer BOC;24;h;14334;0;210;R;RW;RW;RW;RW;RW;RW;RW;R;R;Yes;Yes;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+Geo-Fencing;Geo-Fencing;Geo-Fencing;Disable;;11681;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Geo-Fencing;Position;Home Latitude;"0,0000";;14606;"-90,0000";"90,0000";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 32
+Geo-Fencing;Position;Home Longitude;"0,0000";;14607;"-180,0000";"180,0000";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Signed 32
+Geo-Fencing;Fence 1;Fence 1 Protection;HistRecOnl;;14610;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Geo-Fencing;Fence 1;Fence 1 Radius;"0,0";km;11677;"0,0";"99,9";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Geo-Fencing;Fence 1;Fence 1 Delay;0;s;11682;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Geo-Fencing;Fence 2;Fence 2 Protection;HistRecOnl;;14611;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Geo-Fencing;Fence 2;Fence 2 Radius;"0,0";km;14608;"0,0";"99,9";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Geo-Fencing;Fence 2;Fence 2 Delay;0;s;14609;0;3600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+;;;;;;;;;;;;;;;;;;;;
+Plug-In Modules;Slot A;Slot A;Enabled;;24280;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Plug-In Modules;Slot B;Slot B;Enabled;;24279;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+CM-RS232-485;COM1 Setting;COM 1 Mode;Direct;;24522;;;R;R;R;R;R;R;R;RW;R;R;No;Yes;String list
+CM-RS232-485;COM1 Setting;COM 1 Communication Speed;57600;;24341;;;R;R;R;R;R;R;R;RW;R;R;No;Yes;String list
+CM-RS232-485;COM1 Setting;COM 1 Modbus Communication Speed;9600;;24477;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+CM-RS232-485;COM1 Setting;COM 1 Modbus Mode;8N1;;23867;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+CM-RS232-485;COM2 Setting;COM 2 Mode;Direct;;24451;;;R;R;R;R;R;R;R;RW;R;R;No;Yes;String list
+CM-RS232-485;COM2 Setting;COM 2 Communication Speed;57600;;24340;;;R;R;R;R;R;R;R;RW;R;R;No;Yes;String list
+CM-RS232-485;COM2 Setting;COM 2 Modbus Communication Speed;9600;;24420;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+CM-RS232-485;COM2 Setting;COM 2 Modbus Mode;8N1;;23866;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+;;;;;;;;;;;;;;;;;;;;
+CM-4G-GPS;Cellular Interface;Internet Connection;Enabled;;24315;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;Cellular Interface;Network Mode;Automatic;;24132;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;Cellular Interface;Access Point Name;internet;;24363;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Long string
+CM-4G-GPS;Cellular Interface;APN Authentication;Disabled;;23820;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;Cellular Interface;APN User Name;;;24361;0;0;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;Short string
+CM-4G-GPS;Cellular Interface;APN User Password;;;24360;0;0;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;Short string
+CM-4G-GPS;Cellular Interface;Connection Check IP1;;;23978;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;IP Address
+CM-4G-GPS;Cellular Interface;Connection Check IP2;;;23977;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;IP Address
+CM-4G-GPS;Cellular Interface;Connection Check IP3;;;23976;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;IP Address
+CM-4G-GPS;TCP/IP Settings;DNS Mode;Automatic;;23988;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;TCP/IP Settings;DNS IP Address 1;8.8.8.8;;24314;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;IP Address
+CM-4G-GPS;TCP/IP Settings;DNS IP Address 2;4.4.4.4;;23986;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;IP Address
+CM-4G-GPS;TCP/IP Settings;IP Firewall;Disabled;;23959;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;AirGate Settings;AirGate Connection;Enabled;;23968;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;AirGate Settings;AirGate Address;global.airgate.link;;24364;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Long string
+CM-4G-GPS;AirGate Settings;AirGate Port;54440;;24091;0;65535;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+CM-4G-GPS;ComAp Client Settings;ComAp Client Inactivity Timeout;60;s;24098;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+CM-4G-GPS;ComAp Client Settings;Direct Connection;Enabled;;23961;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;ComAp Client Settings;Direct Connection Port;23;;23960;0;65535;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+CM-4G-GPS;E-mail Settings;SMTP Server Address;;;23962;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-4G-GPS;E-mail Settings;SMTP Sender Address;;;23884;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-4G-GPS;E-mail Settings;SMTP User Name;;;23883;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-4G-GPS;E-mail Settings;SMTP User Password;;;23882;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Long string
+CM-4G-GPS;E-mail Settings;SMTP Encryption;None;;23965;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;E-mail Settings;E-mail Address 1;;;24298;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+CM-4G-GPS;E-mail Settings;E-mail Address 2;;;24297;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+CM-4G-GPS;E-mail Settings;E-mail Address 3;;;24145;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+CM-4G-GPS;E-mail Settings;E-mail Address 4;;;24144;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+CM-4G-GPS;Message Settings;Telephone Number 1;;;24296;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Telephone number
+CM-4G-GPS;Message Settings;Telephone Number 2;;;24295;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Telephone number
+CM-4G-GPS;Message Settings;Telephone Number 3;;;24143;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Telephone number
+CM-4G-GPS;Message Settings;Telephone Number 4;;;24142;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Telephone number
+CM-4G-GPS;Message Settings;E-mail/SMS Language;English;;24299;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;Message Settings;Event Message;Disabled;;18971;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;Message Settings;Wrn Message;Enabled;;8482;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;Message Settings;Al Message;Enabled;;10567;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;Message Settings;Hst Message;Enabled;;10568;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;Message Settings;ALI Message;Enabled;;18993;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;Message Settings;AHI Message;Enabled;;18994;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;Message Settings;Sd Message;Enabled;;8484;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;Message Settings;Sd Override Message;Enabled;;11413;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;Message Settings;Stp Message;Enabled;;8485;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;Message Settings;Ofl Message;Enabled;;8483;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;Message Settings;BOC Message;Enabled;;10566;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;Message Settings;MP Message;Enabled;;10117;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;Message Settings;ECU FC Message;Enabled;;18723;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-4G-GPS;GPS Settings;GPS Tracking;Enabled;;23975;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;RTC Synchronization;NTP Clock Sync;Disabled;;23964;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;RTC Synchronization;NTP Server;pool.ntp.org;;23963;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-4G-GPS;RTC Synchronization;GPS Clock Sync;Enabled;;23974;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-4G-GPS;RTC Synchronization;Time Zone;GMT-5:00;;24366;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+CM-Ethernet;TCP/IP Settings;IP Address Mode;Automatic;;23939;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;TCP/IP Settings;IP Address;192.168.1.254;;23950;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;IP Address
+CM-Ethernet;TCP/IP Settings;Subnet Mask;255.255.255.0;;23949;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;IP Address
+CM-Ethernet;TCP/IP Settings;Gateway IP;192.168.1.1;;23948;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;IP Address
+CM-Ethernet;TCP/IP Settings;DNS Mode;Automatic;;23921;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;TCP/IP Settings;DNS IP Address 1;8.8.8.8;;23947;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;IP Address
+CM-Ethernet;TCP/IP Settings;DNS IP Address 2;4.4.4.4;;23946;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;IP Address
+CM-Ethernet;TCP/IP Settings;IP Firewall;Disabled;;23920;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;AirGate Settings;AirGate Connection;Enabled;;23935;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;AirGate Settings;AirGate Address;global.airgate.link;;24364;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Long string
+CM-Ethernet;AirGate Settings;AirGate Port;54440;;23919;0;65535;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+CM-Ethernet;ComAp Client Settings;ComAp Client Inactivity Timeout;60;s;24098;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+CM-Ethernet;ComAp Client Settings;Direct Connection;Enabled;;23917;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;ComAp Client Settings;Direct Connection Port;23;;23918;0;65535;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+CM-Ethernet;Modbus Settings;Modbus Server;Disabled;;23937;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;Modbus Settings;Modbus Client Inactivity Timeout;60;s;24097;1;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+CM-Ethernet;SNMP Settings;SNMP Agent;Disabled;;23936;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;SNMP Settings;SNMP Trap Format;v2 Inform;;23922;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;String list
+CM-Ethernet;SNMP Settings;SNMP Traps IP Address 1;;;24095;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-Ethernet;SNMP Settings;SNMP Traps IP Address 2;;;24094;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-Ethernet;SNMP Settings;SNMP RD Community String;public;;23941;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Long string
+CM-Ethernet;SNMP Settings;SNMP WR Community String;private;;23940;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;Long string
+CM-Ethernet;SNMP Settings;SNMP Engine User Name;;;23851;0;0;R;R;R;R;R;R;R;RW;R;R;No;No;Long string
+CM-Ethernet;SNMP Settings;SNMP Privacy Protocol;AES128;;23853;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+CM-Ethernet;SNMP Settings;SNMP Authentication Protocol;SHA;;23854;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+CM-Ethernet;SNMP Settings;SNMP Security Level;NONE;;23852;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+CM-Ethernet;E-mail Settings;SMTP Server Address;;;23942;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-Ethernet;E-mail Settings;SMTP Sender Address;;;23881;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-Ethernet;E-mail Settings;SMTP User Name;;;23880;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-Ethernet;E-mail Settings;SMTP User Password;;;23879;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Long string
+CM-Ethernet;E-mail Settings;SMTP Encryption;None;;23938;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;E-mail Settings;E-mail Address 1;;;24298;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+CM-Ethernet;E-mail Settings;E-mail Address 2;;;24297;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+CM-Ethernet;E-mail Settings;E-mail Address 3;;;24145;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+CM-Ethernet;E-mail Settings;E-mail Address 4;;;24144;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+CM-Ethernet;Message Settings;E-mail/SMS Language;English;;24299;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;Message Settings;Event Message;Disabled;;18971;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-Ethernet;Message Settings;Wrn Message;Enabled;;8482;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;Message Settings;Al Message;Enabled;;10567;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-Ethernet;Message Settings;Hst Message;Enabled;;10568;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-Ethernet;Message Settings;ALI Message;Enabled;;18993;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-Ethernet;Message Settings;AHI Message;Enabled;;18994;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-Ethernet;Message Settings;Sd Message;Enabled;;8484;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;Message Settings;Sd Override Message;Enabled;;11413;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-Ethernet;Message Settings;Stp Message;Enabled;;8485;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;Message Settings;Ofl Message;Enabled;;8483;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-Ethernet;Message Settings;BOC Message;Enabled;;10566;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;Message Settings;MP Message;Enabled;;10117;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-Ethernet;Message Settings;ECU FC Message;Enabled;;18723;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+CM-Ethernet;RTC Synchronization;NTP Clock Synchronization;Disabled;;23934;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+CM-Ethernet;RTC Synchronization;NTP Server;pool.ntp.org;;23933;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+CM-Ethernet;RTC Synchronization;Time Zone;GMT-5:00;;24366;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+Ethernet;Ethernet Port Configuration;Ethernet port;Trusted Interface;;23873;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;Yes;Yes;String list
+Ethernet;TCP/IP Settings;IP Address Mode;Manual;;24259;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;TCP/IP Settings;IP Address;192.168.0.201;;24376;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;IP Address
+Ethernet;TCP/IP Settings;Subnet Mask;255.255.255.0;;24375;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;IP Address
+Ethernet;TCP/IP Settings;Gateway IP;192.168.1.1;;24373;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;IP Address
+Ethernet;TCP/IP Settings;DNS Mode;Automatic;;24101;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;No;String list
+Ethernet;TCP/IP Settings;DNS IP Address 1;8.8.8.8;;24362;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;IP Address
+Ethernet;TCP/IP Settings;DNS IP Address 2;4.4.4.4;;24331;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;IP Address
+Ethernet;TCP/IP Settings;IP Firewall;Disabled;;24092;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;AirGate Settings;AirGate Connection;Enabled;;24365;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;AirGate Settings;AirGate Address;global.airgate.link;;24364;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Long string
+Ethernet;AirGate Settings;AirGate Port;54440;;24096;0;65535;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Ethernet;ComAp Client Settings;ComAp Client Inactivity Timeout;60;s;24098;0;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Ethernet;ComAp Client Settings;Direct Connection;Enabled;;24099;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;ComAp Client Settings;Direct Connection Port;23;;24374;0;65535;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Ethernet;Modbus Settings;Modbus Server;Enabled;;24337;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;Modbus Settings;Modbus Client Inactivity Timeout;60;s;24097;1;600;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+Ethernet;SNMP Settings;SNMP Agent;SNMP v1/v2c;;24336;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;SNMP Settings;SNMP Trap Format;v2 Inform;;24136;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;SNMP Settings;SNMP Traps IP Address 1;;;24095;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+Ethernet;SNMP Settings;SNMP Traps IP Address 2;;;24094;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+Ethernet;SNMP Settings;SNMP RD Community String;public;;24335;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Long string
+Ethernet;SNMP Settings;SNMP WR Community String;private;;24334;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Long string
+Ethernet;SNMP Settings;SNMP Engine User Name;;;23851;0;0;R;R;R;R;R;R;R;RW;R;R;No;No;Long string
+Ethernet;SNMP Settings;SNMP Privacy Protocol;AES128;;23856;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+Ethernet;SNMP Settings;SNMP Authentication Protocol;SHA;;23857;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+Ethernet;SNMP Settings;SNMP Security Level;NONE;;23855;;;R;R;R;R;R;R;R;RW;R;R;No;No;String list
+Ethernet;E-mail Settings;SMTP Server Address;;;24093;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+Ethernet;E-mail Settings;SMTP Sender Address;;;23878;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+Ethernet;E-mail Settings;SMTP User Name;;;23877;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+Ethernet;E-mail Settings;SMTP User Password;;;23876;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Long string
+Ethernet;E-mail Settings;SMTP Encryption;None;;24076;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;E-mail Settings;E-mail Address 1;;;24298;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+Ethernet;E-mail Settings;E-mail Address 2;;;24297;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+Ethernet;E-mail Settings;E-mail Address 3;;;24145;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+Ethernet;E-mail Settings;E-mail Address 4;;;24144;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Email
+Ethernet;Messages Settings;E-mail/SMS Language;English;;24299;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;Messages Settings;Event Message;Disabled;;18971;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Ethernet;Messages Settings;Wrn Message;Enabled;;8482;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;Messages Settings;Al Message;Enabled;;10567;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Ethernet;Messages Settings;Hst Message;Enabled;;10568;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Ethernet;Messages Settings;ALI Message;Enabled;;18993;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Ethernet;Messages Settings;AHI Message;Enabled;;18994;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Ethernet;Messages Settings;Sd Message;Enabled;;8484;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;Messages Settings;Sd Override Message;Enabled;;11413;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Ethernet;Messages Settings;Stp Message;Enabled;;8485;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;Messages Settings;Ofl Message;Enabled;;8483;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Ethernet;Messages Settings;BOC Message;Enabled;;10566;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;Messages Settings;MP Message;Enabled;;10117;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Ethernet;Messages Settings;ECU FC Message;Enabled;;18723;;;RW;RW;RW;RW;RW;RW;RW;RW;RW;RW;No;Yes;String list
+Ethernet;RTC Synchronization;NTP Clock Synchronization;Disabled;;24075;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+Ethernet;RTC Synchronization;NTP Server;pool.ntp.org;;24074;0;0;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Huge string
+Ethernet;RTC Synchronization;Time Zone;GMT-5:00;;24366;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+;;;;;;;;;;;;;;;;;;;;
+EM-BIO8-EFCP;EFCP Settings;Earth Fault Current Protection;Enabled;;11631;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+EM-BIO8-EFCP;EFCP Settings;Earth Fault Delay;"0,10";s;11633;"0,03";"5,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+EM-BIO8-EFCP;EFCP Settings;Earth Fault CT Input Range;5A;;14340;;;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;String list
+EM-BIO8-EFCP;EFCP Settings;Earth Fault CT Ratio;500;/(1or5)A;14339;1;10000;R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16
+EM-BIO8-EFCP;EFCP Settings;Earth Fault Sd;"0,30";A;11632;"0,00";"200,00";R;RW;RW;RW;RW;RW;RW;RW;R;R;No;Yes;Unsigned 16

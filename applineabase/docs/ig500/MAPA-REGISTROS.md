@@ -96,7 +96,7 @@ Lectura del 2026-10-22 19:13, en paralelo con 595 kW (solo lectura, una vez).
 | 41311-41312 | Paradas de emergencia (Num E-Stops) | UInt32 | 1 | |
 | 41313-41314 | Paradas por proteccion (Shutdowns) | UInt32 | 1 | |
 | 41392 | Log Bout 2 (bit 5 Ready To AMF, campo listoAmf del modelo; leido 0x1038 el 26-10) | Bits | 1 | |
-| 41328 | Timer text (List#12: 0 No Timer, 4 Cooling, 13 ReturnDelay...), TEMPORIZADOR del modelo. Los segundos que faltan (Timer Value) y los ajustes (tabla Setpoints vacia) no estan en la lista exportada: buscar el registro durante una cuenta (prueba de arranque) | Lista | 1 | |
+| 41328 | Timer text (List#12: 0 No Timer, 4 Cooling, 13 ReturnDelay...), TEMPORIZADOR del modelo. Los segundos que faltan (Timer Value) y los ajustes (tabla Setpoints vacia) no estan en la lista exportada (se volvio a exportar el 26-10, igual): buscar el registro durante una cuenta (prueba de arranque). Los tiempos totales se copiaron del export de setpoints (`setpoints-inteliconfig-2026-10-26.csv`) a `tiemposAjustados` del modelo: Emergency Start Delay 5 s, Mains Return Delay 300 s, MCB Close Delay 5 s, Cooling Time 120 s, Prestart 2 s, Max Cranking 40 s, Cranking Fail Pause 20 s, Idle 10 s, estabilizacion 10/60 s, GCB Delay 2 s. Ademas: Baseload 600 kW (PTM), Import/Export Limitation desactivada, Timer 1 del Scheduler en TEST | Lista | 1 | |
 | 41315-41316 | Consumo total de combustible (l) | UInt32 | 0.1 | |
 | 41324 | Modo del controlador (List#8: 0 OFF, 1 MAN, 2 AUTO, 3 TEST) | UInt16 | - | 2 = AUTO |
 | 41325 | Estado del deslastre de carga (List#9) | UInt16 | - | 0 |

@@ -264,7 +264,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       const t = g.temporizador, seg = g.v.TEMPORIZADOR_VALOR, corre = t !== "No Timer";
       const reloj = !corre ? "0:00" : seg == null ? "-:--" : mmss(seg);
       return `<div class="tg-timer"><div class="tg-anillo${corre ? " tg-corre" : ""}"${corre && seg > 0 ? ` data-seg="${seg}"` : ""}>${reloj}</div>
-        <div><b>${esc(t)}</b><small>${esc(TIMER_ES[t] || "")}</small></div></div>`;
+        <div><b>${esc(t)}</b><small>${esc(TIMER_ES[t] || "")}${corre && g.temporizadorTotal ? " · de " + mmss(g.temporizadorTotal) : ""}</small></div></div>`;
     }
 
     function contar(el) {
