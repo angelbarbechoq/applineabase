@@ -10,7 +10,12 @@ if (!window.TableroGeneradores) {
 .tg-card { background: #fff; border: 1px solid #E4E6EC; border-radius: 12px; padding: 10px 12px; min-width: 0; }
 .tg-card h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #6b7080; text-transform: uppercase; letter-spacing: .04em; }
 .tg-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
-.tg-nombre { font-size: 20px; font-weight: 700; }
+.tg-nombre { font: inherit; font-size: 20px; font-weight: 700; color: inherit; background: none; border: 0; border-radius: 8px; padding: 2px 8px 2px 4px;
+  margin-left: -4px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.tg-nombre:hover { background: #eef3fd; }
+.tg-nombre svg { width: 20px; height: 20px; color: #3B8FF3; flex: none; }
+.tg-nombre.tg-girando svg { animation: tg-girar .8s linear infinite; }
+@keyframes tg-girar { to { transform: rotate(360deg); } }
 .tg-sub, .tg-leido { color: #6b7080; font-size: 13px; }
 .tg-leido { font-size: 12px; }
 .tg-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-weight: 600; font-size: 12px; }
@@ -92,6 +97,8 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
     const VERDE = "#3BB273", APAG = "#d8dbe2", ROJO = "#E8505B", AMARILLO = "#E0B50F";
     // Estados del motor que son falla (parado por falla o no puede arrancar): la G del esquema en rojo.
     const FALLA_MOTOR = ["Shutdown", "NotReady", "SDVentil"];
+    const ICONO_ACTUALIZAR = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>`;
     const fmt = (v, d = 0) => v == null ? "-" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
     const esc = s => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -106,7 +113,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
     function tablero(g) {
       const modos = ["OFF", "MAN", "AUTO", "TEST"].map(m => `<span class="${m}${m === g.modo ? " tg-act" : ""}">${m}</span>`).join("");
       const barra = `<div class="tg-card tg-barra tg-a-top">
-        <span class="tg-nombre">${esc(g.nombre)}</span><span class="tg-sub">${esc(g.modelo)} · ${esc(g.trafo)}</span>
+        <button type="button" class="tg-nombre" title="Actualizar (leer de nuevo los controladores)">${ICONO_ACTUALIZAR}${esc(g.nombre)}</button><span class="tg-sub">${esc(g.modelo)} · ${esc(g.trafo)}</span>
         ${g.sinComunicacion != null
           ? `<span class="tg-badge tg-fuera">SIN COMUNICACION</span><span class="tg-leido">${esc(g.sinComunicacion)}</span>`
           : `<span class="tg-badge ${g.marcha ? "tg-ok" : "tg-gris"}">${g.marcha ? "EN MARCHA" : "PARADO"}</span>
@@ -304,6 +311,16 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
     return {
       render(el, lista) {
         css();
+        // Clic en el nombre de un generador = Actualizar: avisa a la vista (evento tg-actualizar) y el icono gira hasta
+        // que llega la lectura nueva (el render siguiente lo reemplaza).
+        if (!el.tgActualizar) {
+          el.tgActualizar = true;
+          el.addEventListener("click", ev => {
+            if (!ev.target.closest(".tg-nombre")) return;
+            el.querySelectorAll(".tg-nombre").forEach(b => b.classList.add("tg-girando"));
+            el.dispatchEvent(new CustomEvent("tg-actualizar"));
+          });
+        }
         el.innerHTML = `<div class="tg">${lista.map(tablero).join("")}</div>`;
       }
     };

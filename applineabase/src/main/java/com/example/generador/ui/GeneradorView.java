@@ -693,14 +693,16 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     // ================= Estado actual =================
 
     private VerticalLayout crearEstado() {
-        Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> refrescar());
         estadoContenido.setWidthFull();
-        Span nota = new Span("Leido en vivo del controlador cada 15 s (solo lectura: el modo se muestra, no se cambia desde la app). "
+        // Actualizar = clic en el nombre del generador, en la barra de su tablero.
+        estadoContenido.getElement().addEventListener("tg-actualizar", e -> refrescar());
+        Span nota = new Span("Leido en vivo del controlador cada 15 s (solo lectura: el modo se muestra, no se cambia desde la app; "
+                + "clic en el nombre del generador para actualizar ya). "
                 + "Red, planta, corrientes y PF del transformador segun su medidor (ultimo minuto); planta = generador + red. "
                 + "Lineas de limite de tension y color de la frecuencia con los limites de Calidad de Energia; bateria, aceite y "
                 + "temperatura con limites provisorios (sistema de 24 V). Con Todos, un tablero por generador.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
-        VerticalLayout v = new VerticalLayout(actualizar, estadoContenido, nota);
+        VerticalLayout v = new VerticalLayout(estadoContenido, nota);
         v.setPadding(false);
         return v;
     }
