@@ -57,12 +57,6 @@ if (!window.TableroGeneradores) {
 .tg-estados .tg-ev { font-size: 18px; font-weight: 700; text-align: center; }
 .tg-estados .tg-eg { font-size: 12px; text-align: center; color: #e2e4ea; }
 .tg-estados hr { border: 0; border-top: 1px solid #5a6070; margin: 0; }
-.tg-timer { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-.tg-anillo { flex: none; width: 58px; height: 58px; border-radius: 50%; border: 5px solid #d8dbe2; display: flex; align-items: center;
-  justify-content: center; font: 700 15px Consolas, "Courier New", monospace; color: #1E1E2C; }
-.tg-anillo.tg-corre { border-color: #E0B50F; }
-.tg-timer b { display: block; font-size: 14px; }
-.tg-timer small { display: block; font-size: 12px; color: #6b7080; }
 table.tg-io { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.tg-io td { padding: 2px 6px; border-bottom: 1px solid #eef0f4; }
 table.tg-io td:first-child { width: 18px; color: #6b7080; }
@@ -187,7 +181,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       const motorG = (x, c) => `<circle cx="${x}" cy="112" r="34" fill="none" stroke="${c}" stroke-width="5"/>
         <text x="${x}" y="126" text-anchor="middle" fill="${c}" font-size="38" font-weight="800">G</text>`;
       const exporta = red != null && red < 0;
-      return `<svg viewBox="0 0 760 185" role="img" aria-label="Esquema de red, planta y generador">
+      return `<svg viewBox="0 0 780 214" role="img" aria-label="Esquema de red, planta y generador">
         ${kw(14, red == null ? null : Math.abs(red), "#7fb6f7", exporta ? "exportando a la red" : "de la red · " + g.trafo, "start")}
         ${torre(60, colorTorre)}
         ${linea(96, 218, hayRed)}${interruptor(218, g.mcb, "MCB")}${linea(262, 342, vivoPlanta)}
@@ -196,6 +190,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
         ${linea(428, 520, vivoPlanta)}${interruptor(520, g.gcb, "GCB")}${linea(564, 640, genTension && gcb)}
         ${kw(690, gen, "#F29F67", "generador")}
         ${motorG(690, colorGen)}
+        ${relojG(g, 690)}
       </svg>`;
     }
 
@@ -253,28 +248,31 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       const bloque = (titulo, valor, glosa, color) => `<div><div class="tg-et">${titulo}</div>
         <div class="tg-ev" style="color:${color}">${valor == null ? "-" : esc(valor)}</div><div class="tg-eg">${esc(glosa || "")}</div></div>`;
       return `<div class="tg-estados">${bloque("Estado del motor", m, MOTOR_ES[m], colorMotor)}<hr>
-        ${bloque("Estado de interruptores", i, (INTERR_ES[i] || "") + (g.interruptoresDesde ? " desde las " + g.interruptoresDesde : ""), g.sinRed ? "#ffb3b8" : "#fff")}</div>
-        ${temporizador(g)}`;
+        ${bloque("Estado de interruptores", i, (INTERR_ES[i] || "") + (g.interruptoresDesde ? " desde las " + g.interruptoresDesde : ""), g.sinRed ? "#ffb3b8" : "#fff")}</div>`;
     }
 
-    /* Cuenta regresiva del controlador (como el círculo de la pantalla ComAp): cuál corre y cuánto le falta. Entre
+    /* Cuenta regresiva del controlador debajo de la G: tiempo que falta (amarillo mientras corre), nombre ComAp y, en
+       chico, que es y el total ajustado. Sin cuenta: "0:00 No Timer" en gris, como la pantalla del controlador. Entre
        lecturas (cada 15 s) el navegador la sigue bajando de a un segundo (ver contar). */
-    function temporizador(g) {
+    function relojG(g, x) {
       if (g.temporizador == null) return "";
       const t = g.temporizador, seg = g.v.TEMPORIZADOR_VALOR, corre = t !== "No Timer";
-      const reloj = !corre ? "0:00" : seg == null ? "-:--" : mmss(seg);
-      return `<div class="tg-timer"><div class="tg-anillo${corre ? " tg-corre" : ""}"${corre && seg > 0 ? ` data-seg="${seg}"` : ""}>${reloj}</div>
-        <div><b>${esc(t)}</b><small>${esc(TIMER_ES[t] || "")}${corre && g.temporizadorTotal ? " · de " + mmss(g.temporizadorTotal) : ""}</small></div></div>`;
+      const txt = !corre ? "0:00" : seg == null ? "-:--" : mmss(seg);
+      const glosa = (TIMER_ES[t] || "") + (corre && g.temporizadorTotal ? " · de " + mmss(g.temporizadorTotal) : "");
+      return `<text x="${x}" y="173" text-anchor="middle" fill="${corre ? AMARILLO : "#8a8f9c"}" font-size="24" font-weight="700"
+          font-family="Consolas, Courier New, monospace"${corre && seg > 0 ? ` data-seg="${seg}"` : ""}>${txt}</text>
+        <text x="${x}" y="191" text-anchor="middle" fill="${corre ? "#ffffff" : "#8a8f9c"}" font-size="13" font-weight="600">${esc(t)}</text>
+        ${corre ? `<text x="${x}" y="207" text-anchor="middle" fill="#c9ccd6" font-size="12">${esc(glosa)}</text>` : ""}`;
     }
 
     function contar(el) {
       clearInterval(el.tgReloj);
-      const anillos = Array.from(el.querySelectorAll(".tg-anillo[data-seg]"));
-      if (!anillos.length) return;
+      const relojes = Array.from(el.querySelectorAll("[data-seg]"));
+      if (!relojes.length) return;
       const inicio = Date.now();
       el.tgReloj = setInterval(() => {
         const pasados = (Date.now() - inicio) / 1000;
-        anillos.forEach(a => a.textContent = mmss(Number(a.dataset.seg) - pasados));
+        relojes.forEach(r => r.textContent = mmss(Number(r.dataset.seg) - pasados));
       }, 1000);
     }
 
