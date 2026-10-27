@@ -250,6 +250,10 @@ public final class MainLayout extends AppLayout {
         if (lineaAccessService.puedeVerFranjaHoraria()) {
             nav.addItem(new SideNavItem("Consumo por franja horaria", "energia/franja-horaria", VaadinIcon.DOLLAR.create()));
         }
+        // Transformadores (unifilar de la planta 1 en vivo): permiso propio "Ver Transformadores" (ADMIN siempre).
+        if (lineaAccessService.puedeVerTransformadores()) {
+            nav.addItem(new SideNavItem("Transformadores", "transformadores", VaadinIcon.SITEMAP.create()));
+        }
         // Grupo Electrogeno: permiso propio "Ver Generadores" (ADMIN siempre).
         if (lineaAccessService.puedeVerGeneradores()) {
             SideNavItem grupoElectrogeno = new SideNavItem("Grupo Electrogeno");

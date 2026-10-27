@@ -69,6 +69,13 @@ public class Usuario {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean verFranjaHoraria = false;
 
+    /**
+     * Acceso a Transformadores (diagrama unifilar en vivo de la planta 1), mismo criterio que verMezcladores.
+     * Ignorado cuando el rol es ADMIN.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean verTransformadores = false;
+
     public Usuario() {
     }
 
@@ -146,6 +153,14 @@ public class Usuario {
 
     public void setVerFranjaHoraria(boolean verFranjaHoraria) {
         this.verFranjaHoraria = verFranjaHoraria;
+    }
+
+    public boolean isVerTransformadores() {
+        return verTransformadores;
+    }
+
+    public void setVerTransformadores(boolean verTransformadores) {
+        this.verTransformadores = verTransformadores;
     }
 
     public enum Rol {

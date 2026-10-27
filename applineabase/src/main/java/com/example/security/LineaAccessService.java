@@ -115,6 +115,19 @@ public class LineaAccessService {
         return principal.getUsuario().isVerFranjaHoraria();
     }
 
+    /** Transformadores (diagrama unifilar en vivo): ADMIN, o el usuario puntual que tenga marcado "Ver Transformadores"
+     * (independiente de la zona — ver Usuario.verTransformadores). */
+    public boolean puedeVerTransformadores() {
+        if (esAdmin()) {
+            return true;
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {
+            return false;
+        }
+        return principal.getUsuario().isVerTransformadores();
+    }
+
     public boolean esAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {

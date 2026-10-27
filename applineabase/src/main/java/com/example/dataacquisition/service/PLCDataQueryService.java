@@ -62,6 +62,28 @@ public class PLCDataQueryService {
         return row;
     }
 
+    /**
+     * Última fila VIP de varias máquinas con una sola conexión al archivo del día (para pantallas en vivo que leen muchos
+     * medidores cada pocos segundos). Las que no tienen tabla o filas no vienen en el resultado.
+     */
+    public Map<String, Map<String, Object>> getLatestVIPData(java.util.Collection<String> maquinas) {
+        Map<String, Map<String, Object>> resultado = new HashMap<>();
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + databaseInitializationService.getDailyVIPPath())) {
+            for (String m : maquinas) {
+                if (!esNombreMaquinaValido(m)) continue;
+                try (PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM " + m + " ORDER BY fecha DESC LIMIT 1");
+                     ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) resultado.put(m, mapVipRow(rs));
+                } catch (SQLException e) {
+                    logger.debug("Sin ultima lectura de {}: {}", m, e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error leyendo las ultimas lecturas VIP: {}", e.getMessage());
+        }
+        return resultado;
+    }
+
     public Map<String, Object> getLatestVIPDataByMaquina(String nombreMaquina) {
         Map<String, Object> result = new HashMap<>();
         if (!esNombreMaquinaValido(nombreMaquina)) {
