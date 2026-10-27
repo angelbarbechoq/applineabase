@@ -103,7 +103,7 @@ public class TransformadoresView extends VerticalLayout implements BeforeEnterOb
 
     private void refrescar() {
         Foto f = service.leer();
-        lectura.setText("Ultima lectura " + f.leido().format(HORA));
+        lectura.setText("Última lectura " + f.leido().format(HORA));
         try {
             unifilar.getElement().executeJs(SCRIPT + "\nwindow.UnifilarTransformadores.render(this, JSON.parse($0));",
                     JSON.writeValueAsString(datos(f)));

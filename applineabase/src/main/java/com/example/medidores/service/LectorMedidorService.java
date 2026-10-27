@@ -99,7 +99,7 @@ public class LectorMedidorService {
                 // ninguno sale (Unit ID equivocado, otro equipo) no se castiga al modelo entero.
                 if (valores.size() > leidosAntes && modelosSinAgrupar.add(modelo.nombre())) {
                     logger.info("Modelo {}: el bloque {}-{} incluye registros que el medidor no tiene ({}); "
-                            + "desde ahora se lee parametro por parametro", modelo.nombre(), inicio, fin - 1, e.getMessage());
+                            + "desde ahora se lee parámetro por parámetro", modelo.nombre(), inicio, fin - 1, e.getMessage());
                 }
             }
         }
@@ -190,7 +190,7 @@ public class LectorMedidorService {
             case FLOAT32 -> {
                 float f = Float.intBitsToFloat((int) bits);
                 if (Float.isNaN(f) || Float.isInfinite(f)) {
-                    throw new IllegalArgumentException("valor no numerico (el medidor no tiene el dato)");
+                    throw new IllegalArgumentException("valor no numérico (el medidor no tiene el dato)");
                 }
                 yield f;
             }

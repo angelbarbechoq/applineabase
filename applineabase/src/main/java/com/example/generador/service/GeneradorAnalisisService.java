@@ -81,7 +81,7 @@ public class GeneradorAnalisisService {
     private static final DateTimeFormatter DIA_CORTO = DateTimeFormatter.ofPattern("dd-MM");
 
     public enum Agrupacion {
-        DIA("Dia"), SEMANA("Semana"), MES("Mes");
+        DIA("Día"), SEMANA("Semana"), MES("Mes");
 
         private final String etiqueta;
 

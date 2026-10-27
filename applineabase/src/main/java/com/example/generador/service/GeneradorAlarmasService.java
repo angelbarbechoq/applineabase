@@ -64,7 +64,7 @@ public class GeneradorAlarmasService {
             if (nombre == null) {
                 String resto = ev.getMensaje().substring(Math.min(ev.getMensaje().length(), ("Generador " + generador + ": ").length()));
                 int corte = resto.indexOf(" (");
-                ev.setMensaje(prefijo(generador, corte < 0 ? resto : resto.substring(0, corte)) + "resuelta: salio de la lista del controlador)");
+                ev.setMensaje(prefijo(generador, corte < 0 ? resto : resto.substring(0, corte)) + "resuelta: salió de la lista del controlador)");
                 ev.setActiva(false);
                 ev.setFechaFin(fecha);
                 eventoRepository.save(ev);

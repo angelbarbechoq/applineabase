@@ -67,6 +67,10 @@ public class ConsumoMedidoresService {
     private static final DateTimeFormatter CLAVE = DateTimeFormatter.ofPattern("yyyyMMddHH:mm:ss");
     /** Fecha "dd-MM-yyyy HH:mm:ss" pasada a una clave que se ordena como texto. */
     private static final String SQL_CLAVE = "substr(fecha,7,4)||substr(fecha,4,2)||substr(fecha,1,2)||substr(fecha,12)";
+    /** Día como empieza la columna fecha, para filtrar por la clave primaria (ver filtroDias). */
+    private static final DateTimeFormatter DIA_FECHA = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+    /** Con más días que esto no se filtra por día (se recorre el mes, como antes). */
+    private static final int MAX_DIAS_FILTRO = 62;
 
     public record Ventana(LocalDateTime desde, LocalDateTime hasta) {
     }
@@ -77,8 +81,8 @@ public class ConsumoMedidoresService {
      * superó el umbral pero consumió. Términos elegidos por el usuario.
      */
     public enum Estado {
-        ENCENDIDO("Encendido"), ENERGIZADO_Y_SIN_PRODUCCION("Energizado y sin produccion"),
-        APAGADO_CONSUMO_MINIMO("Apagado, consumo minimo"), APAGADO_CERO("Apagado (en cero)"), SIN_DATOS("Sin datos");
+        ENCENDIDO("Encendido"), ENERGIZADO_Y_SIN_PRODUCCION("Energizado y sin producción"),
+        APAGADO_CONSUMO_MINIMO("Apagado, consumo mínimo"), APAGADO_CERO("Apagado (en cero)"), SIN_DATOS("Sin datos");
 
         private final String etiqueta;
 
@@ -300,13 +304,42 @@ public class ConsumoMedidoresService {
         return i;
     }
 
+    /** Días que tocan las ventanas, en orden. */
+    private static java.util.SortedSet<java.time.LocalDate> dias(List<Ventana> ventanas) {
+        java.util.SortedSet<java.time.LocalDate> dias = new java.util.TreeSet<>();
+        for (Ventana v : ventanas) {
+            for (java.time.LocalDate d = v.desde().toLocalDate(); !d.isAfter(v.hasta().toLocalDate()); d = d.plusDays(1)) {
+                dias.add(d);
+                if (dias.size() > MAX_DIAS_FILTRO) return dias;
+            }
+        }
+        return dias;
+    }
+
+    /**
+     * Condición SQL que deja solo las filas de esos días, sobre la clave primaria fecha ("dd-MM-yyyy HH:mm:ss"): cada día
+     * es un rango de texto de la clave, así SQLite usa su índice y no recorre el mes entero (de ~400 a pocos ms por
+     * transformador, medido el 2026-10-27). El orden y las ventanas exactas los sigue poniendo la clave ordenable k.
+     * Con muchos días no filtra.
+     */
+    private static String filtroDias(java.util.SortedSet<java.time.LocalDate> dias) {
+        if (dias.isEmpty() || dias.size() > MAX_DIAS_FILTRO) return "1";
+        StringBuilder sb = new StringBuilder("(");
+        for (java.time.LocalDate d : dias) {
+            if (sb.length() > 1) sb.append(" OR ");
+            String p = d.format(DIA_FECHA);
+            sb.append("(fecha >= '").append(p).append("' AND fecha < '").append(p).append("~')");
+        }
+        return sb.append(")").toString();
+    }
+
     /** Suma de aumentos del contador dentro de cada ventana (sin cruzar de una ventana a otra). */
     private Double kwhEnVentanas(String ruta, String maquina, List<Ventana> ventanas) {
         if (!new File(ruta).exists()) return null;
         String sql = "SELECT count(*), sum(CASE WHEN d >= 0 AND d < " + SALTO_MAXIMO_KWH + " THEN d ELSE 0 END) FROM ("
                 + " SELECT kwh - LAG(kwh) OVER (PARTITION BY w ORDER BY k) AS d FROM ("
                 + "  SELECT kwh, k, " + casoVentana(ventanas) + " AS w FROM ("
-                + "   SELECT kwh, " + SQL_CLAVE + " AS k FROM \"" + maquina + "\" WHERE kwh > 1)"
+                + "   SELECT kwh, " + SQL_CLAVE + " AS k FROM \"" + maquina + "\" WHERE kwh > 1 AND " + filtroDias(dias(ventanas)) + ")"
                 + " ) WHERE w IS NOT NULL)";
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta.replace('\\', '/') + "?mode=ro");
              PreparedStatement ps = c.prepareStatement(sql)) {
@@ -336,7 +369,8 @@ public class ConsumoMedidoresService {
             LocalDateTime b = hasta.isAfter(fin) ? fin : hasta;
             String ruta = RutaArchivosEnergia.construirRutaMensual(mes.getYear(), mes.getMonthValue(), true);
             if (b.isBefore(a) || !new File(ruta).exists()) continue;
-            String sql = "SELECT k, PW FROM (SELECT " + SQL_CLAVE + " AS k, PW FROM \"" + maquina + "\")"
+            String sql = "SELECT k, PW FROM (SELECT " + SQL_CLAVE + " AS k, PW FROM \"" + maquina + "\" WHERE "
+                    + filtroDias(dias(List.of(new Ventana(a, b)))) + ")"
                     + " WHERE k BETWEEN ? AND ? AND PW IS NOT NULL ORDER BY k";
             try (Connection c = DriverManager.getConnection("jdbc:sqlite:file:" + ruta.replace('\\', '/') + "?mode=ro");
                  PreparedStatement ps = c.prepareStatement(sql)) {

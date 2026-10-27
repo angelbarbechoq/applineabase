@@ -81,7 +81,7 @@ public class ConfigLoaderService {
     public void saveGeneradorMetaImportacionRed(double verdeHasta, double amarilloHasta) {
         Map<String, Object> contenido = new LinkedHashMap<>(leerArchivo(GENERADOR_CONFIG_FILE));
         if (contenido.isEmpty()) {
-            throw new IllegalStateException("No se pudo leer " + GENERADOR_CONFIG_FILE + ": no se guardo nada");
+            throw new IllegalStateException("No se pudo leer " + GENERADOR_CONFIG_FILE + ": no se guardó nada");
         }
         Map<String, Object> meta = new LinkedHashMap<>();
         if (contenido.get("metaImportacionRed") instanceof Map<?, ?> m) m.forEach((k, v) -> meta.put(String.valueOf(k), v));
@@ -105,7 +105,7 @@ public class ConfigLoaderService {
 
     /** Ruta de uno de {@link #ARCHIVOS} en la carpeta de configuración de este equipo. */
     public Path rutaArchivo(String nombreArchivo) {
-        if (!ARCHIVOS.contains(nombreArchivo)) throw new IllegalArgumentException("Archivo de configuracion desconocido: " + nombreArchivo);
+        if (!ARCHIVOS.contains(nombreArchivo)) throw new IllegalArgumentException("Archivo de configuración desconocido: " + nombreArchivo);
         return resolverPath(nombreArchivo);
     }
 

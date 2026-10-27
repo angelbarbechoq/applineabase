@@ -125,7 +125,7 @@ public class IslaService {
             LocalDateTime abierta = null;
             for (Isla i : islas) {
                 if (i.delControlador()) continue; // sus eventos los registra RedControladorService al leer
-                eventos.add(EventoGenerador.de(i.desde(), TipoEventoGenerador.ISLA, "Se abrio el interruptor de la planta: el medidor del "
+                eventos.add(EventoGenerador.de(i.desde(), TipoEventoGenerador.ISLA, "Se abrió el interruptor de la planta: el medidor del "
                         + nombreRed(g.redAsociada()) + " marca 0 con el generador con carga, que alimenta solo su parte de la planta; "
                         + i.evidencia(), null));
                 if (i.enCurso()) {
@@ -134,7 +134,7 @@ public class IslaService {
                     String dur = duracion(i.desde(), i.hasta());
                     eventos.add(EventoGenerador.de(i.hasta(), TipoEventoGenerador.FIN_ISLA, i.volvioAParalelo()
                             ? "Vuelve a paralelo con la red tras " + dur + " en isla"
-                            : "Fin de la isla tras " + dur + ": el generador quedo sin carga o se detuvo", null));
+                            : "Fin de la isla tras " + dur + ": el generador quedó sin carga o se detuvo", null));
                 }
             }
             if (abierta != null) enCurso.put(g.nombre(), abierta);
@@ -253,7 +253,7 @@ public class IslaService {
             LocalDateTime hasta = cortadoPorHueco ? muestras.get(j - 1).fecha() : fin == null ? null : fin.fecha();
             boolean volvio = !cortadoPorHueco && fin != null && red.estado(fin.estado()) == SenalesRed.Estado.PARALELO;
             islas.add(new Isla(generador, muestras.get(inicio).fecha(), hasta, volvio, lecturas,
-                    "segun el controlador: " + String.join(", ", estados), true));
+                    "según el controlador: " + String.join(", ", estados), true));
             i = j;
         }
         return islas;

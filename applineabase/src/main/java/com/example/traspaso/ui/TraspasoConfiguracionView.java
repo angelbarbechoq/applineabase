@@ -35,7 +35,7 @@ import java.util.Date;
  * Configuracion > Pasar configuracion: exportar lo configurado en este equipo (la PC de diseño) a un
  * ZIP e importarlo en otro (el servidor), revisando antes qué cambia. Nunca toca el historial.
  */
-@PageTitle("Pasar configuracion | LineaBase")
+@PageTitle("Pasar configuración | LineaBase")
 @Route(value = "configuracion/traspaso", layout = MainLayout.class)
 @RolesAllowed("ADMIN")
 public class TraspasoConfiguracionView extends VerticalLayout {
@@ -57,19 +57,19 @@ public class TraspasoConfiguracionView extends VerticalLayout {
         setPadding(true);
         setSpacing(true);
 
-        add(new H3("Pasar configuracion a otro equipo"));
-        add(texto("Lleva lo configurado en este equipo (por ejemplo, la PC de diseno) a otro (el servidor), sin tocar el "
-                + "historial del que lo recibe. Se usa asi: aqui se configura y se prueba, se exporta, se empaca la app y en el "
-                + "servidor se importa. Cuando se cambie algo mas adelante, se vuelve a exportar e importar."));
+        add(new H3("Pasar configuración a otro equipo"));
+        add(texto("Lleva lo configurado en este equipo (por ejemplo, la PC de diseño) a otro (el servidor), sin tocar el "
+                + "historial del que lo recibe. Se usa así: aquí se configura y se prueba, se exporta, se empaca la app y en el "
+                + "servidor se importa. Cuando se cambie algo más adelante, se vuelve a exportar e importar."));
 
         // 1. Exportar
-        add(new H4("1. Exportar (en el equipo donde se configuro)"));
-        add(texto("El archivo lleva: los archivos de configuracion (PLC, lineas y medidores, mezcladores, TAG, generadores y "
-                + "sus mapas de registros); usuarios y permisos; umbrales de alarmas y del horometro; modelos de medidor con "
-                + "sus registros; limites de calidad y tensiones nominales; planes de mantenimiento y tecnicos; tarifas por "
+        add(new H4("1. Exportar (en el equipo donde se configuró)"));
+        add(texto("El archivo lleva: los archivos de configuración (PLC, líneas y medidores, mezcladores, TAG, generadores y "
+                + "sus mapas de registros); usuarios y permisos; umbrales de alarmas y del horómetro; modelos de medidor con "
+                + "sus registros; límites de calidad y tensiones nominales; planes de mantenimiento y técnicos; tarifas por "
                 + "franja horaria y feriados; y los eventos copiados a mano del historial de los controladores de los generadores. No lleva "
-                + "historial: energia, horometro, alarmas ocurridas, mantenimientos realizados, stock, arranques."));
-        descarga.setText("Exportar configuracion");
+                + "historial: energía, horómetro, alarmas ocurridas, mantenimientos realizados, stock, arranques."));
+        descarga.setText("Exportar configuración");
         descarga.getElement().getThemeList().add("button");
         descarga.getElement().getThemeList().add("primary");
         // Un solo enlace fijo: el archivo y su nombre (con la hora) se arman al pedirlo. Antes se cambiaba el enlace
@@ -88,10 +88,10 @@ public class TraspasoConfiguracionView extends VerticalLayout {
         // 2. Importar
         add(new H4("2. Importar (en el equipo que recibe)"));
         add(texto("Copie el archivo exportado a la carpeta " + TraspasoConfiguracionService.CARPETA_IMPORTAR
-                + " de este equipo, elijalo y pulse Revisar: se muestra que cambia, sin aplicar nada. Al importar se guarda "
-                + "antes una copia de la configuracion y de la base de este equipo en C:\\LineaBaseX\\backup. Usuarios: se "
-                + "crean los que faltan y en los que existen se actualizan rol, zona y permisos, nunca la clave. Lo que esta "
-                + "solo en este equipo se deja como esta."));
+                + " de este equipo, elíjalo y pulse Revisar: se muestra qué cambia, sin aplicar nada. Al importar se guarda "
+                + "antes una copia de la configuración y de la base de este equipo en C:\\LineaBaseX\\backup. Usuarios: se "
+                + "crean los que faltan y en los que existen se actualizan rol, zona y permisos, nunca la clave. Lo que está "
+                + "solo en este equipo se deja como está."));
         archivo.setItemLabelGenerator(p -> p.getFileName().toString() + "  ("
                 + new SimpleDateFormat("dd-MM-yyyy HH:mm").format(new Date(p.toFile().lastModified())) + ")");
         archivo.setWidth("560px");
@@ -137,7 +137,7 @@ public class TraspasoConfiguracionView extends VerticalLayout {
         if (elegido != null && lista.contains(elegido)) archivo.setValue(elegido);
         else if (!lista.isEmpty()) archivo.setValue(lista.get(0));
         if (lista.isEmpty()) {
-            estado.setText("No hay archivos en " + TraspasoConfiguracionService.CARPETA_IMPORTAR + ". Copie ahi el archivo exportado "
+            estado.setText("No hay archivos en " + TraspasoConfiguracionService.CARPETA_IMPORTAR + ". Copie ahí el archivo exportado "
                     + "y pulse Actualizar lista.");
         }
     }
@@ -164,8 +164,8 @@ public class TraspasoConfiguracionView extends VerticalLayout {
             return;
         }
         mostrar(revision, "Archivo de " + revision.paquete().origen() + ".\n"
-                + (revision.hayCambios() ? "Esto es lo que cambiaria en este equipo. Todavia no se aplico nada."
-                : "Este equipo ya tiene esta configuracion: no hay nada para importar."));
+                + (revision.hayCambios() ? "Esto es lo que cambiaría en este equipo. Todavía no se aplicó nada."
+                : "Este equipo ya tiene esta configuración: no hay nada para importar."));
         importar.setEnabled(revision.hayCambios());
     }
 
@@ -182,10 +182,10 @@ public class TraspasoConfiguracionView extends VerticalLayout {
     private void confirmar() {
         if (revision == null) return;
         Dialog d = new Dialog();
-        d.setHeaderTitle("Importar configuracion");
-        d.add(texto("Se va a aplicar en este equipo la configuracion del archivo " + revision.paquete().archivo()
-                + " (" + revision.paquete().origen() + "). Antes se guarda una copia de la configuracion y de la base de este "
-                + "equipo. El historial no se toca. Despues hay que reiniciar la app."));
+        d.setHeaderTitle("Importar configuración");
+        d.add(texto("Se va a aplicar en este equipo la configuración del archivo " + revision.paquete().archivo()
+                + " (" + revision.paquete().origen() + "). Antes se guarda una copia de la configuración y de la base de este "
+                + "equipo. El historial no se toca. Después hay que reiniciar la app."));
         Button si = new Button("Importar", e -> {
             d.close();
             aplicar();
@@ -200,9 +200,9 @@ public class TraspasoConfiguracionView extends VerticalLayout {
         importar.setEnabled(false);
         try {
             Resultado res = service.importar(p, acceso.usuarioActual());
-            mostrar(res.revision(), "Configuracion importada desde " + p.archivo() + ".\nCopia previa en " + res.respaldo()
-                    + " (para volver atras, importar el archivo configuracion-de-este-equipo.zip de esa carpeta).\n"
-                    + "Reinicie la app para que todo tome la configuracion nueva (lectura de PLC y medidores, alarmas, usuarios).");
+            mostrar(res.revision(), "Configuración importada desde " + p.archivo() + ".\nCopia previa en " + res.respaldo()
+                    + " (para volver atrás, importar el archivo configuracion-de-este-equipo.zip de esa carpeta).\n"
+                    + "Reinicie la app para que todo tome la configuración nueva (lectura de PLC y medidores, alarmas, usuarios).");
             revision = null;
         } catch (Exception ex) {
             estado.setText("No se pudo importar: " + ex.getMessage());

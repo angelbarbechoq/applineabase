@@ -38,7 +38,7 @@ class ExportacionCsvDialog extends Dialog {
 
     ExportacionCsvDialog(ExportacionCsvService exportacionCsvService) {
         this.exportacionCsvService = exportacionCsvService;
-        setHeaderTitle("Exportar CSV de todas las maquinas");
+        setHeaderTitle("Exportar CSV de todas las máquinas");
         setWidth("560px");
 
         tipoRangoCombo.setItems(POR_MESES, POR_FECHAS);
@@ -64,9 +64,9 @@ class ExportacionCsvDialog extends Dialog {
             picker.addValueChangeListener(e -> actualizarDescarga());
         }
 
-        Span ayuda = new Span("Se descarga un ZIP con dos carpetas y un CSV por maquina con todo el rango elegido: "
-                + "Energia (kWh) y Voltaje-Corriente-Potencia-PF (archivos con VIP en el nombre). "
-                + "El archivo resumen.txt indica que maquinas tienen datos, cuales estan en cero y cuales no tienen datos. "
+        Span ayuda = new Span("Se descarga un ZIP con dos carpetas y un CSV por máquina con todo el rango elegido: "
+                + "Energía (kWh) y Voltaje-Corriente-Potencia-PF (archivos con VIP en el nombre). "
+                + "El archivo resumen.txt indica qué máquinas tienen datos, cuáles están en cero y cuáles no tienen datos. "
                 + "Puede tardar varios minutos si el rango es grande.");
         ayuda.getStyle().set("font-size", "12px").set("color", "var(--vaadin-text-color-secondary, #666)");
         mensaje.getStyle().set("color", "#721c24");

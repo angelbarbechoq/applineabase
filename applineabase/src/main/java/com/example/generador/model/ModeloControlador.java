@@ -72,7 +72,7 @@ public record ModeloControlador(String modelo, String descripcion, boolean confi
     private static String nombre(List<String> nombres, Double v) {
         if (v == null) return null;
         int codigo = (int) Math.round(v);
-        return codigo >= 0 && codigo < nombres.size() ? nombres.get(codigo) : "codigo " + codigo;
+        return codigo >= 0 && codigo < nombres.size() ? nombres.get(codigo) : "código " + codigo;
     }
 
     /** BITS16: palabra de bits; nunca es "no disponible" (0x8000 = solo el bit 15 activo). */

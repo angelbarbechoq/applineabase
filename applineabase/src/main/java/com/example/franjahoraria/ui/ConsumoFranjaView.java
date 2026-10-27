@@ -75,7 +75,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
     private static final String CHART_ID = "chartdiv_franja_dias";
     private static final String[] MESES = {"enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
             "agosto", "septiembre", "octubre", "noviembre", "diciembre"};
-    private static final String[] DIAS = {"Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"};
+    private static final String[] DIAS = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"};
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd-MM-yyyy");
     private static final DateTimeFormatter CORTA = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
     // Paleta categórica de referencia, slots 1 a 4 en orden fijo (validada para daltonismo en pares vecinos):
@@ -108,7 +108,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
     private String scriptGrafico;
 
     // Histórico
-    private final ComboBox<Integer> anioCombo = new ComboBox<>("Anio");
+    private final ComboBox<Integer> anioCombo = new ComboBox<>("Año");
     private final Grid<FilaMes> mesesGrid = new Grid<>();
     private final Map<Franja, Grid.Column<FilaMes>[]> colMesFranja = new EnumMap<>(Franja.class);
     private Grid.Column<FilaMes> colMes, colMesTotal, colMesCosto, colMesMedio;
@@ -151,11 +151,11 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         StringBuilder franjas = new StringBuilder();
         for (Franja f : Franja.values()) franjas.append(franjas.isEmpty() ? "" : "; ").append(f.etiqueta());
         add(titulo, nota("Medidor general de la planta (" + ConsumoFranjaService.MEDIDOR + "), el mismo punto que factura la "
-                + "empresa electrica. Franjas: " + franjas + ". S = sabado, D = domingo, F = feriado cargado en la pestana Feriados."));
+                + "empresa eléctrica. Franjas: " + franjas + ". S = sábado, D = domingo, F = feriado cargado en la pestaña Feriados."));
 
         tabs.setWidthFull();
         tabDetalle = tabs.add("Detalle del mes", crearDetalle());
-        tabAnual = tabs.add("Historico", crearAnual());
+        tabAnual = tabs.add("Histórico", crearAnual());
         tabs.add("Tarifas", crearTarifas());
         tabs.add("Feriados", crearFeriados());
         // El gráfico se arma con la pestaña visible (con display:none amCharts lo dibuja sin tamaño). La tabla
@@ -205,7 +205,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
             verDetalle();
             anualAlDia = false;
         });
-        recalcular.setTooltipText("Vuelve a leer los archivos de energia del mes (por ejemplo, despues de copiar datos historicos)");
+        recalcular.setTooltipText("Vuelve a leer los archivos de energía del mes (por ejemplo, después de copiar datos históricos)");
         HorizontalLayout filtros = new HorizontalLayout(mesCombo, recalcular, tarifaInfo);
         filtros.setAlignItems(Alignment.END);
         filtros.getStyle().set("flex-wrap", "wrap");
@@ -224,8 +224,8 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         graficos.getStyle().set("flex-wrap", "wrap");
 
         colDia = diasGrid.addColumn(d -> DIAS[d.fecha().getDayOfWeek().getValue() - 1].substring(0, 3) + " "
-                + d.fecha().format(FECHA)).setHeader("Dia").setAutoWidth(true).setFlexGrow(0).setFrozen(true);
-        diasGrid.addColumn(ConsumoFranjaView::tipoDeDia).setHeader("Tipo de dia").setAutoWidth(true).setFlexGrow(0);
+                + d.fecha().format(FECHA)).setHeader("Día").setAutoWidth(true).setFlexGrow(0).setFrozen(true);
+        diasGrid.addColumn(ConsumoFranjaView::tipoDeDia).setHeader("Tipo de día").setAutoWidth(true).setFlexGrow(0);
         for (Franja f : Franja.values()) {
             colDiaFranja.put(f, columna(diasGrid, f.name() + " (kWh)", d -> d.conDatos() ? kwhNum(d.kwh(f)) : "-"));
         }
@@ -237,12 +237,12 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         diasGrid.setWidthFull();
         diasGrid.setHeight("520px");
 
-        Span nota = nota("Cada tramo entre dos lecturas del contador se reparte entre las franjas que cruza, en proporcion al tiempo. "
-                + "Estimado = horas en las que faltaron lecturas por mas de " + ConsumoFranjaService.MINUTOS_HUECO + " minutos: "
+        Span nota = nota("Cada tramo entre dos lecturas del contador se reparte entre las franjas que cruza, en proporción al tiempo. "
+                + "Estimado = horas en las que faltaron lecturas por más de " + ConsumoFranjaService.MINUTOS_HUECO + " minutos: "
                 + "el consumo de ese hueco se reparte por tiempo. Sin datos = horas sin lecturas validas (no se cuentan). "
-                + "Costo = kWh de cada franja x precio de la franja del mes (pestana Tarifas). Mes calendario, como la factura. "
-                + "Los feriados solo cambian algo si caen de lunes a viernes: ese dia no hay A ni B, todo va a C y D.");
-        VerticalLayout v = new VerticalLayout(descripcion("Cuanta energia tomo la planta en cada franja horaria y cuanto cuesta con la "
+                + "Costo = kWh de cada franja x precio de la franja del mes (pestaña Tarifas). Mes calendario, como la factura. "
+                + "Los feriados solo cambian algo si caen de lunes a viernes: ese día no hay A ni B, todo va a C y D.");
+        VerticalLayout v = new VerticalLayout(descripcion("Cuánta energía tomó la planta en cada franja horaria y cuánto cuesta con la "
                 + "tarifa del mes. Por defecto, el mes en curso; se puede elegir cualquier mes."), filtros, mensaje, tarjetas, graficos,
                 diasGrid, nota);
         v.setPadding(false);
@@ -319,7 +319,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         mensaje.setText(nombreMes(mes) + (datos.enCurso() ? ", hasta el " + LocalDateTime.now().format(CORTA) : ", completo")
                 + (datos.feriados().isEmpty() ? ", sin feriados cargados" : ", feriados: " + String.join(", ",
                 datos.feriados().entrySet().stream().map(e -> e.getKey().format(FECHA) + " " + e.getValue()).toList()))
-                + " (" + (System.currentTimeMillis() - t0) + " ms)." + (ultimo.conDatos() ? "" : " El ultimo dia no tiene lecturas."));
+                + " (" + (System.currentTimeMillis() - t0) + " ms)." + (ultimo.conDatos() ? "" : " El último día no tiene lecturas."));
     }
 
     private Double costo(Dia d) {
@@ -340,13 +340,13 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         String texto;
         String[] c;
         if (t.sinTarifa()) {
-            texto = "Sin tarifa cargada: solo kWh (pestana Tarifas)";
+            texto = "Sin tarifa cargada: solo kWh (pestaña Tarifas)";
             c = GRIS;
         } else if (t.propia()) {
             texto = "Tarifa de " + nombreMes(t.mes()) + (t.tarifa().getUsuario() == null ? "" : ", cargada por " + t.tarifa().getUsuario());
             c = VERDE;
         } else {
-            texto = nombreMes(t.mes()) + " no tiene tarifa propia: se usa la de " + nombreMes(t.origen()) + " (pestana Tarifas)";
+            texto = nombreMes(t.mes()) + " no tiene tarifa propia: se usa la de " + nombreMes(t.origen()) + " (pestaña Tarifas)";
             c = AMARILLO;
         }
         tarifaInfo.setText(texto);
@@ -441,8 +441,8 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
             Notification.show("Meses de " + anio + " recalculados", 2500, Notification.Position.BOTTOM_START)
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
         });
-        recalcular.setTooltipText("Vuelve a leer los archivos de energia de todos los meses del anio (por ejemplo, despues de "
-                + "copiar datos historicos)");
+        recalcular.setTooltipText("Vuelve a leer los archivos de energía de todos los meses del año (por ejemplo, después de "
+                + "copiar datos históricos)");
         HorizontalLayout filtros = new HorizontalLayout(anioCombo, recalcular, descarga);
         filtros.setAlignItems(Alignment.END);
 
@@ -468,12 +468,12 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         mesesGrid.setWidthFull();
         mesesGrid.setAllRowsVisible(true);
 
-        Span nota = nota("Mismo formato que la planilla de la empresa electrica. Precio facturado = kWh x costo kWh de la franja; "
-                + "cada mes con su tarifa (en amarillo, los meses que no tienen tarifa propia y usan la del ultimo mes cargado). "
-                + "El detalle por dia de un mes se ve en la pestana Detalle del mes. Lecturas: horas estimadas o sin datos del medidor general en el mes "
+        Span nota = nota("Mismo formato que la planilla de la empresa eléctrica. Precio facturado = kWh x costo kWh de la franja; "
+                + "cada mes con su tarifa (en amarillo, los meses que no tienen tarifa propia y usan la del último mes cargado). "
+                + "El detalle por día de un mes se ve en la pestaña Detalle del mes. Lecturas: horas estimadas o sin datos del medidor general en el mes "
                 + "(por ejemplo, el medidor general tiene datos desde el 08-01-2026). Los feriados cargados cambian los kWh de A/B a C/D. "
                 + "Los meses cerrados se guardan en memoria para no releerlos; Recalcular los vuelve a leer de los archivos.");
-        VerticalLayout v = new VerticalLayout(descripcion("Consumo y costo por franja horaria de cada mes del anio elegido."),
+        VerticalLayout v = new VerticalLayout(descripcion("Consumo y costo por franja horaria de cada mes del año elegido."),
                 filtros, mesesGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
@@ -556,14 +556,14 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         }
         tarifasGrid.addComponentColumn(ConsumoFranjaView::badgeTarifa).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
         tarifasGrid.addColumn(t -> t.propia() && t.tarifa().getObservacion() != null ? t.tarifa().getObservacion() : "")
-                .setHeader("Observacion").setAutoWidth(true);
+                .setHeader("Observación").setAutoWidth(true);
         tarifasGrid.addColumn(t -> !t.propia() ? "" : (t.tarifa().getUsuario() == null ? "" : t.tarifa().getUsuario() + " ")
                 + t.tarifa().getFechaRegistro().format(CORTA)).setHeader("Cargada por").setAutoWidth(true).setFlexGrow(0);
         tarifasGrid.setWidthFull();
         tarifasGrid.setAllRowsVisible(true);
 
         VerticalLayout v = new VerticalLayout(descripcion("Precio del kWh de cada franja, mes por mes. Cada mes guarda su propia tarifa: "
-                + "cambiar un mes no afecta a los demas."));
+                + "cambiar un mes no afecta a los demás."));
         v.setPadding(false);
         v.setWidthFull();
         if (admin) {
@@ -572,7 +572,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
             tarifasGrid.addItemClickListener(e -> abrirDialogoTarifa(e.getItem().mes()));
         }
         v.add(tarifasGrid, nota("Verde = el mes tiene su tarifa. Amarillo = el mes no tiene tarifa propia y se calcula con la del "
-                + "ultimo mes cargado antes (al guardarla queda como propia). Gris = no hay ninguna tarifa cargada hasta ese mes."
+                + "último mes cargado antes (al guardarla queda como propia). Gris = no hay ninguna tarifa cargada hasta ese mes."
                 + (admin ? " Clic en un mes para cargar o corregir su tarifa." : " Solo el administrador carga las tarifas.")));
         return v;
     }
@@ -613,9 +613,9 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
             campos.put(f, n);
             contenido.add(n);
         }
-        TextField observacion = new TextField("Observacion (opcional)");
+        TextField observacion = new TextField("Observación (opcional)");
         observacion.setMaxLength(255);
-        observacion.setPlaceholder("ej. planilla de la empresa electrica");
+        observacion.setPlaceholder("ej. planilla de la empresa eléctrica");
         observacion.setWidthFull();
         contenido.add(observacion);
         contenido.setPadding(false);
@@ -692,7 +692,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
 
     private VerticalLayout crearFeriados() {
         feriadosGrid.addColumn(f -> f.getFecha().format(FECHA)).setHeader("Fecha").setAutoWidth(true).setFlexGrow(0);
-        feriadosGrid.addColumn(f -> DIAS[f.getFecha().getDayOfWeek().getValue() - 1]).setHeader("Dia").setAutoWidth(true).setFlexGrow(0);
+        feriadosGrid.addColumn(f -> DIAS[f.getFecha().getDayOfWeek().getValue() - 1]).setHeader("Día").setAutoWidth(true).setFlexGrow(0);
         feriadosGrid.addColumn(Feriado::getNombre).setHeader("Nombre").setAutoWidth(true);
         feriadosGrid.addComponentColumn(f -> {
             Span s = new Span(Franja.finDeSemana(f.getFecha()) ? "Cae en fin de semana: no cambia nada" : "Cuenta como S, D y F");
@@ -715,8 +715,8 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
         feriadosGrid.setWidthFull();
         feriadosGrid.setAllRowsVisible(true);
 
-        VerticalLayout v = new VerticalLayout(descripcion("Opcional. Los feriados que caen de lunes a viernes se cobran como sabado o "
-                + "domingo: ese dia no hay franjas A ni B, todo va a C y D. Si no se carga ninguno, la pantalla funciona igual."));
+        VerticalLayout v = new VerticalLayout(descripcion("Opcional. Los feriados que caen de lunes a viernes se cobran como sábado o "
+                + "domingo: ese día no hay franjas A ni B, todo va a C y D. Si no se carga ninguno, la pantalla funciona igual."));
         v.setPadding(false);
         v.setWidthFull();
         if (admin) {
@@ -724,7 +724,7 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
             fecha.setLocale(CSV);
             TextField nombre = new TextField("Nombre");
             nombre.setMaxLength(120);
-            nombre.setPlaceholder("ej. Dia del Trabajo");
+            nombre.setPlaceholder("ej. Día del Trabajo");
             nombre.setWidth("280px");
             Button agregar = new Button("Agregar", VaadinIcon.PLUS.create(), e -> {
                 try {
@@ -742,9 +742,9 @@ public class ConsumoFranjaView extends VerticalLayout implements BeforeEnterObse
             form.getStyle().set("flex-wrap", "wrap");
             v.add(form);
         }
-        v.add(feriadosGrid, nota("Cargar solo los dias que la empresa cobra como feriado, no todos los del calendario. Ejemplo "
+        v.add(feriadosGrid, nota("Cargar solo los días que la empresa cobra como feriado, no todos los del calendario. Ejemplo "
                 + "2026: la factura de mayo coincide con el 1 de mayo como feriado; la de abril, sin feriados (el Viernes Santo se "
-                + "cobro como dia normal). Si una fecha ya estaba cargada, Agregar le cambia el nombre."
+                + "cobró como día normal). Si una fecha ya estaba cargada, Agregar le cambia el nombre."
                 + (admin ? "" : " Solo el administrador carga los feriados.")));
         return v;
     }

@@ -52,7 +52,7 @@ public class ExportacionCsvService {
 
     /** Encabezado legible (con unidad) de cada columna de la base en el CSV. */
     private static final Map<String, String> ENCABEZADOS = Map.of(
-            "kwh", "Energia (kWh)", "PW", "Potencia (kW)",
+            "kwh", "Energía (kWh)", "PW", "Potencia (kW)",
             "VAB", "Voltaje VAB (V)", "VAC", "Voltaje VAC (V)", "VBC", "Voltaje VBC (V)",
             "IA", "Corriente IA (A)", "IB", "Corriente IB (A)", "IC", "Corriente IC (A)",
             "PF", "PF");
@@ -68,7 +68,7 @@ public class ExportacionCsvService {
             StringBuilder sb = new StringBuilder("Rango exportado: ").append(rango).append("\r\n\r\n");
             seccion(sb, "Archivos generados con datos", generados);
             seccion(sb, "Archivos generados con todos los valores en cero", enCero);
-            seccion(sb, "Sin datos en el rango (no se genero archivo)", sinDatos);
+            seccion(sb, "Sin datos en el rango (no se generó archivo)", sinDatos);
             seccion(sb, "Meses sin archivo o con error de lectura", errores);
             return sb.toString();
         }

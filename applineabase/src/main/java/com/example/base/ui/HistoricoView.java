@@ -45,7 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@PageTitle("Historico de Graficas | LineaBase")
+@PageTitle("Histórico de Gráficas | LineaBase")
 @Route(value = "historico", layout = MainLayout.class)
 @PermitAll
 public class HistoricoView extends VerticalLayout {
@@ -251,7 +251,7 @@ public class HistoricoView extends VerticalLayout {
         datosActualesCard = new Div();
         datosActualesCard.setVisible(false);
 
-        HorizontalLayout encabezado = new HorizontalLayout(new H3("Historico de Graficas"), datosActualesCard);
+        HorizontalLayout encabezado = new HorizontalLayout(new H3("Histórico de Gráficas"), datosActualesCard);
         encabezado.setAlignItems(FlexComponent.Alignment.CENTER);
         encabezado.getStyle().set("flex-wrap", "wrap");
         if (lineaAccessService.esAdmin()) {
@@ -305,7 +305,7 @@ public class HistoricoView extends VerticalLayout {
     /** Tabla junto al gráfico "Sin filtrar": diferencia de KWh, sin desglose (ver comentario del campo energiaGrid). */
     private Grid<FilaEnergia> buildEnergiaGrid() {
         energiaGrid = new Grid<>(FilaEnergia.class, false);
-        energiaGrid.addColumn(FilaEnergia::maquina).setHeader("Maquina").setAutoWidth(true).setFlexGrow(0);
+        energiaGrid.addColumn(FilaEnergia::maquina).setHeader("Máquina").setAutoWidth(true).setFlexGrow(0);
         energiaGrid.addColumn(FilaEnergia::kwhInicial).setHeader("KWh Inicial").setAutoWidth(true).setFlexGrow(0);
         energiaGrid.addColumn(FilaEnergia::kwhFinal).setHeader("KWh Final").setAutoWidth(true).setFlexGrow(0);
         energiaGrid.addColumn(FilaEnergia::diferenciaKwh).setHeader("Diferencia kWh").setAutoWidth(true).setFlexGrow(0);
@@ -596,7 +596,7 @@ public class HistoricoView extends VerticalLayout {
         }
         java.util.Collections.sort(maquinas);
 
-        maquinaCombo = new ComboBox<>("Maquina");
+        maquinaCombo = new ComboBox<>("Máquina");
         maquinaCombo.setItems(maquinas);
         maquinaCombo.setWidth("200px");
         if (!maquinas.isEmpty()) maquinaCombo.setValue(maquinas.get(0));
@@ -644,7 +644,7 @@ public class HistoricoView extends VerticalLayout {
                 maquinaCombo, desdeDate, hastaDate, variableCombo, ventanaMediaMovilField, consultarBtn, resetZoomBtn);
         if (lineaAccessService.esAdmin()) {
             layout.add(crearLinkDescargaCsv());
-            Button exportarTodoBtn = new Button("Exportar CSV de todas las maquinas",
+            Button exportarTodoBtn = new Button("Exportar CSV de todas las máquinas",
                     e -> new ExportacionCsvDialog(exportacionCsvService).open());
             exportarTodoBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
             layout.add(exportarTodoBtn);
@@ -691,7 +691,7 @@ public class HistoricoView extends VerticalLayout {
             return new ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
         }
         String[] campos = camposPorVariable(ultimaVariableConsultada);
-        sb.append("Maquina;").append(CsvUtil.escape(ultimaMaquinaConsultada)).append("\r\n");
+        sb.append("Máquina;").append(CsvUtil.escape(ultimaMaquinaConsultada)).append("\r\n");
         sb.append("Fecha");
         for (String campo : campos) {
             sb.append(';').append(campo);

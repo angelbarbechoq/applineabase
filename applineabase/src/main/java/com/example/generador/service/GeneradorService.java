@@ -83,7 +83,7 @@ public class GeneradorService {
     /** Lectura en vivo del controlador (función 03, nunca escribe). */
     public LecturaGenerador leerEnVivo(Generador g) throws IOException {
         ModeloControlador m = modelo(g).orElseThrow(() ->
-                new IOException("el modelo " + g.modelo() + " no esta en generador-modelos.json"));
+                new IOException("el modelo " + g.modelo() + " no está en generador-modelos.json"));
         return LectorControlador.leer(g.ip(), g.unitId(), m);
     }
 

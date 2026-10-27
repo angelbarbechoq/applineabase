@@ -93,7 +93,7 @@ public class ConfiguracionView extends VerticalLayout {
     private Span crearAvisoReinicio() {
         Span aviso = new Span(
                 "Los cambios se guardan de inmediato, pero el servicio de lectura Modbus (PLCs y PAS600L) " +
-                        "solo los toma en cuenta despues de reiniciar la aplicación.");
+                        "solo los toma en cuenta después de reiniciar la aplicación.");
         aviso.getStyle()
                 .set("background", "#fff3cd")
                 .set("color", "#7a5b00")
@@ -155,7 +155,7 @@ public class ConfiguracionView extends VerticalLayout {
         // Lista cerrada: el modelo decide qué registros se leen (Configuracion > Modelos de medidor).
         ComboBox<String> medidorField = new ComboBox<>("Medidor");
         medidorField.setItems(modeloMedidorService.listarNombres());
-        medidorField.setHelperText("Modelos de Configuracion > Modelos de medidor");
+        medidorField.setHelperText("Modelos de Configuración > Modelos de medidor");
         ComboBox<String> plcField = new ComboBox<>("PLC");
         plcField.setItems(Stream.concat(
                 plcs.stream().map(p -> String.valueOf(p.get("nombre"))),
@@ -189,13 +189,13 @@ public class ConfiguracionView extends VerticalLayout {
         transformadorField.setItems(lineas.stream()
                 .filter(l -> TipoMedidor.de(l.get("tipo")) == TipoMedidor.TRANSFORMADOR)
                 .map(l -> String.valueOf(l.get("lineaMaquina"))).sorted().collect(Collectors.toList()));
-        transformadorField.setHelperText("De que transformador se alimenta");
+        transformadorField.setHelperText("De qué transformador se alimenta");
         ComboBox<String> dentroDeField = new ComboBox<>("Dentro de (submedidor)");
         dentroDeField.setItems(lineas.stream()
                 .filter(l -> l != lineaEnEdicion && TipoMedidor.de(l.get("tipo")) == TipoMedidor.MAQUINA && l.get("dentroDe") == null)
                 .map(l -> String.valueOf(l.get("lineaMaquina"))).sorted().collect(Collectors.toList()));
         dentroDeField.setClearButtonVisible(true);
-        dentroDeField.setHelperText("Solo si este medidor esta dentro de otro tablero medido (ej. GA752 dentro de Inyeccion)");
+        dentroDeField.setHelperText("Solo si este medidor está dentro de otro tablero medido (ej. GA752 dentro de Inyección)");
 
         if (lineaEnEdicion != null) {
             tipoField.setValue(TipoMedidor.de(lineaEnEdicion.get("tipo")));
@@ -246,7 +246,7 @@ public class ConfiguracionView extends VerticalLayout {
                                   TipoMedidor tipo, String transformador, String dentroDe) {
         if (tipo == null) tipo = TipoMedidor.MAQUINA;
         if (tipo == TipoMedidor.MAQUINA && (transformador == null || transformador.isBlank())) {
-            NotificacionesUtil.mostrarError("Indique de que transformador se alimenta la maquina");
+            NotificacionesUtil.mostrarError("Indique de qué transformador se alimenta la máquina");
             return false;
         }
         if (dentroDe != null && dentroDe.equalsIgnoreCase(nombre)) {

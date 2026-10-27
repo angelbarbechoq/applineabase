@@ -159,7 +159,9 @@
       "avisoFallaRed" : { "parametro" : "AVISOS_RED", "bit" : 4 },
       "proteccionRed" : { "parametro" : "AVISOS_RED", "bit" : 15 },
       "saltoVector" : { "parametro" : "PROTECCIONES_RED", "bit" : 0 },
-      "rocof" : { "parametro" : "PROTECCIONES_RED", "bit" : 1 }
+      "rocof" : { "parametro" : "PROTECCIONES_RED", "bit" : 1 },
+      "limiteSaltoVector" : 10,
+      "limiteRocof" : 1.30
     },
     "modos" : [ "OFF", "MAN", "AUTO", "TEST" ]
   } ]

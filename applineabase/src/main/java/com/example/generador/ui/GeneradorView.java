@@ -167,7 +167,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             Tab t = tabs.add(pestanaGenerador(g), crearEstado(g));
             tabGenerador.put(t, g);
         }
-        tabPlanta = tabs.add("Balance energetico P1", crearPlanta());
+        tabPlanta = tabs.add("Balance energético P1", crearPlanta());
         tabPlanta.getStyle().set("margin-left", "14px");
         tabs.add("Historial de eventos", crearEventos());
         if (lineaAccessService.esAdmin()) {
@@ -269,7 +269,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             ModeloControlador m = service.modelo(g).orElse(null);
             String de = elegido == null ? g.nombre() + ": " : "";
             if (m == null) {
-                avisos.add(de + "el modelo " + g.modelo() + " no esta en C:\\LineaBaseX\\config\\generador-modelos.json: no se lee.");
+                avisos.add(de + "el modelo " + g.modelo() + " no está en C:\\LineaBaseX\\config\\generador-modelos.json: no se lee.");
             } else if (!m.confirmado()) {
                 avisos.add(de + "mapa de registros de " + m.modelo() + " sin confirmar: los valores pueden no corresponder. "
                         + "No se guarda historial ni arranques hasta confirmarlo comparando con la pantalla del controlador.");
@@ -283,7 +283,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     private VerticalLayout crearEventos() {
         eventosPeriodo.setItems(1, 7, 30, 90, 365);
-        eventosPeriodo.setItemLabelGenerator(d -> d == 1 ? "Ultimas 24 h" : d == 365 ? "Ultimo anio" : "Ultimos " + d + " dias");
+        eventosPeriodo.setItemLabelGenerator(d -> d == 1 ? "Últimas 24 h" : d == 365 ? "Último año" : "Últimos " + d + " días");
         eventosPeriodo.setValue(30);
         eventosPeriodo.setWidth("170px");
         eventosTipo.setItems(TipoEventoGenerador.values());
@@ -304,7 +304,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         eventosGrid.addColumn(ev -> ev.id() == null ? "" : String.valueOf(ev.id())).setHeader("Nro").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> ev.fecha().format(HORA)).setHeader("Fecha y hora").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addComponentColumn(ev -> badgeNuevo(ev.tipo().etiqueta(), estadoDe(ev.tipo()))).setHeader("Evento").setAutoWidth(true).setFlexGrow(0);
-        eventosGrid.addColumn(ev -> ev.descripcion() == null ? "" : ev.descripcion()).setHeader("Descripcion").setAutoWidth(true);
+        eventosGrid.addColumn(ev -> ev.descripcion() == null ? "" : ev.descripcion()).setHeader("Descripción").setAutoWidth(true);
         eventosGrid.addColumn(ev -> fmt(ev.rpm(), "%.0f")).setHeader("RPM").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> fmt(ev.kw(), "%.0f")).setHeader("kW").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> fmt(ev.pf(), "%.2f")).setHeader("PF").setAutoWidth(true).setFlexGrow(0);
@@ -313,7 +313,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         eventosGrid.addColumn(ev -> fmt(ev.iGen(), "%.0f")).setHeader("I gen").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> fmt(ev.redFrecuencia(), "%.1f")).setHeader("Hz red").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> fmt(ev.vRed(), "%.0f")).setHeader("V red").setAutoWidth(true).setFlexGrow(0);
-        eventosGrid.addColumn(ev -> fmt(ev.bateria(), "%.1f")).setHeader("Bateria").setAutoWidth(true).setFlexGrow(0);
+        eventosGrid.addColumn(ev -> fmt(ev.bateria(), "%.1f")).setHeader("Batería").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> fmt(ev.tempRefrigerante(), "%.0f")).setHeader("Temp").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> fmt(ev.horasMarcha(), "%.1f")).setHeader("Horas").setAutoWidth(true).setFlexGrow(0);
         eventosGrid.addColumn(ev -> ev.kwh() == null ? "-" : String.format(Locale.ROOT, "%,d", ev.kwh())).setHeader("kWh").setAutoWidth(true).setFlexGrow(0);
@@ -353,11 +353,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         eventos = lista;
         eventosGrid.setItems(eventos);
         eventosMensaje.setText(eventos.size() + " eventos de " + (generadores.size() > 1 ? "todos los generadores" : generador.nombre())
-                + (eventos.isEmpty() ? ". El historial empieza a llenarse desde que se activo esta version." : "."));
+                + (eventos.isEmpty() ? ". El historial empieza a llenarse desde que se activó esta versión." : "."));
     }
 
     private java.io.InputStream csvEventos() {
-        StringBuilder sb = new StringBuilder("﻿Generador;Nro;Fecha y hora;Evento;Descripcion;RPM;kW;PF;Hz gen;V gen;I gen;Hz red;V red;Bateria;Temp;Horas;kWh;Arranques\n");
+        StringBuilder sb = new StringBuilder("﻿Generador;Nro;Fecha y hora;Evento;Descripción;RPM;kW;PF;Hz gen;V gen;I gen;Hz red;V red;Batería;Temp;Horas;kWh;Arranques\n");
         for (EventoGenerador ev : eventos) {
             sb.append(com.example.base.ui.CsvUtil.escape(generadorDeEvento.getOrDefault(ev, ""))).append(';')
                     .append(ev.id()).append(';').append(ev.fecha().format(HORA)).append(';')
@@ -409,7 +409,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         var icono = VaadinIcon.WARNING.create();
         icono.getStyle().set("margin-right", "6px");
         Span titulo = new Span("ALARMA EN EL CONTROLADOR DE " + g.nombre().toUpperCase(Locale.ROOT) + " (" + alarmas.size() + ")"
-                + (ultimaConocida ? " - ultima lectura conocida, sin comunicacion ahora" : ""));
+                + (ultimaConocida ? " - última lectura conocida, sin comunicación ahora" : ""));
         titulo.getStyle().set("font-weight", "700").set("font-size", "15px");
         Div cabeza = new Div(icono, titulo);
         cabeza.getStyle().set("display", "flex").set("align-items", "center");
@@ -417,7 +417,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         for (String a : alarmas) {
             HistorialEventosService.Aparicion ap = historial.aparicion(g.nombre(), a);
             String desde = ap == null ? "" : ap.inicioLectura()
-                    ? ", desde antes del " + ap.fecha().format(CORTA) + " (cuando la app empezo a leer)"
+                    ? ", desde antes del " + ap.fecha().format(CORTA) + " (cuando la app empezó a leer)"
                     : ", desde el " + ap.fecha().format(CORTA);
             Span nombre = new Span(AlarmaComap.nombre(a));
             nombre.getStyle().set("font-weight", "700");
@@ -433,7 +433,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             caja.add(linea, explicacion);
         }
         Span nota = new Span("Lista de alarmas del controlador (solo lectura). El controlador marca con \"!\" la alarma activa y con "
-                + "\"*\" la que todavia no tiene reset. Todo queda en el Historial de eventos: cuando aparece, se activa de nuevo, deja "
+                + "\"*\" la que todavía no tiene reset. Todo queda en el Historial de eventos: cuando aparece, se activa de nuevo, deja "
                 + "de estar activa, se confirma o sale de la lista (reseteada).");
         nota.getStyle().set("font-size", "11px").set("display", "block").set("margin-top", "4px");
         caja.add(nota);
@@ -467,14 +467,14 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private void refrescarPlanta() {
         PlantaEnVivoService.Planta p = plantaService.leer();
         MetaImportacionRed meta = service.metaImportacionRed();
-        plantaHora.setText("Leido " + p.leido().format(HORA));
+        plantaHora.setText("Leído " + p.leido().format(HORA));
         StringBuilder h = new StringBuilder("<div style='display:grid;gap:14px;width:100%;max-width:1150px'>");
 
         String aviso = "<div style='background:#fff3cd;color:#856404;padding:8px 12px;border-radius:6px;font-size:13px'>";
         if (!p.conPrincipal()) {
             h.append(aviso).append("Medidor principal sin lectura reciente")
-                    .append(p.principal() == null || p.principal().fecha() == null ? "" : " (ultima: " + p.principal().fecha().format(CORTA) + ")")
-                    .append(": sin consumo de la planta ni red hasta la proxima lectura.</div>");
+                    .append(p.principal() == null || p.principal().fecha() == null ? "" : " (última: " + p.principal().fecha().format(CORTA) + ")")
+                    .append(": sin consumo de la planta ni red hasta la próxima lectura.</div>");
         }
         if (!p.completa()) {
             h.append(aviso).append("Cifras parciales: ");
@@ -498,7 +498,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             if (antes != null) {
                 String cuando = antes.inicio().format(CORTA) + (antes.inicioEstimado() ? " (aprox.)" : "");
                 String detalle = antes.kw() == null ? "sin lecturas del medidor principal antes del arranque del " + cuando
-                        : "promedio de " + PlantaEnVivoService.MINUTOS_ANTES + " min antes del " + (antes.enCurso() ? "arranque" : "ultimo arranque")
+                        : "promedio de " + PlantaEnVivoService.MINUTOS_ANTES + " min antes del " + (antes.enCurso() ? "arranque" : "último arranque")
                         + " (" + cuando + ")" + (consumo > 0 ? String.format(Locale.ROOT, "; ahora %+,.0f kW", consumo - antes.kw()) : "");
                 h.append(tarjetaPlanta("Consumo antes del arranque", antes.kw() == null ? "-" : kw(antes.kw()), detalle, "#9aa3ad"));
             }
@@ -590,11 +590,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         List<PlantaEnVivoService.EstadoMaquina> maquinas = p.maquinas();
         if (!maquinas.isEmpty()) {
             long trabajando = maquinas.stream().filter(m -> Boolean.TRUE.equals(m.trabajando())).count();
-            h.append("<div style='display:grid;gap:8px'><div style='font-weight:600'>Maquinas: ").append(trabajando).append(" de ")
+            h.append("<div style='display:grid;gap:8px'><div style='font-weight:600'>Máquinas: ").append(trabajando).append(" de ")
                     .append(maquinas.size()).append(" trabajando</div>");
-            String[][] grupos = {{PlantaEnVivoService.GRUPO_EXTRUSION, "Extrusion"},
+            String[][] grupos = {{PlantaEnVivoService.GRUPO_EXTRUSION, "Extrusión"},
                     {PlantaEnVivoService.GRUPO_MEZCLA, "Mezcla (mezcladores, molino y pulverizador)"},
-                    {PlantaEnVivoService.GRUPO_INYECCION, "Inyeccion"}};
+                    {PlantaEnVivoService.GRUPO_INYECCION, "Inyección"}};
             for (String[] g : grupos) {
                 List<PlantaEnVivoService.EstadoMaquina> delGrupo = maquinas.stream().filter(m -> g[0].equals(m.grupo())).toList();
                 if (delGrupo.isEmpty()) continue;
@@ -611,10 +611,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 h.append("</div>");
             }
             List<String> subs = plantaService.submedidoresInyeccion();
-            h.append("<div style='font-size:12px;color:#555'>Trabajando o parada con el criterio del horometro (umbral de encendido y "
+            h.append("<div style='font-size:12px;color:#555'>Trabajando o parada con el criterio del horómetro (umbral de encendido y "
                     + "lecturas seguidas por debajo del umbral). ")
-                    .append(subs.isEmpty() ? "" : "Inyeccion (neta) = Inyeccion − " + esc(String.join(" − ", subs))
-                            + ", contra el umbral de Inyeccion.")
+                    .append(subs.isEmpty() ? "" : "Inyección (neta) = Inyección − " + esc(String.join(" − ", subs))
+                            + ", contra el umbral de Inyección.")
                     .append("</div></div>");
         }
         h.append("</div>");
@@ -761,7 +761,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                     || Boolean.TRUE.equals(SenalesRed.valor(red.avisoFallaRed(), l)));
             if (codigo != null) {
                 SenalesRed.Estado est = red.estado(codigo);
-                d.put("estadoInterruptores", codigo >= 0 && codigo < red.nombres().size() ? red.nombres().get(codigo) : "codigo " + codigo);
+                d.put("estadoInterruptores", codigo >= 0 && codigo < red.nombres().size() ? red.nombres().get(codigo) : "código " + codigo);
                 d.put("sinRed", SenalesRed.sinRed(est));
                 RedControladorService.EstadoActual previo = redControlador.estadoActual(g.nombre());
                 if (SenalesRed.sinRed(est) && previo != null && previo.estado() == est && previo.desde() != null) {
@@ -880,12 +880,12 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                 registrosGrid.setItems(ultimaExploracion);
                 long sinDato = ultimaExploracion.stream().filter(f -> f.celda().valor() == null).count();
                 long cambiaron = ultimaExploracion.stream().filter(this::cambio).count();
-                registrosMensaje.setText("Leidos " + (n - sinDato) + " de " + n + " registros en "
+                registrosMensaje.setText("Leídos " + (n - sinDato) + " de " + n + " registros en "
                         + (System.currentTimeMillis() - t0) + " ms" + (sinDato > 0 ? "; " + sinDato + " no existen en el controlador" : "")
                         + (exploracionAnterior.isEmpty() ? "" : "; " + cambiaron + " cambiaron desde la lectura anterior (amarillo)") + ".");
                 guardar.setEnabled(true);
             } catch (Exception ex) {
-                registrosMensaje.setText("Sin comunicacion con " + g.ip() + ": " + ex.getMessage());
+                registrosMensaje.setText("Sin comunicación con " + g.ip() + ": " + ex.getMessage());
             }
         });
         leer.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -909,8 +909,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         registrosGrid.addColumn(f -> f.celda().valor() == null ? "-" : String.format("%04X", f.celda().valor())).setHeader("Hex").setAutoWidth(true).setFlexGrow(0);
         registrosGrid.addColumn(this::treintaYDos).setHeader("32 bits (con el siguiente)").setAutoWidth(true).setFlexGrow(0);
         registrosGrid.addColumn(f -> f.celda().nota() == null ? "" : f.celda().nota()).setHeader("Nota").setAutoWidth(true);
-        registrosGrid.addColumn(FilaRegistro::parametro).setHeader("Parametro segun el mapa").setAutoWidth(true);
-        registrosGrid.addColumn(FilaRegistro::valorMapa).setHeader("Valor segun el mapa").setAutoWidth(true);
+        registrosGrid.addColumn(FilaRegistro::parametro).setHeader("Parámetro según el mapa").setAutoWidth(true);
+        registrosGrid.addColumn(FilaRegistro::valorMapa).setHeader("Valor según el mapa").setAutoWidth(true);
         registrosGrid.addComponentColumn(f -> {
             if (!cambio(f)) return new Span();
             Integer antes = exploracionAnterior.get(f.celda().registro());

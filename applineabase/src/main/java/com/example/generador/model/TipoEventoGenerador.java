@@ -11,7 +11,7 @@ public enum TipoEventoGenerador {
     ARRANQUE_BREVE("Arranque breve", Nivel.AVISO),
     PARADA("Parada", Nivel.NORMAL),
     TOMA_CARGA("Toma carga", Nivel.BUENO),
-    SIN_CARGA("Queda en vacio", Nivel.NORMAL),
+    SIN_CARGA("Queda en vacío", Nivel.NORMAL),
     FALLA_RED("Falla de red", Nivel.FALLA),
     RETORNO_RED("Retorno de red", Nivel.BUENO),
     ALARMA("Alarma", Nivel.FALLA),
@@ -20,8 +20,8 @@ public enum TipoEventoGenerador {
     /** Confirmada en el controlador (se quitó el "*"); puede seguir activa. */
     ALARMA_CONFIRMADA("Alarma confirmada", Nivel.AVISO),
     ALARMA_RESUELTA("Alarma resuelta", Nivel.BUENO),
-    SIN_COMUNICACION("Sin comunicacion", Nivel.FALLA),
-    COMUNICACION_RECUPERADA("Comunicacion recuperada", Nivel.BUENO),
+    SIN_COMUNICACION("Sin comunicación", Nivel.FALLA),
+    COMUNICACION_RECUPERADA("Comunicación recuperada", Nivel.BUENO),
     /**
      * Se abrió el interruptor de la planta (MCB) y el generador quedó solo con su parte de la planta, aunque el
      * controlador siga viendo tensión de red. Con señales de red en el modelo lo dice el controlador
@@ -34,9 +34,16 @@ public enum TipoEventoGenerador {
     INTERRUPTOR_RED_ABIERTO("Se abre el interruptor de la planta", Nivel.FALLA),
     INTERRUPTOR_RED_CERRADO("Se cierra el interruptor de la planta", Nivel.BUENO),
     /** ROCOF o salto de vector vistos activos en una lectura (actúan en menos de 1 s: casi nunca se ven). */
-    PROTECCION_RED("Proteccion de red", Nivel.FALLA),
-    /** Subió el máximo de ROCOF o de salto de vector que guarda el controlador. */
-    MAXIMO_RED("Maximo de ROCOF o salto de vector", Nivel.AVISO),
+    PROTECCION_RED("Protección de red", Nivel.FALLA),
+    /**
+     * Subió el máximo de ROCOF o de salto de vector que guarda el controlador. Ya no se registra (hasta el 2026-10-27:
+     * salían varios en cada marcha, porque el controlador reinicia el máximo al entrar en paralelo).
+     */
+    MAXIMO_RED("Máximo de ROCOF o salto de vector", Nivel.AVISO),
+    /** Al salir de paralelo: máximos de ROCOF y salto de vector de esa marcha y su % del ajuste de disparo. */
+    RESUMEN_RED("Máximos de ROCOF y salto de vector", Nivel.NORMAL),
+    /** En paralelo, la ROCOF o el salto de vector pasaron la mitad del ajuste de disparo (una vez por marcha). */
+    VARIACION_RED_ALTA("ROCOF o salto de vector alto", Nivel.AVISO),
     /** Modo del controlador (OFF, MAN, AUTO, TEST): fuera de AUTO no arranca solo. */
     CAMBIO_MODO("Cambio de modo del controlador", Nivel.AVISO),
     MODO_AUTO("Vuelve a AUTO", Nivel.BUENO),
@@ -47,7 +54,7 @@ public enum TipoEventoGenerador {
     // Fecha = hora real (la del controlador corregida por el desfase de su reloj); la descripción lleva el
     // motivo de ComAp y la hora del controlador. Primera carga: docs/ig500/historial-controlador-2026-10-12.csv.
     /** Protecciones de red (VectorShift, ROCOF, baja/alta tensión o frecuencia de red). */
-    CONTROLADOR_PROTECCION("Controlador: proteccion de red", Nivel.FALLA),
+    CONTROLADOR_PROTECCION("Controlador: protección de red", Nivel.FALLA),
     /** Apertura y cierre de los interruptores de la planta (MCB) y del generador (GCB). */
     CONTROLADOR_INTERRUPTOR("Controlador: interruptor", Nivel.AVISO),
     /** El resto del historial del controlador (Loaded, RevSyncStarted, Cooling, Ready...). */

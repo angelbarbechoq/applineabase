@@ -564,7 +564,7 @@ public class HorometroView extends VerticalLayout implements BeforeEnterObserver
 
         StringBuilder sb = new StringBuilder();
         sb.append('﻿'); // BOM UTF-8, para que Excel muestre bien tildes/ñ
-        sb.append("Linea;Lunes;Domingo;");
+        sb.append("Línea;Lunes;Domingo;");
         for (String nombreDia : NOMBRES_DIA_CORTOS) {
             sb.append("Horas ").append(nombreDia).append(';');
         }

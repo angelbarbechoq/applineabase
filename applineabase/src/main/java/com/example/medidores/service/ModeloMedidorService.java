@@ -65,7 +65,7 @@ public class ModeloMedidorService {
         if (nombreAnterior != null && !nombreAnterior.equalsIgnoreCase(modelo.getNombre())
                 && !lineasQueLoUsan(nombreAnterior).isEmpty()) {
             throw new IllegalArgumentException("No se puede renombrar: lo usan " + lineasQueLoUsan(nombreAnterior)
-                    + ". Cambia primero el medidor de esas lineas.");
+                    + ". Cambia primero el medidor de esas líneas.");
         }
         modelo.setNombre(modelo.getNombre().trim());
         return repository.save(modelo);

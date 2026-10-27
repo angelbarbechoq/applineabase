@@ -183,7 +183,11 @@ Encontrado el 2026-10-13 con un barrido de 40001-49999 (registros con valor: 410
   medidor de TR1 (PLC) marcaba importacion de 99-106 kW con PF 0,29-0,40 y 282/348/273 A. El controlador mide la corriente
   de red en una sola fase (41040), asi que su potencia de red no es confiable con fases desequilibradas: revisar con el
   tecnico. Ahora se puede comparar 41041 contra TR1 minuto a minuto. La app usa el medidor principal para la red.
-- **Maximos de ROCOF y salto de vector (41046, 41044):** no se sabe cuando se reinician (reset de fallas, cierre del MCB u
-  otro). Si se mantienen hasta un reset, una lectura por minuto podria ver una ROCOF que duro menos de 1 s.
+- **Maximos de ROCOF y salto de vector (41046, 41044), resuelto el 2026-10-27:** el controlador los reinicia cada vez que
+  entra en paralelo (25-10 18:06: 1,7 -> 0,2 grados y 1,11 -> 0,41 Hz/s; 26-10 18:04: 1,1 -> 0,2 y 0,41 -> 0,17) y despues
+  suben solos con la red normal (26-10: 0,7 grados y 0,46 Hz/s). Son una medicion, no un evento: no salen en el History
+  del ComAp, que solo anota cuando la proteccion actua. Ajustes del controlador (`setpoints-inteliconfig-2026-10-26.csv`):
+  salto de vector 10 grados, ROCOF 1,30 Hz/s (ventana 5), solo en paralelo, abren el MCB. La app anota un resumen al
+  salir de paralelo con su % del ajuste y avisa si pasan la mitad.
 - **Estado de los interruptores en una isla:** confirmar en el proximo corte de red que 41327 pasa a MainsFlt / ValidFlt
   / IslOper / MainsRet y que MCB Feedback (41058 bit 1) y MCB Status (41400 bit 10) quedan en 0.

@@ -61,12 +61,12 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
 
     private final ComboBox<String> tareaField = new ComboBox<>("Tarea ejecutada");
     private final DateTimePicker fechaField = new DateTimePicker("Fecha y hora");
-    private final ComboBox<String> lineaMaquinaCombo = new ComboBox<>("Linea / Maquina");
+    private final ComboBox<String> lineaMaquinaCombo = new ComboBox<>("Línea / Máquina");
     private final ComboBox<EquipoTag> equipoCombo = new ComboBox<>("Equipo");
     private final ComboBox<ItemTag> itemCombo = new ComboBox<>("Elemento mantenible");
     private final TextField numeroOtField = new TextField("# OT");
-    private final ComboBox<String> tecnicoField = new ComboBox<>("Tecnico");
-    private final NumberField horometroField = new NumberField("Horometro");
+    private final ComboBox<String> tecnicoField = new ComboBox<>("Técnico");
+    private final NumberField horometroField = new NumberField("Horómetro");
     private final ComboBox<StockBarrilTornillo> stockField = new ComboBox<>("Barril/Tornillo instalado");
     private final Button registrarBtn = new Button("Registrar");
 
@@ -155,10 +155,10 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
         grid.addColumn(r -> r.getFechaRealizado().format(FORMATO_FECHA)).setHeader("Fecha y hora").setAutoWidth(true);
         grid.addColumn(r -> r.getPlanMantenimiento().getTag()).setHeader("TAG").setAutoWidth(true);
         grid.addColumn(MantenimientoRealizado::getNumeroOt).setHeader("# OT").setAutoWidth(true);
-        grid.addColumn(MantenimientoRealizado::getTecnico).setHeader("Tecnico").setAutoWidth(true);
-        grid.addColumn(r -> String.format("%.1f", r.getHorasAcumuladasEnMomento())).setHeader("Horometro").setAutoWidth(true);
+        grid.addColumn(MantenimientoRealizado::getTecnico).setHeader("Técnico").setAutoWidth(true);
+        grid.addColumn(r -> String.format("%.1f", r.getHorasAcumuladasEnMomento())).setHeader("Horómetro").setAutoWidth(true);
         grid.addColumn(this::formatearHorasTranscurridas).setHeader("Horas transcurridas").setAutoWidth(true);
-        grid.addColumn(this::formatearHorasFaltantes).setHeader("Horas faltantes para la recalibracion").setAutoWidth(true);
+        grid.addColumn(this::formatearHorasFaltantes).setHeader("Horas faltantes para la recalibración").setAutoWidth(true);
         grid.setSizeFull();
     }
 
@@ -210,25 +210,25 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
     private void registrar() {
         Optional<String> tag = tagActual();
         if (tag.isEmpty()) {
-            NotificacionesUtil.mostrarError("Selecciona el TAG (Linea/Equipo/Elemento)");
+            NotificacionesUtil.mostrarError("Selecciona el TAG (Línea/Equipo/Elemento)");
             return;
         }
         Optional<PlanMantenimiento> plan = mantenimientoService.planPorTag(tag.get());
         if (plan.isEmpty()) {
-            NotificacionesUtil.mostrarError("No hay ningun plan configurado para ese TAG en Configuracion de Mantenimiento");
+            NotificacionesUtil.mostrarError("No hay ningún plan configurado para ese TAG en Configuración de Mantenimiento");
             return;
         }
         if (fechaField.getValue() == null) {
-            NotificacionesUtil.mostrarError("Indica la fecha y hora en que se realizo la tarea");
+            NotificacionesUtil.mostrarError("Indica la fecha y hora en que se realizó la tarea");
             return;
         }
         if (horometroField.getValue() == null) {
-            NotificacionesUtil.mostrarError("Indica el horometro (horas totales a la fecha de la tarea)");
+            NotificacionesUtil.mostrarError("Indica el horómetro (horas totales a la fecha de la tarea)");
             return;
         }
         boolean esCambio = esTareaCambio();
         if (esCambio && stockField.getValue() == null) {
-            NotificacionesUtil.mostrarError("Selecciona que barril/tornillo del stock se instalo");
+            NotificacionesUtil.mostrarError("Selecciona qué barril/tornillo del stock se instaló");
             return;
         }
         StockBarrilTornillo stockConsumido = esCambio ? stockField.getValue() : null;
@@ -242,7 +242,7 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
         boolean avisarStockBajo = esCambio && stockConsumido.getCantidad() <= 0;
 
         if (avisarStockBajo) {
-            Notification.show("Tarea registrada -- ojo, el stock de " + etiquetaStock(stockConsumido) + " quedo en 0 o negativo",
+            Notification.show("Tarea registrada -- ojo, el stock de " + etiquetaStock(stockConsumido) + " quedó en 0 o negativo",
                     4000, Notification.Position.BOTTOM_END).addThemeVariants(NotificationVariant.LUMO_CONTRAST);
         } else {
             Notification.show("Tarea registrada", 2500, Notification.Position.BOTTOM_END)
@@ -308,7 +308,7 @@ public class MantenimientoView extends VerticalLayout implements BeforeEnterObse
             dialog.getFooter().add(cancelar, confirmar);
         } else {
             dialog.setHeaderTitle("Borrar tarea");
-            dialog.add(new Span("Esta accion no se puede deshacer. Confirmas?"));
+            dialog.add(new Span("Esta acción no se puede deshacer. ¿Confirmas?"));
             Button confirmar = new Button("Confirmar", e -> {
                 mantenimientoService.eliminarMantenimientoRealizado(registro, null, null);
                 dialog.close();

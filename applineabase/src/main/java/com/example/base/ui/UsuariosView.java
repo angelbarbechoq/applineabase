@@ -81,14 +81,14 @@ public class UsuariosView extends VerticalLayout {
         passwordField.setHelperText("Vacío = no cambiar (al editar)");
 
         configurarTooltip(verMezcladoresCheckbox,
-                "Concede acceso a ver la pestana de Mezcladores en Graficas, sin necesidad de rol ADMIN");
+                "Concede acceso a ver la pestaña de Mezcladores en Gráficas, sin necesidad de rol ADMIN");
         configurarTooltip(verMantenimientoCheckbox,
                 "Concede acceso a ver el registro de Mantenimiento Preventivo, sin necesidad de rol ADMIN");
         configurarTooltip(verGeneradoresCheckbox,
-                "Concede acceso a Grupo Electrogeno (Generadores y Analisis) y a los avisos de alarmas de los generadores, "
+                "Concede acceso a Grupo Electrógeno (Generadores y Análisis) y a los avisos de alarmas de los generadores, "
                         + "sin necesidad de rol ADMIN");
         configurarTooltip(verFranjaHorariaCheckbox,
-                "Concede acceso a Consumo por franja horaria (consumo y costo segun la tarifa de la empresa electrica), "
+                "Concede acceso a Consumo por franja horaria (consumo y costo según la tarifa de la empresa eléctrica), "
                         + "sin necesidad de rol ADMIN. Cargar tarifas y feriados sigue siendo solo del ADMIN");
         configurarTooltip(verTransformadoresCheckbox,
                 "Concede acceso a Transformadores (diagrama unifilar de la planta 1 en vivo, con los generadores), "

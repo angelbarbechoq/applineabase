@@ -10,11 +10,11 @@ import java.util.Objects;
  */
 public enum Indicador {
 
-    THD_TENSION("THD tension", "%"),
+    THD_TENSION("THD tensión", "%"),
     THD_CORRIENTE("THD corriente", "%"),
-    DESBALANCE_TENSION("Desbalance tension", "%"),
+    DESBALANCE_TENSION("Desbalance tensión", "%"),
     DESBALANCE_CORRIENTE("Desbalance corriente", "%"),
-    TENSION("Tension (promedio fase-fase)", "V"),
+    TENSION("Tensión (promedio fase-fase)", "V"),
     FRECUENCIA("Frecuencia", "Hz"),
     FACTOR_POTENCIA("Factor de potencia", "");
 

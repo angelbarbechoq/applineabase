@@ -27,12 +27,14 @@ import static com.example.generador.model.TipoEventoGenerador.*;
  * Red e interruptores según el propio controlador (modelos con "red" en generador-modelos.json; hoy el InteliGen 500
  * G2 del Caterpillar y el InteliGen 200 del GenPower, este sin ROCOF ni salto de vector). Cada lectura de fondo (1 por minuto) se compara con la anterior:
  * - historial de eventos: falla de red, paso a isla, retorno de red y vuelta a paralelo (estado de los interruptores),
- *   apertura y cierre del interruptor de la planta (MCB Feedback), ROCOF o salto de vector vistos activos y la suba
- *   de los máximos que guarda el controlador;
+ *   apertura y cierre del interruptor de la planta (MCB Feedback), ROCOF o salto de vector vistos activos, aviso si en
+ *   paralelo pasan la mitad del ajuste de disparo y, al salir de paralelo, los máximos de esa marcha;
  * - alarma "Pérdida de red" (Alarmas Activas, aviso del navegador y globo de Windows en la PC de la app): abierta
  *   mientras el controlador esté sin red, se cierra sola al volver.
- * Las protecciones de red actúan en menos de 1 s: con una lectura por minuto casi nunca se ven activas, por eso se
- * anotan los máximos. Todavía no se sabe cuándo el controlador reinicia esos máximos (se verá en el primer corte).
+ * Las protecciones de red actúan en menos de 1 s: con una lectura por minuto casi nunca se ven activas, por eso se usan
+ * los máximos que guarda el controlador. El Caterpillar los reinicia cada vez que entra en paralelo y después suben solos
+ * con la red normal (25 y 26-10-2026: 0,2 a 1,1 grados y 0,17 a 0,46 Hz/s, con ajustes de 10 grados y 1,30 Hz/s): por eso
+ * no se anota cada suba, solo el resumen al salir de paralelo y el aviso a la mitad del ajuste.
  * Solo lectura del controlador. Con estas señales la isla no se busca comparando con el medidor del transformador
  * (IslaService la toma de lo guardado por el controlador).
  */
@@ -51,9 +53,16 @@ public class RedControladorService {
         String nombre;
         LocalDateTime desde;
         Boolean mcb;
-        Double rocofMax, saltoVectorMax;
         boolean rocofActiva, saltoVectorActivo;
+        // Marcha en paralelo en curso: máximos vistos, si ya se avisó cada uno y desde cuándo (null = la app empezó a
+        // leer con la marcha ya en paralelo).
+        Double rocofMarcha, saltoMarcha;
+        boolean avisoRocof, avisoSalto;
+        LocalDateTime inicioParalelo;
     }
+
+    /** Fracción del ajuste de disparo desde la que se avisa. */
+    static final double FRACCION_AVISO = 0.5;
 
     private final Map<String, Previo> previos = new ConcurrentHashMap<>();
     private final HistorialEventosService historial;
@@ -114,15 +123,8 @@ public class RedControladorService {
             if (saltoActivo && !p.saltoVectorActivo) {
                 eventos.add(EventoGenerador.de(t, PROTECCION_RED, "Salto de vector activo en la lectura" + salto(l), l));
             }
-            if (rocofMax != null && p.rocofMax != null && rocofMax > p.rocofMax) {
-                eventos.add(EventoGenerador.de(t, MAXIMO_RED, String.format(Locale.ROOT,
-                        "El controlador registro una ROCOF maxima de %.2f Hz/s (antes %.2f)", rocofMax, p.rocofMax), l));
-            }
-            if (saltoMax != null && p.saltoVectorMax != null && saltoMax > p.saltoVectorMax) {
-                eventos.add(EventoGenerador.de(t, MAXIMO_RED, String.format(Locale.ROOT,
-                        "El controlador registro un salto de vector maximo de %.1f grados (antes %.1f)", saltoMax, p.saltoVectorMax), l));
-            }
         }
+        if (estado != null) maximosEnParalelo(red, l, p, estado, rocofMax, saltoMax, eventos);
         if (estado != null) {
             p.estado = estado;
             p.nombre = nombre;
@@ -130,10 +132,78 @@ public class RedControladorService {
         if (mcb != null) p.mcb = mcb;
         p.rocofActiva = rocofActiva;
         p.saltoVectorActivo = saltoActivo;
-        if (rocofMax != null) p.rocofMax = rocofMax;
-        if (saltoMax != null) p.saltoVectorMax = saltoMax;
         historial.registrar(generador, eventos);
         if (sinRed != null) sincronizarAlarma(generador, abierta, sinRed, red, l, estado, nombre);
+    }
+
+    /**
+     * Máximos de ROCOF y salto de vector de la marcha en paralelo. El controlador los reinicia al entrar en paralelo, así
+     * que su valor es el de la marcha en curso: mientras dura se avisa una vez si pasan la mitad del ajuste de disparo, y
+     * al salir (parada normal, isla o falla de red: la lectura de salida todavía tiene el máximo de la marcha) se anota el
+     * resumen. Se llama antes de pasar {@code estado} a la lectura anterior.
+     */
+    private static void maximosEnParalelo(SenalesRed red, LecturaGenerador l, Previo p, Estado estado, Double rocofMax,
+                                          Double saltoMax, List<EventoGenerador> eventos) {
+        boolean enParalelo = estado == Estado.PARALELO, antes = p.estado == Estado.PARALELO;
+        if (!enParalelo && !antes) return;
+        if (enParalelo && !antes) {
+            p.rocofMarcha = p.saltoMarcha = null;
+            p.avisoRocof = p.avisoSalto = false;
+            p.inicioParalelo = p.estado == null ? null : l.fecha(); // sin lectura anterior: la marcha ya estaba en curso
+        }
+        p.rocofMarcha = mayor(p.rocofMarcha, rocofMax);
+        p.saltoMarcha = mayor(p.saltoMarcha, saltoMax);
+        LocalDateTime t = l.fecha();
+        if (!p.avisoSalto && pasaAviso(p.saltoMarcha, red.limiteSaltoVector())) {
+            p.avisoSalto = true;
+            eventos.add(EventoGenerador.de(t, VARIACION_RED_ALTA, String.format(Locale.ROOT,
+                    "El salto de vector llegó a %.1f grados, %s del ajuste de disparo de %s grados (la protección abre el "
+                            + "interruptor de la planta al llegar al ajuste)", p.saltoMarcha, porcentaje(p.saltoMarcha, red.limiteSaltoVector()),
+                    numero(red.limiteSaltoVector())), l));
+        }
+        if (!p.avisoRocof && pasaAviso(p.rocofMarcha, red.limiteRocof())) {
+            p.avisoRocof = true;
+            eventos.add(EventoGenerador.de(t, VARIACION_RED_ALTA, String.format(Locale.ROOT,
+                    "La ROCOF llegó a %.2f Hz/s, %s del ajuste de disparo de %s Hz/s (la protección abre el interruptor de la "
+                            + "planta al llegar al ajuste)", p.rocofMarcha, porcentaje(p.rocofMarcha, red.limiteRocof()),
+                    numero(red.limiteRocof())), l));
+        }
+        if (!enParalelo && (p.rocofMarcha != null || p.saltoMarcha != null)) {
+            StringBuilder sb = new StringBuilder("Máximos de la marcha en paralelo");
+            sb.append(p.inicioParalelo == null ? " (la app empezó a leer con la marcha en curso)"
+                    : " (" + duracion(p.inicioParalelo, t) + ")");
+            sb.append(": ");
+            if (p.saltoMarcha != null) {
+                sb.append(String.format(Locale.ROOT, "salto de vector %.1f grados", p.saltoMarcha));
+                if (red.limiteSaltoVector() != null) sb.append(" (").append(porcentaje(p.saltoMarcha, red.limiteSaltoVector()))
+                        .append(" del ajuste de ").append(numero(red.limiteSaltoVector())).append(" grados)");
+            }
+            if (p.rocofMarcha != null) {
+                if (p.saltoMarcha != null) sb.append(", ");
+                sb.append(String.format(Locale.ROOT, "ROCOF %.2f Hz/s", p.rocofMarcha));
+                if (red.limiteRocof() != null) sb.append(" (").append(porcentaje(p.rocofMarcha, red.limiteRocof()))
+                        .append(" del ajuste de ").append(numero(red.limiteRocof())).append(" Hz/s)");
+            }
+            sb.append("; sale de paralelo: estado ").append(red.nombre(SenalesRed.codigo(l)));
+            eventos.add(EventoGenerador.de(t, RESUMEN_RED, sb.toString(), l));
+            p.rocofMarcha = p.saltoMarcha = null;
+        }
+    }
+
+    private static Double mayor(Double a, Double b) {
+        return a == null ? b : b == null ? a : Math.max(a, b);
+    }
+
+    private static boolean pasaAviso(Double valor, Double limite) {
+        return valor != null && limite != null && valor >= FRACCION_AVISO * limite;
+    }
+
+    private static String porcentaje(double valor, double limite) {
+        return Math.round(valor / limite * 100) + " %";
+    }
+
+    private static String numero(double v) {
+        return v == Math.rint(v) ? String.valueOf((long) v) : String.format(Locale.ROOT, "%.2f", v);
     }
 
     /** Evento por el cambio de estado de los interruptores; null si no interesa (arranque o parada normal). */
@@ -145,8 +215,8 @@ public class RedControladorService {
         if (!SenalesRed.sinRed(p.estado)) return null;
         String tras = " tras " + duracion(p.desde, t) + " sin red";
         return estado == Estado.PARALELO
-                ? EventoGenerador.de(t, FIN_ISLA, "Vuelve a paralelo con la red segun el controlador (" + nombre + ")" + tras, l)
-                : EventoGenerador.de(t, RETORNO_RED, "La red ya no figura en falla segun el controlador: estado " + nombre + tras, l);
+                ? EventoGenerador.de(t, FIN_ISLA, "Vuelve a paralelo con la red según el controlador (" + nombre + ")" + tras, l)
+                : EventoGenerador.de(t, RETORNO_RED, "La red ya no figura en falla según el controlador: estado " + nombre + tras, l);
     }
 
     private static com.example.generador.model.TipoEventoGenerador tipoDe(Estado e) {
@@ -159,10 +229,10 @@ public class RedControladorService {
 
     private static String textoEstado(Estado e, String nombre) {
         return switch (e) {
-            case ISLA -> "El controlador esta en isla (" + nombre + "): el interruptor de la planta esta abierto y el generador "
+            case ISLA -> "El controlador está en isla (" + nombre + "): el interruptor de la planta está abierto y el generador "
                     + "alimenta solo su parte de la planta";
-            case RETORNO_RED -> "Retorno de red segun el controlador (" + nombre + "): espera o sincroniza para volver a paralelo";
-            default -> "Falla de red segun el controlador (" + nombre + ")";
+            case RETORNO_RED -> "Retorno de red según el controlador (" + nombre + "): espera o sincroniza para volver a paralelo";
+            default -> "Falla de red según el controlador (" + nombre + ")";
         };
     }
 
@@ -173,23 +243,23 @@ public class RedControladorService {
         if (mcb != null) sb.append("; interruptor de la planta ").append(mcb ? "cerrado" : "abierto");
         if (gcb != null) sb.append("; generador ").append(gcb ? "conectado" : "desconectado");
         if (Boolean.TRUE.equals(SenalesRed.valor(red.avisoFallaRed(), l))) sb.append("; aviso de falla de red activo");
-        if (Boolean.TRUE.equals(SenalesRed.valor(red.proteccionRed(), l))) sb.append("; proteccion de red activa");
+        if (Boolean.TRUE.equals(SenalesRed.valor(red.proteccionRed(), l))) sb.append("; protección de red activa");
         if (Boolean.TRUE.equals(SenalesRed.valor(red.rocof(), l))) sb.append("; ROCOF activa");
         if (Boolean.TRUE.equals(SenalesRed.valor(red.saltoVector(), l))) sb.append("; salto de vector activo");
         Double rocofMax = l.valor(ParametroGenerador.ROCOF_MAX), saltoMax = l.valor(ParametroGenerador.SALTO_VECTOR_MAX);
-        if (rocofMax != null) sb.append(String.format(Locale.ROOT, "; ROCOF maxima registrada %.2f Hz/s", rocofMax));
-        if (saltoMax != null) sb.append(String.format(Locale.ROOT, "; salto de vector maximo %.1f grados", saltoMax));
+        if (rocofMax != null) sb.append(String.format(Locale.ROOT, "; ROCOF máxima registrada %.2f Hz/s", rocofMax));
+        if (saltoMax != null) sb.append(String.format(Locale.ROOT, "; salto de vector máximo %.1f grados", saltoMax));
         return sb.toString();
     }
 
     private static String rocof(LecturaGenerador l) {
         Double v = l.valor(ParametroGenerador.ROCOF), max = l.valor(ParametroGenerador.ROCOF_MAX);
-        return (v == null ? "" : String.format(Locale.ROOT, " (%.2f Hz/s", v) + (max == null ? ")" : String.format(Locale.ROOT, ", maxima %.2f)", max)));
+        return (v == null ? "" : String.format(Locale.ROOT, " (%.2f Hz/s", v) + (max == null ? ")" : String.format(Locale.ROOT, ", máxima %.2f)", max)));
     }
 
     private static String salto(LecturaGenerador l) {
         Double max = l.valor(ParametroGenerador.SALTO_VECTOR_MAX);
-        return max == null ? "" : String.format(Locale.ROOT, " (maximo %.1f grados)", max);
+        return max == null ? "" : String.format(Locale.ROOT, " (máximo %.1f grados)", max);
     }
 
     // ================= Alarma de pérdida de red =================
@@ -210,7 +280,7 @@ public class RedControladorService {
             Boolean mcb = SenalesRed.valor(red.mcbCerrado(), l);
             String mensaje = corto("Generador " + generador + ": perdida de red, " + switch (estado == null ? Estado.ISLA : estado) {
                 case ISLA -> "el generador alimenta solo su parte de la planta";
-                case RETORNO_RED -> "volvio la red y el controlador espera para volver a paralelo";
+                case RETORNO_RED -> "volvió la red y el controlador espera para volver a paralelo";
                 default -> "el controlador indica falla de red";
             } + (estado == null ? "" : " (" + nombre + ")")
                     + (mcb == null ? "" : "; interruptor de la planta " + (mcb ? "cerrado" : "abierto")));

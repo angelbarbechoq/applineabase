@@ -33,7 +33,7 @@ public final class ModbusTcpConexion implements Closeable {
 
         ExcepcionModbus(int codigo) {
             // Sin tildes: el mensaje se muestra en pantalla (alarmas, Probar lectura).
-            super("excepcion Modbus 0x" + String.format("%02X", codigo) + " (" + descripcion(codigo) + ")");
+            super("excepción Modbus 0x" + String.format("%02X", codigo) + " (" + descripcion(codigo) + ")");
             this.codigo = codigo;
         }
 
@@ -43,16 +43,16 @@ public final class ModbusTcpConexion implements Closeable {
 
         static String descripcion(int codigo) {
             return switch (codigo) {
-                case 0x01 -> "funcion no soportada";
-                case 0x02 -> "direccion de registro invalida";
-                case 0x03 -> "valor o cantidad invalida";
+                case 0x01 -> "función no soportada";
+                case 0x02 -> "dirección de registro inválida";
+                case 0x03 -> "valor o cantidad inválida";
                 case 0x04 -> "falla del dispositivo";
                 case 0x05 -> "pedido aceptado, en proceso";
                 case 0x06 -> "dispositivo ocupado";
                 case 0x08 -> "error de paridad de memoria";
                 case 0x0A -> "pasarela sin ruta al dispositivo";
-                case 0x0B -> "el dispositivo no respondio a la pasarela";
-                default -> "codigo no estandar";
+                case 0x0B -> "el dispositivo no respondió a la pasarela";
+                default -> "código no estándar";
             };
         }
     }

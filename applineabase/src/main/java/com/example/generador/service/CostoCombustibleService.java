@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Combustible cargado a mano por período en marcha (galones y precio del galón). */
+/** Combustible por período en marcha (galones y precio del galón), cargado a mano o desde la planilla MF13. */
 @Service
 public class CostoCombustibleService {
 
@@ -41,16 +41,27 @@ public class CostoCombustibleService {
         return repository.findTopByOrderByFechaRegistroDesc().map(CostoCombustible::getPrecioGalon);
     }
 
+    /** Todo lo cargado de un generador. */
+    public List<CostoCombustible> delGenerador(String generador) {
+        return repository.findByGenerador(generador);
+    }
+
     @Transactional
     public CostoCombustible guardar(PeriodoMarcha p, double galones, double precioGalon, String observacion, String usuario) {
+        return guardar(p.generador(), p.arranqueId(), p.inicio(), galones, precioGalon, observacion, usuario);
+    }
+
+    @Transactional
+    public CostoCombustible guardar(String generador, long arranqueId, LocalDateTime inicio, double galones, double precioGalon,
+                                    String observacion, String usuario) {
         if (galones < 0 || galones > GALONES_MAXIMO) {
             throw new IllegalArgumentException("Los galones deben estar entre 0 y " + (int) GALONES_MAXIMO);
         }
         if (precioGalon <= 0 || precioGalon > PRECIO_MAXIMO) {
-            throw new IllegalArgumentException("El precio del galon debe ser mayor que 0 y menor que " + (int) PRECIO_MAXIMO);
+            throw new IllegalArgumentException("El precio del galón debe ser mayor que 0 y menor que " + (int) PRECIO_MAXIMO);
         }
-        CostoCombustible c = repository.findByGeneradorAndArranqueId(p.generador(), p.arranqueId())
-                .orElseGet(() -> new CostoCombustible(p.generador(), p.arranqueId(), p.inicio()));
+        CostoCombustible c = repository.findByGeneradorAndArranqueId(generador, arranqueId)
+                .orElseGet(() -> new CostoCombustible(generador, arranqueId, inicio));
         c.setGalones(galones);
         c.setPrecioGalon(precioGalon);
         c.setObservacion(observacion == null || observacion.isBlank() ? null : observacion.trim());

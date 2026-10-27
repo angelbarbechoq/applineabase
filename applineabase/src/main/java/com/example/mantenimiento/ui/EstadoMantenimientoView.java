@@ -62,14 +62,14 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
 
     private final Grid<StockBarrilTornillo> stockGrid = new Grid<>(StockBarrilTornillo.class, false);
     private final ComboBox<String> modeloField = new ComboBox<>("Modelo");
-    private final ComboBox<String> sistemaField = new ComboBox<>("Sistema de refrigeracion");
+    private final ComboBox<String> sistemaField = new ComboBox<>("Sistema de refrigeración");
     private final IntegerField cantidadField = new IntegerField("Cantidad");
-    private final TextField observacionField = new TextField("Observacion");
+    private final TextField observacionField = new TextField("Observación");
     private final Button guardarStockBtn = new Button("Guardar");
     private final Button nuevoStockBtn = new Button("Nuevo");
 
     private final IntegerField ingresoCantidadField = new IntegerField("Cantidad a ingresar");
-    private final TextField ingresoObservacionField = new TextField("Observacion del ingreso");
+    private final TextField ingresoObservacionField = new TextField("Observación del ingreso");
     private final Button ingresoBtn = new Button("Registrar Ingreso");
 
     private final Grid<MovimientoStock> movimientosGrid = new Grid<>(MovimientoStock.class, false);
@@ -136,9 +136,9 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
             return badge("VENCIDO", FONDO_ROJO, TEXTO_ROJO);
         }
         if (estado.proximoAVencer()) {
-            return badge("PROXIMO A VENCER", FONDO_AMARILLO, TEXTO_AMARILLO);
+            return badge("PRÓXIMO A VENCER", FONDO_AMARILLO, TEXTO_AMARILLO);
         }
-        return badge("AL DIA", FONDO_VERDE, TEXTO_VERDE);
+        return badge("AL DÍA", FONDO_VERDE, TEXTO_VERDE);
     }
 
     private Span badge(String texto, String fondo, String color) {
@@ -161,10 +161,10 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
         panel.setPadding(false);
 
         stockGrid.addColumn(StockBarrilTornillo::getModelo).setHeader("Modelo").setAutoWidth(true).setSortable(true);
-        stockGrid.addColumn(StockBarrilTornillo::geometriaTornillo).setHeader("Geometria").setAutoWidth(true);
-        stockGrid.addColumn(StockBarrilTornillo::getSistemaRefrigeracion).setHeader("Refrigeracion").setAutoWidth(true).setSortable(true);
+        stockGrid.addColumn(StockBarrilTornillo::geometriaTornillo).setHeader("Geometría").setAutoWidth(true);
+        stockGrid.addColumn(StockBarrilTornillo::getSistemaRefrigeracion).setHeader("Refrigeración").setAutoWidth(true).setSortable(true);
         stockGrid.addColumn(StockBarrilTornillo::getCantidad).setHeader("Cantidad").setAutoWidth(true).setSortable(true);
-        stockGrid.addColumn(StockBarrilTornillo::getObservacion).setHeader("Observacion").setAutoWidth(true).setFlexGrow(1);
+        stockGrid.addColumn(StockBarrilTornillo::getObservacion).setHeader("Observación").setAutoWidth(true).setFlexGrow(1);
         stockGrid.setSizeFull();
 
         if (lineaAccessService.esAdmin()) {
@@ -184,7 +184,7 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
             cantidadField.setWidth("110px");
             cantidadField.setMin(0);
             cantidadField.setStepButtonsVisible(true);
-            cantidadField.setHelperText("Solo para un modelo nuevo -- despues se suma con Ingreso");
+            cantidadField.setHelperText("Solo para un modelo nuevo -- después se suma con Ingreso");
 
             observacionField.setWidth("320px");
 
@@ -264,7 +264,7 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
             return;
         }
         if (ingresoCantidadField.getValue() == null || ingresoCantidadField.getValue() <= 0) {
-            NotificacionesUtil.mostrarError("Indica cuantas unidades ingresan");
+            NotificacionesUtil.mostrarError("Indica cuántas unidades ingresan");
             return;
         }
         mantenimientoService.registrarIngresoStock(stockEnEdicion, ingresoCantidadField.getValue(), ingresoObservacionField.getValue());
@@ -283,7 +283,7 @@ public class EstadoMantenimientoView extends VerticalLayout implements BeforeEnt
             return;
         }
         if (sistemaField.getValue() == null || sistemaField.getValue().isBlank()) {
-            NotificacionesUtil.mostrarError("Selecciona el sistema de refrigeracion");
+            NotificacionesUtil.mostrarError("Selecciona el sistema de refrigeración");
             return;
         }
         StockBarrilTornillo stock = stockEnEdicion != null ? stockEnEdicion : new StockBarrilTornillo();

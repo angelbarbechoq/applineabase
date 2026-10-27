@@ -248,7 +248,7 @@ public class PASReaderService {
                     motivos[i] = e.getMessage(); // la pasarela contestó: la red está bien
                     fallasRedSeguidas = 0;
                 } catch (IOException e) {
-                    motivos[i] = "error de comunicacion Modbus: " + e.getMessage();
+                    motivos[i] = "error de comunicación Modbus: " + e.getMessage();
                     fallasRedSeguidas++;
                 }
                 if (motivos[i] != null) {
@@ -275,10 +275,10 @@ public class PASReaderService {
 
         DefinicionModelo modelo = modelos.get(nombreModelo.toUpperCase());
         if (modelo == null) {
-            return "el modelo " + nombreModelo + " no existe en Configuracion > Modelos de medidor";
+            return "el modelo " + nombreModelo + " no existe en Configuración > Modelos de medidor";
         }
         if (!modelo.completo()) {
-            return "el modelo " + nombreModelo + " no tiene cargados los registros basicos " + modelo.faltantesBasicos();
+            return "el modelo " + nombreModelo + " no tiene cargados los registros básicos " + modelo.faltantesBasicos();
         }
 
         // Todo lo que el modelo tiene, en los mismos pedidos agrupados: los requeridos para kWh/VIP
@@ -292,7 +292,7 @@ public class PASReaderService {
             }
         }
         if (!erroresBasicos.isEmpty()) {
-            return "parametros sin lectura " + erroresBasicos;
+            return "parámetros sin lectura " + erroresBasicos;
         }
         calidad[index] = CalculoCalidad.construir(modelo, lectura.valores());
         Map<ParametroMedidor, Double> v = lectura.valores();

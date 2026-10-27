@@ -38,7 +38,7 @@ public class PlantaEnVivoService {
     public static final long RED_VIGENTE_SEGUNDOS = 180;
 
     public enum EstadoGenerador {
-        EN_MARCHA("En marcha"), PARADO("Parado"), SIN_COMUNICACION("Sin comunicacion");
+        EN_MARCHA("En marcha"), PARADO("Parado"), SIN_COMUNICACION("Sin comunicación");
 
         private final String etiqueta;
 
@@ -246,7 +246,7 @@ public class PlantaEnVivoService {
             }
             double umbral = alarmaConfigRepository.findByLineaMaquinaAndTipoAlarma(INYECCION, TipoAlarma.DETENCION)
                     .map(AlarmaConfig::getUmbralMinimoKw).filter(Objects::nonNull).orElse(ConsumoMedidoresService.UMBRAL_DEFECTO);
-            lista.add(new EstadoMaquina(GRUPO_INYECCION, "Inyeccion (neta)", neto == null ? null : neto >= umbral,
+            lista.add(new EstadoMaquina(GRUPO_INYECCION, "Inyección (neta)", neto == null ? null : neto >= umbral,
                     neto == null ? null : Math.max(0, neto)));
         }
         lista.sort(Comparator.comparing(EstadoMaquina::nombre));

@@ -166,7 +166,7 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
      * maximos ("mx"), no instantaneos: quedan No disponible.
      */
     private static void sembrarIon8600(ModeloMedidor m) {
-        m.setDescripcion("Schneider ION8600 (KWhPlanta1). Mapa por defecto del manual; kW y PF -1..1 como los demas medidores");
+        m.setDescripcion("Schneider ION8600 (KWhPlanta1). Mapa por defecto del manual; kW y PF -1..1 como los demás medidores");
         // Como dice el manual y como los demás medidores: VIP con tensiones fase-fase, kW y PF -1..1
         // (el PLC guardaba Vln, W y PF en %; decidido con el usuario el 2026-10-08).
         m.setTensionesHistorico(TensionesHistorico.FASE_FASE);
@@ -216,7 +216,7 @@ public class ModeloMedidorSeeder implements CommandLineRunner {
      * Catálogo en kW/kVAR/kVA (el medidor entrega W, escala 0.001); el histórico VIP en W (marca). Sin THD ni desbalances.
      */
     private static void sembrarPac1020(ModeloMedidor m) {
-        m.setDescripcion("Siemens SENTRON PAC1020 (TDGeneradorSA). Offsets del manual (base 0); kW como los demas medidores. Sin energia de retorno");
+        m.setDescripcion("Siemens SENTRON PAC1020 (TDGeneradorSA). Offsets del manual (base 0); kW como los demás medidores. Sin energía de retorno");
         m.setNumeracionManual(false);
         m.setHistoricoPotenciaEnW(false); // VIP en kW como los demás (manual), no en W como el PLC
         m.setTensionesHistorico(TensionesHistorico.FASE_FASE);

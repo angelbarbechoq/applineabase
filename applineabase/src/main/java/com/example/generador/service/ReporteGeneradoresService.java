@@ -3,9 +3,12 @@ package com.example.generador.service;
 import com.example.generador.model.CostoCombustible;
 import com.example.generador.model.Generador;
 import com.example.generador.model.MetaImportacionRed;
-import com.example.generador.service.GeneradorAnalisisService.DiaMarcha;
+import com.example.generador.service.GeneradorAnalisisService.Agrupacion;
+import com.example.generador.service.GeneradorAnalisisService.Consulta;
+import com.example.generador.service.GeneradorAnalisisService.Fila;
 import com.example.generador.service.GeneradorAnalisisService.MinutoMarcha;
 import com.example.generador.service.GeneradorAnalisisService.PeriodoMarcha;
+import com.example.generador.service.GeneradorAnalisisService.PeriodoPlanta;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
@@ -15,22 +18,23 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Reporte de generadores: un HTML de un solo archivo (Chart.js adentro, funciona sin internet) con todos los
- * arranques del período elegido en Análisis. En el reporte se eligen los arranques y se imprime o se guarda como
- * PDF desde el navegador. Primero lo global (horas, energía, balance del período, meta de consumo cero de la red,
- * combustible y costo) y después el detalle (tabla por período, importación por período, balance diario y, opcional,
- * el perfil de potencia de cada arranque).
- *
- * Las cifras salen del mismo cálculo que la pestaña Períodos en marcha (contadores); el combustible, de lo cargado en
- * Costos, y el costo en la red, del mismo cálculo que Costos (precio de la franja horaria de cada hora). Solo lectura.
+ * Reporte mensual de generadores (rediseño del 2026-10-27 sobre la maqueta aprobada por el usuario): un HTML de un solo
+ * archivo (Chart.js adentro, funciona sin internet) con el mes elegido en Análisis; si es el mes en curso, del 1 hasta
+ * hoy. Mismas cuentas que Análisis: aporte de cada generador (generado - su parte de lo exportado) + importada de la red
+ * = consumo de la planta 1, por períodos de la planta (los arranques que se pisan van juntos); la exportada va solo como
+ * información. Después el balance diario de días completos, el combustible y costo de generación y, opcional, el anexo
+ * con el perfil de potencia de cada arranque. Se imprime o se guarda como PDF desde el navegador. Solo lectura.
  */
 @Service
 public class ReporteGeneradoresService {
@@ -39,6 +43,8 @@ public class ReporteGeneradoresService {
     private static final String CHART_JS = "/reportes/chart.umd.min.js";
     private static final DateTimeFormatter MINUTO = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
     private static final DateTimeFormatter GENERADO = DateTimeFormatter.ofPattern("dd-MM-yyyy 'a las' HH:mm");
+    /** Colores de los generadores en el orden de generador-config.json, los mismos de Análisis. */
+    private static final String[] COLORES_GEN = {"#F29F67", "#6F42C1"};
 
     private final GeneradorService generadorService;
     private final GeneradorAnalisisService analisis;
@@ -53,94 +59,105 @@ public class ReporteGeneradoresService {
         this.objectMapper = objectMapper;
     }
 
-    public static String nombreArchivo(LocalDate desde, LocalDate hasta) {
-        return "reporte-generadores-" + desde + "_a_" + hasta + ".html";
+    public static String nombreArchivo(YearMonth mes) {
+        return "reporte-generadores-" + mes + ".html";
     }
 
-    /** Escribe el reporte de los arranques de esos generadores que se pisan con [desde, hasta]. */
-    public void escribir(OutputStream out, List<Generador> generadores, LocalDate desde, LocalDate hasta) throws IOException {
-        List<PeriodoMarcha> periodos = analisis.periodosEnMarcha(generadores, desde, hasta);
+    /** Escribe el reporte del mes: del día 1 al último, o hasta hoy si el mes no terminó. */
+    public void escribir(OutputStream out, List<Generador> generadores, YearMonth mes) throws IOException {
+        LocalDate desde = mes.atDay(1), hoy = LocalDate.now();
+        LocalDate hasta = mes.atEndOfMonth().isAfter(hoy) ? hoy : mes.atEndOfMonth();
+        Consulta consulta = new Consulta();
+        List<PeriodoMarcha> periodos = desde.isAfter(hasta) ? List.of() : analisis.periodosEnMarcha(consulta, generadores, desde, hasta);
         Map<String, CostoCombustible> combustible = costos.porPeriodo(periodos);
-        List<Map<String, Object>> datos = new ArrayList<>();
-        for (PeriodoMarcha p : periodos) {
-            datos.add(datosPeriodo(p, combustible.get(CostoCombustibleService.clave(p.generador(), p.arranqueId()))));
+
+        Map<String, Object> datos = new LinkedHashMap<>();
+        datos.put("mes", mes.toString());
+        datos.put("desde", desde.toString());
+        datos.put("hasta", hasta.toString());
+        datos.put("mesCompleto", !hasta.isBefore(mes.atEndOfMonth()));
+        List<Map<String, Object>> gens = new ArrayList<>();
+        for (int i = 0; i < generadores.size(); i++) {
+            Generador g = generadores.get(i);
+            gens.add(Map.of("nombre", g.nombre(), "red", g.redAsociada() == null ? "" : g.redAsociada(),
+                    "color", COLORES_GEN[i % COLORES_GEN.length]));
         }
+        datos.put("generadores", gens);
         MetaImportacionRed meta = generadorService.metaImportacionRed();
+        datos.put("verdeHasta", meta.verdeHasta());
+        datos.put("amarilloHasta", meta.amarilloHasta());
+        List<Map<String, Object>> lista = new ArrayList<>();
+        for (PeriodoPlanta p : GeneradorAnalisisService.periodosPlanta(periodos)) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("inicio", p.inicio().format(MINUTO));
+            m.put("fin", p.fin().format(MINUTO));
+            m.put("enCurso", p.enCurso());
+            List<Map<String, Object>> arranques = new ArrayList<>();
+            for (PeriodoMarcha a : p.arranques()) {
+                arranques.add(datosArranque(a, combustible.get(CostoCombustibleService.clave(a.generador(), a.arranqueId()))));
+            }
+            m.put("arranques", arranques);
+            lista.add(m);
+        }
+        datos.put("periodos", lista);
+        datos.put("dias", desde.isAfter(hasta) ? List.of() : diasCompletos(consulta, generadores, desde, hasta));
+
         // "</" dentro del <script> cerraría la etiqueta: se escribe "<\/" (mismo texto para JavaScript).
         String json = objectMapper.writeValueAsString(datos).replace("</", "<\\/");
-        String planta = objectMapper.writeValueAsString(consumoPlanta(generadores, periodos)).replace("</", "<\\/");
         String html = recurso(PLANTILLA)
-                .replace("/*DATOS*/", json)
-                .replace("/*PLANTA*/null", planta)
+                .replace("/*DATOS*/null", json)
                 .replace("/*GENERADO_EL*/", LocalDateTime.now().format(GENERADO))
-                .replace("/*VERDE_HASTA*/", numero(meta.verdeHasta()))
-                .replace("/*AMARILLO_HASTA*/", numero(meta.amarilloHasta()))
                 .replace("/*CHARTJS*/", recurso(CHART_JS));
         out.write(html.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Puntos de 15 minutos del consumo de toda la planta para la sección "Balance energético de la planta". */
-    private static final int MINUTOS_PLANTA = 15;
-
     /**
-     * Con más de un generador: consumo de toda la planta 1 (medidor principal) en promedios de 15 minutos, solo en los
-     * tramos en que alguno de los arranques del período estaba en marcha (el reporte después se queda con los de los
-     * arranques elegidos). Cada punto: fecha, lo que generó cada generador, lo que puso en la planta cada uno,
-     * importada y exportada (kW). null con un solo generador.
+     * Cada día completo (24 h) del mes, como Resumen de energía: la importada del medidor principal y lo que puso cada
+     * generador en la planta (generado - su parte de lo exportado). Aporte + red = consumo del día.
      */
-    private Map<String, Object> consumoPlanta(List<Generador> generadores, List<PeriodoMarcha> periodos) {
-        if (generadores.size() < 2 || periodos.isEmpty()) return null;
-        LocalDateTime ini = periodos.stream().map(PeriodoMarcha::inicio).min(LocalDateTime::compareTo).orElseThrow()
-                .minusMinutes(MINUTOS_PLANTA);
-        LocalDateTime fin = periodos.stream().map(PeriodoMarcha::fin).max(LocalDateTime::compareTo).orElseThrow();
-        int n = generadores.size();
-        List<Object[]> puntos = new ArrayList<>();
-        for (GeneradorAnalisisService.PuntoPlanta p : analisis.consumoPlanta(generadores, ini, fin, MINUTOS_PLANTA)) {
-            LocalDateTime desde = p.fecha(), hasta = p.fecha().plusMinutes(MINUTOS_PLANTA);
-            if (periodos.stream().noneMatch(a -> a.inicio().isBefore(hasta) && a.fin().isAfter(desde))) continue;
-            Object[] fila = new Object[1 + 2 * n + 2];
-            fila[0] = desde.format(MINUTO);
-            for (int i = 0; i < n; i++) {
-                fila[1 + i] = Math.round(p.generado()[i]);
-                fila[1 + n + i] = Math.round(p.aporteGeneradores()[i]);
-            }
-            fila[1 + 2 * n] = Math.round(p.importada());
-            fila[2 + 2 * n] = Math.round(p.exportada());
-            puntos.add(fila);
+    private List<Map<String, Object>> diasCompletos(Consulta c, List<Generador> generadores, LocalDate desde, LocalDate hasta) {
+        Map<String, Map<String, Fila>> porGenerador = new LinkedHashMap<>();
+        for (Generador g : generadores) {
+            Map<String, Fila> m = new HashMap<>();
+            analisis.analizar(c, List.of(g), Agrupacion.DIA, desde, hasta).forEach(f -> m.put(f.periodo(), f));
+            porGenerador.put(g.nombre(), m);
         }
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("generadores", generadores.stream().map(Generador::nombre).toList());
-        m.put("minutos", MINUTOS_PLANTA);
-        m.put("puntos", puntos);
-        return m;
+        List<Map<String, Object>> dias = new ArrayList<>();
+        for (Fila f : analisis.analizar(c, generadores, Agrupacion.DIA, desde, hasta)) {
+            Map<String, Object> d = new LinkedHashMap<>();
+            d.put("dia", f.desde().toString());
+            d.put("red", redondo(f.redImportada()));
+            Map<String, Long> aporte = new LinkedHashMap<>();
+            porGenerador.forEach((n, m) -> {
+                Fila x = m.get(f.periodo());
+                aporte.put(n, x == null || x.generadorUsado() == null ? 0L : Math.round(x.generadorUsado()));
+            });
+            d.put("aporte", aporte);
+            dias.add(d);
+        }
+        dias.sort(Comparator.comparing(d -> (String) d.get("dia")));
+        return dias;
     }
 
-    private Map<String, Object> datosPeriodo(PeriodoMarcha p, CostoCombustible c) {
+    private Map<String, Object> datosArranque(PeriodoMarcha p, CostoCombustible c) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", p.generador() + "-" + p.arranqueId());
         m.put("generador", p.generador());
         m.put("red", p.red());
-        m.put("nro", p.nro());
         m.put("inicio", p.inicio().format(MINUTO));
         m.put("fin", p.fin().format(MINUTO));
         m.put("enCurso", p.enCurso());
-        m.put("inicioEstimado", p.inicioEstimado());
-        // El primer arranque registrado de cada generador: con inicio estimado, es cuando empezó su lectura en LineaBaseX
-        // (va en las notas del reporte); en los demás, la app no estaba leyendo (se avisa antes de imprimir).
-        m.put("primero", p.arranqueId() == 1);
-        m.put("horas", Math.round(p.horas() * 10) / 10.0);
+        m.put("estimado", p.inicioEstimado());
         m.put("generado", redondo(p.kwhGenerado()));
-        m.put("tomado", redondo(p.kwhRedImportada()));
-        m.put("entregado", redondo(p.kwhRedExportada()));
-        m.put("consumo", redondo(p.consumo()));
-
-        List<Object[]> porDia = new ArrayList<>();
-        for (DiaMarcha d : analisis.repartoPorDia(p)) {
-            porDia.add(new Object[]{d.dia().toString(), redondo(d.generado()), redondo(d.redImportada()), redondo(d.redExportada())});
+        m.put("importada", redondo(p.kwhRedImportada()));
+        m.put("exportada", redondo(p.kwhRedExportada()));
+        if (c != null) {
+            m.put("galones", c.getGalones());
+            m.put("precio", c.getPrecioGalon());
         }
-        m.put("porDia", porDia);
+        // Igual que la pestaña Costos: lo aportado (generado - exportado) al precio de la franja horaria de cada hora.
+        if (p.costoRed() != null) m.put("costoRed", Math.round(p.costoRed() * 100) / 100.0);
 
-        // Perfil de potencia en promedios de 15 minutos (anexo del reporte): generador, consumo y red (+ importa, - exporta).
+        // Perfil de potencia en promedios de 15 minutos (anexo opcional): generador, consumo y red (+ importa, - exporta).
         TreeMap<LocalDateTime, double[]> cuartos = new TreeMap<>();
         for (MinutoMarcha x : analisis.minutosMarcha(p)) {
             if (x.generadorKw() == null || x.redKw() == null) continue;
@@ -154,17 +171,6 @@ public class ReporteGeneradoresService {
         List<Object[]> perfil = new ArrayList<>();
         cuartos.forEach((t, v) -> perfil.add(new Object[]{t.format(MINUTO), Math.round(v[0] / v[3]), Math.round(v[1] / v[3]), Math.round(v[2] / v[3])}));
         m.put("perfil15", perfil);
-
-        if (c != null) {
-            m.put("galones", c.getGalones());
-            m.put("precioGalon", c.getPrecioGalon());
-            m.put("costo", Math.round(c.costo() * 100) / 100.0);
-        }
-        if (p.costoRed() != null) {
-            // Igual que la pestaña Costos: aprovechado = generado - exportado, al precio de la franja horaria de cada hora.
-            m.put("aprovechado", redondo(p.generadorUsado()));
-            m.put("costoRed", Math.round(p.costoRed() * 100) / 100.0);
-        }
         return m;
     }
 
@@ -172,14 +178,9 @@ public class ReporteGeneradoresService {
         return v == null ? null : Math.round(v);
     }
 
-    /** 2.0 como "2" y 2.5 como "2.5" (para escribirlo dentro del JavaScript). */
-    private static String numero(double v) {
-        return v == Math.rint(v) ? String.valueOf((long) v) : String.valueOf(v);
-    }
-
     private static String recurso(String ruta) throws IOException {
         try (InputStream in = ReporteGeneradoresService.class.getResourceAsStream(ruta)) {
-            if (in == null) throw new IOException("No se encontro " + ruta + " dentro de la aplicacion");
+            if (in == null) throw new IOException("No se encontró " + ruta + " dentro de la aplicación");
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
     }

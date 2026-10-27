@@ -244,7 +244,7 @@ public final class MainLayout extends AppLayout {
             nav.addItem(alarmas);
             colapsarAlSalirDelMouse(alarmas);
             // Calidad de Energia: mismo alcance que alarmas (ADMIN y zona Mantenimiento).
-            nav.addItem(new SideNavItem("Calidad de Energia", "calidad", VaadinIcon.FLASH.create()));
+            nav.addItem(new SideNavItem("Calidad de Energía", "calidad", VaadinIcon.FLASH.create()));
         }
         // Consumo por franja horaria (tarifa de la empresa electrica): permiso propio "Ver Franja Horaria" (ADMIN siempre).
         if (lineaAccessService.puedeVerFranjaHoraria()) {
@@ -256,11 +256,11 @@ public final class MainLayout extends AppLayout {
         }
         // Grupo Electrogeno: permiso propio "Ver Generadores" (ADMIN siempre).
         if (lineaAccessService.puedeVerGeneradores()) {
-            SideNavItem grupoElectrogeno = new SideNavItem("Grupo Electrogeno");
+            SideNavItem grupoElectrogeno = new SideNavItem("Grupo Electrógeno");
             grupoElectrogeno.setPrefixComponent(VaadinIcon.COGS.create());
             grupoElectrogeno.setExpanded(false);
             grupoElectrogeno.addItem(new SideNavItem("Generadores", "generador", VaadinIcon.COG.create()));
-            grupoElectrogeno.addItem(new SideNavItem("Analisis", "generador/analisis", VaadinIcon.BAR_CHART.create()));
+            grupoElectrogeno.addItem(new SideNavItem("Análisis", "generador/analisis", VaadinIcon.BAR_CHART.create()));
             nav.addItem(grupoElectrogeno);
             colapsarAlSalirDelMouse(grupoElectrogeno);
         }
@@ -296,7 +296,7 @@ public final class MainLayout extends AppLayout {
             configuracion.addItem(new SideNavItem("Modelos de medidor", "configuracion/medidores", VaadinIcon.DASHBOARD.create()));
             configuracion.addItem(new SideNavItem("Configuración Mezcladores", "mezcladores/config", VaadinIcon.FIRE.create()));
             configuracion.addItem(new SideNavItem("Configuración Mantenimiento", "mantenimiento/config", VaadinIcon.TOOLS.create()));
-            configuracion.addItem(new SideNavItem("Pasar configuracion", "configuracion/traspaso", VaadinIcon.EXCHANGE.create()));
+            configuracion.addItem(new SideNavItem("Pasar configuración", "configuracion/traspaso", VaadinIcon.EXCHANGE.create()));
             nav.addItem(configuracion);
             colapsarAlSalirDelMouse(configuracion);
         }

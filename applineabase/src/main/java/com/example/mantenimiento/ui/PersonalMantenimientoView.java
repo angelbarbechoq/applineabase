@@ -32,7 +32,7 @@ public class PersonalMantenimientoView extends VerticalLayout {
     private final MantenimientoService mantenimientoService;
     private final Grid<TecnicoMantenimiento> grid = new Grid<>(TecnicoMantenimiento.class, false);
     private final TextField ciField = new TextField("CI");
-    private final TextField nombreField = new TextField("Tecnico");
+    private final TextField nombreField = new TextField("Técnico");
     private final ComboBox<String> especialidadField = new ComboBox<>("Especialidad");
     private final Button guardarBtn = new Button("Guardar");
     private final Button nuevoBtn = new Button("Nuevo");
@@ -67,7 +67,7 @@ public class PersonalMantenimientoView extends VerticalLayout {
         formLayout.getStyle().set("flex-wrap", "wrap");
 
         grid.addColumn(TecnicoMantenimiento::getCi).setHeader("CI").setAutoWidth(true).setSortable(true);
-        grid.addColumn(TecnicoMantenimiento::getNombre).setHeader("Tecnico").setAutoWidth(true).setSortable(true);
+        grid.addColumn(TecnicoMantenimiento::getNombre).setHeader("Técnico").setAutoWidth(true).setSortable(true);
         grid.addColumn(TecnicoMantenimiento::getEspecialidad).setHeader("Especialidad").setAutoWidth(true).setSortable(true);
         grid.addComponentColumn(this::botonEliminar).setHeader("").setAutoWidth(true);
         grid.asSingleSelect().addValueChangeListener(e -> cargarEnFormulario(e.getValue()));
@@ -110,7 +110,7 @@ public class PersonalMantenimientoView extends VerticalLayout {
 
     private void guardar() {
         if (nombreField.getValue() == null || nombreField.getValue().isBlank()) {
-            NotificacionesUtil.mostrarError("Ingresa el nombre del tecnico");
+            NotificacionesUtil.mostrarError("Ingresa el nombre del técnico");
             return;
         }
         if (tecnicoEnEdicion != null) {

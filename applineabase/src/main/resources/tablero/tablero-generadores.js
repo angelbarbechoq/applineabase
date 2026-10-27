@@ -94,13 +94,13 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
       ParalOper: "en paralelo con la red", RevSync: "sincronizando para volver a la red", Synchro: "sincronizando", MainsFlt: "falla de red",
       ValidFlt: "falla de red confirmada", MainsRet: "retorno de red", MultIslOp: "isla con varios generadores",
       MultParOp: "paralelo con varios generadores", EmergMan: "manual de emergencia", StrUpSync: "sincronizando al arrancar" };
-    const TIMER_ES = { "No Timer": "sin cuenta regresiva", Prestart: "prearranque", Cranking: "arrancando", "Idle Run": "marcha en vacio",
-      Cooling: "enfriamiento", "Stop Valve": "valvula de parada", AfterCool: "postenfriamiento", Pause: "pausa entre intentos",
-      VentilGas: "ventilacion", MinStabTO: "estabilizacion minima", MaxStabTO: "estabilizacion maxima", "MCB Close": "cierre del MCB",
+    const TIMER_ES = { "No Timer": "sin cuenta regresiva", Prestart: "prearranque", Cranking: "arrancando", "Idle Run": "marcha en vacío",
+      Cooling: "enfriamiento", "Stop Valve": "válvula de parada", AfterCool: "postenfriamiento", Pause: "pausa entre intentos",
+      VentilGas: "ventilacion", MinStabTO: "estabilización mínima", MaxStabTO: "estabilización máxima", "MCB Close": "cierre del MCB",
       TransferDel: "demora de transferencia", ReturnDelay: "espera al volver la red", "Start Delay": "demora de arranque por falla de red",
-      "V Detect": "deteccion de tension", "GCB Delay": "demora del GCB", "GCB Open": "apertura del GCB", SyncTOut: "tiempo de sincronizacion",
+      "V Detect": "detección de tensión", "GCB Delay": "demora del GCB", "GCB Open": "apertura del GCB", SyncTOut: "tiempo de sincronización",
       "GCB Close": "cierre del GCB", "MCB Open": "apertura del MCB", WaitToStp: "espera para parar", "Syst Start": "arranque del sistema",
-      "Syst Stop": "parada del sistema", "Next Start": "proximo arranque", "Next Stop": "proxima parada", Warming: "calentamiento" };
+      "Syst Stop": "parada del sistema", "Next Start": "próximo arranque", "Next Stop": "próxima parada", Warming: "calentamiento" };
     const VERDE = "#3BB273", APAG = "#d8dbe2", ROJO = "#E8505B", AMARILLO = "#E0B50F";
     // Segundos como m:ss (h:mm:ss desde una hora), igual que la pantalla del controlador.
     const mmss = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, "0");
@@ -301,8 +301,8 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
 
     function motor(g) {
       const v = g.v, u = g.umbrales;
-      if (!g.mideAceite && !g.mideTemp) return `<div class="tg-nota">Presion de aceite y temperatura del refrigerante: no las mide este controlador.</div>`;
-      return (g.mideAceite ? medida("Presion de aceite", v.PRESION_ACEITE, "bar", 0, 10, u.aceiteAviso, u.aceiteFuera, 1) : `<div class="tg-nota">Presion de aceite: no la mide este controlador.</div>`)
+      if (!g.mideAceite && !g.mideTemp) return `<div class="tg-nota">Presión de aceite y temperatura del refrigerante: no las mide este controlador.</div>`;
+      return (g.mideAceite ? medida("Presión de aceite", v.PRESION_ACEITE, "bar", 0, 10, u.aceiteAviso, u.aceiteFuera, 1) : `<div class="tg-nota">Presión de aceite: no la mide este controlador.</div>`)
         + (g.mideTemp ? medida("Temperatura refrigerante", v.TEMP_REFRIGERANTE, "C", -10, 120, u.tempAviso, u.tempFuera, 0) : `<div class="tg-nota">Temperatura del refrigerante: no la mide este controlador.</div>`);
     }
 
@@ -329,7 +329,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
         <div class="tg-caja">RPM <b>${fmt(v.RPM)}</b></div>
         <div class="tg-caja">PF <b>${g.pf == null ? "-" : fmt(g.pf, 2)}</b></div>
         <div class="tg-caja">kVAr <b>${fmt(v.KVAR)}</b></div>
-        <div class="tg-caja">Bateria <b class="tg-${g.bateria || "gris"}">${v.BATERIA == null ? "-" : fmt(v.BATERIA, 1) + " V"}</b></div>
+        <div class="tg-caja">Batería <b class="tg-${g.bateria || "gris"}">${v.BATERIA == null ? "-" : fmt(v.BATERIA, 1) + " V"}</b></div>
       </div></div>`;
     }
 
@@ -344,7 +344,7 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
     function contadores(g) {
       const v = g.v;
       const filas = [["Horas de marcha", v.HORAS_MARCHA, 1, "h"], ["Contador de mantenimiento 1", v.MANTENIMIENTO, 0, "h"], ["Arranques", v.ARRANQUES, 0, ""],
-        ["Energia generada", v.KWH, 0, "kWh"], ["Energia reactiva", v.KVARH, 0, "kVArh"],
+        ["Energía generada", v.KWH, 0, "kWh"], ["Energía reactiva", v.KVARH, 0, "kVArh"],
         ["Paradas de emergencia", v.PARADAS_EMERGENCIA, 0, ""], ["Paradas por falla", v.PARADAS_FALLA, 0, ""]]
         .map(([t, val, d, u]) => `<div class="tg-contador"><div class="tg-ct">${t}</div>${digitos(val, d, u)}</div>`).join("");
       return `<div class="tg-contadores">${filas}</div>`;

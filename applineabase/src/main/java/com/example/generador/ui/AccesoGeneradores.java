@@ -14,7 +14,7 @@ final class AccesoGeneradores {
 
     static void verificar(BeforeEnterEvent event, LineaAccessService lineaAccessService) {
         if (!lineaAccessService.puedeVerGeneradores()) {
-            Notification.show("No tienes permiso para ver el grupo electrogeno", 3000, Notification.Position.MIDDLE)
+            Notification.show("No tienes permiso para ver el grupo electrógeno", 3000, Notification.Position.MIDDLE)
                     .addThemeVariants(NotificationVariant.LUMO_ERROR);
             event.forwardTo(ChartsView.class);
         }

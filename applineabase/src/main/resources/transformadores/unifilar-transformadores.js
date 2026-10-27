@@ -57,7 +57,7 @@ if (!window.UnifilarTransformadores) {
     function estadoGenerador(g) {
       if (g.estado === "EN_MARCHA") return { texto: "EN MARCHA", falla: false };
       if (g.estado === "PARADO") return g.listo ? { texto: "LISTO PARA ARRANCAR", falla: false } : { texto: "NO LISTO PARA ARRANCAR", falla: true };
-      return { texto: "SIN COMUNICACION", falla: true };
+      return { texto: "SIN COMUNICACIÓN", falla: true };
     }
 
     function iconoAlarma(x, y) {
@@ -94,7 +94,7 @@ if (!window.UnifilarTransformadores) {
       const [bordeRed, fondoRed, textoRed] = d.red === "ok" ? [VERDE, "#E7F6EE", "#1F7A4D"]
         : d.red === "falla" ? [ROJO, "#FDECEE", ROJO] : ["#A9AFBB", "#fff", "#1E1E2C"];
       s += `<rect x="${X_RED - 80}" y="10" width="160" height="38" rx="6" fill="${fondoRed}" stroke="${bordeRed}" stroke-width="2.5"/>`;
-      s += texto(X_RED, 34, "Empresa electrica", `text-anchor="middle" font-weight="600" fill="${textoRed}"`);
+      s += texto(X_RED, 34, "Empresa eléctrica", `text-anchor="middle" font-weight="600" fill="${textoRed}"`);
       s += `<path class="ut-cable" d="M${X_RED} 48 V${Y_NODO}"/>`;
       s += importa ? tramo(X_RED, 48, X_RED, Y_NODO, RED, p.kw, [X_RED, 160])
         : tramo(X_RED, Y_NODO, X_RED, 48, EXPORTA, p.kw, [X_RED, 160]);
@@ -112,7 +112,7 @@ if (!window.UnifilarTransformadores) {
         s += texto(106, 138, trafos.map(t => t.nombre).join(" + "), 'class="chico"')
           + texto(414, 138, n0(b.transformadores) + " kW", 'text-anchor="end" font-weight="600"');
         s += `<rect x="98" y="146" width="324" height="24" rx="6" fill="${fondo}"/>`;
-        s += texto(106, 163, "Diferencia de medicion", `font-size="13" font-weight="600" fill="${color}"`);
+        s += texto(106, 163, "Diferencia de medición", `font-size="13" font-weight="600" fill="${color}"`);
         s += texto(414, 163, (b.diferencia >= 0 ? "+" : "-") + n0(Math.abs(b.diferencia)) + " kW (" + (b.porcentaje >= 0 ? "+" : "")
           + b.porcentaje.toFixed(1) + " %)", `text-anchor="end" font-weight="700" fill="${color}"`);
       }
@@ -128,7 +128,7 @@ if (!window.UnifilarTransformadores) {
       });
       s += `<circle cx="${X_RED}" cy="${Y_NODO}" r="16" fill="none" stroke="#1E1E2C" stroke-width="1.5" stroke-dasharray="3 3"/>`;
       s += `<circle cx="${X_RED}" cy="${Y_NODO}" r="7" fill="#1E1E2C"/>`;
-      s += texto(X_RED, Y_NODO + 30, "media tension", 'text-anchor="middle" class="chico"');
+      s += texto(X_RED, Y_NODO + 30, "media tensión", 'text-anchor="middle" class="chico"');
 
       // Cada transformador con su baja tension
       trafos.forEach((t, i) => {
@@ -148,7 +148,7 @@ if (!window.UnifilarTransformadores) {
         s += texto(lx, 338, kw(m.kw), `${anc}class="valor" fill="${colorT}"`);
         s += texto(lx, 356, medidas(m.pf, m.amperes, m.voltios), `${anc}class="chico"`);
         s += `<path class="ut-cable" d="M${x - 160} 390 H${x + 180}" stroke-width="6"/>`;
-        s += texto(x - 160, 381, "baja tension", 'class="chico"');
+        s += texto(x - 160, 381, "baja tensión", 'class="chico"');
 
         // Generadores
         t.generadores.forEach((g, k) => {
@@ -176,7 +176,7 @@ if (!window.UnifilarTransformadores) {
         s += `<path class="ut-cable" d="M${mx} 390 V444"/>`;
         s += tramo(mx, 390, mx, 444, MAQUINAS, t.maquinas, [mx, 418]);
         s += `<rect x="${mx - 75}" y="444" width="150" height="80" rx="8" fill="#fff" stroke="#A9AFBB" stroke-width="2"/>`;
-        s += texto(mx, 464, "Maquinas con medidor", 'text-anchor="middle" class="chico"');
+        s += texto(mx, 464, "Máquinas con medidor", 'text-anchor="middle" class="chico"');
         s += texto(mx, 486, n0(t.maquinas) + " kW", 'text-anchor="middle" class="valor"');
         if (t.resto != null) {
           s += texto(mx, 510, (t.resto >= 0 ? "sin medidor " : "diferencia ") + (t.resto >= 0 ? "" : "-") + n0(Math.abs(t.resto)) + " kW",
@@ -192,7 +192,7 @@ if (!window.UnifilarTransformadores) {
     function leyenda(d) {
       let h = `<span style="--c:${RED}">De la red</span><span style="--c:${EXPORTA}">Hacia la red</span>`;
       d.transformadores.forEach(t => t.generadores.forEach(g => { h += `<span style="--c:${g.color}">${esc(g.nombre)}</span>`; }));
-      return `<div class="ut-leyenda">${h}<span style="--c:${MAQUINAS}">Maquinas</span></div>`;
+      return `<div class="ut-leyenda">${h}<span style="--c:${MAQUINAS}">Máquinas</span></div>`;
     }
 
     function render(el, d) {

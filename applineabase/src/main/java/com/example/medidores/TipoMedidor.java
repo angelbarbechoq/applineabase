@@ -5,10 +5,10 @@ package com.example.medidores;
  * por transformador: solo las MAQUINA que no están dentro de otro medidor.
  */
 public enum TipoMedidor {
-    MAQUINA("Maquina"),
+    MAQUINA("Máquina"),
     TRANSFORMADOR("Transformador"),
     GENERAL("Medidor general"),
-    SENSOR("Sensor (no mide energia)"),
+    SENSOR("Sensor (no mide energía)"),
     NO_CONTAR("No se cuenta");
 
     private final String etiqueta;

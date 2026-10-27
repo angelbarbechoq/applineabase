@@ -245,7 +245,10 @@ Acordado con el usuario el 2026-10-08. Mapa de registros en `docs/ig200/MAPA-REG
       proteccion de red vista activa y suba de los maximos. Alarma urgente "Perdida de red" (`TipoAlarma.PERDIDA_RED`)
       mientras dure. La isla del Caterpillar ya no se busca con el medidor del transformador desde que se guarda el estado
       (las de antes, 11-10 y 21-10, quedan como estaban). El GenPower sigue con la comparacion hasta tener su propia
-      lista. Falta: confirmar en el primer corte real los codigos y cuando se reinician los maximos.
+      lista. Falta: confirmar en el primer corte real los codigos. Los maximos se reinician cada vez que el Caterpillar
+      entra en paralelo (25 y 26-10) y despues suben solos con la red normal: desde el 2026-10-27 no se anota cada suba,
+      sino un resumen al salir de paralelo con su % del ajuste de disparo (10 grados, 1,30 Hz/s) y un aviso si pasan la
+      mitad del ajuste.
 - [x] G20. (2026-10-12) Alarmas de los generadores en Alarmas Activas y avisos del navegador, y permiso propio.
       Nuevo `TipoAlarma.ALARMA_GENERADOR` (no se configura; fuera del selector de Configuracion de alarmas).
       `GeneradorAlarmasService` (lectura de fondo cada minuto): un `AlarmaEvento` por alarma mientras este en la lista

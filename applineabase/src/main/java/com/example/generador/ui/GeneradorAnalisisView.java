@@ -17,12 +17,16 @@ import com.example.generador.service.GeneradorAnalisisService.Fila;
 import com.example.generador.service.GeneradorAnalisisService.PeriodoMarcha;
 import com.example.generador.service.GeneradorAnalisisService.PeriodoPlanta;
 import com.example.generador.service.GeneradorService;
+import com.example.generador.service.PlanillaCombustibleService;
+import com.example.generador.service.PlanillaCombustibleService.Calculo;
 import com.example.generador.service.GeneradorService.Punto;
 import com.example.generador.service.ReporteGeneradoresService;
 import com.example.security.LineaAccessService;
 import com.example.dataacquisition.RutaArchivosEnergia;
 import com.example.generador.service.GeneradorAlmacen;
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.ClientCallable;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
@@ -66,6 +70,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -89,7 +96,7 @@ import java.util.function.Function;
  *   feriados de Consumo por franja horaria).
  * En pantalla se nombra el transformador ("Transformador 1"), nunca "el tablero".
  */
-@PageTitle("Analisis grupo electrogeno | LineaBase")
+@PageTitle("Análisis grupo electrógeno | LineaBase")
 @Route(value = "generador/analisis", layout = MainLayout.class)
 @PermitAll
 public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnterObserver {
@@ -117,6 +124,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final GeneradorAnalisisService analisis;
     private final ConsumoMedidoresService consumoMedidores;
     private final CostoCombustibleService costos;
+    private final PlanillaCombustibleService planillaCombustible;
     private final ReporteGeneradoresService reporte;
     private final LineaAccessService lineaAccessService;
     /** Semáforo de la meta "consumo cero de la red" (generador-config.json); se relee en cada "Ver". */
@@ -124,8 +132,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
     private final ComboBox<Agrupacion> agrupacionCombo = new ComboBox<>("Ver por");
     private final ComboBox<YearMonth> mesCombo = new ComboBox<>("Mes");
+    /** Mes del reporte de generadores, independiente del periodo de arriba (se pueden sacar meses pasados). */
+    private final ComboBox<YearMonth> mesReporteCombo = new ComboBox<>("Mes del reporte");
+    private volatile YearMonth mesReporte = YearMonth.now();
     private final ComboBox<Integer> semanasCombo = new ComboBox<>("Semanas");
-    private final ComboBox<Integer> anioCombo = new ComboBox<>("Anio");
+    private final ComboBox<Integer> anioCombo = new ComboBox<>("Año");
     private final Span mensaje = new Span();
     private final TabSheet tabs = new TabSheet();
     private Tab tabEnergia, tabPeriodos, tabTendencias, tabCostos;
@@ -176,15 +187,15 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     /** Columnas de {mes}Generador que se pueden graficar. */
     private static final Map<String, String[]> VARIABLES = new LinkedHashMap<>();
     static {
-        VARIABLES.put("Tension de bateria (V)", new String[]{"bateria"});
+        VARIABLES.put("Tensión de batería (V)", new String[]{"bateria"});
         VARIABLES.put("Temperatura refrigerante (C)", new String[]{"temp_refrigerante"});
-        VARIABLES.put("Presion de aceite (bar)", new String[]{"presion_aceite"});
+        VARIABLES.put("Presión de aceite (bar)", new String[]{"presion_aceite"});
         VARIABLES.put("Potencia (kW)", new String[]{"kw"});
         VARIABLES.put("Corrientes (A)", new String[]{"i_l1", "i_l2", "i_l3"});
-        VARIABLES.put("Tension fase-fase (V)", new String[]{"v_l1l2", "v_l2l3", "v_l3l1"});
+        VARIABLES.put("Tensión fase-fase (V)", new String[]{"v_l1l2", "v_l2l3", "v_l3l1"});
         VARIABLES.put("Frecuencia (Hz)", new String[]{"frecuencia"});
         VARIABLES.put("RPM", new String[]{"rpm"});
-        VARIABLES.put("Tension de red fase-fase (V)", new String[]{"red_v_l1l2", "red_v_l2l3", "red_v_l3l1"});
+        VARIABLES.put("Tensión de red fase-fase (V)", new String[]{"red_v_l1l2", "red_v_l2l3", "red_v_l3l1"});
         VARIABLES.put("Frecuencia de red (Hz)", new String[]{"red_frecuencia"});
         VARIABLES.put("Temperatura de aceite (C)", new String[]{"temp_aceite"});
         VARIABLES.put("Nivel de combustible (%)", new String[]{"nivel_combustible"});
@@ -226,7 +237,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     public GeneradorAnalisisView(GeneradorService generadorService, GeneradorAnalisisService analisis,
                                  ConsumoMedidoresService consumoMedidores, CostoCombustibleService costos,
                                  ReporteGeneradoresService reporte, LineaAccessService lineaAccessService,
-                                 GeneradorAlmacen almacen) {
+                                 GeneradorAlmacen almacen, PlanillaCombustibleService planillaCombustible) {
+        this.planillaCombustible = planillaCombustible;
         this.generadorService = generadorService;
         this.almacen = almacen;
         this.analisis = analisis;
@@ -239,7 +251,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         setSpacing(true);
         setWidthFull();
 
-        H3 titulo = new H3("Analisis del grupo electrogeno");
+        H3 titulo = new H3("Análisis del grupo electrógeno");
         titulo.getStyle().set("margin", "0");
         add(titulo);
         List<Generador> generadores = generadorService.generadores();
@@ -261,7 +273,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         mesCombo.setWidth("170px");
 
         semanasCombo.setItems(4, 8, 12, 26, 52);
-        semanasCombo.setItemLabelGenerator(n -> "Ultimas " + n);
+        semanasCombo.setItemLabelGenerator(n -> "Últimas " + n);
         semanasCombo.setValue(8);
         semanasCombo.setWidth("140px");
 
@@ -276,25 +288,35 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Button ver = new Button("Ver", VaadinIcon.CHART.create(), e -> ver());
         ver.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> actualizar(false));
-        // Reporte de generadores del período del último "Ver": se arma al pedirlo (datos del momento) y se abre en una
-        // pestaña nueva; desde ahí se eligen los arranques y se imprime o se guarda como PDF. Mismo enlace fijo que
-        // la exportación de configuración (ver TraspasoConfiguracionView: cambiarlo en cada clic daba "f.txt").
+        // Reporte mensual de generadores (desde el 2026-10-27): su propio mes, también los pasados; el mes en curso va
+        // del 1 hasta hoy. Se arma al pedirlo (datos del momento) y se abre en una pestaña nueva, donde se imprime o se
+        // guarda como PDF. Mismo enlace fijo que la exportación de configuración (ver TraspasoConfiguracionView:
+        // cambiarlo en cada clic daba "f.txt"); el mes se toma del campo al pedirlo.
+        mesReporteCombo.setItems(meses);
+        mesReporteCombo.setItemLabelGenerator(m -> MESES[m.getMonthValue() - 1] + " " + m.getYear());
+        mesReporteCombo.setValue(YearMonth.now());
+        mesReporteCombo.setWidth("170px");
+        mesReporteCombo.addValueChangeListener(e -> { if (e.getValue() != null) mesReporte = e.getValue(); });
         Anchor reporteLink = new Anchor();
         reporteLink.setText("Reporte de generadores");
         reporteLink.getElement().getThemeList().add("button");
-        reporteLink.getElement().setAttribute("title", "Abre el reporte del periodo elegido en una pestana nueva. "
-                + "Ahi se eligen los arranques y se imprime o se guarda como PDF.");
+        reporteLink.getElement().setAttribute("title", "Abre el reporte del mes elegido en una pestaña nueva, "
+                + "para imprimirlo o guardarlo como PDF.");
         reporteLink.setTarget("_blank");
         reporteLink.setHref(event -> {
-            LocalDate d = desde, h = hasta;
-            List<Generador> gens = gensVistos;
-            event.setFileName(ReporteGeneradoresService.nombreArchivo(d, h));
+            YearMonth m = mesReporte;
+            List<Generador> gens = generadorService.generadores();
+            event.setFileName(ReporteGeneradoresService.nombreArchivo(m));
             event.setContentType("text/html; charset=utf-8");
             try (OutputStream out = event.getOutputStream()) {
-                reporte.escribir(out, gens, d, h);
+                reporte.escribir(out, gens, m);
             }
         }, AttachmentType.INLINE);
-        HorizontalLayout filtros = new HorizontalLayout(agrupacionCombo, mesCombo, semanasCombo, anioCombo, ver, actualizar, reporteLink);
+        HorizontalLayout reporteFiltro = new HorizontalLayout(mesReporteCombo, reporteLink);
+        reporteFiltro.setAlignItems(Alignment.END);
+        reporteFiltro.getStyle().set("margin-left", "auto");
+        HorizontalLayout filtros = new HorizontalLayout(agrupacionCombo, mesCombo, semanasCombo, anioCombo, ver, actualizar, reporteFiltro);
+        filtros.setWidthFull();
         filtros.setAlignItems(Alignment.END);
         filtros.getStyle().set("flex-wrap", "wrap");
         mensaje.getStyle().set("font-size", "12px").set("color", "#555");
@@ -302,7 +324,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         tabs.setWidthFull();
         // Períodos en marcha primero (pedido del usuario el 2026-10-25): es la más usada y la que se actualiza sola.
         tabPeriodos = tabs.add("Periodos en marcha", crearPeriodos());
-        tabEnergia = tabs.add("Resumen de energia", crearEnergia());
+        tabEnergia = tabs.add("Resumen de energía", crearEnergia());
         tabTendencias = tabs.add("Tendencias", crearTendencias());
         tabCostos = tabs.add("Costos", crearCostos());
         // El gráfico se arma con la pestaña visible (con display:none amCharts lo dibuja sin tamaño).
@@ -319,7 +341,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             if (e.getSelectedTab() == tabCostos && scriptCostos != null) getElement().executeJs(scriptCostos);
             // Tendencias tiene su propio período (lecturas de cada minuto): el de arriba, Ver y el reporte no le aplican.
             boolean tendencias = e.getSelectedTab() == tabTendencias;
-            for (Component c : new Component[]{agrupacionCombo, ver, actualizar, reporteLink, mensaje}) c.setVisible(!tendencias);
+            for (Component c : new Component[]{agrupacionCombo, ver, actualizar, reporteFiltro, mensaje}) c.setVisible(!tendencias);
             if (tendencias) {
                 mesCombo.setVisible(false);
                 semanasCombo.setVisible(false);
@@ -402,7 +424,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         hastaRango = hasta;
         if (hasta.isAfter(hoy)) hasta = hoy;
         if (desde.isAfter(hasta)) {
-            mensaje.setText("El periodo elegido todavia no empezo.");
+            mensaje.setText("El periodo elegido todavía no empezó.");
             return;
         }
         agrupacionVista = a;
@@ -497,7 +519,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         chart.setWidthFull();
         chart.setHeight("340px");
         tablaEnergia.setWidthFull();
-        Div[] cajas = {caja("Como se cubrio el consumo de la planta", barraEnergia), caja(tituloGraficoEnergia, chart),
+        Div[] cajas = {caja("Cómo se cubrió el consumo de la planta", barraEnergia), caja(tituloGraficoEnergia, chart),
                 caja(tituloDetalleEnergia, tablaEnergia)};
         // caja() está pensada para ir una al lado de la otra (flex 1 1 520px); acá van una debajo de la otra, a todo el ancho.
         for (Div c : cajas) c.getStyle().set("flex", "0 0 auto").set("width", "100%");
@@ -558,13 +580,13 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         RenglonEnergia total = new RenglonEnergia("Total", totalAporte, totalHoras, totalRed, totalConsumo, totalExp, false);
 
-        String unidad = a == Agrupacion.DIA ? "dia" : a == Agrupacion.SEMANA ? "semana" : "mes";
+        String unidad = a == Agrupacion.DIA ? "día" : a == Agrupacion.SEMANA ? "semana" : "mes";
         tituloGraficoEnergia.setText("Consumo de la planta por " + unidad);
         tituloDetalleEnergia.setText("Detalle por " + unidad);
         pintarTarjetasEnergia(total);
         pintarBarraEnergia(gens, total);
         tablaEnergia.removeAll();
-        tablaEnergia.add(new Html(htmlTablaEnergia(gens, renglones, total, a == Agrupacion.DIA ? "Dia" : a == Agrupacion.SEMANA ? "Semana" : "Mes")));
+        tablaEnergia.add(new Html(htmlTablaEnergia(gens, renglones, total, a == Agrupacion.DIA ? "Día" : a == Agrupacion.SEMANA ? "Semana" : "Mes")));
 
         // Columnas apiladas: lo que puso cada generador + la red; la altura es el consumo de la planta.
         List<String> categorias = new ArrayList<>();
@@ -742,7 +764,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         if (kwhPorGalon > 0) {
             double gal = kwhExportada / kwhPorGalon;
             if (s.length() > 0) s.append(" · ");
-            s.append(String.format(Locale.ROOT, "aprox. %,.0f gal de diesel (%s)", gal, dinero(gal * precioGalon)));
+            s.append(String.format(Locale.ROOT, "aprox. %,.0f gal de diésel (%s)", gal, dinero(gal * precioGalon)));
         }
         return s.length() == 0 ? null : s.toString();
     }
@@ -781,7 +803,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             return s;
         }).setHeader("Fin").setAutoWidth(true).setFlexGrow(0);
         periodosGrid.addColumn(PeriodoPlanta::generadores).setHeader("Generadores").setAutoWidth(true).setFlexGrow(1);
-        columna(periodosGrid, "Duracion", p -> duracion(p.horas()));
+        columna(periodosGrid, "Duración", p -> duracion(p.horas()));
         columna(periodosGrid, "Consumo planta (kWh)", p -> kwhNum(p.consumo()));
         periodosGrid.addComponentColumn(p -> badgeRed(p.porcentajeDeRed())).setHeader("De la red").setAutoWidth(true).setFlexGrow(0);
         columna(periodosGrid, "Exportada (kWh)", p -> kwhNum(p.exportada()));
@@ -863,14 +885,14 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
      * cómo se repartió el consumo de la planta. Arriba a la derecha, los límites del semáforo (solo el administrador).
      */
     private Div crearIndicador() {
-        Span titulo = new Span("Meta: cero importacion de la red");
+        Span titulo = new Span("Meta: cero importación de la red");
         titulo.getStyle().set("font-size", "16px").set("font-weight", "700").set("color", TEXTO);
         Div cabecera = new Div(titulo);
         cabecera.getStyle().set("display", "flex").set("align-items", "center").set("justify-content", "space-between")
                 .set("flex-wrap", "wrap").set("gap", "8px").set("width", "100%");
         // Límites del semáforo: solo el administrador los cambia (se guardan en generador-config.json).
         if (lineaAccessService.esAdmin()) {
-            Button limites = new Button("Limite de indicador", VaadinIcon.COG.create(), e -> abrirDialogoLimites());
+            Button limites = new Button("Límite de indicador", VaadinIcon.COG.create(), e -> abrirDialogoLimites());
             limites.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
             cabecera.add(limites);
         }
@@ -922,7 +944,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         String nombreZona = switch (zona) {
             case VERDE -> "Zona verde: hasta " + pctUmbral(meta.verdeHasta());
             case AMARILLO -> "Zona amarilla: de " + pctUmbral(meta.verdeHasta()) + " a " + pctUmbral(meta.amarilloHasta());
-            case ROJO -> "Zona roja: mas de " + pctUmbral(meta.amarilloHasta());
+            case ROJO -> "Zona roja: más de " + pctUmbral(meta.amarilloHasta());
         };
         h.append("<span style='padding:2px 9px;border-radius:10px;font-weight:600;font-size:12px;white-space:nowrap;"
                         + "justify-self:start;background:").append(c[1]).append(";color:").append(c[2]).append("'>")
@@ -988,9 +1010,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         if (!lineaAccessService.esAdmin()) return;
         MetaImportacionRed actual = generadorService.metaImportacionRed();
         Dialog d = new Dialog();
-        d.setHeaderTitle("Limite de indicador: meta cero importacion de la red");
-        Span explicacion = new Span("En % del consumo de la planta importado de la red. Verde: de 0 hasta el primer limite; "
-                + "amarillo: hasta el segundo; rojo: por encima. Valen para Analisis y el reporte de generadores.");
+        d.setHeaderTitle("Límite de indicador: meta cero importación de la red");
+        Span explicacion = new Span("En % del consumo de la planta importado de la red. Verde: de 0 hasta el primer límite; "
+                + "amarillo: hasta el segundo; rojo: por encima. Valen para Análisis y el reporte de generadores.");
         explicacion.getStyle().set("font-size", "13px").set("color", TEXTO_SUAVE);
         NumberField verde = new NumberField("Verde hasta (%)");
         NumberField amarillo = new NumberField("Amarillo hasta (%)");
@@ -1007,7 +1029,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Runnable vistaPrevia = () -> {
             Double v = verde.getValue(), a = amarillo.getValue();
             boolean valido = v != null && a != null && v >= 0 && v < a && a <= 100;
-            rojo.setText(valido ? "Rojo: mas de " + pctUmbral(a) : "El limite verde debe ser menor que el amarillo, entre 0 y 100 %");
+            rojo.setText(valido ? "Rojo: más de " + pctUmbral(a) : "El límite verde debe ser menor que el amarillo, entre 0 y 100 %");
             rojo.getStyle().set("color", tonos(valido ? Estado.FUERA : Estado.AVISO)[2]);
         };
         verde.addValueChangeListener(e -> vistaPrevia.run());
@@ -1021,7 +1043,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Button guardar = new Button("Guardar", e -> {
             Double v = verde.getValue(), a = amarillo.getValue();
             if (v == null || a == null || !(v >= 0 && v < a && a <= 100)) {
-                Notification.show("El limite verde debe ser menor que el amarillo, entre 0 y 100 %", 3500, Notification.Position.MIDDLE)
+                Notification.show("El límite verde debe ser menor que el amarillo, entre 0 y 100 %", 3500, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
@@ -1029,10 +1051,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 generadorService.guardarMetaImportacionRed(v, a);
                 d.close();
                 ver();
-                Notification.show("Limites guardados: verde hasta " + pctUmbral(v) + ", amarillo hasta " + pctUmbral(a), 3000,
+                Notification.show("Límites guardados: verde hasta " + pctUmbral(v) + ", amarillo hasta " + pctUmbral(a), 3000,
                         Notification.Position.BOTTOM_START).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             } catch (RuntimeException ex) {
-                Notification.show("No se pudieron guardar los limites: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                Notification.show("No se pudieron guardar los límites: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });
@@ -1082,12 +1104,12 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             detallePendiente = null;
             detalleDibujado = null;
             recuadrosDibujados = null;
-            indicadorTexto.add(new Html("<div style='color:" + TEXTO_SUAVE + "'>Todavia no hay periodos en marcha para mostrar.</div>"));
+            indicadorTexto.add(new Html("<div style='color:" + TEXTO_SUAVE + "'>Todavía no hay periodos en marcha para mostrar.</div>"));
             return;
         }
         Double pct = p.porcentajeDeRed();
         String etiqueta = elegido ? "Periodo seleccionado" : p.enCurso() ? "Periodo en marcha ahora"
-                : inicialFueraDelPeriodo ? "Ultimo periodo (antes del rango elegido)" : "Ultimo periodo en marcha";
+                : inicialFueraDelPeriodo ? "Último periodo (antes del rango elegido)" : "Último periodo en marcha";
         String aprox = p.inicioEstimado() ? " (aprox.)" : "";
         String cuando = p.enCurso()
                 ? "Desde el " + p.inicio().format(CORTA) + aprox + " (" + duracion(p.horas()) + " hasta las " + p.fin().format(HORA) + ")"
@@ -1279,7 +1301,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         StringBuilder resumen = new StringBuilder().append(trabajando).append(" trabajando, ")
                 .append(paradas).append(paradas == 1 ? " parada" : " paradas");
         return "<div style='display:grid;gap:6px;font-size:13px'>"
-                + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>Maquinas " + esc(GeneradorView.deRed(transformador)) + ": "
+                + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>Máquinas " + esc(GeneradorView.deRed(transformador)) + ": "
                 + resumen + "</span><div style='display:flex;flex-wrap:wrap;gap:5px'>" + chips + "</div></div>";
     }
 
@@ -1322,8 +1344,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                         + String.format(Locale.ROOT, "%.2f%%", pct) + ";background:" + color + "'></div></div>"
                         + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>del consumo de la planta</span>"
                         // Lo que puso en la planta (sin lo que salió a la red), el mismo número del %.
-                        + "<span style='font-size:12px'>Aporto <b>" + kwh(aporte) + "</b> · carga media <b>" + carga + "</b></span>"
-                        + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>Horometro: " + horo + "</span></div>"));
+                        + "<span style='font-size:12px'>Aportó <b>" + kwh(aporte) + "</b> · carga media <b>" + carga + "</b></span>"
+                        + "<span style='font-size:12px;color:" + TEXTO_SUAVE + "'>Horómetro: " + horo + "</span></div>"));
                 if (pct > 0) barra.append(segmentoHtml(pct, color, esc(g.nombre())));
             }
             generadoresPeriodo.add(t);
@@ -1355,7 +1377,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         StringBuilder h = new StringBuilder("<div style='overflow-x:auto'><table style='border-collapse:collapse;width:100%;font-size:13px;color:")
                 .append(TEXTO).append("'><tr>")
                 .append(th).append(";text-align:left'>Inicio</th>").append(th).append(";text-align:left'>Fin</th>")
-                .append(th).append(";text-align:left'>Generador</th>").append(th).append(";text-align:right'>Duracion</th>")
+                .append(th).append(";text-align:left'>Generador</th>").append(th).append(";text-align:right'>Duración</th>")
                 .append(th).append(";text-align:right'>Aporte del generador (kWh)</th>").append(th).append(";text-align:right'>De la red (kWh)</th>")
                 .append(th).append(";text-align:right'>Consumo planta (kWh)</th>").append(th).append(";text-align:right'>Exportada (kWh)</th></tr>");
         long aporte = 0, red = 0, consumo = 0, exportada = 0;
@@ -1481,11 +1503,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private VerticalLayout crearTendencias() {
         ComboBox<String> variable = new ComboBox<>("Variable");
         variable.setItems(VARIABLES.keySet());
-        variable.setValue("Tension de bateria (V)");
+        variable.setValue("Tensión de batería (V)");
         variable.setWidth("260px");
         ComboBox<Integer> rango = new ComboBox<>("Periodo");
         rango.setItems(1, 7, 30, 90);
-        rango.setItemLabelGenerator(d -> d == 1 ? "Ultimas 24 h" : "Ultimos " + d + " dias");
+        rango.setItemLabelGenerator(d -> d == 1 ? "Últimas 24 h" : "Últimos " + d + " días");
         rango.setValue(7);
         Button verTendencia = new Button("Ver", VaadinIcon.CHART.create(), e -> graficarTendencia(variable.getValue(), rango.getValue()));
         verTendencia.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -1494,13 +1516,13 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
         tendenciaMensaje.getStyle().set("font-size", "12px").set("color", "#555");
         tendenciaMensaje.setText("Datos tomados de la base de datos: una lectura por minuto en marcha y una cada 15 min parado. "
-                + "La bateria y la temperatura parado muestran si el generador esta listo para arrancar. Una linea por generador.");
+                + "La batería y la temperatura parado muestran si el generador está listo para arrancar. Una línea por generador.");
         Div chart = new Div();
         chart.setId(CHART_TENDENCIAS);
         chart.setWidthFull();
         chart.setHeight("420px");
-        VerticalLayout v = new VerticalLayout(descripcion("Como evoluciono una variable del controlador en las ultimas horas o "
-                + "dias: bateria, temperaturas, presion de aceite, potencia, corrientes, tensiones o frecuencia."),
+        VerticalLayout v = new VerticalLayout(descripcion("Cómo evolucionó una variable del controlador en las últimas horas o "
+                + "días: batería, temperaturas, presión de aceite, potencia, corrientes, tensiones o frecuencia."),
                 filtros, tendenciaMensaje, chart);
         v.setPadding(false);
         v.setWidthFull();
@@ -1575,7 +1597,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         });
         tendenciaMensaje.setText(variable + ": " + filas.size() + " lecturas de "
                 + gens.stream().map(Generador::nombre).reduce((x, y) -> x + " y " + y).orElse("")
-                + (todos ? ", una linea por generador." : "."));
+                + (todos ? ", una línea por generador." : "."));
         getElement().executeJs(g.getInitScript2(CHART_TENDENCIAS) + g.getSetAllDataScript(CHART_TENDENCIAS, t, v)
                 + g.getAplicarZoomInicialScript(CHART_TENDENCIAS));
     }
@@ -1591,28 +1613,28 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         costosGrid.addColumn(PeriodoMarcha::generador).setHeader("Generador").setAutoWidth(true).setFlexGrow(0).setFrozen(true);
         costosGrid.addColumn(p -> p.nro() == null ? "-" : String.valueOf(p.nro())).setHeader("Nro").setAutoWidth(true).setFlexGrow(0);
         costosGrid.addColumn(p -> p.inicio().format(CORTA)).setHeader("Inicio").setAutoWidth(true).setFlexGrow(0);
-        columna(costosGrid, "Duracion", p -> duracion(p.horas()) + (p.enCurso() ? " (en marcha)" : ""));
+        columna(costosGrid, "Duración", p -> duracion(p.horas()) + (p.enCurso() ? " (en marcha)" : ""));
         columna(costosGrid, "Generado (kWh)", p -> kwhNum(p.kwhGenerado()));
         columna(costosGrid, "Exportada a la red (kWh)", p -> kwhNum(p.kwhRedExportada()));
         columna(costosGrid, "Consumida en planta (kWh)", p -> kwhNum(p.generadorUsado()));
         costosGrid.addColumn(GeneradorAnalisisView::franjas).setHeader("Consumida en planta por franja (kWh)").setAutoWidth(true).setFlexGrow(0);
         columna(costosGrid, "Galones", p -> c(p) == null ? "-" : String.format(Locale.ROOT, "%,.2f", c(p).getGalones()));
-        columna(costosGrid, "Precio galon", p -> c(p) == null ? "-" : dinero(c(p).getPrecioGalon()));
-        columna(costosGrid, "Costo diesel", p -> c(p) == null ? "-" : dinero(c(p).costo()));
+        columna(costosGrid, "Precio galón", p -> c(p) == null ? "-" : dinero(c(p).getPrecioGalon()));
+        columna(costosGrid, "Costo diésel", p -> c(p) == null ? "-" : dinero(c(p).costo()));
         columna(costosGrid, "Costo equivalente en la red", p -> p.costoRed() == null ? "-" : dinero(p.costoRed()));
-        columna(costosGrid, "Diesel $/kWh", p -> precioKwh(precioDiesel(p)));
+        columna(costosGrid, "Diésel $/kWh", p -> precioKwh(precioDiesel(p)));
         columna(costosGrid, "Red $/kWh", p -> precioKwh(p.precioRedMedio()));
-        costosGrid.addComponentColumn(this::vecesSpan).setHeader("Relacion diesel / red").setAutoWidth(true).setFlexGrow(0)
+        costosGrid.addComponentColumn(this::vecesSpan).setHeader("Relación diésel / red").setAutoWidth(true).setFlexGrow(0)
                 .setTextAlign(ColumnTextAlign.END);
-        costosGrid.addComponentColumn(p -> diferenciaSpan(diferencia(p))).setHeader("Costo de mas (o ahorro)").setAutoWidth(true).setFlexGrow(0)
+        costosGrid.addComponentColumn(p -> diferenciaSpan(diferencia(p))).setHeader("Costo de más (o ahorro)").setAutoWidth(true).setFlexGrow(0)
                 .setTextAlign(ColumnTextAlign.END);
-        columna(costosGrid, "kWh por galon", p -> c(p) == null || c(p).getGalones() <= 0 || p.kwhGenerado() == null ? "-"
+        columna(costosGrid, "kWh por galón", p -> c(p) == null || c(p).getGalones() <= 0 || p.kwhGenerado() == null ? "-"
                 : String.format(Locale.ROOT, "%.1f", p.kwhGenerado() / c(p).getGalones()));
         columna(costosGrid, "Galones por hora", p -> c(p) == null || p.horas() <= 0 ? "-"
                 : String.format(Locale.ROOT, "%.1f", c(p).getGalones() / p.horas()));
         costosGrid.addColumn(p -> c(p) == null ? "" : (c(p).getUsuario() == null ? "" : c(p).getUsuario())
                 + (c(p).getObservacion() == null ? "" : " - " + c(p).getObservacion()))
-                .setHeader("Cargado por / observacion").setAutoWidth(true);
+                .setHeader("Cargado por / observación").setAutoWidth(true);
         if (lineaAccessService.esAdmin()) {
             costosGrid.addComponentColumn(p -> {
                 Button b = new Button(c(p) == null ? "Cargar" : "Editar", VaadinIcon.EDIT.create(), e -> abrirDialogoCosto(p));
@@ -1622,20 +1644,23 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         costosGrid.setWidthFull();
         costosGrid.setHeight("520px");
-        Span nota = nota("Por cada arranque se cargan a mano los galones de diesel usados y el precio del galon"
-                + (lineaAccessService.esAdmin() ? " (boton Cargar / Editar)" : " (solo el administrador)")
-                + "; al guardarlos aparece su comparacion. Consumida en planta = generado - exportado a la red: lo que salio a la red "
-                + "no reemplazo energia de la red ni se paga. Costo equivalente en la red = cada kWh consumido en planta al precio de "
-                + "la franja horaria (A, B, C o D) de la hora en que se genero, con la tarifa de su mes y los feriados de Consumo por "
-                + "franja horaria. Diesel $/kWh = costo del diesel / kWh consumidos en planta. Relacion diesel / red = costo del diesel "
-                + "/ costo equivalente en la red: 2.0 veces = generar costo el doble. Solo se compara energia contra combustible: no "
-                + "entran el mantenimiento del generador ni los otros cargos de la factura de la red (demanda, comercializacion). Las "
-                + "tarjetas de arriba suman solo los arranques con diesel cargado. Exportada a la red sin pago = kWh exportados x "
-                + "costo del diesel por kWh generado.");
+        Span nota = nota("Por cada arranque se cargan los galones de diésel usados y el precio del galón"
+                + (lineaAccessService.esAdmin() ? " (botón Cargar / Editar, o Importar planilla MF13: calcula los galones con la "
+                + "planilla de los operadores y los guarda después de confirmar)" : " (solo el administrador)")
+                + "; al guardarlos aparece su comparación. Consumida en planta = generado - exportado a la red: lo que salió a la red "
+                + "no reemplazo energía de la red ni se paga. Costo equivalente en la red = cada kWh consumido en planta al precio de "
+                + "la franja horaria (A, B, C o D) de la hora en que se generó, con la tarifa de su mes y los feriados de Consumo por "
+                + "franja horaria. Diésel $/kWh = costo del diésel / kWh consumidos en planta. Relación diésel / red = costo del diésel "
+                + "/ costo equivalente en la red: 2.0 veces = generar costo el doble. Solo se compara energía contra combustible: no "
+                + "entran el mantenimiento del generador ni los otros cargos de la factura de la red (demanda, comercialización). Las "
+                + "tarjetas de arriba suman solo los arranques con diésel cargado. Exportada a la red sin pago = kWh exportados x "
+                + "costo del diésel por kWh generado.");
 
-        VerticalLayout v = new VerticalLayout(descripcion("Cuanto cuesta generar con diesel contra comprar la misma energia a la red, "
-                + "arranque por arranque. El precio de la red es el de la franja horaria de la hora en que se genero cada kWh."),
-                tarjetasCostos, chartCostos, costosGrid, nota);
+        VerticalLayout v = new VerticalLayout(descripcion("Cuánto cuesta generar con diésel contra comprar la misma energía a la red, "
+                + "arranque por arranque. El precio de la red es el de la franja horaria de la hora en que se generó cada kWh."),
+                tarjetasCostos, chartCostos);
+        if (lineaAccessService.esAdmin()) v.add(botonPlanilla());
+        v.add(costosGrid, nota);
         v.setPadding(false);
         v.setWidthFull();
         return v;
@@ -1676,7 +1701,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     }
 
     private static Span diferenciaSpan(Double v) {
-        Span s = new Span(v == null ? "-" : v >= 0 ? dinero(v) + " de mas" : dinero(-v) + " de ahorro");
+        Span s = new Span(v == null ? "-" : v >= 0 ? dinero(v) + " de más" : dinero(-v) + " de ahorro");
         if (v != null) s.getStyle().set("color", tonos(v > 0 ? Estado.FUERA : Estado.OK)[2]).set("font-weight", "600");
         return s;
     }
@@ -1728,24 +1753,24 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
         tarjetasCostos.removeAll();
         if (cargados == 0) {
-            tarjetasCostos.add(tarjeta("Comparacion con la red", "-", "ningun arranque del periodo tiene el diesel cargado"
-                    + (lineaAccessService.esAdmin() ? " (boton Cargar en la tabla)" : "")));
+            tarjetasCostos.add(tarjeta("Comparación con la red", "-", "ningún arranque del periodo tiene el diésel cargado"
+                    + (lineaAccessService.esAdmin() ? " (botón Cargar en la tabla)" : "")));
         } else if (comparados == 0) {
-            tarjetasCostos.add(tarjeta("Comparacion con la red", "sin tarifa", "cargar la tarifa en Consumo por franja horaria > Tarifas"));
+            tarjetasCostos.add(tarjeta("Comparación con la red", "sin tarifa", "cargar la tarifa en Consumo por franja horaria > Tarifas"));
         } else {
-            tarjetasCostos.add(tarjeta("Costo de generar (diesel)", dinero(costoDiesel), precioKwh(costoDiesel / kwhAprovechado)
-                    + " por kWh consumido en planta; " + comparados + " de " + periodos.size() + " arranques con diesel cargado"));
+            tarjetasCostos.add(tarjeta("Costo de generar (diésel)", dinero(costoDiesel), precioKwh(costoDiesel / kwhAprovechado)
+                    + " por kWh consumido en planta; " + comparados + " de " + periodos.size() + " arranques con diésel cargado"));
             tarjetasCostos.add(tarjeta("Costo equivalente en la red", dinero(costoRed), precioKwh(costoRed / kwhAprovechado)
                     + " por kWh, con el precio de la franja de cada hora"));
             double diferencia = costoDiesel - costoRed;
             tarjetasCostos.add(diferencia > 0
                     ? tarjetaKpi(String.format(Locale.ROOT, "Generar sale %.1f veces la red", costoDiesel / costoRed),
-                    dinero(diferencia) + " de mas", String.format(Locale.ROOT, "%,.0f kWh consumidos en planta", kwhAprovechado), Estado.FUERA)
-                    : tarjetaKpi("Generar sale mas barato que la red", dinero(-diferencia) + " de ahorro",
+                    dinero(diferencia) + " de más", String.format(Locale.ROOT, "%,.0f kWh consumidos en planta", kwhAprovechado), Estado.FUERA)
+                    : tarjetaKpi("Generar sale más barato que la red", dinero(-diferencia) + " de ahorro",
                     String.format(Locale.ROOT, "%,.0f kWh consumidos en planta", kwhAprovechado), Estado.OK));
             double costoKwhGenerado = kwhGenerado > 0 ? costoDiesel / kwhGenerado : 0;
             tarjetasCostos.add(tarjeta("Exportada a la red sin pago", kwh(kwhEntregado), kwhEntregado < 0.5 ? null
-                    : dinero(kwhEntregado * costoKwhGenerado) + " de diesel, a " + precioKwh(costoKwhGenerado) + " por kWh generado"));
+                    : dinero(kwhEntregado * costoKwhGenerado) + " de diésel, a " + precioKwh(costoKwhGenerado) + " por kWh generado"));
         }
         if (cargados > 0) {
             double kwhRend = 0, galRend = 0;
@@ -1759,9 +1784,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             }
             tarjetasCostos.add(tarjeta("Rendimiento", galRend <= 0 ? "-" : String.format(Locale.ROOT, "%.1f kWh/gal", kwhRend / galRend),
                     porGenerador.size() > 1 ? String.join(" · ", porGenerador) + " kWh/gal" : null));
-            tarjetasCostos.add(tarjeta("Diesel usado", String.format(Locale.ROOT, "%,.1f gal", galones),
+            tarjetasCostos.add(tarjeta("Diésel usado", String.format(Locale.ROOT, "%,.1f gal", galones),
                     (horasCargados > 0 ? String.format(Locale.ROOT, "%.1f gal/h; ", galones / horasCargados) : "")
-                            + (galones > 0 ? "precio medio " + dinero(costoCargados / galones) + " por galon" : "")));
+                            + (galones > 0 ? "precio medio " + dinero(costoCargados / galones) + " por galón" : "")));
         }
 
         if (comparados == 0) {
@@ -1772,7 +1797,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         chartCostos.setVisible(true);
         String antes = scriptCostos;
         scriptCostos = GraficaModel.getBarrasAgrupadasScript(CHART_COSTOS, categorias,
-                new String[]{"Diesel $/kWh consumido en planta", "Red $/kWh (franja de cada hora)"}, new String[]{NARANJA, AZUL},
+                new String[]{"Diésel $/kWh consumido en planta", "Red $/kWh (franja de cada hora)"}, new String[]{NARANJA, AZUL},
                 valores, "$/kWh", "#.000");
         if (tabs.getSelectedTab() == tabCostos) dibujar(scriptCostos, antes);
     }
@@ -1784,17 +1809,17 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         Span detalle = new Span("Del " + p.inicio().format(CORTA) + (p.enCurso() ? " (sigue en marcha)" : " al " + p.fin().format(CORTA))
                 + ", " + duracion(p.horas()) + ", " + kwh(p.kwhGenerado()) + " generados.");
         detalle.getStyle().set("font-size", "13px").set("color", "#555");
-        NumberField galones = new NumberField("Galones de diesel usados");
+        NumberField galones = new NumberField("Galones de diésel usados");
         galones.setMin(0);
         galones.setMax(CostoCombustibleService.GALONES_MAXIMO);
         galones.setStep(0.1);
         galones.setWidthFull();
-        NumberField precio = new NumberField("Precio del galon ($)");
+        NumberField precio = new NumberField("Precio del galón ($)");
         precio.setMin(0.01);
         precio.setMax(CostoCombustibleService.PRECIO_MAXIMO);
         precio.setStep(0.001);
         precio.setWidthFull();
-        TextField observacion = new TextField("Observacion (opcional)");
+        TextField observacion = new TextField("Observación (opcional)");
         observacion.setMaxLength(255);
         observacion.setWidthFull();
         if (actual != null) {
@@ -1811,7 +1836,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
 
         Button guardar = new Button("Guardar", e -> {
             if (galones.getValue() == null || precio.getValue() == null || galones.isInvalid() || precio.isInvalid()) {
-                Notification.show("Ingrese los galones y el precio del galon", 3000, Notification.Position.MIDDLE)
+                Notification.show("Ingrese los galones y el precio del galón", 3000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
@@ -1837,6 +1862,125 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             borrar.addThemeVariants(ButtonVariant.LUMO_ERROR);
             d.getFooter().addComponentAsFirst(borrar);
         }
+        d.open();
+    }
+
+    /**
+     * Botón que abre el selector de archivos del navegador: el .xlsx se lee en el navegador y llega en base64 a
+     * {@link #recibirPlanillaMf13} (sin el componente Upload, que no está en el bundle de producción).
+     */
+    private Component botonPlanilla() {
+        Button b = new Button("Importar planilla MF13", VaadinIcon.FILE_TABLE.create());
+        b.setTooltipText("Calcula los galones de cada arranque con la planilla de los operadores (.xlsx) y pide confirmación antes de guardar");
+        b.getElement().executeJs("""
+                const vista = $0;
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.xlsx';
+                input.style.display = 'none';
+                this.after(input);
+                this.addEventListener('click', () => { input.value = ''; input.click(); });
+                input.addEventListener('change', () => {
+                  const f = input.files[0];
+                  if (!f) return;
+                  const r = new FileReader();
+                  r.onload = () => vista.$server.recibirPlanillaMf13(f.name, String(r.result).split(',')[1] || '');
+                  r.readAsDataURL(f);
+                });""", getElement());
+        return b;
+    }
+
+    @ClientCallable
+    public void recibirPlanillaMf13(String nombre, String base64) {
+        if (!lineaAccessService.esAdmin()) return;
+        PlanillaCombustibleService.Resultado r;
+        try {
+            r = planillaCombustible.calcular(Base64.getDecoder().decode(base64), generadorService.generadores());
+        } catch (Exception e) {
+            Notification.show("No se pudo leer " + nombre + ": " + e.getMessage(), 6000, Notification.Position.MIDDLE)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            return;
+        }
+        abrirDialogoPlanilla(nombre, r);
+    }
+
+    private void abrirDialogoPlanilla(String archivo, PlanillaCombustibleService.Resultado r) {
+        Dialog d = new Dialog();
+        d.setHeaderTitle("Combustible desde la planilla MF13");
+        d.setWidth("1150px");
+        d.setMaxWidth("95vw");
+        Set<Calculo> marcados = new HashSet<>();
+        r.arranques().stream().filter(c -> c.galones() != null && c.actual() == null).forEach(marcados::add);
+
+        Span resumen = new Span(archivo + ": " + r.arranques().size() + " arranques con lecturas en la planilla. Quedan marcados "
+                + "los que no tienen combustible cargado; marque también los que quiera reemplazar.");
+        resumen.getStyle().set("font-size", "13px").set("color", "#555");
+        VerticalLayout contenido = new VerticalLayout(resumen);
+        contenido.setPadding(false);
+        for (String aviso : r.avisos()) {
+            Span s = new Span(aviso);
+            s.getStyle().set("font-size", "12px").set("color", tonos(Estado.AVISO)[2]);
+            contenido.add(s);
+        }
+
+        Grid<Calculo> grid = new Grid<>();
+        grid.addComponentColumn(c -> {
+            Checkbox cb = new Checkbox(marcados.contains(c));
+            cb.setEnabled(c.galones() != null);
+            cb.addValueChangeListener(e -> {
+                if (e.getValue()) marcados.add(c);
+                else marcados.remove(c);
+            });
+            return cb;
+        }).setHeader("").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(Calculo::generador).setHeader("Generador").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(c -> c.inicio().format(CORTA)).setHeader("Inicio").setAutoWidth(true).setFlexGrow(0);
+        grid.addColumn(c -> c.fin().format(CORTA)).setHeader("Fin").setAutoWidth(true).setFlexGrow(0);
+        columna(grid, "Generado (kWh)", c -> kwhNum(c.kwh()));
+        columna(grid, "Galones", c -> c.galones() == null ? "-" : String.format(Locale.ROOT, "%,.1f", c.galones()));
+        columna(grid, "kWh por galón", c -> c.kwhPorGalon() == null ? "-" : String.format(Locale.ROOT, "%.1f", c.kwhPorGalon()));
+        columna(grid, "Cargado ahora", c -> c.actual() == null ? "-" : String.format(Locale.ROOT, "%,.1f gal", c.actual().getGalones()));
+        grid.addColumn(Calculo::detalle).setHeader("Cómo se calculó").setAutoWidth(true);
+        grid.setItems(r.arranques());
+        grid.setWidthFull();
+        grid.setHeight("420px");
+
+        NumberField precio = new NumberField("Precio del galón ($)");
+        precio.setMin(0.01);
+        precio.setMax(CostoCombustibleService.PRECIO_MAXIMO);
+        precio.setStep(0.001);
+        costos.ultimoPrecio().ifPresent(precio::setValue);
+        contenido.add(grid, precio);
+        d.add(contenido);
+
+        Button guardar = new Button("Guardar marcados", e -> {
+            if (precio.getValue() == null || precio.isInvalid()) {
+                Notification.show("Ingrese el precio del galón", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            List<Calculo> lista = marcados.stream().filter(c -> c.galones() != null).toList();
+            if (lista.isEmpty()) {
+                Notification.show("No hay arranques marcados", 3000, Notification.Position.MIDDLE);
+                return;
+            }
+            try {
+                for (Calculo c : lista) {
+                    String obs = "Planilla MF13 (" + archivo + "): " + c.detalle();
+                    costos.guardar(c.generador(), c.arranqueId(), c.inicio(), c.galones(), precio.getValue(),
+                            obs.length() > 255 ? obs.substring(0, 255) : obs, lineaAccessService.usuarioActual());
+                }
+            } catch (IllegalArgumentException ex) {
+                Notification.show(ex.getMessage(), 4000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            d.close();
+            verCostos();
+            Notification.show("Combustible guardado en " + lista.size() + " arranques", 3000, Notification.Position.BOTTOM_START)
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+        });
+        guardar.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        d.getFooter().add(new Button("Cancelar", e -> d.close()), guardar);
         d.open();
     }
 

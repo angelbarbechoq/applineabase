@@ -1,22 +1,40 @@
 {
-  "generadores" : [ {
-    "nombre" : "GenPower",
-    "modelo" : "InteliGen200",
-    "ipAddress" : "192.168.0.254",
-    "unitId" : 1,
-    "redAsociada" : "Trafo2",
-    "descripcion" : "Generador Gen Power, controlador ComAp InteliGen 200 (junto a TR2). Solo lectura."
-  }, {
-    "nombre" : "Caterpillar",
-    "modelo" : "InteliGen500",
-    "ipAddress" : "192.168.0.201",
-    "unitId" : 1,
-    "redAsociada" : "Trafo1",
-    "descripcion" : "Generador Caterpillar, controlador ComAp InteliGen 500 (junto a TR1). Solo lectura."
-  } ],
+  "generadores" : [
+    {
+      "nombre" : "GenPower",
+      "modelo" : "InteliGen200",
+      "ipAddress" : "192.168.0.254",
+      "unitId" : 1,
+      "redAsociada" : "Trafo2",
+      "descripcion" : "Generador Gen Power, controlador ComAp InteliGen 200 (junto a TR2). Solo lectura.",
+      "combustible" : {
+        "hoja" : "genPower",
+        "medida" : "NIVEL_CM",
+        "columnaValor" : "D",
+        "columnaKwh" : "P",
+        "radioTanqueM" : 0.7571,
+        "descripcion" : "Planilla MF13: nivel del tanque en cm (columna NIV COMB); tanque cilindrico vertical de radio radioTanqueM, galones = cm que bajo x pi x r2 x 0,01 x 264,172. Las lecturas se ubican por la columna PROD KWH (contador de energia del controlador)."
+      }
+    },
+    {
+      "nombre" : "Caterpillar",
+      "modelo" : "InteliGen500",
+      "ipAddress" : "192.168.0.201",
+      "unitId" : 1,
+      "redAsociada" : "Trafo1",
+      "descripcion" : "Generador Caterpillar, controlador ComAp InteliGen 500 (junto a TR1). Solo lectura.",
+      "combustible" : {
+        "hoja" : "caterpillar",
+        "medida" : "CONTADOR",
+        "columnaValor" : "O",
+        "columnaKwh" : "P",
+        "descripcion" : "Planilla MF13: contador de galones consumidos del motor (columna DIESEL GL); galones = contador al parar - al arrancar. Las lecturas se ubican por la columna PROD KWH (contador de energia del controlador)."
+      }
+    }
+  ],
   "metaImportacionRed" : {
-    "verdeHasta" : 2.0,
-    "amarilloHasta" : 10.0,
+    "verdeHasta" : 2,
+    "amarilloHasta" : 10,
     "descripcion" : "Semaforo de la meta consumo cero de la red (% del consumo importado de la red): verde hasta verdeHasta, amarillo hasta amarilloHasta, rojo por encima. Lo usan Analisis y el reporte de generadores."
   }
 }

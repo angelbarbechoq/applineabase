@@ -80,8 +80,8 @@ public class HistorialEventosService {
         if (e == null) {
             e = new Estado();
             estados.put(generador, e);
-            nuevos.add(EventoGenerador.de(t, INICIO_LECTURA, "La app empezo a leer el controlador; el generador estaba "
-                    + (marcha ? "en marcha" + (Boolean.TRUE.equals(carga) ? " con carga" : " en vacio") : "parado")
+            nuevos.add(EventoGenerador.de(t, INICIO_LECTURA, "La app empezó a leer el controlador; el generador estaba "
+                    + (marcha ? "en marcha" + (Boolean.TRUE.equals(carga) ? " con carga" : " en vacío") : "parado")
                     + (red == null ? "" : red ? ", con red" : ", sin red")
                     + (modo == null ? "" : ", modo " + modo)
                     + (listoAmf == null ? "" : listoAmf ? ", listo para AMF" : ", no listo para AMF")
@@ -92,13 +92,13 @@ public class HistorialEventosService {
                 }
             }
         } else {
-            if (Boolean.FALSE.equals(e.comunicando)) nuevos.add(EventoGenerador.de(t, COMUNICACION_RECUPERADA, "El controlador volvio a responder", l));
+            if (Boolean.FALSE.equals(e.comunicando)) nuevos.add(EventoGenerador.de(t, COMUNICACION_RECUPERADA, "El controlador volvió a responder", l));
             if (marcha && !e.marcha) {
                 nuevos.add(EventoGenerador.de(t, ARRANQUE, "Motor en marcha" + (l.arranques() == null ? "" : " (arranque Nro " + l.arranques() + ")"), l));
             } else if (!marcha && e.marcha) {
                 nuevos.add(EventoGenerador.de(t, PARADA, "Motor parado", l));
             } else if (!marcha && e.arranques != null && l.arranques() != null && l.arranques() > e.arranques) {
-                nuevos.add(EventoGenerador.de(t, ARRANQUE_BREVE, "El contador de arranques del controlador subio de " + e.arranques
+                nuevos.add(EventoGenerador.de(t, ARRANQUE_BREVE, "El contador de arranques del controlador subió de " + e.arranques
                         + " a " + l.arranques() + " sin que se viera el motor en marcha: arranque de menos de 1 minuto", l));
             }
             // Carga: solo con el motor en marcha (al arrancar se compara contra "sin carga").
@@ -107,11 +107,11 @@ public class HistorialEventosService {
                 if (carga && !antes) {
                     nuevos.add(EventoGenerador.de(t, TOMA_CARGA, String.format(java.util.Locale.ROOT, "El generador toma carga (%.0f kW)", l.kw()), l));
                 } else if (!carga && antes) {
-                    nuevos.add(EventoGenerador.de(t, SIN_CARGA, String.format(java.util.Locale.ROOT, "El generador queda en vacio (%.0f kW)", l.kw()), l));
+                    nuevos.add(EventoGenerador.de(t, SIN_CARGA, String.format(java.util.Locale.ROOT, "El generador queda en vacío (%.0f kW)", l.kw()), l));
                 }
             }
             if (red != null && e.red != null && !red.equals(e.red)) {
-                nuevos.add(EventoGenerador.de(t, red ? RETORNO_RED : FALLA_RED, red ? "Volvio la tension de red" : "Sin tension de red", l));
+                nuevos.add(EventoGenerador.de(t, red ? RETORNO_RED : FALLA_RED, red ? "Volvió la tensión de red" : "Sin tensión de red", l));
             }
             if (l.alarmas() != null && e.alarmas != null) {
                 nuevos.addAll(cambiosAlarmas(t, e.alarmas, l.alarmas(), l));
@@ -124,7 +124,7 @@ public class HistorialEventosService {
             if (listoAmf != null && e.listoAmf != null && !listoAmf.equals(e.listoAmf)) {
                 nuevos.add(listoAmf
                         ? EventoGenerador.de(t, LISTO_AMF, "Si se corta la red, el generador vuelve a entrar solo", l)
-                        : EventoGenerador.de(t, NO_LISTO_AMF, "Si se corta la red, el generador no entraria solo"
+                        : EventoGenerador.de(t, NO_LISTO_AMF, "Si se corta la red, el generador no entraría solo"
                                 + (modo == null ? "" : " (modo " + modo + ")"), l));
             }
         }
@@ -164,7 +164,7 @@ public class HistorialEventosService {
         }
         for (String nombre : previas.keySet()) {
             if (!actuales.containsKey(nombre)) {
-                eventos.add(EventoGenerador.de(t, ALARMA_RESUELTA, nombre + ": salio de la lista del controlador (reseteada)", l));
+                eventos.add(EventoGenerador.de(t, ALARMA_RESUELTA, nombre + ": salió de la lista del controlador (reseteada)", l));
             }
         }
         return eventos;
@@ -230,7 +230,7 @@ public class HistorialEventosService {
             e = new Estado();
             estados.put(generador, e);
             guardar(generador, List.of(EventoGenerador.de(LocalDateTime.now().withNano(0), SIN_COMUNICACION,
-                    "Sin comunicacion al iniciar la lectura: " + motivo, null)));
+                    "Sin comunicación al iniciar la lectura: " + motivo, null)));
         } else if (!Boolean.FALSE.equals(e.comunicando)) {
             guardar(generador, List.of(EventoGenerador.de(LocalDateTime.now().withNano(0), SIN_COMUNICACION, motivo, null)));
         }

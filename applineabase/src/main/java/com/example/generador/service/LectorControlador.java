@@ -70,7 +70,7 @@ public final class LectorControlador {
         }
         if (respondidos == 0 && !modelo.registros().isEmpty()) {
             String motivo = errores.values().stream().findFirst().orElse("sin registros");
-            throw new IOException("ningun registro del mapa " + modelo.modelo() + " respondio (" + motivo + ")");
+            throw new IOException("ningún registro del mapa " + modelo.modelo() + " respondió (" + motivo + ")");
         }
         calcularPfSiFalta(modelo, valores);
         List<String> alarmas = leerAlarmas(c, unitId, modelo);

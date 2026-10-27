@@ -72,7 +72,7 @@ public class GeneradoresConfigService {
      */
     public void guardarMetaImportacionRed(double verdeHasta, double amarilloHasta) {
         if (!(verdeHasta >= 0 && verdeHasta < amarilloHasta && amarilloHasta <= 100)) {
-            throw new IllegalArgumentException("El limite verde debe ser menor que el amarillo, entre 0 y 100 %");
+            throw new IllegalArgumentException("El límite verde debe ser menor que el amarillo, entre 0 y 100 %");
         }
         configLoaderService.saveGeneradorMetaImportacionRed(verdeHasta, amarilloHasta);
     }
@@ -153,7 +153,8 @@ public class GeneradoresConfigService {
     /**
      * Campo "red" del modelo: "estado" con los códigos de cada caso (paralelo, isla, fallaRed, retornoRed) y sus
      * "nombres", y los bits mcbCerrado, gcbCerrado, avisoFallaRed, proteccionRed, saltoVector y rocof como
-     * {"parametro": ..., "bit": ...}. Lo que falte o esté mal queda vacío (con aviso en el log).
+     * {"parametro": ..., "bit": ...}, y los ajustes de disparo limiteSaltoVector (grados) y limiteRocof (Hz/s). Lo que
+     * falte o esté mal queda vacío (con aviso en el log).
      */
     private SenalesRed senalesRed(String modelo, Map<?, ?> r) {
         Map<?, ?> estado = r.get("estado") instanceof Map<?, ?> e ? e : Map.of();
@@ -161,7 +162,13 @@ public class GeneradoresConfigService {
         if (estado.get("nombres") instanceof List<?> l) for (Object o : l) nombres.add(String.valueOf(o));
         return new SenalesRed(codigos(estado.get("paralelo")), codigos(estado.get("isla")), codigos(estado.get("fallaRed")),
                 codigos(estado.get("retornoRed")), List.copyOf(nombres), bit(modelo, r, "mcbCerrado"), bit(modelo, r, "gcbCerrado"),
-                bit(modelo, r, "avisoFallaRed"), bit(modelo, r, "proteccionRed"), bit(modelo, r, "saltoVector"), bit(modelo, r, "rocof"));
+                bit(modelo, r, "avisoFallaRed"), bit(modelo, r, "proteccionRed"), bit(modelo, r, "saltoVector"), bit(modelo, r, "rocof"),
+                limite(r.get("limiteSaltoVector")), limite(r.get("limiteRocof")));
+    }
+
+    /** Ajuste de disparo (limiteSaltoVector, limiteRocof); null si falta o no es positivo. */
+    private static Double limite(Object o) {
+        return o instanceof Number n && n.doubleValue() > 0 ? n.doubleValue() : null;
     }
 
     private static Set<Integer> codigos(Object o) {

@@ -84,17 +84,17 @@ public class TraspasoConfiguracionService {
     /** En el orden en que se aplican (los modelos antes que sus registros). */
     private static final List<Tabla> TABLAS = List.of(
             new Tabla("USUARIOS", "Usuarios y permisos", List.of("USERNAME"), Set.of("PASSWORD"), Map.of()),
-            new Tabla("ALARMA_CONFIG", "Umbrales de alarmas y del horometro", List.of("LINEA_MAQUINA", "TIPO_ALARMA"), Set.of(), Map.of()),
+            new Tabla("ALARMA_CONFIG", "Umbrales de alarmas y del horómetro", List.of("LINEA_MAQUINA", "TIPO_ALARMA"), Set.of(), Map.of()),
             new Tabla("MODELO_MEDIDOR", "Modelos de medidor", List.of("NOMBRE"), Set.of(), Map.of()),
             new Tabla(REGISTROS_MODELO, "Registros de los modelos de medidor", List.of(MODELO_NOMBRE, "PARAMETRO"), Set.of(), Map.of()),
-            new Tabla("CONFIGURACION_CALIDAD", "Limites de calidad de energia", List.of("ID"), Set.of(), Map.of()),
+            new Tabla("CONFIGURACION_CALIDAD", "Límites de calidad de energía", List.of("ID"), Set.of(), Map.of()),
             new Tabla("TENSION_NOMINAL", "Tensiones nominales", List.of("LINEA_MAQUINA"), Set.of(), Map.of()),
             new Tabla("PLAN_MANTENIMIENTO", "Planes de mantenimiento", List.of("TAG", "TAREA"), Set.of("NOTIFICADO"), Map.of("NOTIFICADO", false)),
-            new Tabla("TECNICO_MANTENIMIENTO", "Tecnicos de mantenimiento", List.of("CI"), Set.of(), Map.of()),
+            new Tabla("TECNICO_MANTENIMIENTO", "Técnicos de mantenimiento", List.of("CI"), Set.of(), Map.of()),
             new Tabla("TARIFA_FRANJA", "Tarifas por franja horaria", List.of("MES"), Set.of(), Map.of()),
             new Tabla("FERIADO", "Feriados", List.of("FECHA"), Set.of(), Map.of()));
 
-    private static final String GRUPO_ARCHIVOS = "Archivos de configuracion";
+    private static final String GRUPO_ARCHIVOS = "Archivos de configuración";
     private static final String GRUPO_EVENTOS = "Eventos copiados del controlador";
 
     private final DataSource dataSource;
@@ -271,9 +271,9 @@ public class TraspasoConfiguracionService {
                 }
             }
         }
-        if (manifiesto == null) throw new IOException("El archivo no es una configuracion de LineaBaseX (falta manifiesto.json)");
+        if (manifiesto == null) throw new IOException("El archivo no es una configuración de LineaBaseX (falta manifiesto.json)");
         if (!(manifiesto.get("formato") instanceof Number f) || f.intValue() > FORMATO) {
-            throw new IOException("El archivo es de una version mas nueva de la app: actualice primero la app de este equipo");
+            throw new IOException("El archivo es de una versión más nueva de la app: actualice primero la app de este equipo");
         }
         return new Paquete(zipPath.getFileName().toString(), manifiesto, archivos, tablas, eventos);
     }
@@ -318,7 +318,7 @@ public class TraspasoConfiguracionService {
                 c.setAutoCommit(auto);
             }
         } catch (SQLException e) {
-            throw new IOException("No se pudo actualizar la base (no se cambio nada de la base; la copia previa esta en "
+            throw new IOException("No se pudo actualizar la base (no se cambió nada de la base; la copia previa está en "
                     + respaldo + "): " + e.getMessage(), e);
         }
         logger.info("Configuracion importada por {} desde {} ({}); copia previa en {}", usuario, p.archivo(), p.origen(), respaldo);
@@ -339,7 +339,7 @@ public class TraspasoConfiguracionService {
         try (Connection c = dataSource.getConnection(); Statement st = c.createStatement()) {
             st.execute("BACKUP TO '" + destino + "'");
         } catch (SQLException e) {
-            throw new IOException("No se pudo guardar la copia de la base, no se importo nada: " + e.getMessage(), e);
+            throw new IOException("No se pudo guardar la copia de la base, no se importó nada: " + e.getMessage(), e);
         }
         Path eventos = Paths.get(HistorialEventosService.ruta());
         if (Files.exists(eventos)) Files.copy(eventos, carpeta.resolve("eventos-generadores"));
@@ -575,7 +575,7 @@ public class TraspasoConfiguracionService {
     }
 
     private static String mostrar(Object v) {
-        if (v == null) return "(vacio)";
+        if (v == null) return "(vacío)";
         if (v instanceof Number n) return new BigDecimal(n.toString()).stripTrailingZeros().toPlainString();
         return v.toString();
     }

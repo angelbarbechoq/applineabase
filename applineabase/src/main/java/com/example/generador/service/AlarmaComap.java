@@ -42,7 +42,7 @@ public final class AlarmaComap {
     public static String estado(String texto) {
         boolean activa = activa(texto), sinReset = sinConfirmar(texto);
         if (activa) return sinReset ? "activa ahora, sin reset" : "activa ahora, confirmada";
-        return sinReset ? "ya no esta activa, falta el reset en el controlador" : "en la lista del controlador";
+        return sinReset ? "ya no está activa, falta el reset en el controlador" : "en la lista del controlador";
     }
 
     /**
@@ -66,10 +66,10 @@ public final class AlarmaComap {
                     + "de emergencia y hacer el reset de fallas en el controlador.";
         }
         if (t.startsWith("sd ")) {
-            return "Parada por proteccion: el generador no arranca hasta resolver la causa y hacer el reset en el controlador.";
+            return "Parada por protección: el generador no arranca hasta resolver la causa y hacer el reset en el controlador.";
         }
-        if (t.startsWith("stp ")) return "Parada lenta por proteccion, con enfriamiento: revisar la causa y hacer el reset en el controlador.";
-        if (t.startsWith("boc ")) return "Proteccion que abre el interruptor del generador y lo enfria: revisar la causa en el controlador.";
+        if (t.startsWith("stp ")) return "Parada lenta por protección, con enfriamiento: revisar la causa y hacer el reset en el controlador.";
+        if (t.startsWith("boc ")) return "Protección que abre el interruptor del generador y lo enfría: revisar la causa en el controlador.";
         if (t.startsWith("wrn ")) return "Aviso: el generador puede seguir trabajando, pero hay que revisar la causa.";
         return "Revisar en la pantalla del controlador.";
     }

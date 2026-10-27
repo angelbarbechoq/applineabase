@@ -97,7 +97,7 @@ public class MergeVipMensualTool {
             log.add("Error leyendo linea-id-config.json: " + e.getMessage());
             return new ResultadoReparacion(log, 0, false);
         }
-        log.add("Lineas a procesar: " + lineas.size());
+        log.add("Líneas a procesar: " + lineas.size());
 
         if (!new File(mensualPath).exists()) {
             log.add("No existe el archivo mensual " + etiqueta + ", se crea: " + mensualPath);

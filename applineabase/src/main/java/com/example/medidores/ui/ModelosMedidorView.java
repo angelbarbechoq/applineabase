@@ -87,7 +87,7 @@ public class ModelosMedidorView extends VerticalLayout {
         add(new H3("Modelos de medidor"));
         add(aviso("Los cambios rigen desde el siguiente ciclo de lectura (1 minuto), sin reiniciar. "
                 + "Los registros se cargan como figuran en el manual del medidor. Un medidor solo se lee por "
-                + "pasarela si su modelo tiene completos los parametros basicos."));
+                + "pasarela si su modelo tiene completos los parámetros básicos."));
 
         modeloCombo.setItemLabelGenerator(ModeloMedidor::getNombre);
         modeloCombo.setWidth("220px");
@@ -150,18 +150,18 @@ public class ModelosMedidorView extends VerticalLayout {
         if (faltan.isEmpty()) {
             badge(estadoModelo, "Completo: se puede leer por pasarela", "#d4edda", "#155724");
         } else {
-            badge(estadoModelo, "Incompleto: faltan " + faltan.size() + " parametros basicos", "#fff3cd", "#856404");
+            badge(estadoModelo, "Incompleto: faltan " + faltan.size() + " parámetros básicos", "#fff3cd", "#856404");
         }
         List<String> usan = service.lineasQueLoUsan(m.getNombre());
-        usoModelo.setText(usan.isEmpty() ? "Sin lineas asignadas" : "Lo usan: " + String.join(", ", usan));
+        usoModelo.setText(usan.isEmpty() ? "Sin líneas asignadas" : "Lo usan: " + String.join(", ", usan));
         usoModelo.getStyle().set("font-size", "12px").set("color", "#555");
     }
 
     // ================= Pestana Registros =================
 
     private VerticalLayout crearPanelRegistros() {
-        registrosGrid.addColumn(p -> esRequerido(p) ? "Basico" : "Calidad").setHeader("Grupo").setAutoWidth(true);
-        registrosGrid.addColumn(ParametroMedidor::getEtiqueta).setHeader("Parametro").setAutoWidth(true);
+        registrosGrid.addColumn(p -> esRequerido(p) ? "Básico" : "Calidad").setHeader("Grupo").setAutoWidth(true);
+        registrosGrid.addColumn(ParametroMedidor::getEtiqueta).setHeader("Parámetro").setAutoWidth(true);
         registrosGrid.addColumn(ParametroMedidor::getUnidad).setHeader("Unidad").setAutoWidth(true);
         registrosGrid.addComponentColumn(this::celdaRegistro).setHeader("Registro").setAutoWidth(true);
         registrosGrid.addColumn(p -> texto(p, r -> r.getTipoDato().getEtiqueta())).setHeader("Tipo de dato").setAutoWidth(true);
@@ -175,7 +175,7 @@ public class ModelosMedidorView extends VerticalLayout {
         registrosGrid.setSizeFull();
 
         VerticalLayout panel = new VerticalLayout(
-                new Span("Clic en un parametro para cargar o corregir su registro."), registrosGrid);
+                new Span("Clic en un parámetro para cargar o corregir su registro."), registrosGrid);
         panel.setSizeFull();
         panel.setPadding(false);
         panel.setFlexGrow(1, registrosGrid);
@@ -264,7 +264,7 @@ public class ModelosMedidorView extends VerticalLayout {
         if (actual != null) {
             Button noDisponible = new Button("Marcar No disponible", e -> {
                 if (esRequerido(parametro) && !service.lineasQueLoUsan(modelo.getNombre()).isEmpty()) {
-                    NotificacionesUtil.mostrarError("Es un parametro basico y hay lineas con este modelo: dejarian de leerse");
+                    NotificacionesUtil.mostrarError("Es un parámetro básico y hay líneas con este modelo: dejarían de leerse");
                     return;
                 }
                 ejecutar(() -> service.quitarRegistro(modelo.getId(), parametro), "Marcado como No disponible", dialog);
@@ -284,32 +284,32 @@ public class ModelosMedidorView extends VerticalLayout {
         dialog.setWidth("520px");
 
         TextField nombreField = new TextField("Nombre (ej. PM5560)");
-        TextField descripcionField = new TextField("Descripcion (marca, modelo, notas)");
-        ComboBox<FuncionLectura> funcionField = new ComboBox<>("Funcion Modbus de lectura");
+        TextField descripcionField = new TextField("Descripción (marca, modelo, notas)");
+        ComboBox<FuncionLectura> funcionField = new ComboBox<>("Función Modbus de lectura");
         funcionField.setItems(FuncionLectura.values());
         funcionField.setItemLabelGenerator(FuncionLectura::getEtiqueta);
         Checkbox manualField = new Checkbox("Registros numerados como en el manual (base 1: se resta 1 al leer)");
         // Checkbox no implementa HasTooltip: se usa Tooltip.forComponent como en UsuariosView.
         Tooltip.forComponent(manualField)
-                .withText("Schneider y la mayoria de los fabricantes publican los registros en base 1. "
+                .withText("Schneider y la mayoría de los fabricantes publican los registros en base 1. "
                         + "Desmarcar solo si el manual da las direcciones tal como viajan en el cable (base 0).")
                 .withHoverDelay(200)
                 .withHideDelay(5000);
 
-        ComboBox<TensionesHistorico> tensionesField = new ComboBox<>("Tensiones que se guardan en el historico");
+        ComboBox<TensionesHistorico> tensionesField = new ComboBox<>("Tensiones que se guardan en el histórico");
         tensionesField.setItems(TensionesHistorico.values());
         tensionesField.setItemLabelGenerator(TensionesHistorico::getEtiqueta);
-        tensionesField.setHelperText("Columnas VAB, VBC y VAC del historico. Como dicen los manuales: fase-fase. "
+        tensionesField.setHelperText("Columnas VAB, VBC y VAC del histórico. Como dicen los manuales: fase-fase. "
                 + "Fase-neutro solo para un caso especial.");
 
-        Checkbox potenciaWField = new Checkbox("Historico VIP: potencia en W (como lo guardaba el PLC)");
-        Checkbox pfPorcentajeField = new Checkbox("Historico VIP: PF en % (como lo guardaba el PLC)");
+        Checkbox potenciaWField = new Checkbox("Histórico VIP: potencia en W (como lo guardaba el PLC)");
+        Checkbox pfPorcentajeField = new Checkbox("Histórico VIP: PF en % (como lo guardaba el PLC)");
         Tooltip.forComponent(potenciaWField)
-                .withText("El catalogo siempre se carga en kW y PF de -1 a 1, y asi se guarda el historico. Caso especial: "
-                        + "marcar solo si hace falta guardar la potencia en W. Ningun modelo lo usa.")
+                .withText("El catálogo siempre se carga en kW y PF de -1 a 1, y así se guarda el histórico. Caso especial: "
+                        + "marcar solo si hace falta guardar la potencia en W. Ningún modelo lo usa.")
                 .withHoverDelay(200).withHideDelay(5000);
         Tooltip.forComponent(pfPorcentajeField)
-                .withText("Caso especial: guardar el PF del historico en %. Ningun modelo lo usa.")
+                .withText("Caso especial: guardar el PF del histórico en %. Ningún modelo lo usa.")
                 .withHoverDelay(200).withHideDelay(5000);
 
         if (enEdicion != null) {
@@ -358,11 +358,11 @@ public class ModelosMedidorView extends VerticalLayout {
         dialog.setHeaderTitle("Duplicar " + modelo.getNombre());
         dialog.setWidth("420px");
         TextField nombreField = new TextField("Nombre del modelo nuevo");
-        TextField descripcionField = new TextField("Descripcion");
+        TextField descripcionField = new TextField("Descripción");
         nombreField.setWidthFull();
         descripcionField.setWidthFull();
         dialog.add(new VerticalLayout(
-                new Span("Copia todos los registros; despues se corrigen los que cambien."),
+                new Span("Copia todos los registros; después se corrigen los que cambien."),
                 nombreField, descripcionField));
 
         Button cancelar = new Button("Cancelar", e -> dialog.close());
@@ -377,7 +377,7 @@ public class ModelosMedidorView extends VerticalLayout {
     private void confirmarEliminar() {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Eliminar modelo " + modelo.getNombre());
-        dialog.add(new Span("Se borra el modelo y todos sus registros. Solo se puede si ninguna linea lo usa."));
+        dialog.add(new Span("Se borra el modelo y todos sus registros. Solo se puede si ninguna línea lo usa."));
         Button cancelar = new Button("Cancelar", e -> dialog.close());
         Button eliminar = new Button("Eliminar", e -> {
             try {
@@ -438,7 +438,7 @@ public class ModelosMedidorView extends VerticalLayout {
             String nombreModelo = String.valueOf(l.get("modeloMedidor"));
             service.listar().stream().filter(m -> m.getNombre().equalsIgnoreCase(nombreModelo)).findFirst()
                     .ifPresentOrElse(modeloCombo::setValue,
-                            () -> NotificacionesUtil.mostrarError("El modelo " + nombreModelo + " no existe en el catalogo"));
+                            () -> NotificacionesUtil.mostrarError("El modelo " + nombreModelo + " no existe en el catálogo"));
         });
 
         Button probar = new Button("Probar lectura", VaadinIcon.PLAY.create(),
@@ -449,10 +449,10 @@ public class ModelosMedidorView extends VerticalLayout {
         form.setAlignItems(Alignment.END);
         form.getStyle().set("flex-wrap", "wrap");
 
-        pruebaGrid.addColumn(f -> f.parametro().getEtiqueta()).setHeader("Parametro").setAutoWidth(true);
+        pruebaGrid.addColumn(f -> f.parametro().getEtiqueta()).setHeader("Parámetro").setAutoWidth(true);
         pruebaGrid.addColumn(FilaPrueba::registro).setHeader("Registro").setAutoWidth(true);
-        pruebaGrid.addColumn(FilaPrueba::valor).setHeader("Valor leido").setAutoWidth(true);
-        pruebaGrid.addColumn(FilaPrueba::observacion).setHeader("Observacion").setFlexGrow(1);
+        pruebaGrid.addColumn(FilaPrueba::valor).setHeader("Valor leído").setAutoWidth(true);
+        pruebaGrid.addColumn(FilaPrueba::observacion).setHeader("Observación").setFlexGrow(1);
         pruebaGrid.setSizeFull();
 
         VerticalLayout panel = new VerticalLayout(
@@ -499,16 +499,16 @@ public class ModelosMedidorView extends VerticalLayout {
             }
             pruebaGrid.setItems(filas);
             long ms = System.currentTimeMillis() - inicio;
-            badge(resumenPrueba, String.format("Leido en %d ms: %d valores, %d con error",
+            badge(resumenPrueba, String.format("Leído en %d ms: %d valores, %d con error",
                     ms, lectura.valores().size(), lectura.errores().size()),
                     lectura.errores().isEmpty() ? "#d4edda" : "#fff3cd",
                     lectura.errores().isEmpty() ? "#155724" : "#856404");
         } catch (ModbusTcpConexion.ExcepcionModbus ex) {
             pruebaGrid.setItems(List.of());
-            badge(resumenPrueba, "El medidor no contesto: " + ex.getMessage(), "#f8d7da", "#721c24");
+            badge(resumenPrueba, "El medidor no contestó: " + ex.getMessage(), "#f8d7da", "#721c24");
         } catch (IOException ex) {
             pruebaGrid.setItems(List.of());
-            badge(resumenPrueba, "Sin comunicacion con la pasarela " + ip + ": " + ex.getMessage(), "#f8d7da", "#721c24");
+            badge(resumenPrueba, "Sin comunicación con la pasarela " + ip + ": " + ex.getMessage(), "#f8d7da", "#721c24");
         }
     }
 

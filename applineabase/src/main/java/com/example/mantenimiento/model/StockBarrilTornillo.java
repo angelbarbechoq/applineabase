@@ -74,6 +74,6 @@ public class StockBarrilTornillo {
 
     /** LSDP es doble paralelo; el resto de los modelos (LSE, CM) son doble conico. */
     public String geometriaTornillo() {
-        return modelo != null && modelo.toUpperCase().startsWith("LSDP") ? "Doble paralelo" : "Doble conico";
+        return modelo != null && modelo.toUpperCase().startsWith("LSDP") ? "Doble paralelo" : "Doble cónico";
     }
 }

@@ -54,7 +54,7 @@ import java.util.function.ToDoubleFunction;
  * cumplimiento de límites por período y edición de límites (ADMIN). Lee los archivos
  * {mes}Calidad (fase E1); hoy solo tienen datos las máquinas que se leen por pasarela.
  */
-@PageTitle("Calidad de Energia | LineaBase")
+@PageTitle("Calidad de Energía | LineaBase")
 @Route(value = "calidad", layout = MainLayout.class)
 @PermitAll
 public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObserver {
@@ -83,15 +83,15 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
         setSizeFull();
         setPadding(true);
         setSpacing(true);
-        add(new H3("Calidad de Energia"));
+        add(new H3("Calidad de Energía"));
 
         TabSheet tabs = new TabSheet();
         tabs.setSizeFull();
         tabs.add("Estado actual", crearEstado());
-        tabs.add("Historico", crearHistorico());
+        tabs.add("Histórico", crearHistorico());
         tabs.add("Cumplimiento", crearCumplimiento());
         if (lineaAccessService.esAdmin()) {
-            tabs.add("Limites", crearLimites());
+            tabs.add("Límites", crearLimites());
         }
         add(tabs);
         setFlexGrow(1, tabs);
@@ -101,7 +101,7 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
     public void beforeEnter(BeforeEnterEvent event) {
         // Mismo alcance que alarmas: ADMIN y zona Mantenimiento.
         if (!lineaAccessService.puedeVerAlarmas()) {
-            Notification.show("No tienes permiso para ver Calidad de Energia", 3000, Notification.Position.MIDDLE)
+            Notification.show("No tienes permiso para ver Calidad de Energía", 3000, Notification.Position.MIDDLE)
                     .addThemeVariants(NotificationVariant.LUMO_ERROR);
             event.forwardTo(ChartsView.class);
         }
@@ -110,9 +110,9 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
     // ================= Estado actual =================
 
     private VerticalLayout crearEstado() {
-        estadoGrid.addColumn(m -> m).setHeader("Maquina").setAutoWidth(true).setFrozen(true);
+        estadoGrid.addColumn(m -> m).setHeader("Máquina").setAutoWidth(true).setFrozen(true);
         estadoGrid.addColumn(m -> ultimas.get(m) == null ? "-" : ultimas.get(m).fecha().format(HORA))
-                .setHeader("Ultima lectura").setAutoWidth(true);
+                .setHeader("Última lectura").setAutoWidth(true);
         for (Indicador ind : Indicador.values()) {
             estadoGrid.addComponentColumn(m -> celdaEstado(m, ind)).setHeader(ind.getEtiqueta()).setAutoWidth(true);
         }
@@ -120,8 +120,8 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
 
         Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> cargarEstado());
         estadoNota.getStyle().set("font-size", "12px").set("color", "#555");
-        estadoNota.setText("Ultimo minuto leido de cada maquina. Verde: dentro del limite; amarillo: cerca; rojo: fuera; "
-                + "gris: el medidor no lo mide. * = desbalance calculado por la app. Pase el mouse por un valor para ver el limite.");
+        estadoNota.setText("Último minuto leído de cada máquina. Verde: dentro del límite; amarillo: cerca; rojo: fuera; "
+                + "gris: el medidor no lo mide. * = desbalance calculado por la app. Pase el mouse por un valor para ver el límite.");
 
         VerticalLayout panel = new VerticalLayout(new HorizontalLayout(actualizar), estadoNota, estadoGrid);
         panel.setSizeFull();
@@ -141,7 +141,7 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
         ultimas = mapa;
         estadoGrid.setItems(maquinas);
         if (maquinas.isEmpty()) {
-            estadoNota.setText("Todavia no hay datos de calidad: solo se guardan para las maquinas leidas por pasarela.");
+            estadoNota.setText("Todavía no hay datos de calidad: solo se guardan para las máquinas leídas por pasarela.");
         }
     }
 
@@ -154,14 +154,14 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
         boolean calculado = f != null && ((ind == Indicador.DESBALANCE_CORRIENTE && f.desbICalculado())
                 || (ind == Indicador.DESBALANCE_TENSION && f.desbVCalculado()));
         Span s = badge(v == null ? "No disponible" : formato(ind, v) + (calculado ? " *" : ""), e);
-        s.setTitle("Limite: " + service.textoLimite(ind, nominal, cfg));
+        s.setTitle("Límite: " + service.textoLimite(ind, nominal, cfg));
         return s;
     }
 
     // ================= Historico =================
 
     private VerticalLayout crearHistorico() {
-        ComboBox<String> maquina = new ComboBox<>("Maquina");
+        ComboBox<String> maquina = new ComboBox<>("Máquina");
         maquina.setItems(service.maquinasConDatos());
         maquina.setWidth("220px");
         ComboBox<Indicador> indicador = new ComboBox<>("Indicador");
@@ -183,7 +183,7 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
         filtros.getStyle().set("flex-wrap", "wrap");
 
         historicoMensaje.getStyle().set("font-size", "12px").set("color", "#555");
-        historicoMensaje.setText("Promedios de 10 minutos (como pide la norma), una serie por fase y la linea del limite.");
+        historicoMensaje.setText("Promedios de 10 minutos (como pide la norma), una serie por fase y la línea del límite.");
 
         Div chart = new Div();
         chart.setId(CHART_ID);
@@ -198,7 +198,7 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
 
     private void graficar(String maquina, Indicador ind, LocalDateTime desde, LocalDateTime hasta) {
         if (maquina == null || ind == null || desde == null || hasta == null || !desde.isBefore(hasta)) {
-            NotificacionesUtil.mostrarError("Elija maquina, indicador y un rango de fechas valido");
+            NotificacionesUtil.mostrarError("Elija máquina, indicador y un rango de fechas válido");
             return;
         }
         if (desde.plusDays(62).isBefore(hasta)) {
@@ -212,7 +212,7 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
         Double limite = service.lineaLimite(ind, nominal, cfg);
 
         List<String> nombres = new ArrayList<>(columnas);
-        if (limite != null) nombres.add("Limite");
+        if (limite != null) nombres.add("Límite");
         GraficaModel grafica = new GraficaModel(nombres.size());
         grafica.setSeriesNames(nombres.toArray(new String[0]));
         grafica.setMostrarLeyenda(true);
@@ -253,7 +253,7 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
         double margen = Math.max((max - min) * 0.1, 0.01);
         grafica.setMinY(Math.max(0, min - margen));
         grafica.setMaxY(max + margen);
-        historicoMensaje.setText(String.format(Locale.ROOT, "%s - %s: %d bloques de 10 min. Limite: %s",
+        historicoMensaje.setText(String.format(Locale.ROOT, "%s - %s: %d bloques de 10 min. Límite: %s",
                 maquina, ind.getEtiqueta(), tiempos.size(), service.textoLimite(ind, nominal, cfg)));
         getElement().executeJs(grafica.getInitScript2(CHART_ID)
                 + grafica.getSetAllDataScript(CHART_ID, tiempos, filas)
@@ -269,14 +269,14 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
         mes.setItemLabelGenerator(m -> m.getMonthValue() + "/" + m.getYear());
         mes.setWidth("160px");
 
-        cumplimientoGrid.addColumn(m -> m).setHeader("Maquina").setAutoWidth(true).setFrozen(true);
+        cumplimientoGrid.addColumn(m -> m).setHeader("Máquina").setAutoWidth(true).setFrozen(true);
         for (Indicador ind : Indicador.values()) {
             cumplimientoGrid.addComponentColumn(m -> celdaCumplimiento(m, ind)).setHeader(ind.getEtiqueta()).setAutoWidth(true);
         }
         cumplimientoGrid.setSizeFull();
 
-        Span nota = new Span("Porcentaje del tiempo dentro del limite (sobre promedios de 10 minutos, como la norma) "
-                + "y, entre parentesis, el peor promedio de 10 minutos del mes.");
+        Span nota = new Span("Porcentaje del tiempo dentro del límite (sobre promedios de 10 minutos, como la norma) "
+                + "y, entre paréntesis, el peor promedio de 10 minutos del mes.");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
 
         Button calcular = new Button("Calcular", VaadinIcon.CALC.create(), e -> calcularCumplimiento(mes.getValue()));
@@ -316,7 +316,7 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
         }
         Estado e = c.pctDentro() >= 95 ? Estado.OK : c.pctDentro() >= 80 ? Estado.AVISO : Estado.FUERA;
         Span s = badge(String.format(Locale.ROOT, "%.1f %% (%s)", c.pctDentro(), formato(ind, c.peor())), e);
-        s.setTitle(c.bloques() + " bloques de 10 min. Limite: "
+        s.setTitle(c.bloques() + " bloques de 10 min. Límite: "
                 + service.textoLimite(ind, service.tensionNominal(maquina), service.configuracion()));
         return s;
     }
@@ -328,37 +328,37 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
         FormLayout form = new FormLayout();
         form.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1), new FormLayout.ResponsiveStep("500px", 3));
         List<Runnable> guardar = new ArrayList<>();
-        campo(form, guardar, "THD tension hasta 1 kV (%)", cfg, ConfiguracionCalidad::getThdTensionBajaTension, ConfiguracionCalidad::setThdTensionBajaTension);
-        campo(form, guardar, "THD tension 1 a 69 kV (%)", cfg, ConfiguracionCalidad::getThdTensionMediaTension, ConfiguracionCalidad::setThdTensionMediaTension);
+        campo(form, guardar, "THD tensión hasta 1 kV (%)", cfg, ConfiguracionCalidad::getThdTensionBajaTension, ConfiguracionCalidad::setThdTensionBajaTension);
+        campo(form, guardar, "THD tensión 1 a 69 kV (%)", cfg, ConfiguracionCalidad::getThdTensionMediaTension, ConfiguracionCalidad::setThdTensionMediaTension);
         campo(form, guardar, "THD corriente (%)", cfg, ConfiguracionCalidad::getThdCorriente, ConfiguracionCalidad::setThdCorriente);
-        campo(form, guardar, "Desbalance tension (%)", cfg, ConfiguracionCalidad::getDesbalanceTension, ConfiguracionCalidad::setDesbalanceTension);
+        campo(form, guardar, "Desbalance tensión (%)", cfg, ConfiguracionCalidad::getDesbalanceTension, ConfiguracionCalidad::setDesbalanceTension);
         campo(form, guardar, "Desbalance corriente (%)", cfg, ConfiguracionCalidad::getDesbalanceCorriente, ConfiguracionCalidad::setDesbalanceCorriente);
-        campo(form, guardar, "PF minimo", cfg, ConfiguracionCalidad::getPfMinimo, ConfiguracionCalidad::setPfMinimo);
-        campo(form, guardar, "Tension: aviso (+/- %)", cfg, ConfiguracionCalidad::getTensionAvisoPct, ConfiguracionCalidad::setTensionAvisoPct);
-        campo(form, guardar, "Tension: fuera (+/- %)", cfg, ConfiguracionCalidad::getTensionFueraPct, ConfiguracionCalidad::setTensionFueraPct);
-        campo(form, guardar, "Tension nominal por defecto (V fase-fase)", cfg, ConfiguracionCalidad::getTensionNominalPorDefecto, ConfiguracionCalidad::setTensionNominalPorDefecto);
+        campo(form, guardar, "PF mínimo", cfg, ConfiguracionCalidad::getPfMinimo, ConfiguracionCalidad::setPfMinimo);
+        campo(form, guardar, "Tensión: aviso (+/- %)", cfg, ConfiguracionCalidad::getTensionAvisoPct, ConfiguracionCalidad::setTensionAvisoPct);
+        campo(form, guardar, "Tensión: fuera (+/- %)", cfg, ConfiguracionCalidad::getTensionFueraPct, ConfiguracionCalidad::setTensionFueraPct);
+        campo(form, guardar, "Tensión nominal por defecto (V fase-fase)", cfg, ConfiguracionCalidad::getTensionNominalPorDefecto, ConfiguracionCalidad::setTensionNominalPorDefecto);
         campo(form, guardar, "Frecuencia nominal (Hz)", cfg, ConfiguracionCalidad::getFrecuenciaNominal, ConfiguracionCalidad::setFrecuenciaNominal);
         campo(form, guardar, "Frecuencia (+/- %)", cfg, ConfiguracionCalidad::getFrecuenciaPct, ConfiguracionCalidad::setFrecuenciaPct);
 
-        Button guardarBtn = new Button("Guardar limites", e -> {
+        Button guardarBtn = new Button("Guardar límites", e -> {
             guardar.forEach(Runnable::run);
             service.guardarConfiguracion(cfg);
-            exito("Limites guardados");
+            exito("Límites guardados");
             cargarEstado();
         });
         guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         Grid<String> nominales = new Grid<>();
-        nominales.addColumn(m -> m).setHeader("Maquina").setAutoWidth(true);
+        nominales.addColumn(m -> m).setHeader("Máquina").setAutoWidth(true);
         nominales.addColumn(m -> String.format(Locale.ROOT, "%.0f V", service.tensionNominal(m))
-                + (service.tieneNominalPropia(m) ? "" : " (por defecto)")).setHeader("Tension nominal fase-fase").setAutoWidth(true);
+                + (service.tieneNominalPropia(m) ? "" : " (por defecto)")).setHeader("Tensión nominal fase-fase").setAutoWidth(true);
         List<String> maquinas = configLoaderService.loadLineaIDConfig().stream()
                 .map(l -> String.valueOf(l.get("lineaMaquina"))).sorted().toList();
         nominales.setItems(maquinas);
         nominales.addItemClickListener(e -> editarNominal(e.getItem(), nominales));
         nominales.setHeight("320px");
 
-        Span nota = new Span("Clic en una maquina para cargar la tension nominal de su tablero (ej. 460, 480, 22000).");
+        Span nota = new Span("Clic en una máquina para cargar la tensión nominal de su tablero (ej. 460, 480, 22000).");
         nota.getStyle().set("font-size", "12px").set("color", "#555");
         VerticalLayout panel = new VerticalLayout(form, guardarBtn, nota, nominales);
         panel.setPadding(false);
@@ -377,20 +377,20 @@ public class CalidadEnergiaView extends VerticalLayout implements BeforeEnterObs
 
     private void editarNominal(String maquina, Grid<String> grid) {
         Dialog d = new Dialog();
-        d.setHeaderTitle("Tension nominal de " + maquina);
+        d.setHeaderTitle("Tensión nominal de " + maquina);
         NumberField v = new NumberField("Voltios fase-fase");
         v.setValue(service.tensionNominal(maquina));
         d.add(v);
         Button cancelar = new Button("Cancelar", e -> d.close());
         Button ok = new Button("Guardar", e -> {
             if (v.getValue() == null || v.getValue() <= 0) {
-                NotificacionesUtil.mostrarError("Ingrese una tension mayor que 0");
+                NotificacionesUtil.mostrarError("Ingrese una tensión mayor que 0");
                 return;
             }
             service.guardarTensionNominal(maquina, v.getValue());
             d.close();
             grid.getDataProvider().refreshAll();
-            exito("Tension nominal guardada");
+            exito("Tensión nominal guardada");
             cargarEstado();
         });
         ok.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
