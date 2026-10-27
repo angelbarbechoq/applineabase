@@ -1135,7 +1135,7 @@ public class GraficaModel {
                 + "yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x52514e), fontSize: '11px' });"
                 + "yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });"
                 + "yAxis.children.unshift(am5.Label.new(root, { rotation: -90, text: 'kW', y: am5.p50, centerX: am5.p50, fontSize: '11px', fill: am5.color(0x52514e) }));"
-                + "var red = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Red (azul = importada, verde = exportada)', xAxis: xAxis, yAxis: yAxis, valueYField: 'r', valueXField: 't', fill: am5.color(" + colorRed + "), tooltip: am5.Tooltip.new(root, { labelText: 'Red: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
+                + "var red = chart.series.push(am5xy.ColumnSeries.new(root, { name: 'Transformador (azul = entra, verde = sale)', xAxis: xAxis, yAxis: yAxis, valueYField: 'r', valueXField: 't', fill: am5.color(" + colorRed + "), tooltip: am5.Tooltip.new(root, { labelText: 'Transformador: {valueY.formatNumber(\\u0022#,###\\u0022)} kW' }) }));"
                 + "red.columns.template.setAll({ width: am5.percent(100), strokeOpacity: 0 });"
                 + "red.columns.template.adapters.add('fill', function(fill, target) { var v = target.dataItem && target.dataItem.get('valueY'); return v < 0 ? am5.color(" + colorEntregado + ") : am5.color(" + colorRed + "); });"
                 + "red.data.setAll(datos);"

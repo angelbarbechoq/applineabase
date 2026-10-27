@@ -1184,11 +1184,14 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                         nombreConsumo, colorGenerador(g.nombre()), AZUL, AQUA, NOCHE, true));
                 scripts.put(g.nombre(), completo);
             }
-            Html maquinas = new Html(textoMaquinas(consumoMedidores.calcular(ini, fin, g.redAsociada()), g.redAsociada()));
+            List<Component> debajo = new ArrayList<>();
+            Html paso = textoPaso(g, analisis.pasoAOtroTransformador(minutos));
+            if (paso != null) debajo.add(paso);
+            debajo.add(new Html(textoMaquinas(consumoMedidores.calcular(ini, fin, g.redAsociada()), g.redAsociada())));
             if (enLugar && chartDe.containsKey(g.nombre())) {
                 Div chart = chartDe.get(g.nombre());
                 maquinasDe.get(g.nombre()).removeAll();
-                maquinasDe.get(g.nombre()).add(maquinas);
+                maquinasDe.get(g.nombre()).add(debajo.toArray(Component[]::new));
                 boolean estabaOculto = !chart.isVisible();
                 chart.setVisible(completo != null);
                 if (completo != null && tabs.getSelectedTab() == tabPeriodos) {
@@ -1202,7 +1205,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             chart.setWidthFull();
             chart.setHeight("280px");
             chart.setVisible(completo != null);
-            Div lista = new Div(maquinas);
+            Div lista = new Div(debajo.toArray(Component[]::new));
             chartDe.put(g.nombre(), chart);
             maquinasDe.put(g.nombre(), lista);
             Div contenido = new Div(chart, lista);
@@ -1212,6 +1215,19 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
         scriptsGenerador = scripts;
         recuadrosDibujados = estructura;
+    }
+
+    /**
+     * Lo que el generador produjo de más, salió por su transformador y lo consumió el otro transformador (pedido del
+     * usuario el 2026-10-27): solo informativo, ya está dentro del aporte del generador. Null si no pasó nada (menos de 1 kWh).
+     */
+    private Html textoPaso(Generador g, double kwh) {
+        if (kwh < 0.5) return null;
+        List<String> otros = generadorService.generadores().stream().map(Generador::redAsociada)
+                .filter(r -> r != null && !r.equals(g.redAsociada())).distinct().map(GeneradorView::nombreRed).toList();
+        String destino = otros.size() == 1 ? "al " + otros.get(0) : "a otro transformador";
+        return new Html("<div style=\"font-size:13px;color:" + TEXTO_SUAVE + ";margin-bottom:6px\">Paso " + destino
+                + ": <b style=\"color:" + css(AQUA) + "\">" + kwh(kwh) + "</b></div>");
     }
 
     /**

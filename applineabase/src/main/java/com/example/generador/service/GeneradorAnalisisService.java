@@ -635,6 +635,28 @@ public class GeneradorAnalisisService {
         return lista;
     }
 
+    /**
+     * Energía que salió por el transformador del generador hacia media tensión y la consumió otro transformador de la
+     * planta (pedido del usuario el 2026-10-27), con los minutos de {@link #minutosTransformador}: en cada minuto en que
+     * el medidor del transformador marca salida, lo que salió menos lo que en ese minuto exportó el medidor principal (si
+     * el principal importa, todo lo que salió bajó por otro transformador). kWh; solo informativo, no entra en el balance.
+     */
+    public double pasoAOtroTransformador(List<MinutoMarcha> minutos) {
+        if (minutos.size() < 2) return 0;
+        TreeMap<LocalDateTime, Double> principal = seriePotenciaPrincipal(new Consulta(),
+                minutos.get(0).fecha().toLocalDate(), minutos.get(minutos.size() - 1).fecha().toLocalDate());
+        double kwh = 0;
+        for (int i = 1; i < minutos.size(); i++) {
+            MinutoMarcha m = minutos.get(i);
+            if (m.redKw() == null || m.redKw() >= 0) continue;
+            long segundos = Math.min(Duration.between(minutos.get(i - 1).fecha(), m.fecha()).toSeconds(), 120);
+            Map.Entry<LocalDateTime, Double> p = principal.floorEntry(m.fecha());
+            double exportada = p != null && Duration.between(p.getKey(), m.fecha()).toSeconds() <= 90 ? Math.max(0, -p.getValue()) : 0;
+            kwh += Math.max(0, -m.redKw() - exportada) * segundos / 3600.0;
+        }
+        return kwh;
+    }
+
     /** Potencia media de un medidor entre desde (incluido) y hasta (excluido), del archivo VIP; null sin lecturas. */
     public Double potenciaMedia(String maquina, LocalDateTime desde, LocalDateTime hasta) {
         if (!PLCDataQueryService.esNombreMaquinaValido(maquina)) return null;
