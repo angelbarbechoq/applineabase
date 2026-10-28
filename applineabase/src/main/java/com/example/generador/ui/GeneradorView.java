@@ -113,6 +113,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final Span avisoMapa = new Span();
     /** Aviso rojo de alarmas arriba de las pestañas: solo para un generador sin comunicación (su tablero no las muestra). */
     private final Div alertaAlarmas = new Div();
+    private final Div avisoRed = new Div();
     /** Una pestaña por generador (su tablero, lo que antes era Estado actual), con sus marcas de marcha y alarmas. */
     private final Map<Tab, Generador> tabGenerador = new LinkedHashMap<>();
     private final Map<Generador, Div> tableros = new HashMap<>();
@@ -181,7 +182,11 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         });
         alertaAlarmas.setWidthFull();
         alertaAlarmas.setVisible(false);
-        add(avisoMapa, alertaAlarmas, tabs);
+        avisoRed.setWidthFull();
+        avisoRed.setVisible(false);
+        avisoRed.getStyle().set("background-color", "#FDF6DC").set("color", "#7A5E00").set("border", "2px solid #E0B50F")
+                .set("border-radius", "6px").set("padding", "8px 12px").set("box-sizing", "border-box");
+        add(avisoMapa, avisoRed, alertaAlarmas, tabs);
         setFlexGrow(1, tabs);
         cargarEventos();
         refrescar();
@@ -229,6 +234,15 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
                         .set("box-sizing", "border-box");
                 n.getElement().setAttribute("title", alarmas.size() + " alarmas en el controlador");
                 marcas.add(n);
+            }
+            // Interruptor de la planta abierto o sin red: advertencia amarilla también en la pestaña.
+            RedControladorService.EstadoActual red = redControlador.estadoActual(g.nombre());
+            if (red != null && (red.isla() || SenalesRed.sinRed(red.estado()) || Boolean.FALSE.equals(red.mcb()))) {
+                var icono = VaadinIcon.WARNING.create();
+                icono.setColor("#E0B50F");
+                icono.setSize("18px");
+                icono.getElement().setAttribute("title", red.isla() ? "Interruptor de la planta abierto: en isla" : "Sin red según el controlador");
+                marcas.add(icono);
             }
         }
     }
@@ -700,6 +714,36 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
             }
         }
         marcarPestanas(alarmasEnVivo);
+        avisarRed();
+    }
+
+    /**
+     * Advertencia amarilla arriba de las pestañas, para cualquier generador (no solo el de la pestaña): interruptor de la
+     * planta abierto (isla) o falla de red según la última lectura de fondo del controlador. Pedido del usuario el
+     * 27-10-2026, cuando el Caterpillar abrió por ROCOF y solo se veía en el tablero de su pestaña.
+     */
+    private void avisarRed() {
+        avisoRed.removeAll();
+        for (Generador g : generadores) {
+            RedControladorService.EstadoActual e = redControlador.estadoActual(g.nombre());
+            if (e == null || !(e.isla() || SenalesRed.sinRed(e.estado()) || Boolean.FALSE.equals(e.mcb()))) continue;
+            String desde = e.desde() == null ? "" : " desde las " + e.desde().format(HHMM);
+            String texto = e.isla() && e.selectorIsla() ? g.nombre() + ": en isla con el selector en Isla" + desde
+                    + ". El generador alimenta solo su parte de la planta (" + nombreRed(g.redAsociada()) + ")."
+                    : e.isla() ? g.nombre() + ": interruptor de la planta abierto, en isla" + desde
+                    + ". El generador alimenta solo su parte de la planta (" + nombreRed(g.redAsociada()) + ")."
+                    : SenalesRed.sinRed(e.estado()) ? g.nombre() + ": sin red según el controlador" + desde + " (" + e.nombre() + ")."
+                    : g.nombre() + ": interruptor de la planta abierto (" + e.nombre() + ").";
+            var icono = VaadinIcon.WARNING.create();
+            icono.setColor("#B8920A");
+            icono.getStyle().set("flex", "none");
+            Span t = new Span(texto);
+            t.getStyle().set("font-weight", "600");
+            Div fila = new Div(icono, t);
+            fila.getStyle().set("display", "flex").set("align-items", "center").set("gap", "8px").set("padding", "2px 0");
+            avisoRed.add(fila);
+        }
+        avisoRed.setVisible(avisoRed.getComponentCount() > 0);
     }
 
     private static String leerRecurso(String ruta) {

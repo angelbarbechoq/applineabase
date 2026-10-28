@@ -1099,6 +1099,110 @@ public class GraficaModel {
     }
 
     /**
+     * Un arranque en el gráfico de Costos de Análisis.
+     *
+     * @param categoria  texto debajo del par (varias líneas con \n): generador, inicio, fin y duración
+     * @param diesel     $ de diésel por kWh consumido en planta
+     * @param partes     $/kWh de la red por franja A..D (costo de la franja / kWh del arranque): apiladas dan el precio
+     *                   medio de la red en ese arranque
+     * @param tipDiesel  tooltip de la columna del diésel; tipFranja, el de cada tramo (texto vacío = sin tramo)
+     * @param factor     "1.9×" sobre el par; dieselMasCaro lo pinta en rojo (si no, en verde)
+     */
+    public record BarraCosto(String categoria, double diesel, double[] partes, String tipDiesel, String[] tipFranja,
+                             String factor, boolean dieselMasCaro) {
+    }
+
+    /**
+     * Costos de Análisis (pedido del usuario el 2026-10-27, sobre la maqueta aprobada): por arranque, una columna del
+     * diésel y al lado la de la red apilada por franja horaria, con el valor arriba de cada columna, la letra de la
+     * franja dentro de cada tramo que entra y el factor diésel / red arriba del par.
+     */
+    public static String getCostoFranjasScript(String containerId, List<BarraCosto> barras, String nombreDiesel, String colorDiesel,
+                                               String[] nombresFranja, String[] coloresFranja) {
+        String[] letras = {"A", "B", "C", "D"};
+        StringBuilder datos = new StringBuilder("[");
+        for (int i = 0; i < barras.size(); i++) {
+            BarraCosto b = barras.get(i);
+            double red = 0;
+            int arriba = -1;
+            for (int k = 0; k < b.partes().length; k++) {
+                red += b.partes()[k];
+                if (b.partes()[k] > 0.0005) arriba = k;
+            }
+            datos.append(i > 0 ? "," : "").append("{ cat: ").append(jsTexto(b.categoria()))
+                    .append(", dz: ").append(b.diesel()).append(", dTxt: ").append(jsTexto(String.format(java.util.Locale.ROOT, "%.3f", b.diesel())))
+                    .append(", tipD: ").append(jsTexto(b.tipDiesel()))
+                    .append(", tope: ").append(Math.max(b.diesel(), red))
+                    .append(", factor: ").append(jsTexto(b.factor())).append(", mas: ").append(b.dieselMasCaro());
+            for (int k = 0; k < letras.length; k++) {
+                double v = k < b.partes().length ? b.partes()[k] : 0;
+                // Campos fa..fd: "d" solo chocaría con el del diésel.
+                datos.append(", f").append(letras[k].toLowerCase(java.util.Locale.ROOT)).append(": ").append(v > 0.0005 ? String.valueOf(v) : "null")
+                        .append(", let").append(letras[k]).append(": ").append(jsTexto(v >= 0.015 ? letras[k] : ""))
+                        .append(", etq").append(letras[k]).append(": ").append(jsTexto(k == arriba ? String.format(java.util.Locale.ROOT, "%.3f", red) : ""))
+                        .append(", tip").append(letras[k]).append(": ").append(jsTexto(k < b.tipFranja().length ? b.tipFranja()[k] : ""));
+            }
+            datos.append(" }");
+        }
+        datos.append("]");
+
+        StringBuilder js = new StringBuilder(scriptInicializarRoot(containerId))
+                .append("var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: false, panY: false, wheelX: 'none', wheelY: 'none', paddingTop: 34, layout: root.verticalLayout }));")
+                .append("var datos = ").append(datos).append(";")
+                .append("var xAxis = chart.xAxes.push(am5xy.CategoryAxis.new(root, { categoryField: 'cat', renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 10, cellStartLocation: 0.11, cellEndLocation: 0.89 }) }));")
+                .append("xAxis.get('renderer').labels.template.setAll({ fontSize: '10.5px', fill: am5.color(0x6B6F80), textAlign: 'center', centerX: am5.p50, oversizedBehavior: 'none' });")
+                .append("xAxis.get('renderer').grid.template.setAll({ strokeOpacity: 0 });")
+                .append("xAxis.data.setAll(datos);")
+                .append("var yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, { min: 0, extraMax: 0.2, renderer: am5xy.AxisRendererY.new(root, {}) }));")
+                .append("yAxis.get('renderer').labels.template.setAll({ fill: am5.color(0x6B6F80), fontSize: '11px' });")
+                .append("yAxis.get('renderer').grid.template.setAll({ stroke: am5.color(0xE4E6EC), strokeWidth: 1 });")
+                .append("yAxis.children.unshift(am5.Label.new(root, { rotation: -90, text: '$/kWh', y: am5.p50, centerX: am5.p50, fontSize: '11px', fill: am5.color(0x6B6F80) }));")
+                .append("var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 10 }));")
+                .append("legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x1E1E2C) });")
+                .append("function columnas(nombre, campo, color, apilada, tip) {")
+                .append("  var s = chart.series.push(am5xy.ColumnSeries.new(root, { name: nombre, xAxis: xAxis, yAxis: yAxis, valueYField: campo, categoryXField: 'cat', stacked: apilada }));")
+                .append("  s.columns.template.setAll({ fill: am5.color(color), stroke: am5.color(0xffffff), strokeWidth: 1, width: am5.percent(92), tooltipText: '{' + tip + '}' });")
+                .append("  s.data.setAll(datos); legend.data.push(s); return s;")
+                .append("}")
+                .append("function etiqueta(s, campo, locY, opciones) {")
+                .append("  s.bullets.push(function(root, serie, item) {")
+                .append("    if (!item.dataContext[campo]) return;")
+                .append("    return am5.Bullet.new(root, { locationY: locY, sprite: am5.Label.new(root, Object.assign({ text: item.dataContext[campo], centerX: am5.p50, fontSize: '10.5px', fontWeight: '600' }, opciones)) });")
+                .append("  });")
+                .append("}")
+                .append("var sd = columnas(").append(jsString(nombreDiesel)).append(", 'dz', ").append(colorDiesel).append(", false, 'tipD');")
+                .append("sd.columns.template.setAll({ cornerRadiusTL: 4, cornerRadiusTR: 4 });")
+                .append("etiqueta(sd, 'dTxt', 1, { centerY: am5.p100, dy: -2, fill: am5.color(0x1E1E2C) });");
+        for (int k = 0; k < letras.length; k++) {
+            js.append("var s").append(k).append(" = columnas(").append(jsString(nombresFranja[k])).append(", 'f")
+                    .append(letras[k].toLowerCase(java.util.Locale.ROOT)).append("', ").append(coloresFranja[k]).append(", ").append(k > 0)
+                    .append(", 'tip").append(letras[k]).append("');")
+                    .append("etiqueta(s").append(k).append(", 'let").append(letras[k]).append("', 0.5, { centerY: am5.p50, fontSize: '10px', fill: am5.color(")
+                    .append(k == 2 ? "0x1D4F9E" : "0xffffff").append(") });")
+                    .append("etiqueta(s").append(k).append(", 'etq").append(letras[k]).append("', 1, { centerY: am5.p100, dy: -2, fill: am5.color(0x1E1E2C) });");
+        }
+        // El factor va en una serie de línea invisible, en el centro de la categoría, a la altura de la columna más alta.
+        js.append("var sf = chart.series.push(am5xy.LineSeries.new(root, { xAxis: xAxis, yAxis: yAxis, valueYField: 'tope', categoryXField: 'cat' }));")
+                .append("sf.strokes.template.setAll({ strokeOpacity: 0 });")
+                .append("sf.bullets.push(function(root, serie, item) {")
+                .append("  var mas = item.dataContext.mas;")
+                .append("  return am5.Bullet.new(root, { locationY: 0.5, sprite: am5.Label.new(root, { text: item.dataContext.factor, centerX: am5.p50, centerY: am5.p100, dy: -30,")
+                .append("    fontSize: '11px', fontWeight: '700', fill: am5.color(mas ? 0xB42330 : 0x1E7A4C), paddingTop: 1, paddingBottom: 1, paddingLeft: 6, paddingRight: 6,")
+                .append("    background: am5.RoundedRectangle.new(root, { fill: am5.color(mas ? 0xFDE6E8 : 0xE3F5EB), cornerRadiusTL: 8, cornerRadiusTR: 8, cornerRadiusBL: 8, cornerRadiusBR: 8 }) }) });")
+                .append("});")
+                .append("sf.data.setAll(datos);")
+                .append("window.am5Charts[id] = { root: root, chart: chart };")
+                .append("chart.appear(600, 50);");
+        return js.toString();
+    }
+
+    /** Texto para JavaScript entre comillas simples, con los saltos de línea escapados. */
+    private static String jsTexto(String valor) {
+        String seguro = valor == null ? "" : valor.replace("\\", "\\\\").replace("'", "\\'").replace("\r", "").replace("\n", "\\n");
+        return "'" + seguro + "'";
+    }
+
+    /**
      * Minuto a minuto de un generador contra su transformador: línea del generador, línea del consumo del
      * transformador (el total) y columnas de la red (positivas = tomado de la red, en azul; negativas = entregado a la
      * red, en verde agua), con marcadores de clic. Donde la línea del generador va por encima de la del consumo, sobra

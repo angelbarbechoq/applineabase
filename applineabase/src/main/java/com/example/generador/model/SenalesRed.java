@@ -14,13 +14,15 @@ import java.util.Set;
  * @param nombres    nombre que da el controlador a cada código (índice = código), para las descripciones
  * @param mcbCerrado interruptor de la planta (MCB) cerrado; {@code gcbCerrado}, el del generador. Los bits que el
  *                   modelo no tiene quedan en null
+ * @param forzarIsla entrada "Force Island" del controlador: el selector de tres posiciones (AMF / sincronismo con la red /
+ *                   isla) en Isla. Con el selector en Isla la isla es a propósito: no abre la alarma urgente de pérdida de red
  * @param limiteSaltoVector ajuste de disparo de la protección de salto de vector (grados) y {@code limiteRocof}, el de
  *                   la ROCOF (Hz/s), copiados de los ajustes del controlador (no los publica por Modbus); null = no se
  *                   conoce y no se compara
  */
 public record SenalesRed(Set<Integer> paralelo, Set<Integer> isla, Set<Integer> fallaRed, Set<Integer> retornoRed,
                          List<String> nombres, Bit mcbCerrado, Bit gcbCerrado, Bit avisoFallaRed, Bit proteccionRed,
-                         Bit saltoVector, Bit rocof, Double limiteSaltoVector, Double limiteRocof) {
+                         Bit saltoVector, Bit rocof, Bit forzarIsla, Double limiteSaltoVector, Double limiteRocof) {
 
     /** Lo que importa del estado de los interruptores. OTRO: sin generador conectado, sincronizando, etc. */
     public enum Estado { PARALELO, ISLA, FALLA_RED, RETORNO_RED, OTRO }

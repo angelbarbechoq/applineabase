@@ -112,6 +112,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     // violeta del segundo generador, azul noche del consumo y del texto, azul de la red y verde azulado de lo exportado.
     // Se distinguen entre sí también con daltonismo (validador de paleta); los claros siempre van con su etiqueta.
     private static final String NARANJA = "0xF29F67", VIOLETA = "0x6F42C1", NOCHE = "0x1E1E2C", AZUL = "0x3B8FF3", AQUA = "0x34B1AA";
+    /** Costos: la columna de la red, apilada por franja horaria; tonos del azul de la red (B, la más cara, el más oscuro). */
+    private static final String[] NOMBRES_FRANJA = {"Red franja A · L-V 08-18", "Red franja B · L-V 18-22",
+            "Red franja C · noche y fin de semana", "Red franja D · S-D-F 18-22"};
+    private static final String[] COLORES_FRANJA = {AZUL, "0x1D4F9E", "0xA9CDF9", "0x6E9FE0"};
     /** Color de cada generador en esta ventana (en el orden de generador-config.json). */
     private static final String[] COLORES_GEN = {NARANJA, VIOLETA, "0xE87BA4", "0xEDA100"};
     private static final String GRIS = "0xA0A6B4";
@@ -203,6 +207,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     // Costos
     private final HorizontalLayout tarjetasCostos = new HorizontalLayout();
     private final Div chartCostos = new Div();
+    private final Div marcoCostos = new Div();
     private final Grid<PeriodoMarcha> costosGrid = new Grid<>();
     private Map<String, CostoCombustible> combustible = Map.of();
     /** Rendimiento (kWh/gal) y precio medio del galón de los arranques del rango con diesel cargado; 0 = sin datos. */
@@ -1609,7 +1614,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         tarjetasCostos.getStyle().set("flex-wrap", "wrap");
         chartCostos.setId(CHART_COSTOS);
         chartCostos.setWidthFull();
-        chartCostos.setHeight("320px");
+        chartCostos.setHeight("460px");
+        // Un par de columnas por arranque, con su etiqueta de 4 líneas: con muchos arranques, barra de desplazamiento.
+        marcoCostos.add(chartCostos);
+        marcoCostos.setWidthFull();
+        marcoCostos.getStyle().set("overflow-x", "auto");
         costosGrid.addColumn(PeriodoMarcha::generador).setHeader("Generador").setAutoWidth(true).setFlexGrow(0).setFrozen(true);
         costosGrid.addColumn(p -> p.nro() == null ? "-" : String.valueOf(p.nro())).setHeader("Nro").setAutoWidth(true).setFlexGrow(0);
         costosGrid.addColumn(p -> p.inicio().format(CORTA)).setHeader("Inicio").setAutoWidth(true).setFlexGrow(0);
@@ -1648,17 +1657,17 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 + (lineaAccessService.esAdmin() ? " (botón Cargar / Editar, o Importar planilla MF13: calcula los galones con la "
                 + "planilla de los operadores y los guarda después de confirmar)" : " (solo el administrador)")
                 + "; al guardarlos aparece su comparación. Consumida en planta = generado - exportado a la red: lo que salió a la red "
-                + "no reemplazo energía de la red ni se paga. Costo equivalente en la red = cada kWh consumido en planta al precio de "
+                + "no reemplazó energía de la red ni se paga. Costo equivalente en la red = cada kWh consumido en planta al precio de "
                 + "la franja horaria (A, B, C o D) de la hora en que se generó, con la tarifa de su mes y los feriados de Consumo por "
                 + "franja horaria. Diésel $/kWh = costo del diésel / kWh consumidos en planta. Relación diésel / red = costo del diésel "
-                + "/ costo equivalente en la red: 2.0 veces = generar costo el doble. Solo se compara energía contra combustible: no "
+                + "/ costo equivalente en la red: 2.0 veces = generar costó el doble. Solo se compara energía contra combustible: no "
                 + "entran el mantenimiento del generador ni los otros cargos de la factura de la red (demanda, comercialización). Las "
                 + "tarjetas de arriba suman solo los arranques con diésel cargado. Exportada a la red sin pago = kWh exportados x "
                 + "costo del diésel por kWh generado.");
 
         VerticalLayout v = new VerticalLayout(descripcion("Cuánto cuesta generar con diésel contra comprar la misma energía a la red, "
                 + "arranque por arranque. El precio de la red es el de la franja horaria de la hora en que se generó cada kWh."),
-                tarjetasCostos, chartCostos);
+                tarjetasCostos, marcoCostos);
         if (lineaAccessService.esAdmin()) v.add(botonPlanilla());
         v.add(costosGrid, nota);
         v.setPadding(false);
@@ -1721,11 +1730,11 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         double galones = 0, costoCargados = 0, horasCargados = 0;
         int cargados = 0;
         Map<String, double[]> rendimiento = new LinkedHashMap<>(); // generador -> {kWh generados, galones}
+        Map<String, double[]> porHora = new LinkedHashMap<>(); // generador -> {galones, horas en marcha}
         // Comparados: además, con costo en la red y algo aprovechado.
         double costoDiesel = 0, costoRed = 0, kwhAprovechado = 0, kwhEntregado = 0, kwhGenerado = 0;
         int comparados = 0;
-        List<String> categorias = new ArrayList<>();
-        List<Double[]> valores = new ArrayList<>();
+        List<GraficaModel.BarraCosto> barras = new ArrayList<>();
         for (int i = periodos.size() - 1; i >= 0; i--) { // del más viejo al más nuevo (orden del gráfico)
             PeriodoMarcha p = periodos.get(i);
             CostoCombustible cc = c(p);
@@ -1734,6 +1743,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             galones += cc.getGalones();
             costoCargados += cc.costo();
             horasCargados += p.horas();
+            double[] h = porHora.computeIfAbsent(p.generador(), k -> new double[2]);
+            h[0] += cc.getGalones();
+            h[1] += p.horas();
             if (p.kwhGenerado() != null) {
                 double[] r = rendimiento.computeIfAbsent(p.generador(), k -> new double[2]);
                 r[0] += p.kwhGenerado();
@@ -1747,8 +1759,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             kwhAprovechado += aprovechado;
             kwhGenerado += p.kwhGenerado();
             kwhEntregado += p.kwhRedExportada() == null ? 0 : p.kwhRedExportada();
-            categorias.add(p.generador() + " " + p.inicio().format(DateTimeFormatter.ofPattern("dd-MM HH:mm")));
-            valores.add(new Double[]{cc.costo() / aprovechado, p.costoRed() / aprovechado});
+            barras.add(barraCosto(p, cc, aprovechado, css(colorGenerador(p.generador()))));
         }
 
         tarjetasCostos.removeAll();
@@ -1785,21 +1796,62 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
             tarjetasCostos.add(tarjeta("Rendimiento", galRend <= 0 ? "-" : String.format(Locale.ROOT, "%.1f kWh/gal", kwhRend / galRend),
                     porGenerador.size() > 1 ? String.join(" · ", porGenerador) + " kWh/gal" : null));
             tarjetasCostos.add(tarjeta("Diésel usado", String.format(Locale.ROOT, "%,.1f gal", galones),
-                    (horasCargados > 0 ? String.format(Locale.ROOT, "%.1f gal/h; ", galones / horasCargados) : "")
-                            + (galones > 0 ? "precio medio " + dinero(costoCargados / galones) + " por galón" : "")));
+                    galones > 0 ? "precio medio " + dinero(costoCargados / galones) + " por galón" : null));
+            // Galones por hora de marcha (con diésel cargado): el de todos arriba y el de cada generador en su renglón.
+            if (horasCargados > 0) {
+                List<String> galHora = new ArrayList<>();
+                porHora.forEach((g, h) -> { if (h[1] > 0) galHora.add(g + String.format(Locale.ROOT, " %.1f gal/h", h[0] / h[1])); });
+                tarjetasCostos.add(tarjeta("Consumo por hora", String.format(Locale.ROOT, "%.1f gal/h", galones / horasCargados),
+                        galHora.size() > 1 ? String.join("\n", galHora) : null));
+            }
         }
 
         if (comparados == 0) {
             scriptCostos = null;
-            chartCostos.setVisible(false);
+            marcoCostos.setVisible(false);
             return;
         }
-        chartCostos.setVisible(true);
+        marcoCostos.setVisible(true);
+        chartCostos.setWidth("max(100%, " + (barras.size() * 64 + 80) + "px)");
         String antes = scriptCostos;
-        scriptCostos = GraficaModel.getBarrasAgrupadasScript(CHART_COSTOS, categorias,
-                new String[]{"Diésel $/kWh consumido en planta", "Red $/kWh (franja de cada hora)"}, new String[]{NARANJA, AZUL},
-                valores, "$/kWh", "#.000");
+        scriptCostos = GraficaModel.getCostoFranjasScript(CHART_COSTOS, barras, "Diésel $/kWh consumido en planta", NARANJA,
+                NOMBRES_FRANJA, COLORES_FRANJA);
         if (tabs.getSelectedTab() == tabCostos) dibujar(scriptCostos, antes);
+    }
+
+    /**
+     * Un arranque del gráfico de Costos: diésel por kWh consumido en planta y, al lado, la red apilada por franja (costo de
+     * la franja / kWh del arranque: apiladas dan el precio medio de la red), con su detalle en el tooltip.
+     */
+    private static GraficaModel.BarraCosto barraCosto(PeriodoMarcha p, CostoCombustible cc, double aprovechado, String colorGen) {
+        DateTimeFormatter diaHora = DateTimeFormatter.ofPattern("dd-MM HH:mm"), hora = DateTimeFormatter.ofPattern("HH:mm");
+        long min = Duration.between(p.inicio(), p.fin()).toMinutes();
+        String fin = p.enCurso() ? "en marcha" : "a " + p.fin().format(p.fin().toLocalDate().equals(p.inicio().toLocalDate()) ? hora : diaHora);
+        // Debajo del par, corto como en el reporte: la fecha de inicio y el generador (dos arranques pueden empezar juntos),
+        // este en su color (el de Transformadores y el resto de Análisis), con el formato de texto de amCharts.
+        String categoria = p.inicio().getDayOfMonth() + " " + MESES[p.inicio().getMonthValue() - 1].substring(0, 3) + " "
+                + p.inicio().format(hora) + "\n[" + colorGen + " bold]" + p.generador() + "[/]";
+        String titulo = p.generador() + " " + p.inicio().format(diaHora) + " " + fin
+                + String.format(Locale.ROOT, " (%d:%02d h)", min / 60, min % 60);
+        double diesel = cc.costo() / aprovechado, red = p.costoRed() / aprovechado;
+        String veces = String.format(Locale.ROOT, "%.1f", diesel / red);
+        String pie = "\nDiésel " + veces + " veces la red";
+        double[] partes = new double[Franja.values().length];
+        String[] tips = new String[partes.length];
+        for (Franja f : Franja.values()) {
+            int i = f.ordinal();
+            double kwh = p.aprovechadoFranja() == null ? 0 : p.aprovechadoFranja()[i];
+            double costo = p.costoRedFranja() == null ? 0 : p.costoRedFranja()[i];
+            partes[i] = costo / aprovechado;
+            tips[i] = titulo + "\nFranja " + f.name() + " (" + f.horario() + "): "
+                    + String.format(Locale.ROOT, "%,.0f kWh (%.0f %%)", kwh, 100 * kwh / aprovechado)
+                    + "\nCosto en la red: " + dinero(costo)
+                    + String.format(Locale.ROOT, "\n%.3f de los %.3f $/kWh de la red", partes[i], red) + pie;
+        }
+        String tipDiesel = titulo + String.format(Locale.ROOT, "\nDiésel: %.3f $/kWh", diesel)
+                + String.format(Locale.ROOT, "\n%,.1f gal x %s = %s / %,.0f kWh", cc.getGalones(), dinero(cc.getPrecioGalon()), dinero(cc.costo()), aprovechado)
+                + String.format(Locale.ROOT, "\nRed: %.3f $/kWh", red) + pie;
+        return new GraficaModel.BarraCosto(categoria, diesel, partes, tipDiesel, tips, veces + "×", diesel > red);
     }
 
     private void abrirDialogoCosto(PeriodoMarcha p) {
@@ -1998,7 +2050,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         VerticalLayout c = new VerticalLayout(t, v);
         if (detalle != null) {
             Span d = new Span(detalle);
-            d.getStyle().set("font-size", "11px").set("color", TEXTO_SUAVE);
+            d.getStyle().set("font-size", "11px").set("color", TEXTO_SUAVE).set("white-space", "pre-line"); // \n = otro renglón
             c.add(d);
         }
         c.setSpacing(false);

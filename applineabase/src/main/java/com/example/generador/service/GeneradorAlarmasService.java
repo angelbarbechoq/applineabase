@@ -95,4 +95,77 @@ public class GeneradorAlarmasService {
             if (ev.isUrgente()) trayNotifier.notificarUrgente(generador, ev.getMensaje());
         }
     }
+
+    // ================= Potencia sobre el límite =================
+
+    /** kW que tiene que bajar del límite para cerrar la alarma: así no se abre y cierra cada minuto cerca del límite. */
+    static final double HISTERESIS_KW = 20;
+
+    /** Máximo de la alarma de potencia abierta de cada generador (para no guardar el mensaje en cada lectura). */
+    private final Map<String, Double> maximoPotencia = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Alarma de potencia alta (pedido del usuario el 28-10-2026, 700 kW): se abre con la primera lectura del controlador
+     * sobre el límite ("alarmaPotenciaKw" de generador-config.json), lleva el máximo y se cierra cuando baja
+     * {@link #HISTERESIS_KW} del límite o el generador para. Evento en el historial al abrir y al cerrar. No urgente.
+     *
+     * @param limite kW; null = sin alarma para el generador (cierra la que hubiera)
+     */
+    public void sincronizarPotencia(String generador, com.example.generador.model.LecturaGenerador l, Double limite) {
+        Double kw = l.kw();
+        if (kw == null) return;
+        List<AlarmaEvento> abiertas = eventoRepository.findByLineaMaquinaAndTipoAlarmaAndActivaTrue(generador, TipoAlarma.POTENCIA_GENERADOR);
+        AlarmaEvento abierta = abiertas.isEmpty() ? null : abiertas.get(0);
+        String lim = limite == null ? "" : String.format(java.util.Locale.ROOT, "%.0f", limite);
+        if (abierta == null) {
+            if (limite == null || kw <= limite) return;
+            AlarmaEvento ev = new AlarmaEvento();
+            ev.setLineaMaquina(generador);
+            ev.setTipoAlarma(TipoAlarma.POTENCIA_GENERADOR);
+            ev.setMensaje(mensajePotencia(generador, lim, kw));
+            ev.setFechaInicio(LocalDateTime.now());
+            ev.setActiva(true);
+            ev.setUrgente(false);
+            eventoRepository.save(ev);
+            maximoPotencia.put(generador, kw);
+            logger.warn("Alarma: {}", ev.getMensaje());
+            historial.registrar(generador, List.of(com.example.generador.model.EventoGenerador.de(l.fecha(),
+                    com.example.generador.model.TipoEventoGenerador.POTENCIA_ALTA,
+                    String.format(java.util.Locale.ROOT, "El generador pasa el límite de %s kW: %.0f kW", lim, kw), l)));
+            return;
+        }
+        // Máximo de la alarma: el guardado en memoria o, si la app se reinició, el que dice el mensaje.
+        double maximo = Math.max(kw, maximoPotencia.getOrDefault(generador, maximoDelMensaje(abierta.getMensaje())));
+        maximoPotencia.put(generador, maximo);
+        if (limite != null && kw > limite - HISTERESIS_KW) {
+            String nuevo = mensajePotencia(generador, lim, maximo);
+            if (!nuevo.equals(abierta.getMensaje())) {
+                abierta.setMensaje(nuevo);
+                eventoRepository.save(abierta);
+            }
+            return;
+        }
+        long min = Math.max(0, Math.round(java.time.Duration.between(abierta.getFechaInicio(), l.fecha()).toSeconds() / 60.0));
+        abierta.setMensaje(String.format(java.util.Locale.ROOT,
+                "Generador %s: potencia sobre el límite de %s kW (resuelta: %.0f kW tras %d min; máximo %.0f kW)",
+                generador, lim.isEmpty() ? "-" : lim, kw, min, maximo));
+        abierta.setActiva(false);
+        abierta.setFechaFin(l.fecha());
+        eventoRepository.save(abierta);
+        maximoPotencia.remove(generador);
+        logger.info("Alarma resuelta: {}", abierta.getMensaje());
+        historial.registrar(generador, List.of(com.example.generador.model.EventoGenerador.de(l.fecha(),
+                com.example.generador.model.TipoEventoGenerador.POTENCIA_NORMAL,
+                String.format(java.util.Locale.ROOT, "La potencia vuelve bajo el límite: %.0f kW tras %d min; máximo %.0f kW", kw, min, maximo), l)));
+    }
+
+    private static String mensajePotencia(String generador, String limite, double maximo) {
+        return String.format(java.util.Locale.ROOT, "Generador %s: potencia sobre el límite de %s kW (máximo %.0f kW)", generador, limite, maximo);
+    }
+
+    /** "(máximo 866 kW)" del mensaje de la alarma; 0 si no está. */
+    private static double maximoDelMensaje(String mensaje) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("máximo (\\d+) kW").matcher(mensaje == null ? "" : mensaje);
+        return m.find() ? Double.parseDouble(m.group(1)) : 0;
+    }
 }

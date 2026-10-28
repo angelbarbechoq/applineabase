@@ -13,7 +13,9 @@ if (!window.UnifilarTransformadores) {
 .ut-tarjeta .v { font-size: 22px; font-weight: 700; margin: 2px 0; font-variant-numeric: tabular-nums; }
 .ut-tarjeta .d { font-size: 12px; color: #6C7383; min-height: 17px; }
 .ut-caja { background: #fff; border: 1px solid #E4E6EC; border-radius: 12px; padding: 12px 16px; min-width: 0; }
-.ut-caja h2 { font-size: 15px; margin: 0 0 6px; }
+.ut-aviso { background: #FDF6DC; color: #7A5E00; border: 2px solid #E0B50F; border-radius: 8px; padding: 8px 12px; display: grid; gap: 4px; }
+.ut-aviso-linea { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.ut-aviso-linea svg { flex: none; }
 .ut-esquema { overflow-x: auto; }
 .ut-esquema svg { display: block; width: 100%; min-width: 900px; max-width: 1400px; margin: 0 auto; height: auto; }
 .ut svg text { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #1E1E2C; }
@@ -37,13 +39,16 @@ if (!window.UnifilarTransformadores) {
     const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const texto = (x, y, t, extra) => `<text x="${x}" y="${y}" ${extra || ""}>${esc(t)}</text>`;
 
-    // Tramo de energia de (x1,y1) a (x2,y2) en el sentido del flujo: cable animado del color del origen y una flecha.
+    // Tramo de energia de (x1,y1) a (x2,y2) en el sentido del flujo: cable animado del color del origen y una flecha
+    // (flecha = false: solo el cable animado).
     function tramo(x1, y1, x2, y2, color, activo, flecha) {
       if (!activo) return "";
       if (typeof activo === "number" && Math.abs(activo) < 1) return "";
+      const cable = `<path class="ut-flujo" stroke="${color}" d="M${x1} ${y1} L${x2} ${y2}"/>`;
+      if (flecha === false) return cable;
       const [fx, fy] = flecha || [(x1 + x2) / 2, (y1 + y2) / 2];
       const giro = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI - 90;
-      return `<path class="ut-flujo" stroke="${color}" d="M${x1} ${y1} L${x2} ${y2}"/>`
+      return cable
         + `<path d="M-11,-9 L11,-9 L0,10 Z" transform="translate(${fx} ${fy}) rotate(${giro})" fill="${color}" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>`;
     }
 
@@ -63,6 +68,12 @@ if (!window.UnifilarTransformadores) {
     function iconoAlarma(x, y) {
       return `<g transform="translate(${x} ${y})"><path d="M11 1 L21 19 H1 Z" fill="#fff" stroke="${ROJO}" stroke-width="2" stroke-linejoin="round"/>`
         + `<rect x="10" y="7" width="2" height="6" fill="${ROJO}"/><rect x="10" y="15" width="2" height="2" fill="${ROJO}"/></g>`;
+    }
+
+    // Advertencia amarilla: interruptor de la planta abierto.
+    function iconoAdvertencia(x, y) {
+      return `<g transform="translate(${x} ${y})"><path d="M11 1 L21 19 H1 Z" fill="#FFD43B" stroke="#B8920A" stroke-width="1.5" stroke-linejoin="round"/>`
+        + `<rect x="10" y="7" width="2" height="6" fill="#1E1E2C"/><rect x="10" y="15" width="2" height="2" fill="#1E1E2C"/></g>`;
     }
 
     function tarjeta(titulo, valor, detalle, color) {
@@ -140,8 +151,24 @@ if (!window.UnifilarTransformadores) {
         s += `<circle cx="${x}" cy="270" r="16" fill="#fff" stroke="#1E1E2C" stroke-width="2"/><circle cx="${x}" cy="292" r="16" fill="#fff" stroke="#1E1E2C" stroke-width="2"/>`;
         s += texto(x + 26, 286, t.nombre, 'font-weight="700" font-size="15"');
         // El medidor del transformador esta en baja tension: entre el transformador y su barra, con sus valores al lado.
-        s += `<path class="ut-cable" d="M${x} 308 V390"/>`;
-        s += baja ? tramo(x, 308, x, 390, colorT, m.kw, [x, 377]) : tramo(x, 390, x, 308, colorT, m.kw, [x, 377]);
+        // Debajo del medidor, en el mismo cable, el interruptor de la planta (MCB) segun el controlador del generador:
+        // cerrado = cuadro verde lleno; abierto = cuadro rojo con la cuchilla levantada, cable cortado y advertencia amarilla.
+        const abierto = t.generadores.some(g => g.mcbAbierto === true), conMcb = t.generadores.some(g => g.mcbAbierto != null);
+        if (!conMcb) {
+          s += `<path class="ut-cable" d="M${x} 308 V390"/>`;
+          s += baja ? tramo(x, 308, x, 390, colorT, m.kw, [x, 377]) : tramo(x, 390, x, 308, colorT, m.kw, [x, 377]);
+        } else if (!abierto) {
+          s += `<path class="ut-cable" d="M${x} 308 V390"/>`;
+          s += baja ? tramo(x, 308, x, 390, colorT, m.kw, false) : tramo(x, 390, x, 308, colorT, m.kw, false);
+          s += `<rect x="${x - 7}" y="361" width="14" height="14" rx="2" fill="${VERDE}"/>`;
+        } else {
+          s += `<path class="ut-cable" d="M${x} 308 V361"/>`;
+          s += `<rect x="${x - 9}" y="359" width="18" height="18" rx="2" fill="#fff" stroke="${ROJO}" stroke-width="2.5"/>`;
+          s += `<line x1="${x - 5}" y1="374" x2="${x + 6}" y2="361" stroke="${ROJO}" stroke-width="2.5" stroke-linecap="round"/>`;
+          s += `<path d="M${x} 377 V389" stroke="${ROJO}" stroke-width="3" stroke-dasharray="3 3"/>`;
+          s += iconoAdvertencia(izq ? x + 16 : x - 38, 357);
+          s += texto(izq ? x + 42 : x - 44, 372, "abierto", `${izq ? "" : 'text-anchor="end" '}font-size="12" font-weight="700" style="fill:${ROJO}"`);
+        }
         s += `<circle cx="${x}" cy="340" r="15" fill="#fff" stroke="#1E1E2C" stroke-width="2"/>`;
         s += texto(x, 345, "M", 'text-anchor="middle" font-weight="700" font-size="13"');
         const lx = izq ? x - 24 : x + 24, anc = izq ? 'text-anchor="end" ' : "";
@@ -163,8 +190,8 @@ if (!window.UnifilarTransformadores) {
           // Con alarmas en el controlador, solo el icono de advertencia en rojo (sin detallar cuales).
           if (conAlarma) s += iconoAlarma(gx + 30, 446);
           s += texto(gx, 520, g.nombre, 'text-anchor="middle" font-weight="700"');
-          const estado = e.texto + (marcha && g.pf != null ? " · FP " + g.pf.toFixed(2) : "") + (marcha && g.voltios != null ? " · " + voltios(g.voltios) : "");
-          s += texto(gx, 538, estado, `text-anchor="middle" font-size="12" font-weight="600" fill="${e.falla ? ROJO : "#1F7A4D"}"`);
+          const estado = (g.isla ? "EN ISLA" : e.texto) + (marcha && g.pf != null ? " · FP " + g.pf.toFixed(2) : "") + (marcha && g.voltios != null ? " · " + voltios(g.voltios) : "");
+          s += texto(gx, 538, estado, `text-anchor="middle" font-size="12" font-weight="600" style="fill:${e.falla ? ROJO : g.isla ? "#B8920A" : "#1F7A4D"}"`);
           if (marcha) {
             s += texto(gx, 560, "aporta " + (g.aporte == null ? kw(g.kw) : n0(g.aporte) + " kW"), `text-anchor="middle" class="valor" fill="${g.color}"`);
             if (g.pct != null) s += texto(gx, 578, pct(g.pct) + " de la planta", 'text-anchor="middle" class="chico"');
@@ -195,6 +222,21 @@ if (!window.UnifilarTransformadores) {
       return `<div class="ut-leyenda">${h}<span style="--c:${MAQUINAS}">Máquinas</span></div>`;
     }
 
+    // Franja amarilla arriba, solo mientras el interruptor de la planta de algun generador esta abierto.
+    function aviso(d) {
+      let h = "";
+      d.transformadores.forEach(t => t.generadores.forEach(g => {
+        if (g.mcbAbierto !== true) return;
+        const txt = g.isla && g.selectorIsla
+          ? `${g.nombre}: en isla con el selector en Isla${g.islaDesde ? " desde las " + g.islaDesde : ""}. El generador alimenta solo su parte de la planta (${t.nombre}).`
+          : g.isla
+          ? `${g.nombre}: interruptor de la planta abierto, en isla${g.islaDesde ? " desde las " + g.islaDesde : ""}. El generador alimenta solo su parte de la planta (${t.nombre}).`
+          : `${g.nombre}: interruptor de la planta abierto (${t.nombre}).`;
+        h += `<div class="ut-aviso-linea"><svg width="22" height="20" viewBox="0 0 22 20">${iconoAdvertencia(0, 0)}</svg>${esc(txt)}</div>`;
+      }));
+      return h ? `<div class="ut-aviso">${h}</div>` : "";
+    }
+
     function render(el, d) {
       if (!document.getElementById("ut-estilos")) {
         const st = document.createElement("style");
@@ -208,7 +250,7 @@ if (!window.UnifilarTransformadores) {
         let espera;
         window.addEventListener("resize", () => { clearTimeout(espera); espera = setTimeout(() => ajustar(el), 150); });
       }
-      el.innerHTML = `<div class="ut">${tarjetas(d)}<section class="ut-caja"><h2>Diagrama unifilar</h2>`
+      el.innerHTML = `<div class="ut">${aviso(d)}${tarjetas(d)}<section class="ut-caja">`
         + `<div class="ut-esquema">${esquema(d)}</div>${leyenda(d)}</section></div>`;
       ajustar(el);
     }

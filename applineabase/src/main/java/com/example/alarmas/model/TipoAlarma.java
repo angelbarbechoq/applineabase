@@ -20,10 +20,15 @@ public enum TipoAlarma {
      * Pérdida de red según el controlador de un generador: falla de red, isla o retorno de red
      * (RedControladorService). No se configura; urgente, abierta mientras dure.
      */
-    PERDIDA_RED;
+    PERDIDA_RED,
+    /**
+     * Potencia de un generador sobre el límite de generador-config.json ("alarmaPotenciaKw" de cada generador), según
+     * su controlador (GeneradorAlarmasService). Abierta mientras dure; no urgente.
+     */
+    POTENCIA_GENERADOR;
 
     /** Alarmas de los generadores: no se configuran y las ve quien tiene "Ver Generadores". */
     public boolean deGenerador() {
-        return this == ALARMA_GENERADOR || this == PERDIDA_RED;
+        return this == ALARMA_GENERADOR || this == PERDIDA_RED || this == POTENCIA_GENERADOR;
     }
 }

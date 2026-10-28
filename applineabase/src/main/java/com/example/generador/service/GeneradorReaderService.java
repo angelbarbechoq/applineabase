@@ -101,6 +101,11 @@ public class GeneradorReaderService {
             } catch (Exception e) {
                 logger.error("Generador {}: error pasando sus alarmas a Alarmas Activas: {}", g.nombre(), e.getMessage(), e);
             }
+            try {
+                alarmas.sincronizarPotencia(g.nombre(), l, config.limitePotenciaKw(g.nombre()));
+            } catch (Exception e) {
+                logger.error("Generador {}: error con la alarma de potencia: {}", g.nombre(), e.getMessage(), e);
+            }
             if (modelo.get().red() != null) {
                 try {
                     red.procesar(g.nombre(), modelo.get().red(), l);

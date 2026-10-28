@@ -181,6 +181,10 @@ public class TransformadoresView extends VerticalLayout implements BeforeEnterOb
                 mg.put("listo", g.listo());
                 mg.put("alarmas", g.alarmas());
                 mg.put("voltios", g.voltios());
+                mg.put("mcbAbierto", g.mcbAbierto());
+                mg.put("isla", g.isla());
+                mg.put("selectorIsla", g.selectorIsla());
+                mg.put("islaDesde", g.islaDesde() == null ? null : g.islaDesde().format(DateTimeFormatter.ofPattern("HH:mm")));
                 if (g.estado() == EstadoGenerador.EN_MARCHA && g.kw() != null) {
                     kwGeneradores += g.kw();
                     if (conPrincipal) {

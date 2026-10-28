@@ -28,6 +28,14 @@ public enum TipoEventoGenerador {
      * (RedControladorService); si no, lo detecta IslaService con lo guardado (medidor del transformador en 0).
      */
     ISLA("Paso a isla", Nivel.FALLA),
+    /** Paso a isla con el selector del controlador en Isla (entrada Force Island): a propósito, sin alarma urgente. */
+    ISLA_SELECTOR("Paso a isla con el selector", Nivel.AVISO),
+    /** Selector de tres posiciones del controlador (AMF / sincronismo con la red / isla), entrada Force Island. */
+    SELECTOR_ISLA("Selector en Isla", Nivel.AVISO),
+    SELECTOR_FUERA_ISLA("Selector fuera de Isla", Nivel.NORMAL),
+    /** Potencia sobre el límite de generador-config.json (alarmaPotenciaKw) y su vuelta por debajo. */
+    POTENCIA_ALTA("Potencia sobre el límite", Nivel.AVISO),
+    POTENCIA_NORMAL("Potencia vuelve bajo el límite", Nivel.BUENO),
     FIN_ISLA("Vuelve a paralelo", Nivel.BUENO),
     // Señales de red del controlador (modelos con "red" en generador-modelos.json, RedControladorService).
     /** El interruptor de la planta (MCB) según la entrada MCB Feedback del controlador. */

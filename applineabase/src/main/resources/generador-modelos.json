@@ -77,6 +77,7 @@
         "nombres" : [ "Init", "BrksOff", "IslOper", "MainsOper", "ParalOper", "RevSync", "Synchro", "MainsFlt", "ValidFlt", "MainsRet", "MultIslOp", "MultParOp", "EmergMan" ]
       },
       "mcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 1 },
+      "forzarIsla" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 2 },
       "gcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 0 },
       "avisoFallaRed" : { "parametro" : "AVISOS_RED", "bit" : 8 }
     },
@@ -155,6 +156,7 @@
         "nombres" : [ "Init", "BrksOff", "IslOper", "MainsOper", "ParalOper", "RevSync", "Synchro", "MainsFlt", "ValidFlt", "MainsRet", "MultIslOp", "MultParOp", "EmergMan", "StrUpSync" ]
       },
       "mcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 1 },
+      "forzarIsla" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 5 },
       "gcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 2 },
       "avisoFallaRed" : { "parametro" : "AVISOS_RED", "bit" : 4 },
       "proteccionRed" : { "parametro" : "AVISOS_RED", "bit" : 15 },

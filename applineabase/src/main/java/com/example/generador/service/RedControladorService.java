@@ -31,6 +31,9 @@ import static com.example.generador.model.TipoEventoGenerador.*;
  *   paralelo pasan la mitad del ajuste de disparo y, al salir de paralelo, los máximos de esa marcha;
  * - alarma "Pérdida de red" (Alarmas Activas, aviso del navegador y globo de Windows en la PC de la app): abierta
  *   mientras el controlador esté sin red, se cierra sola al volver.
+ * - selector de tres posiciones del controlador (AMF / sincronismo con la red / isla, entrada Force Island): con el
+ *   selector en Isla la isla es a propósito ("Paso a isla con el selector") y no se abre la alarma, tampoco si después
+ *   corta la empresa eléctrica (pedido del usuario el 28-10-2026; base de la sirena física que se agregará).
  * Las protecciones de red actúan en menos de 1 s: con una lectura por minuto casi nunca se ven activas, por eso se usan
  * los máximos que guarda el controlador. El Caterpillar los reinicia cada vez que entra en paralelo y después suben solos
  * con la red normal (25 y 26-10-2026: 0,2 a 1,1 grados y 0,17 a 0,46 Hz/s, con ajustes de 10 grados y 1,30 Hz/s): por eso
@@ -44,7 +47,13 @@ public class RedControladorService {
     private static final Logger logger = LoggerFactory.getLogger(RedControladorService.class);
 
     /** Estado de los interruptores según la última lectura y desde cuándo está así (null si el modelo no lo da). */
-    public record EstadoActual(Estado estado, String nombre, LocalDateTime desde) {
+    /**
+     * @param isla generador con carga y el interruptor de la planta abierto (cualquier estado sin red: también MainsRet,
+     *             que el controlador usa después de abrir por una protección de red mientras espera para volver)
+     * @param mcb  interruptor de la planta cerrado según la entrada MCB Feedback (null si el modelo no la tiene)
+     * @param selectorIsla selector de tres posiciones del controlador en Isla (entrada Force Island): isla a propósito
+     */
+    public record EstadoActual(Estado estado, String nombre, LocalDateTime desde, boolean isla, Boolean mcb, boolean selectorIsla) {
     }
 
     /** Lo visto en la lectura anterior de cada generador. */
@@ -52,8 +61,9 @@ public class RedControladorService {
         Estado estado;
         String nombre;
         LocalDateTime desde;
-        Boolean mcb;
+        Boolean mcb, selectorIsla;
         boolean rocofActiva, saltoVectorActivo;
+        boolean enIsla;
         // Marcha en paralelo en curso: máximos vistos, si ya se avisó cada uno y desde cuándo (null = la app empezó a
         // leer con la marcha ya en paralelo).
         Double rocofMarcha, saltoMarcha;
@@ -79,7 +89,8 @@ public class RedControladorService {
     /** Estado de los interruptores del generador según la última lectura de fondo (null = todavía no se leyó). */
     public EstadoActual estadoActual(String generador) {
         Previo p = previos.get(generador);
-        return p == null || p.estado == null ? null : new EstadoActual(p.estado, p.nombre, p.desde);
+        return p == null || p.estado == null ? null : new EstadoActual(p.estado, p.nombre, p.desde, p.enIsla, p.mcb,
+                Boolean.TRUE.equals(p.selectorIsla));
     }
 
     /** Compara la lectura con la anterior: eventos de red y alarma de pérdida de red. */
@@ -93,6 +104,13 @@ public class RedControladorService {
         boolean saltoActivo = Boolean.TRUE.equals(SenalesRed.valor(red.saltoVector(), l));
         Double rocofMax = l.valor(ParametroGenerador.ROCOF_MAX), saltoMax = l.valor(ParametroGenerador.SALTO_VECTOR_MAX);
         Boolean sinRed = red.sinRed(l);
+        // Selector del controlador en Isla (entrada Force Island): la isla es a propósito, no abre la alarma urgente.
+        Boolean selector = SenalesRed.valor(red.forzarIsla(), l);
+        boolean selectorIsla = Boolean.TRUE.equals(selector);
+        // Isla: sin red con el interruptor de la planta abierto y el generador con carga. El 27-10-2026 el Caterpillar abrió
+        // por ROCOF y quedó 6 min en MainsRet (9), alimentando solo su parte de la planta: también es isla.
+        boolean isla = estado != null && SenalesRed.sinRed(estado) && !Boolean.TRUE.equals(mcb)
+                && l.kw() != null && l.kw() >= GeneradorAnalisisService.KW_VACIO;
 
         List<EventoGenerador> eventos = new ArrayList<>();
         Previo p = previos.get(generador);
@@ -103,12 +121,14 @@ public class RedControladorService {
             // Al iniciar la lectura: si ya estaba sin red, se anota (y la alarma abierta de antes da la hora de comienzo).
             p.desde = Boolean.TRUE.equals(sinRed) && abierta != null ? abierta.getFechaInicio() : t;
             if (estado != null && SenalesRed.sinRed(estado)) {
-                eventos.add(EventoGenerador.de(t, tipoDe(estado), textoEstado(estado, nombre) + detalle(red, l)
+                eventos.add(isla ? EventoGenerador.de(t, selectorIsla ? ISLA_SELECTOR : ISLA, (selectorIsla ? textoIslaSelector(nombre)
+                        : textoIsla(red, l, nombre)) + " (ya estaba al iniciar la lectura)", l)
+                        : EventoGenerador.de(t, tipoDe(estado), textoEstado(estado, nombre) + detalle(red, l)
                         + " (ya estaba al iniciar la lectura)", l));
             }
         } else {
             if (estado != null && p.estado != null && estado != p.estado) {
-                EventoGenerador ev = cambioDeEstado(red, l, p, estado, nombre);
+                EventoGenerador ev = cambioDeEstado(red, l, p, estado, nombre, isla, selectorIsla);
                 if (ev != null) eventos.add(ev);
             }
             if (estado != null && estado != p.estado) p.desde = t;
@@ -116,6 +136,11 @@ public class RedControladorService {
                 eventos.add(EventoGenerador.de(t, mcb ? INTERRUPTOR_RED_CERRADO : INTERRUPTOR_RED_ABIERTO, mcb
                         ? "El controlador ve cerrado el interruptor de la planta (MCB Feedback); estado " + nombre
                         : "El controlador ve abierto el interruptor de la planta (MCB Feedback); estado " + nombre + detalle(red, l), l));
+            }
+            if (selector != null && p.selectorIsla != null && !selector.equals(p.selectorIsla)) {
+                eventos.add(EventoGenerador.de(t, selector ? SELECTOR_ISLA : SELECTOR_FUERA_ISLA, selector
+                        ? "El selector del controlador pasa a Isla (entrada Force Island); estado " + nombre
+                        : "El selector del controlador sale de Isla (entrada Force Island); estado " + nombre, l));
             }
             if (rocofActiva && !p.rocofActiva) {
                 eventos.add(EventoGenerador.de(t, PROTECCION_RED, "ROCOF activa en la lectura" + rocof(l), l));
@@ -130,10 +155,16 @@ public class RedControladorService {
             p.nombre = nombre;
         }
         if (mcb != null) p.mcb = mcb;
+        if (selector != null) p.selectorIsla = selector;
         p.rocofActiva = rocofActiva;
         p.saltoVectorActivo = saltoActivo;
+        boolean eraIsla = p.enIsla;
+        p.enIsla = isla;
         historial.registrar(generador, eventos);
-        if (sinRed != null) sincronizarAlarma(generador, abierta, sinRed, red, l, estado, nombre);
+        // Con el selector en Isla no se abre la alarma (isla a propósito, y el corte de la empresa eléctrica que llega con la
+        // planta ya en isla); una que ya estaba abierta sigue hasta que vuelva la red.
+        if (sinRed != null) sincronizarAlarma(generador, abierta, sinRed && (abierta != null || !selectorIsla), red, l, estado, nombre,
+                isla || eraIsla && Boolean.TRUE.equals(sinRed));
     }
 
     /**
@@ -150,6 +181,9 @@ public class RedControladorService {
             p.rocofMarcha = p.saltoMarcha = null;
             p.avisoRocof = p.avisoSalto = false;
             p.inicioParalelo = p.estado == null ? null : l.fecha(); // sin lectura anterior: la marcha ya estaba en curso
+            // Al volver a paralelo la primera lectura todavía puede traer el máximo de antes (27-10: 0,89 Hz/s de la isla,
+            // aviso falso): se empieza a contar desde la lectura siguiente.
+            if (p.estado != null) return;
         }
         p.rocofMarcha = mayor(p.rocofMarcha, rocofMax);
         p.saltoMarcha = mayor(p.saltoMarcha, saltoMax);
@@ -207,13 +241,25 @@ public class RedControladorService {
     }
 
     /** Evento por el cambio de estado de los interruptores; null si no interesa (arranque o parada normal). */
-    private static EventoGenerador cambioDeEstado(SenalesRed red, LecturaGenerador l, Previo p, Estado estado, String nombre) {
+    private static EventoGenerador cambioDeEstado(SenalesRed red, LecturaGenerador l, Previo p, Estado estado, String nombre,
+                                                  boolean isla, boolean selectorIsla) {
         LocalDateTime t = l.fecha();
         if (SenalesRed.sinRed(estado)) {
+            // De paralelo a isla (también si el controlador pasa directo a MainsRet tras abrir por una protección de red).
+            if (isla && !p.enIsla) return selectorIsla ? EventoGenerador.de(t, ISLA_SELECTOR, textoIslaSelector(nombre), l)
+                    : EventoGenerador.de(t, ISLA, textoIsla(red, l, nombre), l);
+            if (isla) {
+                // Sigue en isla: solo interesan el corte de la empresa eléctrica y la vuelta de la red.
+                if (estado == Estado.FALLA_RED) return EventoGenerador.de(t, FALLA_RED, "Se cortó la red con el generador ya en isla ("
+                        + nombre + ")" + (selectorIsla ? ", selector en Isla" : "") + detalle(red, l), l);
+                if (p.estado == Estado.FALLA_RED) return EventoGenerador.de(t, RETORNO_RED, "Volvió la red con el generador en isla ("
+                        + nombre + ")" + (selectorIsla ? "; con el selector en Isla sigue en isla hasta pasarlo a sincronismo" : ""), l);
+                return null;
+            }
             return EventoGenerador.de(t, tipoDe(estado), textoEstado(estado, nombre) + detalle(red, l), l);
         }
         if (!SenalesRed.sinRed(p.estado)) return null;
-        String tras = " tras " + duracion(p.desde, t) + " sin red";
+        String tras = " tras " + duracion(p.desde, t) + (p.enIsla ? " en isla" : " sin red");
         return estado == Estado.PARALELO
                 ? EventoGenerador.de(t, FIN_ISLA, "Vuelve a paralelo con la red según el controlador (" + nombre + ")" + tras, l)
                 : EventoGenerador.de(t, RETORNO_RED, "La red ya no figura en falla según el controlador: estado " + nombre + tras, l);
@@ -234,6 +280,31 @@ public class RedControladorService {
             case RETORNO_RED -> "Retorno de red según el controlador (" + nombre + "): espera o sincroniza para volver a paralelo";
             default -> "Falla de red según el controlador (" + nombre + ")";
         };
+    }
+
+    /**
+     * Paso a isla: qué pasó, por qué abrió si se sabe (máximo de ROCOF o de salto de vector en o sobre su ajuste de
+     * disparo) y el detalle de las señales.
+     */
+    private static String textoIsla(SenalesRed red, LecturaGenerador l, String nombre) {
+        StringBuilder sb = new StringBuilder("Se abrió el interruptor de la planta y el generador alimenta solo su parte de la planta (")
+                .append(nombre).append(")");
+        Double rocofMax = l.valor(ParametroGenerador.ROCOF_MAX), saltoMax = l.valor(ParametroGenerador.SALTO_VECTOR_MAX);
+        if (rocofMax != null && red.limiteRocof() != null && rocofMax >= red.limiteRocof()) {
+            sb.append(String.format(Locale.ROOT, "; abrió por ROCOF: %.2f Hz/s con ajuste de disparo de %s Hz/s",
+                    rocofMax, numero(red.limiteRocof())));
+        }
+        if (saltoMax != null && red.limiteSaltoVector() != null && saltoMax >= red.limiteSaltoVector()) {
+            sb.append(String.format(Locale.ROOT, "; abrió por salto de vector: %.1f grados con ajuste de disparo de %s grados",
+                    saltoMax, numero(red.limiteSaltoVector())));
+        }
+        return sb.append(detalle(red, l)).toString();
+    }
+
+    /** Paso a isla a propósito, con el selector del controlador en Isla. */
+    private static String textoIslaSelector(String nombre) {
+        return "Paso a isla con el selector en Isla: se abrió el interruptor de la planta y el generador alimenta solo su parte"
+                + " de la planta (" + nombre + ")";
     }
 
     /** Lo que se sabe además: interruptores, avisos de red y máximos del controlador. */
@@ -274,11 +345,14 @@ public class RedControladorService {
      * cierra al volver. Si la app se reinició con la alarma abierta, se sigue con la misma.
      */
     private void sincronizarAlarma(String generador, AlarmaEvento abierta, boolean sinRed, SenalesRed red, LecturaGenerador l,
-                                   Estado estado, String nombre) {
+                                   Estado estado, String nombre, boolean isla) {
         if (sinRed) {
             // Corto: el mensaje de la alarma tiene lugar para 255 caracteres (el detalle completo va al historial).
             Boolean mcb = SenalesRed.valor(red.mcbCerrado(), l);
-            String mensaje = corto("Generador " + generador + ": perdida de red, " + switch (estado == null ? Estado.ISLA : estado) {
+            String mensaje = corto(isla
+                    ? "Generador " + generador + ": en isla, se abrió el interruptor de la planta y el generador alimenta solo su parte"
+                    + " de la planta" + (estado == null ? "" : " (" + nombre + ")")
+                    : "Generador " + generador + ": pérdida de red, " + switch (estado == null ? Estado.ISLA : estado) {
                 case ISLA -> "el generador alimenta solo su parte de la planta";
                 case RETORNO_RED -> "volvió la red y el controlador espera para volver a paralelo";
                 default -> "el controlador indica falla de red";
@@ -301,7 +375,7 @@ public class RedControladorService {
                 eventoRepository.save(abierta);
             }
         } else if (abierta != null) {
-            abierta.setMensaje(corto("Generador " + generador + ": perdida de red (resuelta: "
+            abierta.setMensaje(corto("Generador " + generador + ": pérdida de red (resuelta: "
                     + (estado == Estado.PARALELO ? "vuelve a paralelo con la red" : "la red ya no figura en falla, estado " + nombre)
                     + ", tras " + duracion(abierta.getFechaInicio(), l.fecha()) + ")"));
             abierta.setActiva(false);

@@ -330,6 +330,7 @@ public class GeneradorAnalisisService {
      *                         hora en que se generaron; null si las lecturas del generador no alcanzan para repartirlos
      * @param costoRed         lo que habría costado lo aprovechado comprado a la red, con el precio de la franja de cada
      *                         hora y la tarifa de su mes (Consumo por franja horaria); null sin reparto o sin tarifa
+     * @param costoRedFranja   costoRed separado por franja A..D (suma costoRed); null cuando costoRed es null
      * @param horometroInicio  horas de marcha del controlador al arrancar; horometroFin, al parar (null si sigue en marcha)
      */
     public record PeriodoMarcha(String generador, String red, long arranqueId, Integer nro, LocalDateTime inicio,
@@ -337,7 +338,8 @@ public class GeneradorAnalisisService {
                                 Double kwhGenerado, Double kwhRedImportada, Double kwhRedExportada, Double kwMax,
                                 double minParalelo, double minIsla, double minVacio,
                                 int lecturasTomando, int lecturasRed, Double picoTomadoKw,
-                                double[] aprovechadoFranja, Double costoRed, Double horometroInicio, Double horometroFin) {
+                                double[] aprovechadoFranja, Double costoRed, double[] costoRedFranja,
+                                Double horometroInicio, Double horometroFin) {
 
         /** $/kWh medio de la red en las horas en que trabajó el generador. */
         public Double precioRedMedio() {
@@ -463,6 +465,7 @@ public class GeneradorAnalisisService {
                 // El total del arranque manda (contador del controlador al inicio y al fin): el reparto se escala a ese total.
                 double[] aprovechadoFranja = null;
                 Double costoRed = null;
+                double[] costoRedFranja = null;
                 Reparto rg = repartir(kwhGen, a.inicio(), f, KW_MAX_GENERADOR, especial, tarifaDe);
                 if (generado != null && rg.total() > 0) {
                     Reparto re = repartir(exportada, a.inicio(), f, KW_MAX_RED, especial, tarifaDe);
@@ -476,11 +479,22 @@ public class GeneradorAnalisisService {
                     if (suma > 0) {
                         for (int i = 0; i < aprovechadoFranja.length; i++) aprovechadoFranja[i] *= aprovechado / suma;
                     }
-                    if (!rg.sinTarifa() && !re.sinTarifa()) costoRed = Math.max(0, rg.costo() * escala - re.costo());
+                    if (!rg.sinTarifa() && !re.sinTarifa()) {
+                        costoRed = Math.max(0, rg.costo() * escala - re.costo());
+                        // Mismo cálculo por franja, ajustado para que las cuatro sumen costoRed.
+                        costoRedFranja = new double[rg.kwh().length];
+                        for (int i = 0; i < costoRedFranja.length; i++) {
+                            costoRedFranja[i] = Math.max(0, rg.costoFranja()[i] * escala - re.costoFranja()[i]);
+                        }
+                        double sumaCosto = Arrays.stream(costoRedFranja).sum();
+                        for (int i = 0; i < costoRedFranja.length; i++) {
+                            costoRedFranja[i] = sumaCosto > 0 ? costoRedFranja[i] * costoRed / sumaCosto : 0;
+                        }
+                    }
                 }
                 lista.add(new PeriodoMarcha(g.nombre(), g.redAsociada(), a.id(), a.arranqueNro(), a.inicio(), f, a.fin() == null,
                         a.inicioEstimado(), generado, deltaEnVentana(importada, a.inicio(), f, KW_MAX_RED),
-                        exportado, kwMax, min[0], min[1], min[2], tomando, lecturasRed, pico, aprovechadoFranja, costoRed,
+                        exportado, kwMax, min[0], min[1], min[2], tomando, lecturasRed, pico, aprovechadoFranja, costoRed, costoRedFranja,
                         a.horasInicio(), a.horasFin()));
             }
         }
@@ -830,8 +844,8 @@ public class GeneradorAnalisisService {
         return cubierto ? total : null;
     }
 
-    /** Lo que sumó un contador en una ventana, por franja horaria (A..D), y su valor con la tarifa de la red. */
-    record Reparto(double[] kwh, double costo, boolean sinTarifa) {
+    /** Lo que sumó un contador en una ventana, por franja horaria (A..D), y su valor con la tarifa de la red (total y por franja). */
+    record Reparto(double[] kwh, double costo, double[] costoFranja, boolean sinTarifa) {
         double total() {
             return Arrays.stream(kwh).sum();
         }
@@ -845,11 +859,12 @@ public class GeneradorAnalisisService {
     static Reparto repartir(TreeMap<LocalDateTime, Double> serie, LocalDateTime ini, LocalDateTime fin, double kwMax,
                             Predicate<LocalDate> diaEspecial, Function<YearMonth, TarifaDelMes> tarifaDe) {
         double[] kwh = new double[Franja.values().length];
+        double[] costoFranja = new double[kwh.length];
         double costo = 0;
         boolean sinTarifa = false;
         Map.Entry<LocalDateTime, Double> a = serie.floorEntry(ini);
         if (a == null) a = serie.ceilingEntry(ini);
-        if (a == null || a.getKey().isAfter(fin)) return new Reparto(kwh, 0, false);
+        if (a == null || a.getKey().isAfter(fin)) return new Reparto(kwh, 0, costoFranja, false);
         for (Map.Entry<LocalDateTime, Double> b : serie.tailMap(a.getKey(), false).entrySet()) {
             long tramo = Duration.between(a.getKey(), b.getKey()).toSeconds();
             LocalDateTime desdeAdentro = a.getKey().isAfter(ini) ? a.getKey() : ini;
@@ -862,13 +877,16 @@ public class GeneradorAnalisisService {
                     kwh[p.franja().ordinal()] += k;
                     TarifaDelMes t = tarifaDe.apply(YearMonth.from(p.desde()));
                     if (t.sinTarifa()) sinTarifa = true;
-                    else costo += k * t.precio(p.franja());
+                    else {
+                        costo += k * t.precio(p.franja());
+                        costoFranja[p.franja().ordinal()] += k * t.precio(p.franja());
+                    }
                 }
             }
             if (!b.getKey().isBefore(fin)) break;
             a = b;
         }
-        return new Reparto(kwh, costo, sinTarifa);
+        return new Reparto(kwh, costo, costoFranja, sinTarifa);
     }
 
     // ================= Generador =================

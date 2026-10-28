@@ -9,6 +9,7 @@ import com.example.generador.model.ModeloControlador;
 import com.example.generador.model.SenalesRed;
 import com.example.generador.service.GeneradorAnalisisService;
 import com.example.generador.service.GeneradorService;
+import com.example.generador.service.RedControladorService;
 import com.example.medidores.service.TopologiaMedidores;
 import org.springframework.stereotype.Service;
 
@@ -56,10 +57,14 @@ public class TransformadoresService {
      * Un generador ahora (kw 0 parado, null sin comunicación). listo: parado y listo para arrancar (sin falla del motor
      * y listo para AMF si el modelo lo publica). alarmas: cuántas tiene la lista de alarmas del controlador. redPresente:
      * si el controlador ve tensión de red y no avisa falla de red (null = no lo sabe). voltios: tensión entre fases media del
-     * generador en marcha (solo informativo).
+     * generador en marcha (solo informativo). mcbAbierto: interruptor de la planta abierto según el controlador (MCB
+     * Feedback, o un estado sin red si el modelo no tiene esa entrada; null = no lo sabe). isla: además con el generador
+     * alimentando su parte de la planta; islaDesde, la hora en que empezó (de las lecturas de fondo); selectorIsla, el
+     * selector del controlador en Isla (isla a propósito).
      */
     public record GeneradorAhora(String nombre, EstadoGenerador estado, Double kw, Double pf, String error, boolean listo,
-                                 int alarmas, Boolean redPresente, Double voltios) {
+                                 int alarmas, Boolean redPresente, Double voltios, Boolean mcbAbierto, boolean isla,
+                                 LocalDateTime islaDesde, boolean selectorIsla) {
     }
 
     /**
@@ -77,9 +82,12 @@ public class TransformadoresService {
     private final GeneradorService generadorService;
     private final PLCDataQueryService plcDataQueryService;
     private final ConfigLoaderService configLoaderService;
+    private final RedControladorService redControlador;
 
     public TransformadoresService(TopologiaMedidores topologia, GeneradorService generadorService,
-                                  PLCDataQueryService plcDataQueryService, ConfigLoaderService configLoaderService) {
+                                  PLCDataQueryService plcDataQueryService, ConfigLoaderService configLoaderService,
+                                  RedControladorService redControlador) {
+        this.redControlador = redControlador;
         this.topologia = topologia;
         this.generadorService = generadorService;
         this.plcDataQueryService = plcDataQueryService;
@@ -132,18 +140,24 @@ public class TransformadoresService {
         try {
             l = generadorService.leerEnVivo(g);
         } catch (Exception e) {
-            return new GeneradorAhora(g.nombre(), EstadoGenerador.SIN_COMUNICACION, null, null, e.getMessage(), false, 0, null, null);
+            return new GeneradorAhora(g.nombre(), EstadoGenerador.SIN_COMUNICACION, null, null, e.getMessage(), false, 0, null, null,
+                    null, false, null, false);
         }
         ModeloControlador m = generadorService.modelo(g).orElse(null);
         int alarmas = l.alarmas() == null ? 0 : l.alarmas().size();
         Boolean red = redPresente(m, l);
+        Boolean mcbAbierto = mcbAbierto(m, l);
+        RedControladorService.EstadoActual fondo = redControlador.estadoActual(g.nombre());
+        boolean isla = Boolean.TRUE.equals(mcbAbierto) && l.enMarcha() && l.kw() != null && l.kw() >= GeneradorAnalisisService.KW_VACIO;
+        LocalDateTime islaDesde = isla && fondo != null && fondo.isla() ? fondo.desde() : null;
         if (!l.enMarcha()) {
             // Mismo criterio que el tablero de Generadores: estado del motor en falla, o no listo para AMF = no listo.
             boolean listo = m == null || (!FALLA_MOTOR.contains(m.estadoMotor(l)) && !Boolean.FALSE.equals(m.listoAmf(l)));
-            return new GeneradorAhora(g.nombre(), EstadoGenerador.PARADO, 0.0, null, null, listo, alarmas, red, null);
+            return new GeneradorAhora(g.nombre(), EstadoGenerador.PARADO, 0.0, null, null, listo, alarmas, red, null, mcbAbierto, false, null, false);
         }
         return new GeneradorAhora(g.nombre(), EstadoGenerador.EN_MARCHA, l.kw() == null ? null : Math.max(0, l.kw()), l.pf(),
-                l.kw() == null ? "el controlador no dio la potencia" : null, true, alarmas, red, promedio(l.vL1L2(), l.vL2L3(), l.vL3L1()));
+                l.kw() == null ? "el controlador no dio la potencia" : null, true, alarmas, red, promedio(l.vL1L2(), l.vL2L3(), l.vL3L1()),
+                mcbAbierto, isla, islaDesde, m != null && m.red() != null && Boolean.TRUE.equals(SenalesRed.valor(m.red().forzarIsla(), l)));
     }
 
     /** Promedio de las tres fases, o null si falta alguna o están en cero. */
@@ -166,6 +180,19 @@ public class TransformadoresService {
         }
         Double v = l.redVL1L2();
         return v == null ? null : v > 100;
+    }
+
+    /**
+     * Interruptor de la planta abierto según el controlador: su entrada MCB Feedback y, si el modelo no la tiene, un estado
+     * de los interruptores sin red (falla, isla o retorno de red). null = el modelo no lo publica.
+     */
+    private static Boolean mcbAbierto(ModeloControlador m, LecturaGenerador l) {
+        SenalesRed red = m == null ? null : m.red();
+        if (red == null) return null;
+        Boolean mcb = SenalesRed.valor(red.mcbCerrado(), l);
+        if (mcb != null) return !mcb;
+        Integer codigo = SenalesRed.codigo(l);
+        return codigo == null ? null : SenalesRed.sinRed(red.estado(codigo));
     }
 
     /** kW por unidad guardada de cada medidor: 0,001 los que el PLC guarda en W, 1 el resto. */
