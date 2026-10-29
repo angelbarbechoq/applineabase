@@ -34,6 +34,17 @@
       }
     }
   ],
+  "sirena" : {
+    "habilitada" : false,
+    "ip" : "192.168.0.240",
+    "puerto" : 502,
+    "unitId" : 1,
+    "entradaActivar" : "V1.0",
+    "entradaDesactivar" : "V1.1",
+    "silencioMinutos" : 5,
+    "descripcion" : "Sirena fisica: PLC Siemens LOGO! 8 por Modbus TCP. El programa del LOGO! lleva NI1 (V1.0) a la entrada S de un RS y NI2 (V1.1) a la R: sirena ON = V1.0 en 1 y V1.1 en 0; OFF = V1.0 en 0 y V1.1 en 1. Suena con la alarma de perdida de red (salvo selector en Isla o corte programado), con la de potencia y con las alarmas activas de los generadores (paro de emergencia, paros por proteccion, avisos). En el LOGO! la memoria V 0.0 - 850.7 es Bob. 1 - 6808, asi que V1.0 es la direccion 8 y V1.1 la 9 en el cable. Silenciar la calla silencioMinutos minutos y se anula con una alarma nueva. Habilitarla solo en una instancia de la app (el servidor).",
+    "cortesProgramados" : [ ]
+  },
   "metaImportacionRed" : {
     "verdeHasta" : 2,
     "amarilloHasta" : 10,

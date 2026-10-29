@@ -69,8 +69,11 @@ Mains Healthy de Log Bout 2; alarmas AL ...), 41243-41244 contadores de mantenim
 de combustible (L; leido 0: el motor no lo informa). Temporizadores (cuenta regresiva de la pantalla del
 controlador, en el tablero desde el 2026-10-26 como TEMPORIZADOR y TEMPORIZADOR_VALOR): 41261 Timer text (List#5: 0 No Timer, 4 Cooling, 11 MCB Close, 13 ReturnDelay, 14 Start Delay...) y
 41265 Timer Value (s); ajustes 43070 Cooling Time (leido 180 s), 43152 Emergency Start Delay (15 s), 43153 Mains
-Return Delay (60 s), 43154 MCB Close Delay (x10, 1,0 s). No tiene medida de ROCOF ni de salto de vector (solo los
-ajustes de esas protecciones, 43167-43172).
+Return Delay (60 s), 43154 MCB Close Delay (x10, 1,0 s). No publica la medida de ROCOF ni de salto de vector (solo los
+ajustes de esas protecciones, 43167-43172). Leidos el 2026-10-28: Vector Shift Protection = Parallel, limite 10 grados; ROCOF
+Protection = Parallel, ventana 5, 1,3 Hz/s; Vector Shift/ROCOF CB Selector = GCB (abre el interruptor del generador, no el
+de la planta como el Caterpillar). Otros ajustes leidos: Base PF 0,95, Load Ramp 30 s, Connection Type 3Ph4Wire, demora de
+frecuencia de red 0,5 s, sincronizacion Phase Window 5 grados, Voltage Window 3 %, Dwell 0,5 s, Timeout 360 s.
 
 ## Pendientes
 - Aclarados con la lista: 41047 = angulo de deslizamiento (Slip Angle); 41055 = corriente de red L1 (una sola

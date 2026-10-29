@@ -235,8 +235,8 @@ public class GeneradorAlmacen {
         }
     }
 
-    /** Cierra el arranque abierto (si hay) con la lectura de parada. */
-    public void cerrarArranque(String generador, LecturaGenerador l) {
+    /** Cierra el arranque abierto (si hay) con la lectura de parada; devuelve su id (null si no había o falló). */
+    public Long cerrarArranque(String generador, LecturaGenerador l) {
         try (Connection c = abrirArranques(generador)) {
             Long id = null;
             LocalDateTime inicio = null;
@@ -250,7 +250,7 @@ public class GeneradorAlmacen {
                 }
             }
             if (id == null) {
-                return;
+                return null;
             }
             try (PreparedStatement ps = c.prepareStatement("UPDATE \"" + generador + "\" SET fin = ?, duracion_min = ?, "
                     + "kwh_fin = ?, kwh_generados = ?, horas_fin = ? WHERE id = ?")) {
@@ -264,8 +264,22 @@ public class GeneradorAlmacen {
                 ps.executeUpdate();
             }
             logger.info("Generador {}: parada registrada ({})", generador, l.fecha().format(FECHA));
+            return id;
         } catch (SQLException e) {
             logger.error("Error cerrando arranque de {}: {}", generador, e.getMessage());
+            return null;
+        }
+    }
+
+    /** Borra un arranque que resultó ser un intento de arranque fallido (el motor giró y se detuvo sin arrancar). */
+    public void borrarArranque(String generador, long id) {
+        try (Connection c = abrirArranques(generador);
+             PreparedStatement ps = c.prepareStatement("DELETE FROM \"" + generador + "\" WHERE id = ?")) {
+            ps.setLong(1, id);
+            ps.executeUpdate();
+            logger.info("Generador {}: el arranque {} fue un intento fallido (el controlador no conto el arranque), se borra", generador, id);
+        } catch (SQLException e) {
+            logger.error("Error borrando el arranque {} de {}: {}", id, generador, e.getMessage());
         }
     }
 

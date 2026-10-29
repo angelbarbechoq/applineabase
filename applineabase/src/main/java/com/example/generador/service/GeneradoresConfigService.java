@@ -49,6 +49,15 @@ public class GeneradoresConfigService {
         return lista;
     }
 
+    /** Captura al segundo encendida ("capturaAlSegundo" de generador-config.json; apagada si falta). */
+    public boolean capturaAlSegundo() {
+        return configLoaderService.loadGeneradorCapturaAlSegundo();
+    }
+
+    public void guardarCapturaAlSegundo(boolean encendida) {
+        configLoaderService.saveGeneradorCapturaAlSegundo(encendida);
+    }
+
     /**
      * Límite de potencia del generador para la alarma de potencia alta (generador-config.json, "alarmaPotenciaKw" del
      * generador, en kW). null = sin alarma (falta o no es positivo).
@@ -165,7 +174,7 @@ public class GeneradoresConfigService {
 
     /**
      * Campo "red" del modelo: "estado" con los códigos de cada caso (paralelo, isla, fallaRed, retornoRed) y sus
-     * "nombres", y los bits mcbCerrado, gcbCerrado, avisoFallaRed, proteccionRed, saltoVector, rocof y forzarIsla como
+     * "nombres", y los bits mcbCerrado, gcbCerrado, avisoFallaRed, proteccionRed, saltoVector, rocof, forzarIsla y sincronismo como
      * {"parametro": ..., "bit": ...}, y los ajustes de disparo limiteSaltoVector (grados) y limiteRocof (Hz/s). Lo que
      * falte o esté mal queda vacío (con aviso en el log).
      */
@@ -176,7 +185,7 @@ public class GeneradoresConfigService {
         return new SenalesRed(codigos(estado.get("paralelo")), codigos(estado.get("isla")), codigos(estado.get("fallaRed")),
                 codigos(estado.get("retornoRed")), List.copyOf(nombres), bit(modelo, r, "mcbCerrado"), bit(modelo, r, "gcbCerrado"),
                 bit(modelo, r, "avisoFallaRed"), bit(modelo, r, "proteccionRed"), bit(modelo, r, "saltoVector"), bit(modelo, r, "rocof"),
-                bit(modelo, r, "forzarIsla"),
+                bit(modelo, r, "forzarIsla"), bit(modelo, r, "sincronismo"),
                 limite(r.get("limiteSaltoVector")), limite(r.get("limiteRocof")));
     }
 

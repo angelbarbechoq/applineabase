@@ -13,10 +13,14 @@ import com.example.generador.model.Generador;
 import com.example.generador.model.LecturaGenerador;
 import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.model.TipoEventoGenerador;
+import com.example.base.model.GraficaModel;
+import com.example.base.ui.CsvUtil;
 import com.example.generador.service.AlarmaComap;
+import com.example.generador.service.CapturaSegundoService;
 import com.example.generador.service.GeneradorAlmacen;
 import com.example.generador.service.HistorialEventosService;
 import com.example.generador.service.RedControladorService;
+import com.example.generador.service.SirenaService;
 import com.example.generador.model.SenalesRed;
 import com.example.generador.service.PlantaEnVivoService;
 import com.example.generador.model.ModeloControlador;
@@ -25,13 +29,16 @@ import com.example.generador.service.GeneradorService;
 import com.example.generador.service.GeneradorService.FilaRegistro;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
@@ -100,6 +107,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final PlantaEnVivoService plantaService;
     private final RedControladorService redControlador;
     private final GeneradorAlmacen almacen;
+    private final CapturaSegundoService capturas;
     /** Generadores en el orden de las pestañas: Transformador 1 primero. */
     private List<Generador> generadores = List.of();
     /** Generador de la pestaña elegida (el último elegido si la pestaña es otra sección). */
@@ -119,6 +127,9 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
     private final Map<Generador, Div> tableros = new HashMap<>();
     private final Map<Generador, Span> marcasTab = new HashMap<>();
     private Tab tabRegistros;
+    private Tab tabCapturas;
+    private Tab tabSirena;
+    private final SirenaService sirena;
     /** Generador de cada fila del Historial de eventos (sus registros no lo traen). */
     private final Map<EventoGenerador, String> generadorDeEvento = new IdentityHashMap<>();
     private Grid.Column<EventoGenerador> colEventoGenerador;
@@ -140,7 +151,10 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
 
     public GeneradorView(GeneradorService service, CalidadEnergiaService calidad, LineaAccessService lineaAccessService,
                          HistorialEventosService historial, PlantaEnVivoService plantaService,
-                         RedControladorService redControlador, GeneradorAlmacen almacen) {
+                         RedControladorService redControlador, GeneradorAlmacen almacen, CapturaSegundoService capturas,
+                         SirenaService sirena) {
+        this.sirena = sirena;
+        this.capturas = capturas;
         this.service = service;
         this.calidad = calidad;
         this.lineaAccessService = lineaAccessService;
@@ -173,11 +187,25 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         tabs.add("Historial de eventos", crearEventos());
         if (lineaAccessService.esAdmin()) {
             tabRegistros = tabs.add("Registros", crearRegistros());
+            tabCapturas = tabs.add("Capturas al segundo", crearCapturas());
+            tabSirena = tabs.add("Sirena", crearSirena());
         }
         tabs.addSelectedChangeListener(e -> {
             Generador g = tabGenerador.get(e.getSelectedTab());
             if (g != null) generador = g;
             if (e.getSelectedTab() == tabPlanta) refrescarPlanta();
+            if (tabCapturas != null && e.getSelectedTab() == tabCapturas) cargarCapturas();
+            if (tabSirena != null) {
+                if (e.getSelectedTab() == tabSirena) {
+                    refrescarSirena();
+                    // Mientras se ve la pestaña Sirena, el navegador pide el estado cada 2 s: el silencio se anula con una alarma
+                    // nueva y el contador tiene que reflejarlo enseguida. Se detiene solo si la vista deja de estar en la página.
+                    getElement().executeJs("clearInterval(this._sirenaTick); this._sirenaTick = setInterval(() => {"
+                            + " if (!this.isConnected) { clearInterval(this._sirenaTick); return; } this.$server.tickSirena(); }, 2000);");
+                } else {
+                    getElement().executeJs("clearInterval(this._sirenaTick);");
+                }
+            }
             refrescar();
         });
         alertaAlarmas.setWidthFull();
@@ -291,6 +319,472 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         }
         avisoMapa.setText(String.join("   |   ", avisos));
         avisoMapa.setVisible(!avisos.isEmpty());
+    }
+
+    // ================= Sirena (solo ADMIN) =================
+
+    private static final String[] CHIP_VERDE = {"#d4edda", "#155724"}, CHIP_AMARILLO = {"#fff3cd", "#856404"},
+            CHIP_ROJO = {"#f8d7da", "#721c24"}, CHIP_GRIS = {"#e2e3e5", "#383d41"};
+    private final Checkbox sirenaHabilitada = new Checkbox("Sirena habilitada");
+    private final Div sirenaPlc = new Div();
+    private final Div sirenaEstado = new Div();
+    private final IntegerField sirenaSilencioMin = new IntegerField("Silenciar por (min)");
+    private List<SirenaService.CorteProgramado> cortesMostrados = List.of();
+    private String estadosCortesMostrados = "";
+    /** Cuenta regresiva del silencio en el navegador (mm:ss), a partir de los ms que faltan ($0). */
+    private static final String JS_CUENTA = "const el = this, fin = Date.now() + $0; clearInterval(el._cuenta);"
+            + "const f = () => { if (!el.isConnected) { clearInterval(el._cuenta); return; }"
+            + " const s = Math.max(0, Math.ceil((fin - Date.now()) / 1000));"
+            + " el.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };"
+            + "f(); el._cuenta = setInterval(f, 1000);";
+    private final Div sirenaCausaRed = new Div();
+    private final Div sirenaCausaPotencia = new Div();
+    private final Div sirenaCausaGenerador = new Div();
+    private final Button sirenaSilenciar = new Button("Silenciar", VaadinIcon.BELL_SLASH.create());
+    private final Grid<SirenaService.CorteProgramado> cortesGrid = new Grid<>();
+
+    /**
+     * Sirena física por el LOGO! (pedido del usuario el 28-10-2026): habilitarla, ver si el LOGO! contesta y si suena, qué la
+     * hace sonar, silenciarla, probarla y cargar los cortes programados (en los que la alarma de red no la hace sonar).
+     */
+    private Component crearSirena() {
+        sirenaHabilitada.addValueChangeListener(e -> {
+            if (!e.isFromClient()) return;
+            try {
+                sirena.habilitar(e.getValue());
+                Notification.show(e.getValue() ? "Sirena habilitada." : "Sirena deshabilitada.", 3000, Notification.Position.MIDDLE);
+            } catch (Exception ex) {
+                sirenaHabilitada.setValue(!e.getValue());
+                avisoError("No se pudo cambiar: " + ex.getMessage());
+            }
+            refrescarSirena();
+        });
+        sirenaSilenciar.addClickListener(e -> {
+            sirena.silenciar();
+            refrescarSirena();
+        });
+        Button probar = new Button("Probar sirena", VaadinIcon.PLAY.create(), e -> confirmarPrueba());
+        Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> refrescarSirena());
+        HorizontalLayout barra = new HorizontalLayout(sirenaHabilitada, sirenaPlc);
+        barra.setAlignItems(Alignment.CENTER);
+        // Cuánto dura "Silenciar": pasado ese tiempo, si siguen las alarmas, la sirena vuelve a sonar.
+        sirenaSilencioMin.setMin(1);
+        sirenaSilencioMin.setMax(SirenaService.SILENCIO_MINUTOS_MAXIMO);
+        sirenaSilencioMin.setStepButtonsVisible(true);
+        sirenaSilencioMin.setWidth("170px");
+        sirenaSilencioMin.setValue(sirena.config().silencioMinutos());
+        sirenaSilencioMin.addValueChangeListener(e -> {
+            if (!e.isFromClient() || e.getValue() == null) return;
+            try {
+                sirena.silencioMinutos(e.getValue());
+                Notification.show("Silenciar durará " + e.getValue() + " min.", 2500, Notification.Position.MIDDLE);
+            } catch (Exception ex) {
+                if (e.getOldValue() != null) sirenaSilencioMin.setValue(e.getOldValue());
+                avisoError(ex.getMessage());
+            }
+        });
+        HorizontalLayout botones = new HorizontalLayout(sirenaSilenciar, sirenaSilencioMin, probar, actualizar);
+        botones.setAlignItems(Alignment.END);
+        botones.getStyle().set("flex-wrap", "wrap");
+
+        Span tituloCorte = new Span("Corte programado");
+        tituloCorte.getStyle().set("font-weight", "700").set("margin-top", "12px");
+        DateTimePicker desde = new DateTimePicker("Desde");
+        DateTimePicker hasta = new DateTimePicker("Hasta");
+        desde.setValue(LocalDateTime.now().plusHours(1).withMinute(0).withSecond(0).withNano(0));
+        hasta.setValue(desde.getValue().plusHours(4));
+        Button agregar = new Button("Agregar corte", VaadinIcon.PLUS.create(), e -> {
+            try {
+                sirena.agregarCorte(desde.getValue(), hasta.getValue());
+                refrescarSirena();
+            } catch (Exception ex) {
+                avisoError(ex.getMessage());
+            }
+        });
+        HorizontalLayout filtros = new HorizontalLayout(desde, hasta, agregar);
+        filtros.setAlignItems(Alignment.END);
+        filtros.getStyle().set("flex-wrap", "wrap");
+
+        cortesGrid.addColumn(c -> c.desde().format(CORTA)).setHeader("Desde").setAutoWidth(true).setFlexGrow(0);
+        cortesGrid.addColumn(c -> c.hasta().format(CORTA)).setHeader("Hasta").setAutoWidth(true).setFlexGrow(0);
+        cortesGrid.addColumn(c -> c.estado(LocalDateTime.now())).setHeader("Estado").setAutoWidth(true).setFlexGrow(0);
+        cortesGrid.addComponentColumn(c -> {
+            Button borrar = new Button(VaadinIcon.TRASH.create(), ev -> {
+                sirena.borrarCorte(c);
+                refrescarSirena();
+            });
+            borrar.getStyle().set("color", "#E8505B");
+            borrar.getElement().setAttribute("aria-label", "Borrar el corte");
+            return borrar;
+        }).setHeader("").setAutoWidth(true).setFlexGrow(0);
+        cortesGrid.setHeight("220px");
+
+        VerticalLayout v = new VerticalLayout(barra, sirenaEstado, sirenaCausaRed, sirenaCausaPotencia, sirenaCausaGenerador, botones,
+                tituloCorte, filtros, cortesGrid);
+        v.setPadding(false);
+        v.setSizeFull();
+        refrescarSirena();
+        return v;
+    }
+
+    private void confirmarPrueba() {
+        com.vaadin.flow.component.dialog.Dialog d = new com.vaadin.flow.component.dialog.Dialog();
+        d.setHeaderTitle("¿Probar la sirena?");
+        d.add(new Span("La sirena va a sonar unos 3 segundos."));
+        Button si = new Button("Probar", e -> {
+            sirena.probar();
+            d.close();
+            refrescarSirena();
+        });
+        si.getStyle().set("background-color", "#E8505B").set("color", "#fff");
+        d.getFooter().add(new Button("Cancelar", e -> d.close()), si);
+        d.open();
+    }
+
+    private static void avisoError(String texto) {
+        Notification.show(texto, 5000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
+    }
+
+    private void refrescarSirena() {
+        SirenaService.Estado e = sirena.estado();
+        sirenaHabilitada.setValue(e.habilitada());
+        sirenaPlc.removeAll();
+        String plc = "LOGO! " + e.ip();
+        if (!e.plcEnUso()) {
+            sirenaPlc.add(chip(plc + ": sin uso", CHIP_GRIS));
+        } else if (e.plcOk()) {
+            sirenaPlc.add(chip(plc + ": contesta", CHIP_VERDE));
+        } else {
+            sirenaPlc.add(chip(plc + ": sin comunicación", CHIP_ROJO));
+            if (e.errorPlc() != null) {
+                Span motivo = new Span(" " + e.errorPlc());
+                motivo.getStyle().set("font-size", "12px").set("color", "#6b7080");
+                sirenaPlc.add(motivo);
+            }
+        }
+        // La sirena: suena (rojo) o está apagada (verde); el LOGO! se activa con una entrada y se apaga con la otra.
+        sirenaEstado.removeAll();
+        sirenaEstado.getStyle().set("display", "flex").set("align-items", "center").set("gap", "8px").set("flex-wrap", "wrap");
+        Span nombre = new Span("Sirena");
+        nombre.getStyle().set("font-weight", "700").set("min-width", "230px");
+        long restante = e.silencioHasta() - System.currentTimeMillis();
+        sirenaEstado.add(nombre, e.prueba() ? chip("PRUEBA", CHIP_AMARILLO) : e.sonando() ? chip("SUENA", CHIP_ROJO)
+                : restante > 0 ? chip("Silenciada", CHIP_AMARILLO) : chip("Apagada", CHIP_VERDE));
+        if (restante > 0) {
+            // Contador descendente: vuelve a sonar al llegar a cero si siguen las alarmas.
+            Span etiqueta = new Span("vuelve a sonar en");
+            etiqueta.getStyle().set("font-size", "12px").set("color", "#6b7080");
+            Span cuenta = new Span(String.format("%02d:%02d", restante / 60_000, restante / 1000 % 60));
+            cuenta.getStyle().set("font-weight", "700").set("font-size", "18px").set("font-variant-numeric", "tabular-nums").set("color", "#856404");
+            sirenaEstado.add(etiqueta, cuenta);
+            cuenta.getElement().executeJs(JS_CUENTA, restante);
+        }
+        if (e.plcEnUso() && e.leidoActivar() != null && e.leidoDesactivar() != null
+                && (e.leidoActivar() != e.sonando() || e.leidoDesactivar() == e.sonando())) {
+            sirenaEstado.add(chip("El LOGO! lee " + e.entradaActivar() + " = " + (e.leidoActivar() ? 1 : 0) + " y "
+                    + e.entradaDesactivar() + " = " + (e.leidoDesactivar() ? 1 : 0), CHIP_ROJO));
+        }
+        mostrarCausa(sirenaCausaRed, "Alarma de pérdida de red", e.condRed(), e.silenciadaRed(), e.corteActivo(), e.habilitada(), e.motivoRed());
+        mostrarCausa(sirenaCausaPotencia, "Alarma de potencia", e.condPotencia(), e.silenciadaPotencia(), false, e.habilitada(), e.motivoPotencia());
+        mostrarCausa(sirenaCausaGenerador, "Alarmas de los generadores", e.condGenerador(), e.silenciadaGenerador(), false, e.habilitada(),
+                e.motivoGenerador());
+        sirenaSilenciar.setEnabled(e.sonando() && !e.prueba());
+        if (!Objects.equals(sirenaSilencioMin.getValue(), e.silencioMinutos())) sirenaSilencioMin.setValue(e.silencioMinutos());
+        // La grilla de cortes solo se vuelve a cargar si cambió algo (con el refresco de 2 s se perdería el clic en Borrar).
+        List<SirenaService.CorteProgramado> cortes = sirena.config().cortes();
+        LocalDateTime ahora = LocalDateTime.now();
+        String estados = cortes.stream().map(c -> c.estado(ahora)).collect(Collectors.joining("|"));
+        if (!cortes.equals(cortesMostrados) || !estados.equals(estadosCortesMostrados)) {
+            cortesGrid.setItems(cortes);
+            cortesMostrados = cortes;
+            estadosCortesMostrados = estados;
+        }
+    }
+
+    /** El navegador la llama cada 2 s mientras se ve la pestaña Sirena (ver el listener de pestañas). */
+    @ClientCallable
+    public void tickSirena() {
+        if (tabSirena != null && tabs.getSelectedTab() == tabSirena) refrescarSirena();
+    }
+
+    /** Una línea por causa: en alarma (rojo) o normal (verde), y si está silenciada o en corte programado (amarillo), con el motivo. */
+    private static void mostrarCausa(Div linea, String titulo, boolean condicion, boolean silenciada, boolean corte, boolean habilitada,
+                                     String motivo) {
+        linea.removeAll();
+        linea.getStyle().set("display", "flex").set("align-items", "center").set("gap", "8px").set("flex-wrap", "wrap");
+        Span nombre = new Span(titulo);
+        nombre.getStyle().set("min-width", "230px");
+        linea.add(nombre);
+        if (!condicion) linea.add(chip("Normal", CHIP_VERDE));
+        else if (silenciada) linea.add(chip("En alarma, silenciada", CHIP_AMARILLO));
+        else if (corte) linea.add(chip("En alarma, corte programado: no suena", CHIP_AMARILLO));
+        else if (!habilitada) linea.add(chip("En alarma, sirena deshabilitada", CHIP_GRIS));
+        else linea.add(chip("En alarma", CHIP_ROJO));
+        if (condicion && motivo != null && !motivo.isEmpty()) {
+            Span m = new Span(motivo);
+            m.getStyle().set("font-size", "12px").set("color", "#6b7080");
+            linea.add(m);
+        }
+    }
+
+    private static Span chip(String texto, String[] color) {
+        Span s = new Span(texto);
+        s.getStyle().set("background", color[0]).set("color", color[1]).set("padding", "3px 10px").set("border-radius", "6px")
+                .set("font-weight", "600").set("font-size", "12px");
+        return s;
+    }
+
+    // ================= Capturas al segundo (solo ADMIN) =================
+
+    private static final String CHART_CAPTURA = "chart-captura-segundo";
+    /** Colores de los generadores en el orden de generador-config.json, los mismos de Análisis y Transformadores. */
+    private static final String[] COLORES_CAPTURA = {"0xF29F67", "0x6F42C1"};
+    private final Grid<CapturaSegundoService.Captura> capturasGrid = new Grid<>();
+    private final Span capturasEstado = new Span();
+    private final Div capturaDetalle = new Div();
+    private final Checkbox capturaEncendida = new Checkbox("Captura al segundo encendida");
+
+    /**
+     * Capturas al segundo de los dos controladores alrededor de cada evento (pedido del usuario el 28-10-2026 para ver qué
+     * pasa en un disparo por ROCOF). Se guardan solas; aquí se encienden o apagan, se ven y se descargan.
+     */
+    private Component crearCapturas() {
+        capturaEncendida.setValue(capturas.encendida());
+        capturaEncendida.addValueChangeListener(e -> {
+            if (!e.isFromClient()) return;
+            try {
+                capturas.encender(e.getValue());
+                Notification.show(e.getValue() ? "Captura al segundo encendida." : "Captura al segundo apagada.", 3000, Notification.Position.MIDDLE);
+            } catch (Exception ex) {
+                capturaEncendida.setValue(!e.getValue());
+                Notification.show("No se pudo cambiar: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+            cargarCapturas();
+        });
+        Button guardar = new Button("Guardar ahora", VaadinIcon.DOWNLOAD_ALT.create(), e -> {
+            try {
+                String usuario = lineaAccessService.usuarioActual();
+                long id = capturas.guardarAhora(usuario == null ? "administrador" : usuario);
+                Notification.show("Se guardaron los últimos 10 minutos (captura " + id + ").", 3000, Notification.Position.MIDDLE);
+                cargarCapturas();
+            } catch (Exception ex) {
+                Notification.show("No se pudo guardar: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+        guardar.getElement().setAttribute("title", "Guarda los últimos 10 minutos en memoria, por si se vio algo que no disparó una captura");
+        Button actualizar = new Button("Actualizar", VaadinIcon.REFRESH.create(), e -> cargarCapturas());
+        HorizontalLayout barra = new HorizontalLayout(capturaEncendida, guardar, actualizar, capturasEstado);
+        barra.setAlignItems(Alignment.CENTER);
+        barra.setWidthFull();
+        capturasEstado.getStyle().set("font-size", "13px").set("color", "#6b7080");
+
+        Span nota = new Span("Lee los dos controladores cada segundo y guarda sola una captura cuando se abre un interruptor, el "
+                + "generador sale de paralelo, la ROCOF pasa la mitad del ajuste, sube de golpe su máximo o el del salto de vector, "
+                + "la potencia cae más de 200 kW en un segundo o la frecuencia de la red sale de 59,8 a 60,2 Hz: 5 minutos antes y "
+                + "5 minutos después de que todo vuelva a la normalidad. Solo lectura de los controladores.");
+        nota.getStyle().set("font-size", "12px").set("color", "#6b7080");
+
+        capturasGrid.addColumn(c -> c.disparo().format(HORA)).setHeader("Evento").setAutoWidth(true).setFlexGrow(0);
+        capturasGrid.addColumn(c -> c.manual() ? "A mano" : "Automática").setHeader("Tipo").setAutoWidth(true).setFlexGrow(0);
+        capturasGrid.addColumn(c -> c.fin() == null ? "-" : duracionMinSeg(java.time.Duration.between(c.inicio(), c.fin()).getSeconds()))
+                .setHeader("Duración").setAutoWidth(true).setFlexGrow(0);
+        capturasGrid.addColumn(CapturaSegundoService.Captura::motivo).setHeader("Motivo").setFlexGrow(1);
+        capturasGrid.setHeight("220px");
+        capturasGrid.asSingleSelect().addValueChangeListener(e -> mostrarCaptura(e.getValue()));
+
+        capturaDetalle.setWidthFull();
+        VerticalLayout v = new VerticalLayout(barra, nota, capturasGrid, capturaDetalle);
+        v.setPadding(false);
+        v.setSizeFull();
+        return v;
+    }
+
+    private static String duracionMinSeg(long s) {
+        return s / 60 + " min " + String.format("%02d", s % 60) + " s";
+    }
+
+    private void cargarCapturas() {
+        capturaEncendida.setValue(capturas.encendida());
+        StringBuilder estado = new StringBuilder();
+        if (capturas.encendida()) {
+            Map<String, Integer> mem = capturas.enMemoria();
+            estado.append(mem.isEmpty() ? "Sin lecturas todavía" : "En memoria: " + mem.entrySet().stream()
+                    .map(x -> x.getKey() + " " + x.getValue() + " s").collect(Collectors.joining(", ")));
+            String curso = capturas.enCurso();
+            if (curso != null) estado.append(" · Captura en curso (se guarda al completarse): ").append(curso);
+        } else {
+            estado.append("Apagada: no se lee al segundo ni se guardan capturas.");
+        }
+        capturasEstado.setText(estado.toString());
+        CapturaSegundoService.Captura elegida = capturasGrid.asSingleSelect().getValue();
+        List<CapturaSegundoService.Captura> lista = capturas.capturas();
+        capturasGrid.setItems(lista);
+        if (elegida != null) lista.stream().filter(c -> c.id() == elegida.id()).findFirst().ifPresent(capturasGrid::select);
+    }
+
+    /** Gráfico segundo a segundo de la captura y su CSV. */
+    private void mostrarCaptura(CapturaSegundoService.Captura c) {
+        capturaDetalle.removeAll();
+        if (c == null) return;
+        List<CapturaSegundoService.Muestra> muestras = capturas.muestras(c.id());
+        if (muestras.isEmpty()) {
+            capturaDetalle.add(new Span("La captura no tiene lecturas."));
+            return;
+        }
+        // Generadores en el orden de generador-config.json (sus colores) y, después, cualquier otro que aparezca.
+        List<String> nombres = new ArrayList<>(service.generadores().stream().map(Generador::nombre).toList());
+        muestras.stream().map(CapturaSegundoService.Muestra::generador).distinct().filter(n -> !nombres.contains(n)).forEach(nombres::add);
+        nombres.removeIf(n -> muestras.stream().noneMatch(m -> m.generador().equals(n)));
+
+        // ROCOF y salto de vector, cada uno en su panel con su ajuste de disparo y la mitad (desde la mitad avisa la app); solo
+        // si algún generador los publica (el InteliGen 200 del GenPower no).
+        List<String> conRocof = nombres.stream().filter(n -> muestras.stream().anyMatch(m -> m.generador().equals(n) && m.v(ParametroGenerador.ROCOF) != null)).toList();
+        Double ajusteRocof = null, ajusteSalto = null;
+        for (String n : conRocof) {
+            SenalesRed red = generadores.stream().filter(g -> g.nombre().equals(n)).findFirst().flatMap(service::modelo).map(ModeloControlador::red).orElse(null);
+            if (red != null && ajusteRocof == null) ajusteRocof = red.limiteRocof();
+            if (red != null && ajusteSalto == null) ajusteSalto = red.limiteSaltoVector();
+        }
+        List<String> paneles = new ArrayList<>(List.of("kW / kVAr", "RPM", "Frecuencia (Hz)", "Tensión de red (V)"));
+        int pRocof = -1, pSalto = -1;
+        if (!conRocof.isEmpty()) {
+            pRocof = paneles.size();
+            paneles.add("ROCOF (Hz/s)");
+            pSalto = paneles.size();
+            paneles.add("Salto de vector (°)");
+        }
+        int pInterruptor = paneles.size();
+        paneles.add("Interruptor (1 = cerrado)");
+        List<GraficaModel.LineaReferencia> referencias = new ArrayList<>();
+        if (ajusteRocof != null) {
+            referencias.add(new GraficaModel.LineaReferencia(pRocof, ajusteRocof, "0xE8505B", "Ajuste de disparo " + numero(ajusteRocof) + " Hz/s"));
+            referencias.add(new GraficaModel.LineaReferencia(pRocof, ajusteRocof / 2, "0xB8920A", "Mitad del ajuste " + numero(ajusteRocof / 2) + " Hz/s"));
+        }
+        if (ajusteSalto != null) {
+            referencias.add(new GraficaModel.LineaReferencia(pSalto, ajusteSalto, "0xE8505B", "Ajuste de disparo " + numero(ajusteSalto) + "°"));
+            referencias.add(new GraficaModel.LineaReferencia(pSalto, ajusteSalto / 2, "0xB8920A", "Mitad del ajuste " + numero(ajusteSalto / 2) + "°"));
+        }
+        List<GraficaModel.SerieCaptura> series = new ArrayList<>();
+        List<java.util.function.Function<CapturaSegundoService.Muestra, Double>> lectores = new ArrayList<>();
+        List<String> deGenerador = new ArrayList<>();
+        for (int i = 0; i < nombres.size(); i++) {
+            String n = nombres.get(i), color = COLORES_CAPTURA[i % COLORES_CAPTURA.length];
+            agregar(series, lectores, deGenerador, n, n + " kW", 0, color, false, false, m -> m.v(ParametroGenerador.KW));
+            agregar(series, lectores, deGenerador, n, n + " kVAr", 0, color, true, false, m -> m.v(ParametroGenerador.KVAR));
+            agregar(series, lectores, deGenerador, n, n + " RPM", 1, color, false, false, m -> m.v(ParametroGenerador.RPM));
+            agregar(series, lectores, deGenerador, n, n + " Hz generador", 2, color, false, false, m -> m.v(ParametroGenerador.FRECUENCIA));
+            agregar(series, lectores, deGenerador, n, n + " Hz red", 2, color, true, false, m -> m.v(ParametroGenerador.RED_FRECUENCIA));
+            agregar(series, lectores, deGenerador, n, n + " V red", 3, color, false, false, m -> promedio(m.v(ParametroGenerador.RED_V_L1L2),
+                    m.v(ParametroGenerador.RED_V_L2L3), m.v(ParametroGenerador.RED_V_L3L1)));
+            if (conRocof.contains(n)) {
+                agregar(series, lectores, deGenerador, n, n + " ROCOF", pRocof, color, false, false, ajusteRocof, m -> m.v(ParametroGenerador.ROCOF));
+                agregar(series, lectores, deGenerador, n, n + " ROCOF máxima", pRocof, color, true, true, ajusteRocof, m -> m.v(ParametroGenerador.ROCOF_MAX));
+                agregar(series, lectores, deGenerador, n, n + " salto de vector máximo", pSalto, color, true, true, ajusteSalto, m -> m.v(ParametroGenerador.SALTO_VECTOR_MAX));
+            }
+            agregar(series, lectores, deGenerador, n, n + " MCB", pInterruptor, color, false, true, m -> m.mcb() == null ? null : m.mcb() ? 1.0 : 0.0);
+            agregar(series, lectores, deGenerador, n, n + " GCB", pInterruptor, color, true, true, m -> m.gcb() == null ? null : m.gcb() ? 1.0 : 0.0);
+        }
+        // Una fila por segundo con las lecturas de los dos generadores de ese segundo.
+        java.util.TreeMap<Long, Double[]> filas = new java.util.TreeMap<>();
+        for (CapturaSegundoService.Muestra m : muestras) {
+            Double[] fila = filas.computeIfAbsent(m.t() / 1000 * 1000, k -> new Double[series.size()]);
+            for (int s = 0; s < series.size(); s++) {
+                if (deGenerador.get(s).equals(m.generador())) fila[s] = lectores.get(s).apply(m);
+            }
+        }
+        long disparo = c.disparo().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+        Div chart = new Div();
+        chart.setId(CHART_CAPTURA);
+        chart.setWidthFull();
+        chart.setHeight((180 + paneles.size() * 130) + "px");
+        Span titulo = new Span("Captura del " + c.disparo().format(HORA) + " · " + c.motivo());
+        titulo.getStyle().set("font-weight", "600");
+        Span ayuda = new Span("La línea roja marca el evento. Arrastrar para acercar, rueda para moverse; clic deja una marca con la hora y doble clic las borra. "
+                + "La leyenda prende y apaga cada curva. La lectura es cada segundo: el disparo de la protección dura menos."
+                + " El GenPower no tiene curva de ROCOF: su controlador no publica esa medición por Modbus (sí tiene la protección).");
+        ayuda.getStyle().set("font-size", "12px").set("color", "#6b7080");
+        var link = CsvUtil.crearLinkDescarga("captura-" + c.id() + "-" + c.disparo().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")) + ".csv",
+                () -> new java.io.ByteArrayInputStream(csvCaptura(muestras).getBytes(java.nio.charset.StandardCharsets.UTF_8)), "Descargar CSV");
+        Button borrar = new Button("Borrar", VaadinIcon.TRASH.create(), e -> confirmarBorrado(c));
+        borrar.getStyle().set("color", "#E8505B");
+        HorizontalLayout cab = new HorizontalLayout(titulo, link, borrar);
+        cab.setAlignItems(Alignment.CENTER);
+        capturaDetalle.add(cab, ayuda, chart);
+        // Tooltips semitransparentes, como en Períodos en marcha (pedido del usuario): no tapan las curvas.
+        chart.getElement().executeJs(GraficaModel.conTooltipsTransparentes(GraficaModel.getCapturaScript(CHART_CAPTURA,
+                new ArrayList<>(filas.keySet()), paneles, series, new ArrayList<>(filas.values()), disparo, referencias)));
+    }
+
+    /** Borrar una captura pide confirmación: se pierde del todo (no hay otra copia). */
+    private void confirmarBorrado(CapturaSegundoService.Captura c) {
+        com.vaadin.flow.component.dialog.Dialog d = new com.vaadin.flow.component.dialog.Dialog();
+        d.setHeaderTitle("¿Borrar la captura?");
+        d.add(new Span("Captura del " + c.disparo().format(HORA) + ": " + c.motivo() + ". Se borran todas sus lecturas y no se puede deshacer."));
+        Button si = new Button("Borrar", e -> {
+            try {
+                capturas.borrar(c.id());
+                d.close();
+                capturaDetalle.removeAll();
+                capturasGrid.deselectAll();
+                cargarCapturas();
+                Notification.show("Captura borrada.", 3000, Notification.Position.MIDDLE);
+            } catch (Exception ex) {
+                Notification.show("No se pudo borrar: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+        si.getStyle().set("background-color", "#E8505B").set("color", "#fff");
+        d.getFooter().add(new Button("Cancelar", e -> d.close()), si);
+        d.open();
+    }
+
+    private static void agregar(List<GraficaModel.SerieCaptura> series, List<java.util.function.Function<CapturaSegundoService.Muestra, Double>> lectores,
+                                List<String> deGenerador, String generador, String nombre, int panel, String color, boolean punteada,
+                                boolean escalon, java.util.function.Function<CapturaSegundoService.Muestra, Double> lector) {
+        agregar(series, lectores, deGenerador, generador, nombre, panel, color, punteada, escalon, null, lector);
+    }
+
+    /** ajuste: el de disparo de la protección, para mostrar en el tooltip el % del ajuste. */
+    private static void agregar(List<GraficaModel.SerieCaptura> series, List<java.util.function.Function<CapturaSegundoService.Muestra, Double>> lectores,
+                                List<String> deGenerador, String generador, String nombre, int panel, String color, boolean punteada,
+                                boolean escalon, Double ajuste, java.util.function.Function<CapturaSegundoService.Muestra, Double> lector) {
+        series.add(new GraficaModel.SerieCaptura(nombre, panel, color, punteada, escalon, ajuste));
+        lectores.add(lector);
+        deGenerador.add(generador);
+    }
+
+    /** 1,3 · 0,65 · 10: sin ceros de más, con coma decimal. */
+    private static String numero(double v) {
+        return java.math.BigDecimal.valueOf(Math.round(v * 100) / 100.0).stripTrailingZeros().toPlainString().replace('.', ',');
+    }
+
+    private static Double promedio(Double a, Double b, Double c) {
+        if (a == null || b == null || c == null) return null;
+        return Math.round((a + b + c) / 3 * 10) / 10.0;
+    }
+
+    /** CSV de la captura: una fila por segundo y generador, con todas las columnas guardadas. */
+    private static String csvCaptura(List<CapturaSegundoService.Muestra> muestras) {
+        StringBuilder sb = new StringBuilder("﻿fecha;milisegundo;generador;marcha;selector;estado;mcb;gcb");
+        List<ParametroGenerador> cols = CapturaSegundoService.columnas();
+        for (ParametroGenerador p : cols) sb.append(';').append(p.columna());
+        sb.append('\n');
+        DateTimeFormatter f = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+        for (CapturaSegundoService.Muestra m : muestras) {
+            LocalDateTime t = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(m.t()), java.time.ZoneId.systemDefault());
+            sb.append(t.format(f)).append(';').append(m.t() % 1000).append(';').append(CsvUtil.escape(m.generador())).append(';')
+                    .append(m.marcha() ? 1 : 0).append(';').append(m.selector() == null ? "" : m.selector().etiqueta()).append(';')
+                    .append(m.estado() == null ? "" : m.estado().name()).append(';')
+                    .append(m.mcb() == null ? "" : m.mcb() ? 1 : 0).append(';').append(m.gcb() == null ? "" : m.gcb() ? 1 : 0);
+            for (ParametroGenerador p : cols) {
+                Double v = m.v(p);
+                sb.append(';').append(v == null ? "" : String.valueOf(v).replace('.', ','));
+            }
+            sb.append('\n');
+        }
+        return sb.toString();
     }
 
     // ================= Historial de eventos =================
@@ -715,6 +1209,7 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         }
         marcarPestanas(alarmasEnVivo);
         avisarRed();
+        if (tabSirena != null && tabs.getSelectedTab() == tabSirena) refrescarSirena();
     }
 
     /**
@@ -780,6 +1275,8 @@ public class GeneradorView extends VerticalLayout implements BeforeEnterObserver
         }
         d.put("modo", m == null ? null : m.modo(l));
         d.put("listoAmf", m == null ? null : m.listoAmf(l));
+        SenalesRed.Selector selector = m == null || m.red() == null ? null : m.red().selector(l);
+        d.put("selector", selector == null ? null : selector.name());
         d.put("temporizador", m == null ? null : m.temporizador(l));
         d.put("temporizadorTotal", m == null ? null : m.tiempoAjustado(m.temporizador(l), l));
         Map<String, Double> v = new LinkedHashMap<>();

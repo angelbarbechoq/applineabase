@@ -37,22 +37,32 @@ public class GeneradorReaderService {
     private final GeneradorAlarmasService alarmas;
     private final IslaService islas;
     private final RedControladorService red;
+    private final ModoFuncionamientoService modo;
 
     /** Último estado conocido (true = en marcha) y última lectura guardada estando parado. */
     private final Map<String, Boolean> enMarchaAnterior = new ConcurrentHashMap<>();
     private final Map<String, LocalDateTime> ultimoGuardadoParado = new ConcurrentHashMap<>();
+    /**
+     * Intento de arranque fallido: contador de arranques del controlador en la última lectura parado, el de antes del
+     * arranque en curso (null = la app empezó con el generador en marcha) y si ese arranque tomó carga.
+     */
+    private final Map<String, Integer> contadorParado = new ConcurrentHashMap<>();
+    private final Map<String, Integer> contadorAntes = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> tomoCarga = new ConcurrentHashMap<>();
     /** Comunicación por generador: el log avisa solo cuando cambia (no cada minuto). */
     private final Map<String, Boolean> comunicando = new ConcurrentHashMap<>();
     private final Set<String> avisados = ConcurrentHashMap.newKeySet();
 
     public GeneradorReaderService(GeneradoresConfigService config, GeneradorAlmacen almacen, HistorialEventosService historial,
-                                  GeneradorAlarmasService alarmas, IslaService islas, RedControladorService red) {
+                                  GeneradorAlarmasService alarmas, IslaService islas, RedControladorService red,
+                                  ModoFuncionamientoService modo) {
         this.config = config;
         this.almacen = almacen;
         this.historial = historial;
         this.alarmas = alarmas;
         this.islas = islas;
         this.red = red;
+        this.modo = modo;
     }
 
     public void leerGeneradores() {
@@ -112,6 +122,11 @@ public class GeneradorReaderService {
                 } catch (Exception e) {
                     logger.error("Generador {}: error con las senales de red del controlador: {}", g.nombre(), e.getMessage(), e);
                 }
+                try {
+                    modo.procesar(g.nombre(), modelo.get().red(), l, modelo.get().listoAmf(l));
+                } catch (Exception e) {
+                    logger.error("Generador {}: error verificando el modo del selector: {}", g.nombre(), e.getMessage(), e);
+                }
             }
         }
         // Isla (interruptor de la planta abierto con el controlador viendo red): se busca en lo recién guardado. En los
@@ -140,14 +155,26 @@ public class GeneradorReaderService {
             } else {
                 almacen.abrirArranque(nombre, l, antes == null);
             }
+            Integer previo = antes == null ? null : contadorParado.get(nombre);
+            if (previo == null) contadorAntes.remove(nombre);
+            else contadorAntes.put(nombre, previo);
+            tomoCarga.put(nombre, false);
         } else if (!enMarcha && Boolean.TRUE.equals(antes)) {
-            almacen.cerrarArranque(nombre, l);
+            Long id = almacen.cerrarArranque(nombre, l);
+            // El motor giró y se detuvo sin que el controlador contara el arranque ni tomara carga: no es un arranque (el
+            // historial lo anota como intento fallido).
+            if (id != null && LecturaGenerador.intentoDeArranque(contadorAntes.get(nombre), l.arranques(),
+                    Boolean.TRUE.equals(tomoCarga.get(nombre)))) {
+                almacen.borrarArranque(nombre, id);
+            }
             ultimoGuardadoParado.remove(nombre); // guardar la primera lectura ya parado
         } else if (!enMarcha && antes == null) {
             // App recién iniciada con el generador parado: cerrar un arranque que quedó abierto.
             almacen.cerrarArranque(nombre, l);
         }
 
+        if (enMarcha && l.kw() != null && l.kw() >= GeneradorAnalisisService.KW_VACIO) tomoCarga.put(nombre, true);
+        if (!enMarcha && l.arranques() != null) contadorParado.put(nombre, l.arranques());
         if (enMarcha) {
             almacen.guardarLectura(nombre, l);
             almacen.actualizarKwMax(nombre, l.kw());

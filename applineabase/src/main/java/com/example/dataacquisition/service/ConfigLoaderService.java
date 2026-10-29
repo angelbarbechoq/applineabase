@@ -74,6 +74,40 @@ public class ConfigLoaderService {
         return meta instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
     }
 
+    /** Captura al segundo de los generadores encendida (clave "capturaAlSegundo" de generador-config.json); false si falta. */
+    public boolean loadGeneradorCapturaAlSegundo() {
+        return Boolean.TRUE.equals(leerArchivo(GENERADOR_CONFIG_FILE).get("capturaAlSegundo"));
+    }
+
+    /** Bloque "sirena" de generador-config.json (PLC LOGO!, entradas de red y cortes programados); vacío si falta. */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> loadGeneradorSirena() {
+        Object s = leerArchivo(GENERADOR_CONFIG_FILE).get("sirena");
+        return s instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+    }
+
+    /** Guarda el bloque "sirena"; el resto de generador-config.json queda igual (si no se puede leer, no escribe nada). */
+    public void saveGeneradorSirena(Map<String, Object> sirena) {
+        Map<String, Object> contenido = new LinkedHashMap<>(leerArchivo(GENERADOR_CONFIG_FILE));
+        if (contenido.isEmpty()) {
+            throw new IllegalStateException("No se pudo leer " + GENERADOR_CONFIG_FILE + ": no se guardó nada");
+        }
+        contenido.put("sirena", sirena);
+        escribirArchivo(GENERADOR_CONFIG_FILE, contenido);
+        logger.info("{}: configuración de la sirena guardada", GENERADOR_CONFIG_FILE);
+    }
+
+    /** Enciende o apaga la captura al segundo (lo hace el administrador); el resto de generador-config.json queda igual. */
+    public void saveGeneradorCapturaAlSegundo(boolean encendida) {
+        Map<String, Object> contenido = new LinkedHashMap<>(leerArchivo(GENERADOR_CONFIG_FILE));
+        if (contenido.isEmpty()) {
+            throw new IllegalStateException("No se pudo leer " + GENERADOR_CONFIG_FILE + ": no se guardó nada");
+        }
+        contenido.put("capturaAlSegundo", encendida);
+        escribirArchivo(GENERADOR_CONFIG_FILE, contenido);
+        logger.info("{}: captura al segundo {}", GENERADOR_CONFIG_FILE, encendida ? "encendida" : "apagada");
+    }
+
     /**
      * Guarda los límites del semáforo de la meta (clave "metaImportacionRed" de generador-config.json); el resto del
      * archivo queda igual. Si no se puede leer el archivo no escribe nada, para no perder los generadores.

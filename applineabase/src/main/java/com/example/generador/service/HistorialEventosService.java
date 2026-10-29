@@ -56,6 +56,15 @@ public class HistorialEventosService {
         Set<String> alarmas;
         String modo;
         Boolean listoAmf;
+        // Lecturas seguidas sin "listo para AMF": se avisa recién con 2 (en cada parada y en algunos arranques el
+        // controlador lo pierde 1 minuto, 26 al 28-10-2026).
+        int noListoSeguidas;
+        // Marcha en curso: contador de arranques de antes de girar, cuándo empezó, si tomó carga y las rpm máximas (para
+        // distinguir un intento de arranque fallido).
+        Integer arranquesAntes;
+        LocalDateTime inicioMarcha;
+        boolean huboCarga;
+        double rpmMax;
     }
 
     private final Map<String, Estado> estados = new ConcurrentHashMap<>();
@@ -95,8 +104,21 @@ public class HistorialEventosService {
             if (Boolean.FALSE.equals(e.comunicando)) nuevos.add(EventoGenerador.de(t, COMUNICACION_RECUPERADA, "El controlador volvió a responder", l));
             if (marcha && !e.marcha) {
                 nuevos.add(EventoGenerador.de(t, ARRANQUE, "Motor en marcha" + (l.arranques() == null ? "" : " (arranque Nro " + l.arranques() + ")"), l));
+                e.arranquesAntes = e.arranques;
+                e.inicioMarcha = t;
+                e.huboCarga = false;
+                e.rpmMax = 0;
             } else if (!marcha && e.marcha) {
-                nuevos.add(EventoGenerador.de(t, PARADA, "Motor parado", l));
+                if (e.inicioMarcha != null && LecturaGenerador.intentoDeArranque(e.arranquesAntes, l.arranques(), e.huboCarga)) {
+                    // No arrancó: en vez de "arranque" y "parada", un intento fallido (el arranque ya anotado se borra).
+                    borrar(generador, ARRANQUE, e.inicioMarcha);
+                    nuevos.add(EventoGenerador.de(t, INTENTO_ARRANQUE, String.format(java.util.Locale.ROOT,
+                            "El motor giró desde las %s (hasta %.0f rpm) y se detuvo sin arrancar: el controlador no contó el arranque (sigue en %d)",
+                            e.inicioMarcha.format(DateTimeFormatter.ofPattern("HH:mm:ss")), e.rpmMax, l.arranques()), l));
+                } else {
+                    nuevos.add(EventoGenerador.de(t, PARADA, "Motor parado", l));
+                }
+                e.inicioMarcha = null;
             } else if (!marcha && e.arranques != null && l.arranques() != null && l.arranques() > e.arranques) {
                 nuevos.add(EventoGenerador.de(t, ARRANQUE_BREVE, "El contador de arranques del controlador subió de " + e.arranques
                         + " a " + l.arranques() + " sin que se viera el motor en marcha: arranque de menos de 1 minuto", l));
@@ -121,15 +143,25 @@ public class HistorialEventosService {
                         ? EventoGenerador.de(t, MODO_AUTO, "El controlador vuelve a AUTO (estaba en " + e.modo + ")", l)
                         : EventoGenerador.de(t, CAMBIO_MODO, "El controlador pasa de " + e.modo + " a " + modo, l));
             }
-            if (listoAmf != null && e.listoAmf != null && !listoAmf.equals(e.listoAmf)) {
-                nuevos.add(listoAmf
-                        ? EventoGenerador.de(t, LISTO_AMF, "Si se corta la red, el generador vuelve a entrar solo", l)
-                        : EventoGenerador.de(t, NO_LISTO_AMF, "Si se corta la red, el generador no entraría solo"
-                                + (modo == null ? "" : " (modo " + modo + ")"), l));
+            if (listoAmf != null && e.listoAmf != null) {
+                if (listoAmf) {
+                    if (!e.listoAmf) nuevos.add(EventoGenerador.de(t, LISTO_AMF, "Si se corta la red, el generador vuelve a entrar solo", l));
+                } else if (e.listoAmf && e.noListoSeguidas + 1 >= 2) {
+                    nuevos.add(EventoGenerador.de(t, NO_LISTO_AMF, "Si se corta la red, el generador no entraría solo (desde la lectura anterior"
+                            + (modo == null ? "" : ", modo " + modo) + ")", l));
+                }
             }
         }
         if (modo != null) e.modo = modo;
-        if (listoAmf != null) e.listoAmf = listoAmf;
+        if (listoAmf != null) {
+            e.noListoSeguidas = listoAmf ? 0 : e.noListoSeguidas + 1;
+            // El estado informado cambia a "no listo" recién con 2 lecturas seguidas (o en la primera lectura).
+            if (listoAmf || e.listoAmf == null || e.noListoSeguidas >= 2) e.listoAmf = listoAmf;
+        }
+        if (marcha) {
+            if (Boolean.TRUE.equals(carga)) e.huboCarga = true;
+            if (l.rpm() != null) e.rpmMax = Math.max(e.rpmMax, l.rpm());
+        }
         e.comunicando = true;
         e.marcha = marcha;
         e.carga = carga;
@@ -248,6 +280,18 @@ public class HistorialEventosService {
     /** Guarda eventos detectados fuera de esta clase (señales de red del controlador, RedControladorService). */
     public void registrar(String generador, List<EventoGenerador> eventos) {
         guardar(generador, eventos);
+    }
+
+    /** Borra el evento de ese tipo y fecha (el "arranque" de un intento de arranque fallido). */
+    private void borrar(String generador, TipoEventoGenerador tipo, LocalDateTime fecha) {
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + ruta());
+             PreparedStatement ps = c.prepareStatement("DELETE FROM \"" + generador + "\" WHERE tipo = ? AND fecha = ?")) {
+            ps.setString(1, tipo.name());
+            ps.setString(2, fecha.format(FECHA));
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            logger.error("No se pudo borrar el evento {} de {} del {}: {}", tipo, generador, fecha, e.getMessage());
+        }
     }
 
     private void guardar(String generador, List<EventoGenerador> eventos) {

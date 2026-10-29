@@ -41,6 +41,17 @@ public record LecturaGenerador(LocalDateTime fecha, Map<ParametroGenerador, Doub
         return rpm != null && rpm > 0;
     }
 
+    /**
+     * Intento de arranque fallido: el motor giró y se detuvo sin que el contador de arranques del controlador subiera
+     * (ComAp lo cuenta al arrancar de verdad) y sin tomar carga. false si no se conoce el contador de antes.
+     *
+     * @param contadorAntes contador en la última lectura con el motor parado, antes de girar
+     * @param contadorAlParar contador en la lectura en que se lo ve parado
+     */
+    public static boolean intentoDeArranque(Integer contadorAntes, Integer contadorAlParar, boolean tomoCarga) {
+        return contadorAntes != null && contadorAlParar != null && contadorAlParar <= contadorAntes && !tomoCarga;
+    }
+
     public Double rpm() { return valor(RPM); }
     public Double frecuencia() { return valor(FRECUENCIA); }
     public Double vL1N() { return valor(V_L1N); }

@@ -9,6 +9,11 @@ public enum TipoEventoGenerador {
     INICIO_LECTURA("Inicio de lectura", Nivel.NORMAL),
     ARRANQUE("Arranque", Nivel.BUENO),
     ARRANQUE_BREVE("Arranque breve", Nivel.AVISO),
+    /**
+     * El motor giró y se detuvo sin arrancar: el contador de arranques del controlador no subió y no tomó carga (el
+     * GenPower lo hizo el 26 y el 27-10-2026, entró al segundo intento). No se guarda como arranque.
+     */
+    INTENTO_ARRANQUE("Intento de arranque fallido", Nivel.AVISO),
     PARADA("Parada", Nivel.NORMAL),
     TOMA_CARGA("Toma carga", Nivel.BUENO),
     SIN_CARGA("Queda en vacío", Nivel.NORMAL),
@@ -30,9 +35,11 @@ public enum TipoEventoGenerador {
     ISLA("Paso a isla", Nivel.FALLA),
     /** Paso a isla con el selector del controlador en Isla (entrada Force Island): a propósito, sin alarma urgente. */
     ISLA_SELECTOR("Paso a isla con el selector", Nivel.AVISO),
-    /** Selector de tres posiciones del controlador (AMF / sincronismo con la red / isla), entrada Force Island. */
-    SELECTOR_ISLA("Selector en Isla", Nivel.AVISO),
-    SELECTOR_FUERA_ISLA("Selector fuera de Isla", Nivel.NORMAL),
+    /** Selector de tres posiciones del tablero (AMF / Sincronismo / Isla), entradas Remote Start/Stop y Force Island. */
+    CAMBIO_SELECTOR("Cambio de posición del selector", Nivel.NORMAL),
+    /** Con el selector en una posición, el controlador no hace lo que corresponde por más de 5 min (ModoFuncionamientoService). */
+    MODO_NO_CUMPLE("No cumple el modo del selector", Nivel.AVISO),
+    MODO_CUMPLE("Vuelve a cumplir el modo del selector", Nivel.BUENO),
     /** Potencia sobre el límite de generador-config.json (alarmaPotenciaKw) y su vuelta por debajo. */
     POTENCIA_ALTA("Potencia sobre el límite", Nivel.AVISO),
     POTENCIA_NORMAL("Potencia vuelve bajo el límite", Nivel.BUENO),

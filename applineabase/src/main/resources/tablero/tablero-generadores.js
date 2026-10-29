@@ -26,6 +26,9 @@ if (!window.TableroGeneradores) {
 .tg-modos span.tg-act.AUTO { background: #3BB273; border-color: #3BB273; color: #fff; }
 .tg-modos span.tg-act.MAN, .tg-modos span.tg-act.TEST { background: #E0B50F; border-color: #E0B50F; color: #fff; }
 .tg-modos span.tg-act.OFF { background: #E8505B; border-color: #E8505B; color: #fff; }
+.tg-selector { margin-left: 12px; align-items: center; }
+.tg-selector em { font-style: normal; font-size: 12px; color: #6b7080; margin-right: 2px; }
+.tg-selector span.tg-act { background: #3B8FF3; border-color: #3B8FF3; color: #fff; }
 .tg-esquema { background: #2B2F3A; border-radius: 12px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(220px, 1fr); gap: 14px; color: #fff; }
 .tg-esquema > svg { width: 100%; max-width: 860px; height: auto; display: block; margin: 0 auto; align-self: center; }
 .tg-alarmas { background: #20232c; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
@@ -124,6 +127,9 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
 
     function tablero(g) {
       const modos = ["OFF", "MAN", "AUTO", "TEST"].map(m => `<span class="${m}${m === g.modo ? " tg-act" : ""}">${m}</span>`).join("");
+      // Selector de tres posiciones del tablero del generador, en el orden de la llave: Sincronismo, AMF, Isla.
+      const selector = [["SINCRONISMO", "Sincronismo"], ["AMF", "AMF"], ["ISLA", "Isla"]]
+        .map(([k, t]) => `<span class="${k === g.selector ? "tg-act" : ""}">${t}</span>`).join("");
       const barra = `<div class="tg-card tg-barra tg-a-top">
         <button type="button" class="tg-nombre" title="Actualizar (leer de nuevo los controladores)">${ICONO_ACTUALIZAR}${esc(g.nombre)}</button><span class="tg-sub">${esc(g.modelo)} · ${esc(g.trafo)}</span>
         ${g.sinComunicacion != null
@@ -133,7 +139,8 @@ table.tg-io tr.tg-nousado td { color: #b0b4bf; }
                ? `<span class="tg-badge tg-ok" title="Si se corta la red, el generador entra solo">LISTO PARA AMF</span>`
                : `<span class="tg-badge tg-fuera" title="Si se corta la red, el generador no entraria solo">NO LISTO PARA AMF</span>`}
              <span class="tg-leido">Leido ${esc(g.leido)}${g.reloj ? ` · reloj del controlador ${esc(g.reloj)} <span class="tg-badge ${g.desfaseAlto ? "tg-aviso" : "tg-ok"}">${esc(g.desfase)}</span>` : ""}</span>`}
-        ${g.modo != null ? `<span class="tg-modos">${modos}</span>` : ""}</div>`;
+        ${g.modo != null ? `<span class="tg-modos">${modos}</span>` : ""}
+        ${g.selector != null ? `<span class="tg-modos tg-selector" title="Posición del selector del tablero del generador"><em>Selector</em>${selector}</span>` : ""}</div>`;
       if (g.sinComunicacion != null) return `<section class="tg-tablero">${barra}</section>`;
       return `<section class="tg-tablero">${barra}
         <div class="tg-esquema tg-a-esq">${esquema(g)}${alarmas(g)}</div>

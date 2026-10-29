@@ -13,6 +13,9 @@ public interface AlarmaEventoRepository extends JpaRepository<AlarmaEvento, Long
     Optional<AlarmaEvento> findFirstByLineaMaquinaAndTipoAlarmaAndActivaTrue(String lineaMaquina, TipoAlarma tipoAlarma);
     /** Todas las activas de una máquina y tipo (un generador puede tener varias alarmas a la vez). */
     List<AlarmaEvento> findByLineaMaquinaAndTipoAlarmaAndActivaTrue(String lineaMaquina, TipoAlarma tipoAlarma);
+    /** Las activas de este tipo, de cualquier máquina (la sirena sigue a las alarmas de red y de potencia de cada generador). */
+    List<AlarmaEvento> findByTipoAlarmaAndActivaTrue(TipoAlarma tipoAlarma);
+
     List<AlarmaEvento> findAllByOrderByFechaInicioDesc();
     List<AlarmaEvento> findByFechaInicioAfterOrderByFechaInicioDesc(LocalDateTime fechaInicio);
     List<AlarmaEvento> findByActivaTrueOrderByFechaInicioDesc();

@@ -127,6 +127,7 @@ public class AlarmasConfigView extends VerticalLayout {
                     c.getLecturasConsecutivasUrgente() == null ? 0 : c.getLecturasConsecutivasUrgente());
             case ALARMA_GENERADOR, PERDIDA_RED -> "la define el controlador del generador";
             case POTENCIA_GENERADOR -> "límite de cada generador en generador-config.json";
+            case MODO_GENERADOR -> "la define el selector del tablero del generador";
         };
     }
 

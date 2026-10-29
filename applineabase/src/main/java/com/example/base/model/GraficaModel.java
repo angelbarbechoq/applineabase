@@ -1306,6 +1306,103 @@ public class GraficaModel {
     }
 
     /**
+     * Una curva de la captura al segundo: en qué panel va, su color ("0xRRGGBB"), si es punteada, si va en escalón y, si se
+     * da, el ajuste de disparo contra el que se muestra su % en el tooltip.
+     */
+    public record SerieCaptura(String nombre, int panel, String color, boolean punteada, boolean escalon, Double ajuste) {
+    }
+
+    /** Línea horizontal de referencia en un panel (el ajuste de disparo y su mitad). */
+    public record LineaReferencia(int panel, double valor, String color, String texto) {
+    }
+
+    /**
+     * Captura al segundo de los generadores (Generadores > Capturas al segundo): un panel por magnitud, uno debajo del otro
+     * y con el mismo eje de tiempo (potencia, frecuencia, tensión de red, ROCOF, interruptores), una línea roja en el
+     * instante del disparo y los marcadores de clic. La leyenda prende y apaga cada curva. {@code valores.get(i)[s]} = valor
+     * de la serie s en {@code tiempos.get(i)} (null = sin lectura en ese segundo).
+     */
+    public static String getCapturaScript(String containerId, List<Long> tiempos, List<String> paneles, List<SerieCaptura> series,
+                                          List<Double[]> valores, Long disparo, List<LineaReferencia> referencias) {
+        StringBuilder datos = new StringBuilder("[");
+        for (int i = 0; i < tiempos.size(); i++) {
+            if (i > 0) datos.append(",");
+            datos.append("{t:").append(tiempos.get(i));
+            Double[] v = valores.get(i);
+            for (int s = 0; s < series.size(); s++) {
+                Double x = v[s];
+                datos.append(",s").append(s).append(":").append(x == null || x.isNaN() ? "null" : String.valueOf(Math.round(x * 100) / 100.0));
+                Double aj = series.get(s).ajuste();
+                if (aj != null && aj > 0 && x != null && !x.isNaN()) datos.append(",p").append(s).append(":").append(Math.round(Math.abs(x) / aj * 100));
+            }
+            datos.append("}");
+        }
+        datos.append("]");
+        StringBuilder js = new StringBuilder("(function() {").append(scriptInicializarRoot(containerId))
+                .append("var chart = root.container.children.push(am5xy.XYChart.new(root, { panX: true, panY: false, wheelX: 'panX', wheelY: 'zoomX', layout: root.verticalLayout, paddingTop: 6 }));")
+                .append("chart.leftAxesContainer.set('layout', root.verticalLayout);")
+                .append("var datos = ").append(datos).append(";")
+                .append("var xAxis = chart.xAxes.push(am5xy.DateAxis.new(root, { baseInterval: { timeUnit: 'second', count: 1 }, renderer: am5xy.AxisRendererX.new(root, { minGridDistance: 80 }), tooltip: am5.Tooltip.new(root, {}) }));")
+                .append("xAxis.get('dateFormats')['second'] = 'HH:mm:ss'; xAxis.get('periodChangeDateFormats')['second'] = 'HH:mm:ss';")
+                .append("xAxis.get('renderer').labels.template.setAll({ fontSize: '11px', fill: am5.color(0x52514e) });")
+                .append("var ejes = [];");
+        // Un panel con líneas de referencia llega por lo menos hasta la más alta, para que se vea aunque los valores estén lejos.
+        double[] tope = new double[paneles.size()];
+        java.util.Arrays.fill(tope, Double.NaN);
+        for (LineaReferencia r : referencias) tope[r.panel()] = Double.isNaN(tope[r.panel()]) ? r.valor() : Math.max(tope[r.panel()], r.valor());
+        for (int s = 0; s < series.size(); s++) {
+            int p = series.get(s).panel();
+            if (Double.isNaN(tope[p])) continue;
+            for (Double[] v : valores) if (v[s] != null && !v[s].isNaN()) tope[p] = Math.max(tope[p], Math.abs(v[s]));
+        }
+        for (int p = 0; p < paneles.size(); p++) {
+            js.append("var y").append(p).append(" = chart.yAxes.push(am5xy.ValueAxis.new(root, { renderer: am5xy.AxisRendererY.new(root, {}), marginTop: ")
+                    .append(p == 0 ? 0 : 14).append(" }));")
+                    .append(Double.isNaN(tope[p]) ? "" : "y" + p + ".setAll({ min: 0, max: " + Math.round(tope[p] * 1.15 * 100) / 100.0 + ", strictMinMax: true });")
+                    .append("y").append(p).append(".get('renderer').labels.template.setAll({ fill: am5.color(0x52514e), fontSize: '10px' });")
+                    .append("y").append(p).append(".get('renderer').grid.template.setAll({ stroke: am5.color(0xe1e0d9), strokeWidth: 1 });")
+                    .append("y").append(p).append(".children.unshift(am5.Label.new(root, { rotation: -90, text: ").append(jsString(paneles.get(p)))
+                    .append(", y: am5.p50, centerX: am5.p50, fontSize: '10px', fill: am5.color(0x52514e) }));")
+                    .append("ejes.push(y").append(p).append(");");
+        }
+        js.append("var lista = [];");
+        for (int s = 0; s < series.size(); s++) {
+            SerieCaptura sc = series.get(s);
+            String tipo = sc.escalon() ? "StepLineSeries" : "LineSeries";
+            js.append("(function() { var sr = chart.series.push(am5xy.").append(tipo).append(".new(root, { name: ").append(jsString(sc.nombre()))
+                    .append(", xAxis: xAxis, yAxis: ejes[").append(sc.panel()).append("], valueYField: 's").append(s)
+                    .append("', valueXField: 't', connect: false, stroke: am5.color(").append(sc.color()).append("), fill: am5.color(").append(sc.color())
+                    .append("), tooltip: am5.Tooltip.new(root, { labelText: ").append(jsString(sc.nombre() + ": {valueY}"
+                            + (sc.ajuste() == null ? "" : " · {p" + s + "} % del ajuste"))).append(" }) }));")
+                    .append("sr.strokes.template.setAll({ strokeWidth: 1.4").append(sc.punteada() ? ", strokeDasharray: [4, 3]" : "").append(" });")
+                    .append("sr.data.setAll(datos); lista.push(sr); })();");
+        }
+        for (LineaReferencia r : referencias) {
+            js.append("(function() { var ri = ejes[").append(r.panel()).append("].makeDataItem({ value: ").append(r.valor())
+                    .append(" }); var rg = ejes[").append(r.panel()).append("].createAxisRange(ri);")
+                    .append("setTimeout(function() { if (rg.get('grid')) rg.get('grid').setAll({ stroke: am5.color(").append(r.color())
+                    .append("), strokeWidth: 1.5, strokeDasharray: [6, 4], strokeOpacity: 0.9, visible: true }); }, 0);")
+                    .append("rg.get('label').setAll({ text: ").append(jsString(r.texto())).append(", fill: am5.color(").append(r.color())
+                    .append("), fontSize: '10px', inside: true, centerY: am5.p100, centerX: am5.p0, dx: 4, visible: true,")
+                    .append(" background: am5.RoundedRectangle.new(root, { fill: am5.color(0xffffff), fillOpacity: 0.8 }) }); })();");
+        }
+        if (disparo != null) {
+            js.append("var rd = xAxis.makeDataItem({ value: ").append(disparo).append(" }); var rr = xAxis.createAxisRange(rd);")
+                    .append("setTimeout(function() { if (rr.get('grid')) rr.get('grid').setAll({ stroke: am5.color(0xd32f2f), strokeWidth: 2, strokeOpacity: 0.9, visible: true }); }, 0);");
+        }
+        js.append("var legend = chart.children.push(am5.Legend.new(root, { centerX: am5.p50, x: am5.p50, marginTop: 8 }));")
+                .append("legend.labels.template.setAll({ fontSize: '12px', fill: am5.color(0x0b0b0b) });")
+                .append("legend.data.setAll(lista);")
+                .append("chart.set('cursor', am5xy.XYCursor.new(root, { behavior: 'zoomX', xAxis: xAxis }));")
+                .append("chart.get('cursor').lineY.set('visible', false);")
+                .append("chart.set('scrollbarX', am5.Scrollbar.new(root, { orientation: 'horizontal' }));")
+                .append(scriptMarcadoresDeClic())
+                .append("window.am5Charts[id] = { root: root, chart: chart };")
+                .append("})();");
+        return js.toString();
+    }
+
+    /**
      * Consumo de la planta en el tiempo (también el minuto a minuto de un período en marcha en Análisis): una línea por
      * generador con lo que genera, la línea del consumo de la planta y
      * columnas de la red (hacia arriba lo tomado, en azul; hacia abajo lo entregado, en verde agua).

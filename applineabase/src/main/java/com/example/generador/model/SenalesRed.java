@@ -16,16 +16,45 @@ import java.util.Set;
  *                   modelo no tiene quedan en null
  * @param forzarIsla entrada "Force Island" del controlador: el selector de tres posiciones (AMF / sincronismo con la red /
  *                   isla) en Isla. Con el selector en Isla la isla es a propósito: no abre la alarma urgente de pérdida de red
+ * @param sincronismo entrada "Remote Start/Stop": el mismo selector en Sincronismo (arranca y entra en paralelo con la red);
+ *                   sin esta ni Force Island, el selector está en AMF
  * @param limiteSaltoVector ajuste de disparo de la protección de salto de vector (grados) y {@code limiteRocof}, el de
  *                   la ROCOF (Hz/s), copiados de los ajustes del controlador (no los publica por Modbus); null = no se
  *                   conoce y no se compara
  */
 public record SenalesRed(Set<Integer> paralelo, Set<Integer> isla, Set<Integer> fallaRed, Set<Integer> retornoRed,
                          List<String> nombres, Bit mcbCerrado, Bit gcbCerrado, Bit avisoFallaRed, Bit proteccionRed,
-                         Bit saltoVector, Bit rocof, Bit forzarIsla, Double limiteSaltoVector, Double limiteRocof) {
+                         Bit saltoVector, Bit rocof, Bit forzarIsla, Bit sincronismo, Double limiteSaltoVector,
+                         Double limiteRocof) {
 
     /** Lo que importa del estado de los interruptores. OTRO: sin generador conectado, sincronizando, etc. */
     public enum Estado { PARALELO, ISLA, FALLA_RED, RETORNO_RED, OTRO }
+
+    /** Posición del selector de tres posiciones del tablero del generador. */
+    public enum Selector {
+        AMF("AMF"), SINCRONISMO("Sincronismo"), ISLA("Isla");
+
+        private final String etiqueta;
+
+        Selector(String etiqueta) {
+            this.etiqueta = etiqueta;
+        }
+
+        public String etiqueta() {
+            return etiqueta;
+        }
+    }
+
+    /**
+     * Posición del selector según las entradas Force Island (Isla) y Remote Start/Stop (Sincronismo); ninguna = AMF.
+     * null si el modelo no tiene las dos entradas o no se leyeron (no se puede distinguir AMF).
+     */
+    public Selector selector(LecturaGenerador l) {
+        Boolean isla = valor(forzarIsla, l), sinc = valor(sincronismo, l);
+        if (Boolean.TRUE.equals(isla)) return Selector.ISLA;
+        if (Boolean.TRUE.equals(sinc)) return Selector.SINCRONISMO;
+        return isla == null || sinc == null ? null : Selector.AMF;
+    }
 
     /** Un bit de una palabra leída (bit 0 = el de menor peso). */
     public record Bit(ParametroGenerador parametro, int bit) {

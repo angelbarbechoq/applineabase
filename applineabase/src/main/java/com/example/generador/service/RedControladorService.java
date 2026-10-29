@@ -25,7 +25,7 @@ import static com.example.generador.model.TipoEventoGenerador.*;
 
 /**
  * Red e interruptores según el propio controlador (modelos con "red" en generador-modelos.json; hoy el InteliGen 500
- * G2 del Caterpillar y el InteliGen 200 del GenPower, este sin ROCOF ni salto de vector). Cada lectura de fondo (1 por minuto) se compara con la anterior:
+ * G2 del Caterpillar y el InteliGen 200 del GenPower, que no publica la medición de ROCOF ni de salto de vector; sus protecciones abren su GCB). Cada lectura de fondo (1 por minuto) se compara con la anterior:
  * - historial de eventos: falla de red, paso a isla, retorno de red y vuelta a paralelo (estado de los interruptores),
  *   apertura y cierre del interruptor de la planta (MCB Feedback), ROCOF o salto de vector vistos activos, aviso si en
  *   paralelo pasan la mitad del ajuste de disparo y, al salir de paralelo, los máximos de esa marcha;
@@ -136,11 +136,6 @@ public class RedControladorService {
                 eventos.add(EventoGenerador.de(t, mcb ? INTERRUPTOR_RED_CERRADO : INTERRUPTOR_RED_ABIERTO, mcb
                         ? "El controlador ve cerrado el interruptor de la planta (MCB Feedback); estado " + nombre
                         : "El controlador ve abierto el interruptor de la planta (MCB Feedback); estado " + nombre + detalle(red, l), l));
-            }
-            if (selector != null && p.selectorIsla != null && !selector.equals(p.selectorIsla)) {
-                eventos.add(EventoGenerador.de(t, selector ? SELECTOR_ISLA : SELECTOR_FUERA_ISLA, selector
-                        ? "El selector del controlador pasa a Isla (entrada Force Island); estado " + nombre
-                        : "El selector del controlador sale de Isla (entrada Force Island); estado " + nombre, l));
             }
             if (rocofActiva && !p.rocofActiva) {
                 eventos.add(EventoGenerador.de(t, PROTECCION_RED, "ROCOF activa en la lectura" + rocof(l), l));

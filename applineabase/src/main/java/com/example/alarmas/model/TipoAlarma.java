@@ -25,10 +25,15 @@ public enum TipoAlarma {
      * Potencia de un generador sobre el límite de generador-config.json ("alarmaPotenciaKw" de cada generador), según
      * su controlador (GeneradorAlarmasService). Abierta mientras dure; no urgente.
      */
-    POTENCIA_GENERADOR;
+    POTENCIA_GENERADOR,
+    /**
+     * El generador no hace lo que pide el selector de su tablero (AMF / Sincronismo / Isla) por más de 5 min
+     * (ModoFuncionamientoService). Abierta mientras dure; no urgente.
+     */
+    MODO_GENERADOR;
 
     /** Alarmas de los generadores: no se configuran y las ve quien tiene "Ver Generadores". */
     public boolean deGenerador() {
-        return this == ALARMA_GENERADOR || this == PERDIDA_RED || this == POTENCIA_GENERADOR;
+        return this == ALARMA_GENERADOR || this == PERDIDA_RED || this == POTENCIA_GENERADOR || this == MODO_GENERADOR;
     }
 }

@@ -78,6 +78,7 @@
       },
       "mcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 1 },
       "forzarIsla" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 2 },
+      "sincronismo" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 7 },
       "gcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 0 },
       "avisoFallaRed" : { "parametro" : "AVISOS_RED", "bit" : 8 }
     },
@@ -157,6 +158,7 @@
       },
       "mcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 1 },
       "forzarIsla" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 5 },
+      "sincronismo" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 4 },
       "gcbCerrado" : { "parametro" : "ENTRADAS_BINARIAS", "bit" : 2 },
       "avisoFallaRed" : { "parametro" : "AVISOS_RED", "bit" : 4 },
       "proteccionRed" : { "parametro" : "AVISOS_RED", "bit" : 15 },

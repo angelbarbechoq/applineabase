@@ -6,6 +6,7 @@ import com.ghgande.j2mod.modbus.facade.ModbusTCPMaster;
 import com.ghgande.j2mod.modbus.procimg.InputRegister;
 import com.ghgande.j2mod.modbus.procimg.Register;
 import com.ghgande.j2mod.modbus.procimg.SimpleRegister;
+import com.ghgande.j2mod.modbus.util.BitVector;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -107,6 +108,27 @@ public final class ModbusTcpConexion implements Closeable {
     /** Función 04. {@code direccion} base 0. Valores 0-65535. */
     public int[] leerInput(int unitId, int direccion, int cantidad) throws IOException, ExcepcionModbus {
         return valores(ejecutar(() -> master.readInputRegisters(unitId, direccion, cantidad)), cantidad);
+    }
+
+    /**
+     * Función 01: lee {@code cantidad} bits desde {@code direccion} (base 0). En Modbus se llaman "coils"; en el LOGO! son
+     * las salidas Q, las marcas M y la memoria V (de ahí las entradas de red V1.0 y V1.1 de la sirena).
+     */
+    public boolean[] leerBits(int unitId, int direccion, int cantidad) throws IOException, ExcepcionModbus {
+        BitVector bv = ejecutar(() -> master.readCoils(unitId, direccion, cantidad));
+        if (bv == null || bv.size() < cantidad) {
+            throw new IOException("respuesta con " + (bv == null ? 0 : bv.size()) + " bits, se esperaban " + cantidad);
+        }
+        boolean[] bits = new boolean[cantidad];
+        for (int i = 0; i < cantidad; i++) {
+            bits[i] = bv.getBit(i);
+        }
+        return bits;
+    }
+
+    /** Función 05: escribe un bit. {@code direccion} base 0. */
+    public void escribirBit(int unitId, int direccion, boolean valor) throws IOException, ExcepcionModbus {
+        ejecutar(() -> master.writeCoil(unitId, direccion, valor));
     }
 
     /** Función 16. {@code direccion} base 0. */

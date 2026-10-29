@@ -1,6 +1,8 @@
 package com.example.dataacquisition.service;
 
+import com.example.generador.service.CapturaSegundoService;
 import com.example.generador.service.GeneradorReaderService;
+import com.example.generador.service.SirenaService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -43,13 +45,19 @@ public class DataAcquisitionTask {
     private final MezcladorReaderService mezcladorReaderService;
     private final DatabaseInitializationService databaseInitializationService;
     private final GeneradorReaderService generadorReaderService;
+    private final CapturaSegundoService capturaSegundoService;
+    private final SirenaService sirenaService;
 
     public DataAcquisitionTask(PLCDataAcquisitionService plcDataAcquisitionService,
                                PASReaderService pasReaderService,
                                MezcladorReaderService mezcladorReaderService,
                                DatabaseInitializationService databaseInitializationService,
-                               GeneradorReaderService generadorReaderService) {
+                               GeneradorReaderService generadorReaderService,
+                               CapturaSegundoService capturaSegundoService,
+                               SirenaService sirenaService) {
         this.generadorReaderService = generadorReaderService;
+        this.capturaSegundoService = capturaSegundoService;
+        this.sirenaService = sirenaService;
         this.plcDataAcquisitionService = plcDataAcquisitionService;
         this.pasReaderService = pasReaderService;
         this.mezcladorReaderService = mezcladorReaderService;
@@ -59,6 +67,25 @@ public class DataAcquisitionTask {
 
     public int getSecondCounter() {
         return secondCounter;
+    }
+
+    /**
+     * Captura al segundo de los generadores (CapturaSegundoService): un tic aparte del de acquire, porque el ciclo de 60 s
+     * corre dentro de acquire y mientras dura no hay tics. Solo lanza las lecturas en sus propios hilos y vuelve enseguida:
+     * no demora el ciclo de 60 s.
+     */
+    @Scheduled(fixedRate = 1000)
+    public void capturaAlSegundo() {
+        try {
+            capturaSegundoService.tic();
+        } catch (Exception e) {
+            logger.error("Error en la captura al segundo de los generadores", e);
+        }
+        try {
+            sirenaService.tic(); // sirena física: el ciclo corre en su propio hilo
+        } catch (Exception e) {
+            logger.error("Error en la sirena", e);
+        }
     }
 
     @Scheduled(fixedRate = 1000) // Executes every 1 second (1000ms)
