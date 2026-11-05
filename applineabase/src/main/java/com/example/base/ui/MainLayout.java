@@ -261,6 +261,7 @@ public final class MainLayout extends AppLayout {
             grupoElectrogeno.setExpanded(false);
             grupoElectrogeno.addItem(new SideNavItem("Generadores", "generador", VaadinIcon.COG.create()));
             grupoElectrogeno.addItem(new SideNavItem("Análisis", "generador/analisis", VaadinIcon.BAR_CHART.create()));
+            grupoElectrogeno.addItem(new SideNavItem("Control MF-13", "generador/mf13", VaadinIcon.CLIPBOARD_CHECK.create()));
             nav.addItem(grupoElectrogeno);
             colapsarAlSalirDelMouse(grupoElectrogeno);
         }

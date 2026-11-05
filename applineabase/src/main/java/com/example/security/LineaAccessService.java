@@ -128,6 +128,18 @@ public class LineaAccessService {
         return principal.getUsuario().isVerTransformadores();
     }
 
+    /** Cargar registros en Control MF-13: ADMIN, o quien vea los generadores y tenga marcado "Registrar MF-13". */
+    public boolean puedeRegistrarMf13() {
+        if (esAdmin()) {
+            return true;
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {
+            return false;
+        }
+        return puedeVerGeneradores() && principal.getUsuario().isRegistrarMf13();
+    }
+
     public boolean esAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof UsuarioPrincipal principal)) {

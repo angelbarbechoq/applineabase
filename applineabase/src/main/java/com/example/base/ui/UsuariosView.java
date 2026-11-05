@@ -46,6 +46,7 @@ public class UsuariosView extends VerticalLayout {
     private final Checkbox verGeneradoresCheckbox = new Checkbox("Ver Generadores");
     private final Checkbox verFranjaHorariaCheckbox = new Checkbox("Ver Franja Horaria");
     private final Checkbox verTransformadoresCheckbox = new Checkbox("Ver Transformadores");
+    private final Checkbox registrarMf13Checkbox = new Checkbox("Registrar MF-13");
     private final Span formTitle = new Span("Nuevo usuario");
 
     private Usuario usuarioEnEdicion;
@@ -93,6 +94,9 @@ public class UsuariosView extends VerticalLayout {
         configurarTooltip(verTransformadoresCheckbox,
                 "Concede acceso a Transformadores (diagrama unifilar de la planta 1 en vivo, con los generadores), "
                         + "sin necesidad de rol ADMIN");
+        configurarTooltip(registrarMf13Checkbox,
+                "Permite cargar registros en Grupo Electrógeno > Control MF-13 (chequeos e inspección de los generadores). "
+                        + "Para verlo también necesita Ver Generadores");
 
         Button guardarBtn = new Button("Guardar", e -> guardar());
         guardarBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -104,6 +108,7 @@ public class UsuariosView extends VerticalLayout {
                 usernameField, passwordField, rolSelect, zonaCombo, habilitadoCheckbox,
                 verMezcladoresCheckbox, verMantenimientoCheckbox, verGeneradoresCheckbox, verFranjaHorariaCheckbox,
                 verTransformadoresCheckbox,
+                registrarMf13Checkbox,
                 guardarBtn, nuevoBtn
         );
         formLayout.setAlignItems(Alignment.END);
@@ -126,6 +131,8 @@ public class UsuariosView extends VerticalLayout {
                 .setHeader("Ver Franja Horaria").setAutoWidth(true);
         grid.addColumn(u -> u.getRol() == Usuario.Rol.ADMIN || u.isVerTransformadores() ? "Sí" : "No")
                 .setHeader("Ver Transformadores").setAutoWidth(true);
+        grid.addColumn(u -> u.getRol() == Usuario.Rol.ADMIN || u.isRegistrarMf13() ? "Sí" : "No")
+                .setHeader("Registrar MF-13").setAutoWidth(true);
         grid.addComponentColumn(this::crearAccionesColumna).setHeader("Acciones").setAutoWidth(true);
         grid.setSizeFull();
 
@@ -157,6 +164,7 @@ public class UsuariosView extends VerticalLayout {
         verGeneradoresCheckbox.setValue(usuario.isVerGeneradores());
         verFranjaHorariaCheckbox.setValue(usuario.isVerFranjaHoraria());
         verTransformadoresCheckbox.setValue(usuario.isVerTransformadores());
+        registrarMf13Checkbox.setValue(usuario.isRegistrarMf13());
     }
 
     private void limpiarFormulario() {
@@ -174,6 +182,7 @@ public class UsuariosView extends VerticalLayout {
         verGeneradoresCheckbox.setValue(false);
         verFranjaHorariaCheckbox.setValue(false);
         verTransformadoresCheckbox.setValue(false);
+        registrarMf13Checkbox.setValue(false);
     }
 
     private void guardar() {
@@ -216,6 +225,7 @@ public class UsuariosView extends VerticalLayout {
         usuario.setVerGeneradores(verGeneradoresCheckbox.getValue());
         usuario.setVerFranjaHoraria(verFranjaHorariaCheckbox.getValue());
         usuario.setVerTransformadores(verTransformadoresCheckbox.getValue());
+        usuario.setRegistrarMf13(registrarMf13Checkbox.getValue());
 
         usuarioRepository.save(usuario);
         Notification.show("Usuario guardado", 2500, Notification.Position.BOTTOM_END)

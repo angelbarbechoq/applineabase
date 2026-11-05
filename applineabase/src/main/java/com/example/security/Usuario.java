@@ -76,6 +76,13 @@ public class Usuario {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean verTransformadores = false;
 
+    /**
+     * Permite cargar registros en Control MF-13 (chequeos e inspección de los generadores). Verlo depende de
+     * verGeneradores. Ignorado cuando el rol es ADMIN.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean registrarMf13 = false;
+
     public Usuario() {
     }
 
@@ -161,6 +168,14 @@ public class Usuario {
 
     public void setVerTransformadores(boolean verTransformadores) {
         this.verTransformadores = verTransformadores;
+    }
+
+    public boolean isRegistrarMf13() {
+        return registrarMf13;
+    }
+
+    public void setRegistrarMf13(boolean registrarMf13) {
+        this.registrarMf13 = registrarMf13;
     }
 
     public enum Rol {

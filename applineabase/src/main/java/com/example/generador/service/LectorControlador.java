@@ -34,9 +34,32 @@ public final class LectorControlador {
     }
 
     public static LecturaGenerador leer(String ip, int unitId, ModeloControlador modelo) throws IOException {
+        try {
+            return leerUnaVez(ip, unitId, modelo);
+        } catch (IOException e) {
+            if (!sesionCerradaPorElControlador(e)) throw e;
+            // El controlador cerró la sesión recién abierta (visto en el primer pedido, 1 a 7 veces por día en el
+            // Caterpillar): reintentar sobre esa conexión no sirve, una nueva casi siempre responde.
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw e;
+            }
+            return leerUnaVez(ip, unitId, modelo);
+        }
+    }
+
+    private static LecturaGenerador leerUnaVez(String ip, int unitId, ModeloControlador modelo) throws IOException {
         try (ModbusTcpConexion c = new ModbusTcpConexion(ip, TIMEOUT_MS)) {
             return leer(c, unitId, modelo);
         }
+    }
+
+    /** Corte inmediato (no un timeout): no duplica la espera cuando el controlador de verdad no contesta. */
+    private static boolean sesionCerradaPorElControlador(IOException e) {
+        String m = e.getMessage();
+        return m != null && (m.contains("Premature end of stream") || m.contains("Connection reset"));
     }
 
     static LecturaGenerador leer(ModbusTcpConexion c, int unitId, ModeloControlador modelo) throws IOException {

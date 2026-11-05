@@ -107,7 +107,7 @@ public class PlanillaCombustibleService {
                 continue;
             }
             List<Map<String, String>> filas = hojas.entrySet().stream()
-                    .filter(e -> e.getKey().equalsIgnoreCase(p.hoja())).map(Map.Entry::getValue).findFirst().orElse(null);
+                    .filter(e -> mismaHoja(e.getKey(), p.hoja())).map(Map.Entry::getValue).findFirst().orElse(null);
             if (filas == null) {
                 avisos.add(g.nombre() + ": la planilla no tiene la hoja \"" + p.hoja() + "\"");
                 continue;
@@ -302,8 +302,13 @@ public class PlanillaCombustibleService {
 
     // ---------------- Lectura del .xlsx (sin librerías: es un ZIP con XML) ----------------
 
+    /** Mismo nombre de hoja sin importar mayúsculas ni espacios ("GEN POWER" = "genPower"). */
+    public static boolean mismaHoja(String a, String b) {
+        return a != null && b != null && a.replaceAll("[\\s_]", "").equalsIgnoreCase(b.replaceAll("[\\s_]", ""));
+    }
+
     /** Hoja -> filas; cada fila = columna ("A", "B"...) -> texto o número tal como está guardado, y "#" = nro de fila. */
-    private static Map<String, List<Map<String, String>>> leerLibro(byte[] xlsx) throws IOException {
+    public static Map<String, List<Map<String, String>>> leerLibro(byte[] xlsx) throws IOException {
         Map<String, byte[]> partes = new HashMap<>();
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(xlsx))) {
             ZipEntry e;
