@@ -92,7 +92,8 @@ public class TraspasoConfiguracionService {
             new Tabla("PLAN_MANTENIMIENTO", "Planes de mantenimiento", List.of("TAG", "TAREA"), Set.of("NOTIFICADO"), Map.of("NOTIFICADO", false)),
             new Tabla("TECNICO_MANTENIMIENTO", "Técnicos de mantenimiento", List.of("CI"), Set.of(), Map.of()),
             new Tabla("TARIFA_FRANJA", "Tarifas por franja horaria", List.of("MES"), Set.of(), Map.of()),
-            new Tabla("FERIADO", "Feriados", List.of("FECHA"), Set.of(), Map.of()));
+            new Tabla("FERIADO", "Feriados", List.of("FECHA"), Set.of(), Map.of()),
+            new Tabla("PRODUCTO_LINEA", "Catálogo de productos por línea (lotes)", List.of("LINEA", "CLAVE"), Set.of(), Map.of()));
 
     private static final String GRUPO_ARCHIVOS = "Archivos de configuración";
     private static final String GRUPO_EVENTOS = "Eventos copiados del controlador";

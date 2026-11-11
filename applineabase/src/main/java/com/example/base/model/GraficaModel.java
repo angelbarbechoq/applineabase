@@ -1709,6 +1709,60 @@ public class GraficaModel {
 
     /** Decimal con coma (convención local), no punto — fijo en Locale.US antes de reemplazar el
      * separador para que el resultado no dependa del Locale por defecto de la JVM donde corra. */
+    /**
+     * Marca de lote validado (inicio o fin) sobre una gráfica de {@link #getScript}: línea continua del color dado con
+     * el texto arriba. Queda aparte de los marcadores de clic (el doble clic no la borra). La usan Tiempo Real e
+     * Histórico a través de {@code MarcadoLotesPanel}.
+     */
+    public static String scriptMarcaLote(String containerId, long timestamp, String texto, String colorHex) {
+        String t = texto.replace("\\", "\\\\").replace("'", "\\'").replace("[", "[[").replace("]", "]]").replace("\n", "\\n");
+        return "var inst = window.am5Charts && window.am5Charts['" + containerId + "'];"
+                + "if (inst) {"
+                + "  inst.marcasLote = inst.marcasLote || [];"
+                + "  var di = inst.xAxis.makeDataItem({ value: " + timestamp + " });"
+                + "  var rg = inst.xAxis.createAxisRange(di);"
+                + "  inst.marcasLote.push(di);"
+                + "  setTimeout(function() {"
+                + "    if (rg.get('grid')) rg.get('grid').setAll({ stroke: am5.color(0x" + colorHex + "), strokeWidth: 2, strokeOpacity: 0.9, visible: true });"
+                + "    rg.get('label').setAll({ text: '[bold #" + colorHex + "]" + t + "[/]', fontSize: '10px', visible: true, inside: true,"
+                + "      centerX: am5.p0, centerY: am5.p100, dx: 4, dy: -90, background: am5.RoundedRectangle.new(inst.root, { fill: am5.color(0xffffff), fillOpacity: 0.85 }) });"
+                + "  }, 0);"
+                + "}";
+    }
+
+    /**
+     * Banda del lote en curso sobre la gráfica de KWh de Tiempo Real: objetivo (verde), máximo y mínimo (gris punteado)
+     * y el área entre ellos. Reemplaza la banda anterior; con objetivo null solo la quita.
+     */
+    public static String scriptBandaLote(String containerId, Double objetivo, double maximo, double minimo) {
+        StringBuilder s = new StringBuilder("var inst = window.am5Charts && window.am5Charts['" + containerId + "'];"
+                + "if (inst) {"
+                + "  (inst.bandaLote || []).forEach(function(d) { inst.yAxis.axisRanges.removeValue(d); });"
+                + "  inst.bandaLote = [];");
+        if (objetivo != null) {
+            s.append(String.format(java.util.Locale.US,
+                    "  var lineas = [[%f, 0x3BB273, [], 2, 'OBJETIVO'], [%f, 0x9AA0AE, [6, 5], 1.2, 'MÁXIMO'], [%f, 0x9AA0AE, [6, 5], 1.2, 'MÍNIMO']];"
+                            + "  var area = inst.yAxis.makeDataItem({ value: %f, endValue: %f });"
+                            + "  var ra = inst.yAxis.createAxisRange(area); inst.bandaLote.push(area);"
+                            + "  setTimeout(function() {"
+                            + "    ra.get('axisFill').setAll({ fill: am5.color(0x3BB273), fillOpacity: 0.08, visible: true });"
+                            + "    if (ra.get('grid')) ra.get('grid').set('visible', false);"
+                            + "    if (ra.get('label')) ra.get('label').set('visible', false);"
+                            + "  }, 0);"
+                            + "  lineas.forEach(function(z) {"
+                            + "    var di = inst.yAxis.makeDataItem({ value: z[0] });"
+                            + "    var rg = inst.yAxis.createAxisRange(di); inst.bandaLote.push(di);"
+                            + "    setTimeout(function() {"
+                            + "      rg.get('grid').setAll({ stroke: am5.color(z[1]), strokeWidth: z[3], strokeOpacity: 1, strokeDasharray: z[2], visible: true });"
+                            + "      rg.get('label').setAll({ text: z[4] + ' ' + z[0].toFixed(3).replace('.', ','), fill: am5.color(z[1] === 0x3BB273 ? 0x1D7A46 : 0x4A4F5C),"
+                            + "        fontSize: '10px', inside: true, centerY: am5.p100, visible: true, background: am5.RoundedRectangle.new(inst.root, { fill: am5.color(0xffffff), fillOpacity: 0.85 }) });"
+                            + "    }, 0);"
+                            + "  });",
+                    objetivo, maximo, minimo, minimo, maximo));
+        }
+        return s.append("}").toString();
+    }
+
     public static String formatearDecimal(double valor) {
         return String.format(java.util.Locale.US, "%.2f", valor).replace('.', ',');
     }

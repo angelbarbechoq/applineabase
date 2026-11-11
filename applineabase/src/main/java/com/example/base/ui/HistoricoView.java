@@ -9,6 +9,9 @@ import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
+import com.example.lotes.service.CatalogoProductosService;
+import com.example.lotes.service.LotesService;
+import com.example.lotes.ui.MarcadoLotesPanel;
 import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.button.Button;
@@ -195,8 +198,12 @@ public class HistoricoView extends VerticalLayout {
     // (hoy Mixer01-04) o no, así que el combo Máquina es la unión de ambas listas.
     private final Set<String> mezcladoresDisponibles;
 
+    // Marcado de lotes (solo ADMIN, mismo componente que Tiempo Real); null para el resto.
+    private MarcadoLotesPanel marcadoLotes;
+
     public HistoricoView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
-                          PLCDataQueryService plcDataQueryService, ExportacionCsvService exportacionCsvService) {
+                          PLCDataQueryService plcDataQueryService, ExportacionCsvService exportacionCsvService,
+                          CatalogoProductosService catalogoProductos, LotesService lotesService) {
         this.exportacionCsvService = exportacionCsvService;
         this.configLoaderService = configLoaderService;
         this.lineaAccessService = lineaAccessService;
@@ -266,6 +273,12 @@ public class HistoricoView extends VerticalLayout {
         }
 
         add(buildFiltrosLayout());
+
+        if (lineaAccessService.esAdmin()) {
+            marcadoLotes = new MarcadoLotesPanel(catalogoProductos, lotesService, lineaAccessService, this,
+                    ID_CHART_CRUDO, ID_CHART_FILTRADO);
+            add(marcadoLotes);
+        }
 
         mensajeSpan = new Span("Seleccione los filtros y presione Consultar");
         add(mensajeSpan);
@@ -715,6 +728,7 @@ public class HistoricoView extends VerticalLayout {
 
     private void consultar() {
         String maquina = maquinaCombo.getValue();
+        if (marcadoLotes != null) marcadoLotes.setLinea(maquina);
         LocalDate desde = desdeDate.getValue();
         LocalDate hasta = hastaDate.getValue();
         String variable = variableCombo.getValue();
@@ -1099,6 +1113,7 @@ public class HistoricoView extends VerticalLayout {
             TarjetasEstadoActual.limpiarUltimoClickHistorico((MainLayout) this.getParent().get(), datosActualesCard);
         }
         puntoAnteriorAnalisis = null;
+        if (marcadoLotes != null) marcadoLotes.limpiar();
         if (analisisGrid != null) {
             filasAnalisis.clear();
             analisisGrid.getDataProvider().refreshAll();
@@ -1120,6 +1135,7 @@ public class HistoricoView extends VerticalLayout {
             return;
         }
         TarjetasEstadoActual.PuntoClick actual = actualizarTarjetaUltimoClick(timestamp);
+        if (marcadoLotes != null) marcadoLotes.alClic(timestamp);
         if (modoConArranque) {
             registrarClickConArranque(actual);
         } else {

@@ -7,6 +7,11 @@ import com.example.dataacquisition.service.ConfigLoaderService;
 import com.example.dataacquisition.service.PLCDataQueryService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.AttachEvent;
+import com.example.lotes.service.CatalogoProductosService;
+import com.example.lotes.service.LineaBaseProductoService;
+import com.example.lotes.service.LotesService;
+import com.example.lotes.ui.LineaBaseProductoPanel;
+import com.example.lotes.ui.MarcadoLotesPanel;
 import com.vaadin.flow.component.ClientCallable;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.Div;
@@ -41,6 +46,14 @@ public class ChartsView extends VerticalLayout {
     private final LineaAccessService lineaAccessService;
     private final PLCDataQueryService plcDataQueryService;
     private final AlarmaConfigRepository alarmaConfigRepository;
+    private final CatalogoProductosService catalogoProductos;
+    private final LotesService lotesService;
+    private final LineaBaseProductoService lineaBaseProducto;
+    // Marcado de lotes (solo ADMIN); null para el resto.
+    private MarcadoLotesPanel marcadoLotes;
+    // Pestaña «Línea base» (solo ADMIN): línea de la gráfica + producto de la franja Lote.
+    private Tab tabLineaBase;
+    private LineaBaseProductoPanel panelLineaBase;
 
     private ComboBox<String> maquinaCombo;
     private Span mensajeSpan;
@@ -77,7 +90,12 @@ public class ChartsView extends VerticalLayout {
     private String mezcladorSeleccionado;
 
     public ChartsView(ConfigLoaderService configLoaderService, LineaAccessService lineaAccessService,
-                       PLCDataQueryService plcDataQueryService, AlarmaConfigRepository alarmaConfigRepository) {
+                       PLCDataQueryService plcDataQueryService, AlarmaConfigRepository alarmaConfigRepository,
+                       CatalogoProductosService catalogoProductos, LotesService lotesService,
+                       LineaBaseProductoService lineaBaseProducto) {
+        this.catalogoProductos = catalogoProductos;
+        this.lineaBaseProducto = lineaBaseProducto;
+        this.lotesService = lotesService;
         this.graficaModel = new GraficaModel(1);
         this.configLoaderService = configLoaderService;
         this.lineaAccessService = lineaAccessService;
@@ -120,6 +138,16 @@ public class ChartsView extends VerticalLayout {
         if (mostrarMezcladores) {
             tabMezcladores = tabSheet.add("Mezcladores", crearPanelMezcladores());
         }
+        if (marcadoLotes != null) {
+            panelLineaBase = new LineaBaseProductoPanel(lineaBaseProducto, true);
+            Div contenedor = new Div(panelLineaBase);
+            contenedor.getStyle().set("background", "#F5F6FA").set("padding", "10px").set("overflow", "auto").set("height", "100%")
+                    .set("box-sizing", "border-box");
+            tabLineaBase = tabSheet.add("Línea base", contenedor);
+            marcadoLotes.setAlCambiarProducto(() -> {
+                if (tabSheet.getSelectedTab() == tabLineaBase) actualizarLineaBase();
+            });
+        }
         add(tabSheet);
         setFlexGrow(1, tabSheet);
 
@@ -145,6 +173,7 @@ public class ChartsView extends VerticalLayout {
                 kwhSSECerrado = true;
                 detenerSSE();
             }
+            if (seleccionada == tabLineaBase) actualizarLineaBase();
             if (seleccionada == tabTemperatura && !temperaturaCargada) {
                 temperaturaCargada = true;
                 cargarTemperaturaChart();
@@ -176,6 +205,25 @@ public class ChartsView extends VerticalLayout {
         });
     }
 
+    /** Pestaña «Línea base»: la línea de la gráfica y el producto elegido en la franja Lote (o el del lote en curso). */
+    private void actualizarLineaBase() {
+        if (panelLineaBase == null) return;
+        String linea = marcadoLotes.getLinea();
+        if (linea == null) {
+            panelLineaBase.mensaje("La línea base por producto es solo para las líneas de extrusión. Elija una línea en la pestaña KWh.");
+            return;
+        }
+        String producto = marcadoLotes.productoElegido();
+        String nl = linea.replace("Linea", "Línea ");
+        if (producto == null || com.example.lotes.service.LotesService.SIN_ITEM.equals(producto)) {
+            panelLineaBase.mensaje("Elija el producto en la franja «Lote» de la pestaña KWh (" + nl + ").");
+            return;
+        }
+        lineaBaseProducto.producto(linea, producto).ifPresentOrElse(p -> panelLineaBase.mostrar(p, true),
+                () -> panelLineaBase.mensaje("<b>" + producto + "</b> no tiene lotes de " + LineaBaseProductoService.ANIO_BASE
+                        + " en la " + nl + ": sin línea base del producto. Se controla con la línea base mensual de la línea."));
+    }
+
     private VerticalLayout crearPanelKwh() {
         VerticalLayout panel = new VerticalLayout();
         panel.setSizeFull();
@@ -202,27 +250,33 @@ public class ChartsView extends VerticalLayout {
             .set("padding", "0px")
             .set("margin-bottom", "0px")
             .set("flex-wrap", "wrap");
-        com.vaadin.flow.component.button.Button resetZoomBtn = new com.vaadin.flow.component.button.Button("Reset Zoom", e -> resetZoom());
-        resetZoomBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
-
         mensajeSpan = new Span();
 
         HorizontalLayout selectorLayout = new HorizontalLayout(
                 maquinaCombo,
-                maquinaInfoCard,
-                resetZoomBtn,
-                mensajeSpan
+                maquinaInfoCard
         );
         selectorLayout.setAlignItems(Alignment.CENTER);
         selectorLayout.setSpacing(true);
         selectorLayout.getStyle().set("flex-wrap", "wrap");
         panel.add(selectorLayout);
 
+        // Lotes (solo ADMIN): en la misma fila que Máquina; el cuadro del lote en curso debajo y el «Lote en curso» en
+        // la franja de arriba. Sin el botón Reset Zoom (pedido del usuario: amCharts tiene su botón para quitar el zoom).
+        if (lineaAccessService.esAdmin()) {
+            marcadoLotes = new MarcadoLotesPanel(catalogoProductos, lotesService, lineaAccessService, this, "chartdiv_industrial");
+            marcadoLotes.conLineaBase(lineaBaseProducto);
+            selectorLayout.add(marcadoLotes);
+            panel.add(marcadoLotes.getControl());
+        }
+        selectorLayout.add(mensajeSpan);
+
         if (!maquinas.isEmpty()) {
             maquinaCombo.setValue(maquinas.getFirst());//get(0)
             maquinaSeleccionada = maquinas.getFirst();
             mostrarInfoMaquina(maquinaSeleccionada);
             cargarDatosActuales(maquinaSeleccionada);
+            if (marcadoLotes != null) marcadoLotes.setLinea(maquinaSeleccionada);
         }
 
         maquinaCombo.addValueChangeListener(e -> {
@@ -231,6 +285,8 @@ public class ChartsView extends VerticalLayout {
                 maquinaSeleccionada = e.getValue();
                 mostrarInfoMaquina(maquinaSeleccionada);
                 cargarDatosActuales(maquinaSeleccionada);
+                // Antes de cargarDatos: la gráfica nueva dibuja la banda del lote en curso de esta línea.
+                if (marcadoLotes != null) marcadoLotes.setLinea(maquinaSeleccionada);
                 cargarDatos(maquinaSeleccionada);
                 this.getUI().ifPresent(ui -> {
                     ui.access(() -> {
@@ -242,10 +298,18 @@ public class ChartsView extends VerticalLayout {
         });
 
         chartContainer = PanelGraficoUtil.agregarDivGrafico(panel, "chartdiv_industrial");
-        this.addDetachListener(event ->
-                this.getUI().ifPresent(ui -> TarjetasEstadoActual.mostrarUltimoClickCard(ui, false)));
+        this.addDetachListener(event -> {
+            this.getUI().ifPresent(ui -> TarjetasEstadoActual.mostrarUltimoClickCard(ui, false));
+            if (marcadoLotes != null && getParent().orElse(null) instanceof MainLayout ml) {
+                ml.getLoteEnCursoCard().setVisible(false);
+                marcadoLotes.setDestinoEnCurso(null);
+            }
+        });
         this.addAttachListener(event -> {
             this.getUI().ifPresent(ui -> TarjetasEstadoActual.mostrarUltimoClickCard(ui, true));
+            if (marcadoLotes != null && getParent().orElse(null) instanceof MainLayout ml) {
+                marcadoLotes.setDestinoEnCurso(ml.getLoteEnCursoCard());
+            }
             actualizarTarjetaUltimoClick(System.currentTimeMillis());
         });
 
@@ -611,7 +675,7 @@ public class ChartsView extends VerticalLayout {
     }
 
     private void cargarDatos(String maquina) {
-        mensajeSpan.setText("Cargando gráfica para " + maquina + "...");
+        mensajeSpan.setText("");
 
         try {
             if (!lineaAccessService.tieneAccesoAMaquina(maquina)) {
@@ -646,6 +710,7 @@ public class ChartsView extends VerticalLayout {
             GraficaModel.ResultadoGrafica resultado = graficaModel.graficarSerieKWh(
                     "chartdiv_industrial", datos, conDiferencia, maquina, new String[]{"KWh"}, true);
             getElement().executeJs(resultado.script());
+            if (marcadoLotes != null) marcadoLotes.redibujarBanda();
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -763,20 +828,20 @@ public class ChartsView extends VerticalLayout {
         );
     }
 
-    private void resetZoom() {
-        getElement().executeJs(graficaModel.getResetZoomScript("chartdiv_industrial"));
-    }
 
     @ClientCallable
     public void limpiarTarjetas() {
         if (this.getParent().isPresent() && this.getParent().get() instanceof MainLayout) {
             TarjetasEstadoActual.limpiarUltimoClick((MainLayout) this.getParent().get());
         }
+        if (marcadoLotes != null && !kwhSSECerrado) marcadoLotes.limpiar();
     }
 
     @ClientCallable
     public void registrarClickEnGrafica(long timestamp) {
         actualizarTarjetaUltimoClick(timestamp);
+        // Solo los clics en la gráfica de KWh (Temperatura y PF general usan el mismo script de clic).
+        if (marcadoLotes != null && !kwhSSECerrado) marcadoLotes.alClic(timestamp);
     }
 
     private void actualizarTarjetaUltimoClick(long timestamp) {

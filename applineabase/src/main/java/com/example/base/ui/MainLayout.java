@@ -43,6 +43,8 @@ public final class MainLayout extends AppLayout {
 
     private Div statusIndicator;
     private Div ultimoClickCard;
+    // Lote en curso de la línea de Tiempo Real, después de Fecha, Hora y KWh (lo llena MarcadoLotesPanel; solo ADMIN).
+    private final Div loteEnCursoCard = new Div();
     private final AuthenticationContext authenticationContext;
     private final LineaAccessService lineaAccessService;
     private final AlarmaEventoRepository alarmaEventoRepository;
@@ -126,6 +128,9 @@ public final class MainLayout extends AppLayout {
             .set("margin-left", "auto")
             .set("margin-right", "20px");
         addToNavbar(ultimoClickCard);
+        loteEnCursoCard.setVisible(false);
+        loteEnCursoCard.getStyle().set("margin-left", "16px");
+        addToNavbar(loteEnCursoCard);
         addToNavbar(statusLayout);
 
         // Avisos de alarmas nuevas: las de planta para quien ve Alarmas, las de los generadores para quien
@@ -226,6 +231,9 @@ public final class MainLayout extends AppLayout {
         graficas.setExpanded(false);
         graficas.addItem(new SideNavItem("Tiempo Real", "grafica", VaadinIcon.CHART_LINE.create()));
         graficas.addItem(new SideNavItem("Histórico", "historico", VaadinIcon.CLOCK.create()));
+        if (lineaAccessService.esAdmin()) {
+            graficas.addItem(new SideNavItem("Línea base por producto", "lotes/linea-base", VaadinIcon.TRENDING_UP.create()));
+        }
         nav.addItem(graficas);
         colapsarAlSalirDelMouse(graficas);
 
@@ -352,6 +360,10 @@ public final class MainLayout extends AppLayout {
 
         return indicator;
     }
+    public Div getLoteEnCursoCard() {
+        return loteEnCursoCard;
+    }
+
     public Div getUltimoClickCard() {
         return ultimoClickCard;
     }
