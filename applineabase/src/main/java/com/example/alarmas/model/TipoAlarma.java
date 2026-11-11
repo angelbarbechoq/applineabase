@@ -30,7 +30,18 @@ public enum TipoAlarma {
      * El generador no hace lo que pide el selector de su tablero (AMF / Sincronismo / Isla) por más de 5 min
      * (ModoFuncionamientoService). Abierta mientras dure; no urgente.
      */
-    MODO_GENERADOR;
+    MODO_GENERADOR,
+    /**
+     * Consumo del lote en curso fuera de la banda de su línea base por producto: el promedio de la última hora queda sobre
+     * el máximo o bajo el mínimo durante 30 min seguidos (VigilanciaLoteService). No se configura; no urgente; se cierra
+     * sola al volver a la banda o al cerrar el lote.
+     */
+    CONSUMO_LOTE;
+
+    /** Se configuran en Alarmas (umbral por línea); las demás las define otro módulo. */
+    public boolean configurable() {
+        return !deGenerador() && this != CONSUMO_LOTE;
+    }
 
     /** Alarmas de los generadores: no se configuran y las ve quien tiene "Ver Generadores". */
     public boolean deGenerador() {

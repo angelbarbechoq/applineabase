@@ -57,7 +57,7 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         setSpacing(false);
         setWidthFull();
         titulo.setVisible(conTitulo);
-        Div izq = tarjeta(new H2Chico("kWh contra kg procesados"), nota("Recta y banda calculadas solo con el año base. Los lotes del año de comparación se comparan contra ella y no la modifican."), grafico);
+        Div izq = tarjeta(new H2Chico("kWh contra kg procesados"), nota("Recta y banda calculadas solo con los lotes del período base. Los lotes posteriores se comparan contra ella y no la modifican."), grafico);
         Div der = new Div(tarjeta(new H2Chico("Validez de la línea base"), validez), tarjeta(new H2Chico("Línea base"), lineaBase), tarjeta(mensual));
         fila = new HorizontalLayout(izq, der);
         fila.setWidthFull();
@@ -70,7 +70,7 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         mensaje("Elija un producto.");
     }
 
-    /** Solo un aviso (sin producto, «Sin ítem» o producto sin lotes en el año base). */
+    /** Solo un aviso (sin producto, «Sin ítem» o producto sin lotes en el período base). */
     public void mensaje(String texto) {
         titulo.removeAll();
         estado.removeAll();
@@ -88,14 +88,18 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         Evaluacion e = p.ev();
         Regresion r = e.r();
         String nl = p.linea().replace("Linea", "Línea ");
-        List<LoteExcel> comp = comparar ? servicio.comparacion(p.linea(), p.clave()) : List.of();
+        List<LoteExcel> comp = comparar ? servicio.comparacion(p) : List.of();
 
         String quitados = e.atipicos().isEmpty() ? "" : " R² con todos los lotes " + num(e.r2Inicial(), 3) + " &lt; 0,75: se quitaron "
                 + e.atipicos().size() + " atípicos a más de 2 sigma (en rojo); cada uno necesita su causa.";
+        String periodo = " Período base: " + p.periodo() + (p.ampliado() ? " (ampliado porque con 2025 no alcanzaba; se comparan los lotes desde octubre de 2026)" : "") + ".";
+        String objetivo = r.origen()
+                ? num(r.m(), 4) + " kWh/kg × kg, por el origen (el intercepto no es significativo)"
+                : num(r.m(), 4) + " kWh/kg × kg + " + num(r.b(), 0) + " kWh";
         estado.removeAll();
         estado.add(new Html(e.valida()
-                ? "<div style='" + caja("#E3F5EA", "#1d7a46") + "'><b>Línea base válida.</b> Objetivo = " + num(r.m(), 4) + " kWh/kg × kg + "
-                + num(r.b(), 0) + " kWh. Máximo y mínimo: objetivo ± " + num(2 * r.se(), 0) + " kWh." + quitados + "</div>"
+                ? "<div style='" + caja("#E3F5EA", "#1d7a46") + "'><b>Línea base válida.</b> Objetivo = " + objetivo
+                + ". Máximo y mínimo: objetivo ± " + num(2 * r.se(), 0) + " kWh." + periodo + quitados + "</div>"
                 : "<div style='" + caja("#FCE4E6", "#a3222c") + "'><b>Sin referencia válida.</b> Motivo: " + e.motivo()
                 + ". Los lotes de este producto se controlan con la línea base mensual " + LineaBaseProductoService.ANIO_BASE + " de la " + nl + "." + quitados + "</div>"));
 
@@ -116,10 +120,10 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         List<String[]> kp = new ArrayList<>();
         if (e.valida()) {
             kp.add(new String[]{"Objetivo (m)", num(r.m(), 4) + " kWh/kg"});
-            kp.add(new String[]{"Energía fija del lote (b)", num(r.b(), 0) + " kWh"});
+            kp.add(new String[]{"Energía fija del lote (b)", r.origen() ? "0 (por el origen)" : num(r.b(), 0) + " kWh"});
             kp.add(new String[]{"Sigma", num(r.se(), 0) + " kWh"});
             kp.add(new String[]{"CV", r.cv() == null ? "—" : num(100 * r.cv(), 1) + " %"});
-            kp.add(new String[]{"kWh/kg medio " + LineaBaseProductoService.ANIO_BASE, num(kwhT / kgT, 4)});
+            kp.add(new String[]{"kWh/kg medio del período base", num(kwhT / kgT, 4)});
         } else {
             kp.add(new String[]{"Recta calculada", recta(r)});
             kp.add(new String[]{"Uso", "No se usa"});
@@ -144,7 +148,7 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         StringBuilder t = new StringBuilder("<div style='max-height:420px;overflow:auto'><table style='" + TABLA + "'><tr>" + th("Año") + th("Inicio") + th("Fin")
                 + th("Horas", true) + th("kg", true) + th("kWh", true) + th("kWh/kg", true) + th("Esperado", true) + th("Diferencia", true) + th("Estado") + "</tr>");
         for (LoteExcel x : todos) {
-            boolean base = x.anio() == LineaBaseProductoService.ANIO_BASE;
+            boolean base = p.lotes().contains(x);
             boolean atip = base && e.atipico(p.lotes().indexOf(x));
             String esp = "—", dif = "—", est;
             if (e.valida()) {
@@ -169,9 +173,9 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         grafico.removeAll();
         getElement().executeJs(AJUSTE, getElement());
         grafico.add(new Html("<div>" + svg(p, comp) + "<div style='font-size:12px;color:#6b6f80'><span style='color:" + AZUL + "'>●</span> "
-                + LineaBaseProductoService.ANIO_BASE + ": línea base (" + e.n() + ")"
+                + "línea base " + p.periodo() + " (" + e.n() + ")"
                 + (e.atipicos().isEmpty() ? "" : " &nbsp; <span style='color:#E8505B'>●</span> atípico quitado (" + e.atipicos().size() + ")")
-                + (comp.isEmpty() ? "" : " &nbsp; <span style='color:" + NARANJA + "'>●</span> " + comp.getFirst().anio() + ": se compara (" + comp.size() + ")")
+                + (comp.isEmpty() ? "" : " &nbsp; <span style='color:" + NARANJA + "'>●</span> " + comp.getFirst().anio() + " en adelante: se compara (" + comp.size() + ")")
                 + "</div></div>"));
     }
 
@@ -212,8 +216,8 @@ public class LineaBaseProductoPanel extends VerticalLayout {
             }
             s.append(recta(X, Y, r, xm, 0, col, 2, !e.valida(), e.valida() ? "OBJETIVO" : "sin validez", W - mr));
             if (e.valida()) {
-                s.append(String.format(Locale.US, "<text x='%.1f' y='%.1f' font-size='12' fill='#1E1E2C'>kWh = %s × kg + %s · R² %s</text>",
-                        ml + 8, mt + 14, num(r.m(), 4), num(r.b(), 0), num(r.r2(), 3)));
+                s.append(String.format(Locale.US, "<text x='%.1f' y='%.1f' font-size='12' fill='#1E1E2C'>%s · R² %s</text>",
+                        ml + 8, mt + 14, recta(r), num(r.r2(), 3)));
             }
             if (r.b() < 0) {
                 s.append(String.format(Locale.US, "<circle cx='%.1f' cy='%.1f' r='4' fill='#E8505B'/><text x='%.1f' y='%.1f' font-size='11' fill='#a3222c'>b = %s kWh</text>",
@@ -221,7 +225,7 @@ public class LineaBaseProductoPanel extends VerticalLayout {
             }
         }
         for (LoteExcel x : todos) {
-            boolean b0 = x.anio() == LineaBaseProductoService.ANIO_BASE;
+            boolean b0 = p.lotes().contains(x);
             String c = !b0 ? NARANJA : e.atipico(p.lotes().indexOf(x)) ? "#E8505B" : AZUL;
             s.append(String.format(Locale.US, "<circle cx='%.1f' cy='%.1f' r='5.5' fill='%s' stroke='#fff'><title>%d · %s a %s · %s kg · %s kWh · %s kWh/kg</title></circle>",
                     X.applyAsDouble(x.kg()), Y.applyAsDouble(x.kwh()), c, x.anio(), x.inicio().format(FH), x.fin().format(FH),
@@ -248,7 +252,9 @@ public class LineaBaseProductoPanel extends VerticalLayout {
     }
 
     private static String recta(Regresion r) {
-        return r == null ? "—" : "kWh = " + num(r.m(), 4) + " × kg " + (r.b() < 0 ? "− " : "+ ") + num(Math.abs(r.b()), 0);
+        if (r == null) return "—";
+        if (r.origen()) return "kWh = " + num(r.m(), 4) + " × kg (por el origen)";
+        return "kWh = " + num(r.m(), 4) + " × kg " + (r.b() < 0 ? "− " : "+ ") + num(Math.abs(r.b()), 0);
     }
 
     private static String caja(String fondo, String color) {
@@ -347,13 +353,14 @@ public class LineaBaseProductoPanel extends VerticalLayout {
             setTimeout(ajustar, 0);
             """;
 
-    private static final String COMO = "<div style='font-size:12px;color:#6b6f80'><b>Cómo se calcula.</b> Regresión lineal kWh = m × kg + b con todos los "
-                + "lotes del año base del producto en esa línea (período de línea base, ISO 50006). Con R² ≥ 0,75 no se quita ningún lote. Si R² &lt; 0,75 "
-                + "se quita el lote más alejado de la recta si está a más de 2 sigma y se vuelve a ajustar, hasta llegar a 0,75 o quedar 3 lotes; cada "
-                + "atípico quitado debe tener su causa (ISO 50006: los atípicos se examinan). Con los lotes que quedan, la línea base del producto "
-                + "se usa solo si pasa las cinco pruebas: al menos 3 lotes, R² ≥ 0,75, prueba F con p &lt; 0,05 (la relación kWh–kg no es casualidad), "
-                + "pendiente m &gt; 0 (más kg, más energía) e intercepto b ≥ 0 (la energía fija del lote, arranque y calentamiento, no puede ser negativa). "
-                + "Si falla alguna, el producto queda <b>sin referencia válida</b> y sus lotes se controlan con la línea base mensual de la línea; el "
-                + "motivo queda registrado para la auditoría. Objetivo = m × kg + b; máximo y mínimo = objetivo ± 2 sigma (sigma = error estándar de "
-                + "la regresión). Lotes tomados de la hoja MEDICION_XTR de los Excel de medición (kg = total de material procesado de PRODUCCIÓN).</div>";
+    private static final String COMO = "<div style='font-size:12px;color:#6b6f80'><b>Cómo se calcula.</b> Regresión lineal kWh = m × kg + b con los "
+            + "lotes del período base del producto en esa línea (ISO 50006): 2025; si con 2025 no alcanza, 2025 más enero a septiembre de 2026, y "
+            + "entonces se comparan los lotes desde octubre de 2026 (revisión de la línea base por datos insuficientes). Con R² ≥ 0,75 no se quita "
+            + "ningún lote; si R² &lt; 0,75 se quita el lote más alejado de la recta si está a más de 2 sigma y se vuelve a ajustar, hasta llegar a "
+            + "0,75 o quedar 3 lotes; cada atípico quitado debe tener su causa. La línea base se usa solo si pasa las cinco pruebas: al menos 3 lotes, "
+            + "R² ≥ 0,75, prueba F con p &lt; 0,05 (la relación kWh–kg no es casualidad), pendiente m &gt; 0 e intercepto b ≥ 0 (la energía fija "
+            + "del lote no puede ser negativa). Si solo falla el intercepto y no es distinto de cero (prueba t, p &gt; 0,05), se ajusta por el origen "
+            + "(kWh = m × kg) y se vuelven a pedir las pruebas. Si nada alcanza, el producto queda <b>sin referencia válida</b> y se controla con la "
+            + "línea base mensual de la línea; el motivo queda registrado. Objetivo = m × kg + b; máximo y mínimo = objetivo ± 2 sigma (sigma = error "
+            + "estándar de la regresión). Lotes de la hoja MEDICION_XTR de los Excel de medición (kg = total de material procesado de PRODUCCIÓN).</div>";
 }

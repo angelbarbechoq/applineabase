@@ -116,7 +116,10 @@ public class MarcadoLotesPanel extends HorizontalLayout {
                 "<span style='font-size:12px;white-space:nowrap'>${item.n}</span>").withProperty("n", s -> s));
         producto.setAllowCustomValue(false);
         producto.setClearButtonVisible(true);
-        producto.addValueChangeListener(e -> alCambiarProducto.run());
+        producto.addValueChangeListener(e -> {
+            banda(false);
+            alCambiarProducto.run();
+        });
 
         Button inicio = new Button("Validar inicio", e -> validarInicio());
         inicio.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -191,8 +194,9 @@ public class MarcadoLotesPanel extends HorizontalLayout {
 
     private void banda(boolean conMarcaInicio) {
         if (lineaBase == null || graficas.isEmpty()) return;
-        Optional<LineaBaseProductoService.Banda> b = linea == null ? Optional.empty()
-                : lotes.enCurso(linea).flatMap(l -> lineaBase.banda(linea, l.getProducto()));
+        // Producto elegido en el selector (o el del lote en curso): la banda aparece al elegirlo, haya o no lote abierto.
+        String prod = productoElegido();
+        Optional<LineaBaseProductoService.Banda> b = linea == null || prod == null ? Optional.empty() : lineaBase.banda(linea, prod);
         host.getElement().executeJs(b.map(x -> GraficaModel.scriptBandaLote(graficas.getFirst(), x.objetivo(), x.maximo(), x.minimo()))
                 .orElse(GraficaModel.scriptBandaLote(graficas.getFirst(), null, 0, 0)));
         Optional<LoteProduccion> l = linea == null ? Optional.empty() : lotes.enCurso(linea);
@@ -208,7 +212,7 @@ public class MarcadoLotesPanel extends HorizontalLayout {
         LoteProduccion l = lo.get();
         Optional<LineaBaseProductoService.Producto> pr = lineaBase.producto(linea, l.getProducto());
         if (pr.isEmpty() || !pr.get().ev().valida()) {
-            String motivo = pr.map(x -> x.ev().motivo()).orElse("sin lotes en " + LineaBaseProductoService.ANIO_BASE);
+            String motivo = pr.map(x -> x.ev().motivo()).orElse("sin lotes en el período base");
             control.add(new Html("<div style='border-radius:8px;padding:6px 10px;background:#FCE4E6;color:#a3222c'><b>Sin referencia válida</b> para "
                     + "este producto (" + motivo + "). Se controla con la línea base mensual de la línea.</div>"));
             return;
@@ -253,8 +257,11 @@ public class MarcadoLotesPanel extends HorizontalLayout {
         punto.getStyle().set("color", kwh == null ? "#721c24" : "#1e1e2c");
     }
 
-    /** Doble clic: borra el punto elegido. */
+    /** Doble clic: borra el punto elegido y la banda de la gráfica (vuelve al cambiar el producto o recargar la gráfica). */
     public void limpiar() {
+        if (lineaBase != null && !graficas.isEmpty()) {
+            host.getElement().executeJs(GraficaModel.scriptBandaLote(graficas.getFirst(), null, 0, 0));
+        }
         momento = null;
         kwh = null;
         punto.setText("");

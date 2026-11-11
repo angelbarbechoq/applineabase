@@ -3,11 +3,17 @@ package com.example.lotes.service;
 import java.util.List;
 
 /**
- * Regresión lineal y = m x + b por mínimos cuadrados, con R², error estándar (sigma), CV y prueba F de la regresión
- * (F con 1 y n-2 grados de libertad; p = probabilidad de un F así de grande si kWh no dependiera de kg).
+ * Regresión lineal por mínimos cuadrados con R², error estándar (sigma), CV y prueba F de la regresión (p = probabilidad
+ * de un ajuste así de bueno si kWh no dependiera de kg).
+ * <ul>
+ *   <li>{@link #de}: y = m x + b. F con 1 y n-2 grados de libertad; pB = p de la prueba t del intercepto (b distinto de 0).</li>
+ *   <li>{@link #porOrigen}: y = m x (b = 0), para cuando el intercepto no es significativo. R² centrado (contra la media,
+ *   comparable con el del modelo con intercepto); F = t² de la pendiente con 1 y n-1 grados de libertad.</li>
+ * </ul>
  * Con menos de 3 puntos no hay sigma, F ni p (null).
  */
-public record Regresion(int n, double m, double b, double r2, Double se, Double f, Double p, Double cv) {
+public record Regresion(int n, double m, double b, double r2, Double se, Double f, Double p, Double cv, Double pB,
+                        boolean origen) {
 
     /** Puntos {x, y}. Null con menos de 2. */
     public static Regresion de(List<double[]> puntos) {
@@ -24,14 +30,48 @@ public record Regresion(int n, double m, double b, double r2, Double se, Double 
         double m = sxx == 0 ? 0 : sxy / sxx, b = my - m * mx, sse = 0;
         for (double[] p : puntos) sse += Math.pow(p[1] - (m * p[0] + b), 2);
         double r2 = syy == 0 ? 0 : 1 - sse / syy;
-        Double se = null, f = null, pv = null, cv = null;
+        Double se = null, f = null, pv = null, cv = null, pb = null;
         if (n > 2) {
             se = Math.sqrt(sse / (n - 2));
             f = sse > 0 ? (syy - sse) / (sse / (n - 2)) : Double.POSITIVE_INFINITY;
-            pv = f.isInfinite() ? 0.0 : betaIncompleta((n - 2) / 2.0, 0.5, (n - 2) / (n - 2 + f));
+            pv = pDeF(f, n - 2);
+            cv = my == 0 ? null : se / my;
+            if (sxx > 0) {
+                double seB = se * Math.sqrt(1.0 / n + mx * mx / sxx);
+                pb = seB == 0 ? 0.0 : pDeF((b / seB) * (b / seB), n - 2);
+            }
+        }
+        return new Regresion(n, m, b, r2, se, f, pv, cv, pb, false);
+    }
+
+    /** y = m x sin intercepto. Null con menos de 2 puntos o x todos en 0. */
+    public static Regresion porOrigen(List<double[]> puntos) {
+        int n = puntos.size();
+        if (n < 2) return null;
+        double sxx = 0, sxy = 0, sy = 0;
+        for (double[] p : puntos) { sxx += p[0] * p[0]; sxy += p[0] * p[1]; sy += p[1]; }
+        if (sxx == 0) return null;
+        double m = sxy / sxx, my = sy / n, sse = 0, syy = 0;
+        for (double[] p : puntos) {
+            sse += Math.pow(p[1] - m * p[0], 2);
+            syy += (p[1] - my) * (p[1] - my);
+        }
+        double r2 = syy == 0 ? 0 : 1 - sse / syy;
+        Double se = null, f = null, pv = null, cv = null;
+        if (n > 2) {
+            se = Math.sqrt(sse / (n - 1));
+            double seM = se / Math.sqrt(sxx);
+            f = seM == 0 ? Double.POSITIVE_INFINITY : (m / seM) * (m / seM);
+            pv = pDeF(f, n - 1);
             cv = my == 0 ? null : se / my;
         }
-        return new Regresion(n, m, b, r2, se, f, pv, cv);
+        return new Regresion(n, m, 0, r2, se, f, pv, cv, null, true);
+    }
+
+    /** p de un F con 1 y d grados de libertad (= p de dos colas de una t con d grados de libertad, t² = F). */
+    static double pDeF(double f, int d) {
+        if (Double.isInfinite(f)) return 0;
+        return betaIncompleta(d / 2.0, 0.5, d / (d + f));
     }
 
     // Función beta incompleta regularizada (Numerical Recipes, fracción continua).

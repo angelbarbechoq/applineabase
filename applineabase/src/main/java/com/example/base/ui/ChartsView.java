@@ -220,7 +220,7 @@ public class ChartsView extends VerticalLayout {
             return;
         }
         lineaBaseProducto.producto(linea, producto).ifPresentOrElse(p -> panelLineaBase.mostrar(p, true),
-                () -> panelLineaBase.mensaje("<b>" + producto + "</b> no tiene lotes de " + LineaBaseProductoService.ANIO_BASE
+                () -> panelLineaBase.mensaje("<b>" + producto + "</b> no tiene lotes en el período base (2025 a septiembre de 2026)"
                         + " en la " + nl + ": sin línea base del producto. Se controla con la línea base mensual de la línea."));
     }
 
@@ -792,6 +792,7 @@ public class ChartsView extends VerticalLayout {
             scriptParsearFechaATimestamp("data.fecha") +
             "      inst.seriesList[0].data.push({ date: timestamp, value: Math.abs(data.diferencia) });" +
             "      inst.seriesList[0].markDirtyValues();" +
+            "      if (inst.actualizarTendencia) inst.actualizarTendencia();" +
             "      inst.aplicarZoomCalculado();" +
             "      console.log('✅ Punto agregado y renderizado:', { fecha: data.fecha, diferencia: data.diferencia, timestamp: timestamp });" +
             "    } else {" +

@@ -45,7 +45,7 @@ public class LineaBaseProductoView extends VerticalLayout {
     private final LineaBaseProductoService servicio;
     private final ComboBox<String> linea = new ComboBox<>("Línea");
     private final ComboBox<Producto> producto = new ComboBox<>("Producto");
-    private final Checkbox comparar = new Checkbox("Mostrar lotes del año de comparación", true);
+    private final Checkbox comparar = new Checkbox("Mostrar lotes que se comparan", true);
     private final LineaBaseProductoPanel panel;
     private final Span origen = new Span();
     private final H2 resumenTitulo = new H2();
@@ -93,7 +93,7 @@ public class LineaBaseProductoView extends VerticalLayout {
         resumenTitulo.getStyle().set("font-size", "16px").set("margin", "0");
 
         add(titulo, origen, LineaBaseProductoPanel.tarjeta(filtros), panel,
-                LineaBaseProductoPanel.tarjeta(resumenTitulo, LineaBaseProductoPanel.nota("Todos los productos con lotes en el año base. Clic en una fila para verla arriba."), resumen, resumenTotal));
+                LineaBaseProductoPanel.tarjeta(resumenTitulo, LineaBaseProductoPanel.nota("Todos los productos con lotes en el período base. Clic en una fila para verla arriba."), resumen, resumenTotal));
         iniciar();
     }
 

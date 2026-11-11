@@ -353,6 +353,16 @@ contra 6.708), septiembre (valor de julio copiado; 5.775 contra 6.926). Causa: e
 `$E$246:$E$247` (bloque de abril) en casi todos los bloques. Efecto: +5.889 kWh en 9 meses (0,14 % del consumo). El
 usuario decidio aplicar la regla desde octubre y dejar los meses anteriores como estan por ahora.
 
+## 5.5 Vigilancia en tiempo real del lote (hecha el 2026-11-11)
+
+Primera pieza en vivo, sobre la linea base por producto (paquete `lotes`): en Tiempo Real, con un producto elegido, la
+grafica de KWh muestra objetivo, maximo, minimo y la linea de tendencia (promedio de los ultimos 60 min).
+`VigilanciaLoteService` revisa cada minuto los lotes en curso con producto con linea base valida: si el promedio de la
+ultima hora queda sobre el maximo o bajo el minimo 30 min seguidos, abre la alarma `CONSUMO_LOTE` (amarilla, no urgente,
+sin sirena) y la cierra al volver a la banda o al cerrar el lote. Es el control del lote; la etapa 1 de este plan
+(revision nocturna de todos los medidores) sigue pendiente y no la reemplaza. Cuando exista la pantalla Vigilancia, estos
+avisos pueden pasar por el mismo registro (foto del aviso, Correcto / Falsa alarma).
+
 ## 6. Que viaja al servidor
 
 - Resumen diario y avisos: cada PC calcula los suyos (como la franja horaria). No viajan.

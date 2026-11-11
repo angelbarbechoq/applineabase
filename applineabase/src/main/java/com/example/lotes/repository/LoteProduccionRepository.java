@@ -11,4 +11,6 @@ public interface LoteProduccionRepository extends JpaRepository<LoteProduccion, 
     Optional<LoteProduccion> findFirstByLineaAndFinIsNullOrderByInicioDesc(String linea);
 
     List<LoteProduccion> findAllByOrderByInicioDesc();
+
+    List<LoteProduccion> findByFinIsNull();
 }

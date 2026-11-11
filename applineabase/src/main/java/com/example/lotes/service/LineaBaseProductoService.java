@@ -24,10 +24,19 @@ import java.util.regex.Matcher;
 
 /**
  * Línea base por producto (ISO 50006). Período de línea base = los lotes de {@link #ANIO_BASE} del Excel de medición
- * de ese año (hoja MEDICION_XTR); los lotes del año más reciente se comparan contra ella y nunca la modifican.
- * Regresión kWh = m × kg + b con todos los lotes del producto en la línea, sin quitar ninguno. Se usa solo si pasa las
- * cinco pruebas (al menos 3 lotes, R² >= 0,75, prueba F con p < 0,05, m > 0, b >= 0); si no, el producto queda sin
- * referencia válida y se controla con la línea base mensual de la línea (suma de los lotes de cada mes del año base).
+ * de ese año (hoja MEDICION_XTR); los lotes posteriores se comparan contra ella y nunca la modifican.
+ * Regresión kWh = m × kg + b con los lotes del producto en la línea (atípicos a más de 2 sigma solo si R² < 0,75). Se
+ * usa si pasa las cinco pruebas (al menos 3 lotes, R² >= 0,75, prueba F con p < 0,05, m > 0, b >= 0). Dos soluciones
+ * aprobadas por el usuario el 2026-11-11 (informe reportes/validez-linea-base-por-producto.html):
+ * <ol>
+ *   <li>Si solo falla b < 0 y el intercepto no es significativo (prueba t, p > 0,05), se ajusta por el origen
+ *   (kWh = m × kg) y se vuelven a pedir lotes, R², prueba F y m > 0.</li>
+ *   <li>Si con 2025 no hay línea base válida, período base ampliado con los lotes de 2026 que terminan antes de
+ *   {@link #FIN_PERIODO_AMPLIADO} (revisión de la línea base por datos insuficientes); esos lotes son línea base y solo
+ *   los posteriores se comparan. Los válidos con 2025 conservan la de 2025.</li>
+ * </ol>
+ * Si nada alcanza, el producto queda sin referencia válida y se controla con la línea base mensual de la línea (suma
+ * de los lotes de cada mes del año base).
  * Los libros se leen una vez y quedan en memoria; {@link #recargar()} vuelve a leerlos.
  */
 @Service
@@ -39,6 +48,10 @@ public class LineaBaseProductoService {
     public static final double R2_MINIMO = 0.75;
     public static final double P_MAXIMO = 0.05;
     public static final int LOTES_MINIMO = 3;
+    /** Fin (exclusivo) del período base ampliado: los lotes de 2026 que terminan antes entran en la línea base. */
+    public static final LocalDateTime FIN_PERIODO_AMPLIADO = LocalDateTime.of(2026, 10, 1, 0, 0);
+    public static final String PERIODO_BASE = "2025";
+    public static final String PERIODO_AMPLIADO = "2025 + enero a septiembre de 2026";
 
     public record Prueba(String nombre, String resultado, String requisito, boolean cumple, String motivo) {
     }
@@ -54,7 +67,9 @@ public class LineaBaseProductoService {
         public boolean atipico(int i) { return atipicos.contains(i); }
     }
 
-    public record Producto(String linea, String clave, String nombre, List<LoteExcel> lotes, Evaluacion ev) {
+    /** lotes = los de la línea base (los evaluados, en orden de inicio); periodo = PERIODO_BASE o PERIODO_AMPLIADO. */
+    public record Producto(String linea, String clave, String nombre, List<LoteExcel> lotes, Evaluacion ev, String periodo) {
+        public boolean ampliado() { return PERIODO_AMPLIADO.equals(periodo); }
     }
 
     /** Banda de Tiempo Real en kWh/min y el ritmo de producción del año base. */
@@ -131,43 +146,62 @@ public class LineaBaseProductoService {
 
     // ---------------- Consultas ----------------
 
+    /** Lotes que pueden ser línea base: los del año base y los del período ampliado. */
+    private List<LoteExcel> candidatos() {
+        List<LoteExcel> l = new ArrayList<>(datos().base());
+        for (LoteExcel x : datos().comparacion()) if (x.fin().isBefore(FIN_PERIODO_AMPLIADO)) l.add(x);
+        return l;
+    }
+
     public List<String> lineas() {
         TreeSet<String> s = new TreeSet<>();
-        for (LoteExcel x : datos().base()) s.add(x.linea());
+        for (LoteExcel x : candidatos()) s.add(x.linea());
         return new ArrayList<>(s);
     }
 
-    /** Productos de la línea con lotes en el año base, en orden alfabético. */
+    /** Productos de la línea con lotes en el período base (2025 o el ampliado), en orden alfabético. */
     public List<Producto> productos(String linea) {
-        Map<String, List<LoteExcel>> g = new TreeMap<>();
-        for (LoteExcel x : datos().base()) {
-            if (x.linea().equals(linea)) g.computeIfAbsent(x.clave(), k -> new ArrayList<>()).add(x);
-        }
+        TreeSet<String> claves = new TreeSet<>();
+        for (LoteExcel x : candidatos()) if (x.linea().equals(linea)) claves.add(x.clave());
         List<Producto> out = new ArrayList<>();
-        g.forEach((clave, l) -> out.add(producto(linea, clave, l)));
+        for (String c : claves) out.add(construir(linea, c));
         out.sort(Comparator.comparing(Producto::nombre, String.CASE_INSENSITIVE_ORDER));
         return out;
     }
 
-    /** Producto por su nombre (el del catálogo o el ITEM del Excel). Vacío si no tiene lotes en el año base. */
+    /** Producto por su nombre (el del catálogo o el ITEM del Excel). Vacío si no tiene lotes en el período base. */
     public Optional<Producto> producto(String linea, String nombre) {
         if (linea == null || nombre == null) return Optional.empty();
         String clave = nombre.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
-        List<LoteExcel> l = datos().base().stream().filter(x -> x.linea().equals(linea) && x.clave().equals(clave)).toList();
-        return l.isEmpty() ? Optional.empty() : Optional.of(producto(linea, clave, l));
+        boolean hay = candidatos().stream().anyMatch(x -> x.linea().equals(linea) && x.clave().equals(clave));
+        return hay ? Optional.of(construir(linea, clave)) : Optional.empty();
     }
 
-    private Producto producto(String linea, String clave, List<LoteExcel> l) {
-        List<LoteExcel> ord = new ArrayList<>(l);
-        ord.sort(Comparator.comparing(LoteExcel::inicio));
-        Evaluacion ev = cache.computeIfAbsent(linea + "|" + clave,
-                k -> evaluar(ord.stream().map(x -> new double[]{x.kg(), x.kwh()}).toList()));
-        return new Producto(linea, clave, ord.getLast().item(), ord, ev);
+    /** Primero con 2025; si no es válida, con el período ampliado. Cada uno con su modelo por el origen si corresponde. */
+    private Producto construir(String linea, String clave) {
+        List<LoteExcel> l25 = ordenados(datos().base(), linea, clave);
+        List<LoteExcel> lA = ordenados(candidatos(), linea, clave);
+        Producto p25 = l25.isEmpty() ? null : armar(linea, clave, l25, PERIODO_BASE);
+        if (p25 != null && (p25.ev().valida() || lA.size() == l25.size())) return p25;
+        Producto pA = armar(linea, clave, lA, PERIODO_AMPLIADO);
+        return pA.ev().valida() || p25 == null ? pA : p25;
     }
 
-    /** Lotes del año de comparación de ese producto. */
-    public List<LoteExcel> comparacion(String linea, String clave) {
-        return datos().comparacion().stream().filter(x -> x.linea().equals(linea) && x.clave().equals(clave))
+    private static List<LoteExcel> ordenados(List<LoteExcel> todos, String linea, String clave) {
+        return todos.stream().filter(x -> x.linea().equals(linea) && x.clave().equals(clave))
+                .sorted(Comparator.comparing(LoteExcel::inicio)).toList();
+    }
+
+    private Producto armar(String linea, String clave, List<LoteExcel> l, String periodo) {
+        Evaluacion ev = cache.computeIfAbsent(linea + "|" + clave + "|" + periodo,
+                k -> evaluarConOrigen(l.stream().map(x -> new double[]{x.kg(), x.kwh()}).toList()));
+        return new Producto(linea, clave, l.getLast().item(), l, ev, periodo);
+    }
+
+    /** Lotes posteriores a la línea base del producto, que se comparan contra ella. */
+    public List<LoteExcel> comparacion(Producto p) {
+        return datos().comparacion().stream().filter(x -> x.linea().equals(p.linea()) && x.clave().equals(p.clave())
+                        && !(p.ampliado() && x.fin().isBefore(FIN_PERIODO_AMPLIADO)))
                 .sorted(Comparator.comparing(LoteExcel::inicio)).toList();
     }
 
@@ -244,6 +278,29 @@ public class LineaBaseProductoService {
         boolean ok = pr.stream().allMatch(Prueba::cumple);
         String motivo = String.join("; ", pr.stream().filter(x -> !x.cumple()).map(Prueba::motivo).toList());
         return new Evaluacion(n, todos.size(), r, pr, ok, motivo, fuera, r0 == null ? null : r0.r2());
+    }
+
+    /**
+     * {@link #evaluar} y, si solo falla el intercepto negativo y ese intercepto no es significativo (p de su prueba t
+     * > 0,05), el mismo grupo de lotes (sin los atípicos) ajustado por el origen con sus propias pruebas.
+     */
+    static Evaluacion evaluarConOrigen(List<double[]> todos) {
+        Evaluacion e = evaluar(todos);
+        Regresion r = e.r();
+        if (e.valida() || !"intercepto negativo".equals(e.motivo()) || r.pB() == null || r.pB() <= P_MAXIMO) return e;
+        List<double[]> quedan = new ArrayList<>();
+        for (int i = 0; i < todos.size(); i++) if (!e.atipico(i)) quedan.add(todos.get(i));
+        Regresion o = Regresion.porOrigen(quedan);
+        if (o == null || o.p() == null) return e;
+        List<Prueba> pr = List.of(
+                e.pruebas().getFirst(),
+                new Prueba("R²", num(o.r2(), 3) + " (por el origen)", "≥ 0,75", o.r2() >= R2_MINIMO, "R² bajo"),
+                new Prueba("Prueba F (p)", p(o.p()), "p < 0,05", o.p() < P_MAXIMO, "prueba F no significativa"),
+                new Prueba("Pendiente m", num(o.m(), 4) + " kWh/kg", "m > 0", o.m() > 0, "pendiente no positiva"),
+                new Prueba("Intercepto b", num(r.b(), 0) + " kWh, no significativo (p " + p(r.pB()) + "): por el origen",
+                        "b ≥ 0 o no significativo", true, ""));
+        if (quedan.size() < LOTES_MINIMO || !pr.stream().allMatch(Prueba::cumple)) return e;
+        return new Evaluacion(quedan.size(), todos.size(), o, pr, true, "", e.atipicos(), e.r2Inicial());
     }
 
     public static String p(double p) {

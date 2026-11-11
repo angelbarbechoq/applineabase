@@ -1732,16 +1732,20 @@ public class GraficaModel {
 
     /**
      * Banda del lote en curso sobre la gráfica de KWh de Tiempo Real: objetivo (verde), máximo y mínimo (gris punteado)
-     * y el área entre ellos. Reemplaza la banda anterior; con objetivo null solo la quita.
+     * y el área entre ellos, más la línea de tendencia (promedio de los últimos 60 min de la serie, negra en punto y raya) que se recalcula
+     * con cada dato nuevo ({@code inst.actualizarTendencia}, lo llama el SSE de Tiempo Real). Reemplaza la banda anterior;
+     * con objetivo null solo la quita.
      */
     public static String scriptBandaLote(String containerId, Double objetivo, double maximo, double minimo) {
         StringBuilder s = new StringBuilder("var inst = window.am5Charts && window.am5Charts['" + containerId + "'];"
                 + "if (inst) {"
                 + "  (inst.bandaLote || []).forEach(function(d) { inst.yAxis.axisRanges.removeValue(d); });"
-                + "  inst.bandaLote = [];");
+                + "  inst.bandaLote = [];"
+                + "  if (inst.tendencia) { inst.chart.series.removeValue(inst.tendencia); inst.tendencia.dispose(); inst.tendencia = null; }"
+                + "  inst.actualizarTendencia = null;");
         if (objetivo != null) {
             s.append(String.format(java.util.Locale.US,
-                    "  var lineas = [[%f, 0x3BB273, [], 2, 'OBJETIVO'], [%f, 0x9AA0AE, [6, 5], 1.2, 'MÁXIMO'], [%f, 0x9AA0AE, [6, 5], 1.2, 'MÍNIMO']];"
+                    "  var lineas = [[%f, 0x3BB273, [5, 4], 1.2, 'OBJETIVO'], [%f, 0x9AA0AE, [6, 5], 1, 'MÁXIMO'], [%f, 0x9AA0AE, [6, 5], 1, 'MÍNIMO']];"
                             + "  var area = inst.yAxis.makeDataItem({ value: %f, endValue: %f });"
                             + "  var ra = inst.yAxis.createAxisRange(area); inst.bandaLote.push(area);"
                             + "  setTimeout(function() {"
@@ -1759,6 +1763,22 @@ public class GraficaModel {
                             + "    }, 0);"
                             + "  });",
                     objetivo, maximo, minimo, minimo, maximo));
+            s.append("  var t = inst.chart.series.push(am5xy.LineSeries.new(inst.root, { name: 'Promedio 60 min', xAxis: inst.xAxis, yAxis: inst.yAxis,"
+                    + "    valueYField: 'value', valueXField: 'date', stroke: am5.color(0x1E1E2C), fill: am5.color(0x1E1E2C),"
+                    + "    tooltip: am5.Tooltip.new(inst.root, { labelText: 'Promedio 60 min: {valueY.formatNumber(\"#.000\")}' }) }));"
+                    + "  t.strokes.template.setAll({ strokeWidth: 1.6, strokeDasharray: [10, 3, 2, 3] });"
+                    + "  inst.tendencia = t;"
+                    // Promedio móvil de 60 min por tiempo (no por cantidad de puntos); empieza recién con una hora de datos.
+                    + "  inst.actualizarTendencia = function() {"
+                    + "    var d = inst.seriesList[0].data.values, out = [], j = 0, suma = 0;"
+                    + "    for (var i = 0; i < d.length; i++) {"
+                    + "      suma += d[i].value;"
+                    + "      while (d[i].date - d[j].date >= 3600000) { suma -= d[j].value; j++; }"
+                    + "      if (d[i].date - d[0].date >= 3540000) out.push({ date: d[i].date, value: suma / (i - j + 1) });"
+                    + "    }"
+                    + "    t.data.setAll(out);"
+                    + "  };"
+                    + "  inst.actualizarTendencia();");
         }
         return s.append("}").toString();
     }
