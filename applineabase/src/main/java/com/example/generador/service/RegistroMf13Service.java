@@ -308,10 +308,41 @@ public class RegistroMf13Service {
 
     /** Diésel por nivel del tanque en los tramos entre registros con nivel cuyo segundo cumple {@code incluir}. */
     private Diesel porNivel(String generador, List<RegistroMf13> rs, java.util.function.Predicate<RegistroMf13> incluir) {
+        int[] sin = {0};
+        double gal = 0, est = 0;
+        for (Tramo t : tramosNivel(generador, rs, incluir, sin)) {
+            gal += t.galones();
+            if (t.estimado()) est += t.galones();
+        }
+        return new Diesel(gal, est, sin[0]);
+    }
+
+    /**
+     * Diésel entre dos registros seguidos: lo que marca el tramo (contador del motor o nivel del tanque más la carga),
+     * con el contador de energía en cada punta (null si no hay lectura válida). La suma de los tramos de un mes da el mes.
+     */
+    public record Tramo(LocalDateTime hasta, Double kwhDesde, Double kwhHasta, double galones, boolean estimado) {
+    }
+
+    private List<Tramo> tramos(String generador, List<RegistroMf13> rs, java.util.function.Predicate<RegistroMf13> incluir) {
+        if (!usaContador(generador)) return tramosNivel(generador, rs, incluir, new int[1]);
+        Set<RegistroMf13> kv = kwhValidos(rs);
+        List<RegistroMf13> ok = validos(rs, RegistroMf13::getContadorDiesel);
+        List<Tramo> out = new ArrayList<>();
+        for (int i = 1; i < ok.size(); i++) {
+            RegistroMf13 a = ok.get(i - 1), b = ok.get(i);
+            if (incluir.test(b)) {
+                out.add(new Tramo(b.getFechaHora(), kwhDe(a, kv), kwhDe(b, kv), b.getContadorDiesel() - a.getContadorDiesel(), false));
+            }
+        }
+        return out;
+    }
+
+    private List<Tramo> tramosNivel(String generador, List<RegistroMf13> rs, java.util.function.Predicate<RegistroMf13> incluir, int[] sin) {
         Planilla p = planillas.planilla(generador);
         double galCm = p == null ? 0 : p.galonesPorCm();
-        double gal = 0, est = 0;
-        int sin = 0;
+        Set<RegistroMf13> kv = kwhValidos(rs);
+        List<Tramo> out = new ArrayList<>();
         List<Integer> conNivel = new ArrayList<>();
         for (int i = 0; i < rs.size(); i++) if (rs.get(i).getNivelCm() != null) conNivel.add(i);
         for (int k = 1; k < conNivel.size(); k++) {
@@ -319,7 +350,7 @@ public class RegistroMf13Service {
             if (!incluir.test(b)) continue;
             double na = a.getNivelCm(), nb = b.getNivelCm();
             if (nb <= na + 0.2) {
-                gal += Math.max(0, na - nb) * galCm;
+                out.add(new Tramo(b.getFechaHora(), kwhDe(a, kv), kwhDe(b, kv), Math.max(0, na - nb) * galCm, false));
                 continue;
             }
             RegistroMf13 conCarga = null;
@@ -331,14 +362,113 @@ public class RegistroMf13Service {
                 }
             }
             if (conCarga != null) {
-                double consumo = (na - nb) * galCm + conCarga.getDieselCargado();
-                gal += consumo;
-                if (conCarga.isDieselCargadoEstimado()) est += consumo;
-            } else if (energiaEntre(rs, conNivel.get(k - 1), conNivel.get(k), kwhValidos(rs)) > 0) {
-                sin++;
+                out.add(new Tramo(b.getFechaHora(), kwhDe(a, kv), kwhDe(b, kv), (na - nb) * galCm + conCarga.getDieselCargado(),
+                        conCarga.isDieselCargadoEstimado()));
+            } else if (energiaEntre(rs, conNivel.get(k - 1), conNivel.get(k), kv) > 0) {
+                sin[0]++;
             }
         }
-        return new Diesel(gal, est, sin);
+        return out;
+    }
+
+    private static Double kwhDe(RegistroMf13 r, Set<RegistroMf13> validos) {
+        return validos.contains(r) ? r.getProdKwh() : null;
+    }
+
+    /**
+     * Diésel del registro MF-13 repartido entre los arranques que guardó la aplicación, para Costos: cada tramo va al
+     * arranque según el contador de energía (o, si en el tramo no se generó, al arranque en cuya hora cae). Lo que no cae
+     * en ningún arranque (marchas de antes de que la aplicación leyera el controlador, o sin registro) queda en
+     * {@code soloMf13}, una fila por marcha del MF-13. Así la suma da lo mismo que el mes en Control MF-13. Vacío si el
+     * mes no sale del registro (menos de dos registros propios).
+     */
+    public record DieselArranques(Map<Long, Double> porArranque, List<Marcha> soloMf13) {
+    }
+
+    public Optional<DieselArranques> dieselPorArranque(String generador, YearMonth mes) {
+        List<RegistroMf13> rs = todos(generador);
+        long propios = rs.stream().filter(r -> YearMonth.from(r.getFechaHora()).equals(mes) && !esReferencia(r)).count();
+        if (propios < 2) return Optional.empty();
+        List<PlanillaCombustibleService.ArranqueGuardado> arranques = planillas.arranques(generador);
+        Map<Long, Double> porArranque = new LinkedHashMap<>();
+        for (var a : arranques) if (YearMonth.from(a.inicio()).equals(mes)) porArranque.put(a.id(), 0.0);
+        List<Marcha> marchas = marchas(generador, mes);
+        double[] galResto = new double[marchas.size() + 1], kwhResto = new double[marchas.size() + 1];
+        boolean[] estResto = new boolean[marchas.size() + 1];
+        for (Tramo t : tramos(generador, rs, r -> YearMonth.from(r.getFechaHora()).equals(mes))) {
+            if (t.galones() == 0) continue; // los negativos también (carga anotada de más): el mes los suma
+            double asignado = 0, kwhTramo = 0;
+            if (t.kwhDesde() != null && t.kwhHasta() != null && t.kwhHasta() > t.kwhDesde()) {
+                kwhTramo = t.kwhHasta() - t.kwhDesde();
+                double kwhAsignado = 0;
+                for (var a : arranques) {
+                    double ov = Math.min(t.kwhHasta(), a.kwhFin()) - Math.max(t.kwhDesde(), a.kwhInicio());
+                    if (ov <= 0) continue;
+                    porArranque.merge(a.id(), t.galones() * ov / kwhTramo, Double::sum);
+                    kwhAsignado += ov;
+                }
+                asignado = kwhAsignado / kwhTramo;
+            } else {
+                for (var a : arranques) {
+                    if (!t.hasta().isBefore(a.inicio()) && !t.hasta().isAfter(a.fin())) {
+                        porArranque.merge(a.id(), t.galones(), Double::sum);
+                        asignado = 1;
+                        break;
+                    }
+                }
+            }
+            if (asignado >= 0.9999) continue;
+            int m = marchas.isEmpty() ? 0 : marchaDe(marchas, t.hasta());
+            galResto[m] += t.galones() * (1 - asignado);
+            kwhResto[m] += kwhTramo * (1 - asignado);
+            estResto[m] |= t.estimado();
+        }
+        List<Marcha> solo = new ArrayList<>();
+        for (int i = 0; i < galResto.length; i++) {
+            if (Math.abs(galResto[i]) < 0.05) continue;
+            Marcha m = i < marchas.size() ? marchas.get(i) : null;
+            // Resto chico (el contador de energía de la planilla y el del arranque difieren en unos kWh): va al arranque
+            // de la aplicación que coincide en hora con la marcha.
+            if (m != null && kwhResto[i] < 20) {
+                Long id = arranqueEnHora(arranques, m);
+                if (id != null) {
+                    porArranque.merge(id, galResto[i], Double::sum);
+                    continue;
+                }
+            }
+            LocalDateTime ini = m != null ? m.inicio() : mes.atDay(1).atStartOfDay();
+            LocalDateTime fin = m != null ? m.fin() : ini;
+            double horas = m != null && m.kwh() > 0 ? m.horas() * Math.min(1, kwhResto[i] / m.kwh()) : 0;
+            solo.add(new Marcha(generador, ini, fin, horas, kwhResto[i], galResto[i], estResto[i]));
+        }
+        return Optional.of(new DieselArranques(porArranque, solo));
+    }
+
+    /** Arranque de la aplicación que más se pisa en hora con una marcha del MF-13; null si ninguno. */
+    private static Long arranqueEnHora(List<PlanillaCombustibleService.ArranqueGuardado> arranques, Marcha m) {
+        Long mejor = null;
+        long max = 0;
+        for (var a : arranques) {
+            LocalDateTime d = a.inicio().isAfter(m.inicio()) ? a.inicio() : m.inicio();
+            LocalDateTime h = a.fin().isBefore(m.fin()) ? a.fin() : m.fin();
+            long s = java.time.Duration.between(d, h).toSeconds();
+            if (s > max || (mejor == null && s == 0 && !d.isAfter(h))) {
+                max = s;
+                mejor = a.id();
+            }
+        }
+        return mejor;
+    }
+
+    /** Marcha del MF-13 a la que pertenece un instante: la que lo contiene, si no la última anterior, si no la primera. */
+    private static int marchaDe(List<Marcha> marchas, LocalDateTime t) {
+        int anterior = 0;
+        for (int i = 0; i < marchas.size(); i++) {
+            Marcha m = marchas.get(i);
+            if (!t.isBefore(m.inicio()) && !t.isAfter(m.fin())) return i;
+            if (!m.fin().isAfter(t)) anterior = i;
+        }
+        return anterior;
     }
 
     /** Registros cuya energía sigue la secuencia (los mal anotados no cuentan para la energía de un tramo). */

@@ -11,6 +11,7 @@ import com.example.generador.model.MetaImportacionRed;
 import com.example.generador.service.ConsumoMedidoresService;
 import com.example.generador.service.ConsumoMedidoresService.ConsumoMedidor;
 import com.example.generador.service.CostoCombustibleService;
+import com.example.generador.service.RegistroMf13Service;
 import com.example.generador.service.GeneradorAnalisisService;
 import com.example.generador.service.GeneradorAnalisisService.Agrupacion;
 import com.example.generador.service.GeneradorAnalisisService.Fila;
@@ -71,6 +72,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.Optional;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.HashMap;
@@ -128,6 +131,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final GeneradorAnalisisService analisis;
     private final ConsumoMedidoresService consumoMedidores;
     private final CostoCombustibleService costos;
+    private final RegistroMf13Service mf13;
     private final PlanillaCombustibleService planillaCombustible;
     private final ReporteGeneradoresService reporte;
     private final LineaAccessService lineaAccessService;
@@ -210,6 +214,10 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     private final Div marcoCostos = new Div();
     private final Grid<PeriodoMarcha> costosGrid = new Grid<>();
     private Map<String, CostoCombustible> combustible = Map.of();
+    /** Galones del registro MF-13 por arranque (y de las marchas que solo están en el MF-13), cuando el mes sale del registro. */
+    private Map<String, CostoCombustible> combustibleMf13 = Map.of();
+    /** Filas de Costos: los arranques del período más las marchas que solo están en el MF-13. */
+    private List<PeriodoMarcha> filasCostos = List.of();
     /** Rendimiento (kWh/gal) y precio medio del galón de los arranques del rango con diesel cargado; 0 = sin datos. */
     private double kwhPorGalon, precioGalon;
     /** Arranques del período elegido, uno por generador (Costos va por arranque: el diésel se carga por generador). */
@@ -242,7 +250,9 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     public GeneradorAnalisisView(GeneradorService generadorService, GeneradorAnalisisService analisis,
                                  ConsumoMedidoresService consumoMedidores, CostoCombustibleService costos,
                                  ReporteGeneradoresService reporte, LineaAccessService lineaAccessService,
-                                 GeneradorAlmacen almacen, PlanillaCombustibleService planillaCombustible) {
+                                 GeneradorAlmacen almacen, PlanillaCombustibleService planillaCombustible,
+                                 RegistroMf13Service mf13) {
+        this.mf13 = mf13;
         this.planillaCombustible = planillaCombustible;
         this.generadorService = generadorService;
         this.almacen = almacen;
@@ -495,6 +505,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         periodoInicial = periodoDelIndicador(consulta, gens);
         // Después de los períodos: sus tarjetas "con generadores en marcha" los usan.
         combustible = costos.porPeriodo(periodos);
+        cargarMf13();
         calcularRendimientoDiesel();
         verEnergia(consulta, agrupacionVista);
         verPeriodos();
@@ -1646,6 +1657,7 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
                 .setHeader("Cargado por / observación").setAutoWidth(true);
         if (lineaAccessService.esAdmin()) {
             costosGrid.addComponentColumn(p -> {
+                if (p.arranqueId() < 0) return new Span();
                 Button b = new Button(c(p) == null ? "Cargar" : "Editar", VaadinIcon.EDIT.create(), e -> abrirDialogoCosto(p));
                 b.addThemeVariants(ButtonVariant.LUMO_SMALL);
                 return b;
@@ -1720,12 +1732,63 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
     }
 
     private CostoCombustible c(PeriodoMarcha p) {
-        return combustible.get(CostoCombustibleService.clave(p.generador(), p.arranqueId()));
+        String k = CostoCombustibleService.clave(p.generador(), p.arranqueId());
+        CostoCombustible m = combustibleMf13.get(k);
+        return m != null ? m : combustible.get(k);
+    }
+
+    /**
+     * Diésel de Costos desde el registro MF-13 (lo anotado a mano por los operadores), así el total coincide con Control
+     * MF-13: cada arranque lleva su parte y las marchas que la aplicación no registró (antes de que empezara a leer el
+     * controlador) se agregan como filas propias. El precio del galón es el cargado en el arranque o el último usado.
+     */
+    private void cargarMf13() {
+        Map<String, CostoCombustible> mapa = new HashMap<>();
+        List<PeriodoMarcha> filas = new ArrayList<>(periodos);
+        double precio = costos.ultimoPrecio().orElse(0.0);
+        long id = -1;
+        LocalDateTime d = desde.atStartOfDay(), h = hasta.plusDays(1).atStartOfDay();
+        for (Generador g : gensVistos) {
+            List<PlanillaCombustibleService.ArranqueGuardado> arranques = planillaCombustible.arranques(g.nombre());
+            LocalDateTime desdeApp = arranques.stream().map(PlanillaCombustibleService.ArranqueGuardado::inicio)
+                    .min(Comparator.naturalOrder()).orElse(null);
+            for (YearMonth m = YearMonth.from(desde); !m.isAfter(YearMonth.from(hasta)); m = m.plusMonths(1)) {
+                Optional<RegistroMf13Service.DieselArranques> r = mf13.dieselPorArranque(g.nombre(), m);
+                if (r.isEmpty()) continue;
+                for (Map.Entry<Long, Double> e : r.get().porArranque().entrySet()) {
+                    String k = CostoCombustibleService.clave(g.nombre(), e.getKey());
+                    CostoCombustible guardado = combustible.get(k);
+                    CostoCombustible c = mapa.computeIfAbsent(k, x -> {
+                        CostoCombustible n = new CostoCombustible(g.nombre(), e.getKey(), null);
+                        n.setPrecioGalon(guardado != null ? guardado.getPrecioGalon() : precio);
+                        n.setObservacion("Ajustado del MF-13");
+                        return n;
+                    });
+                    c.setGalones(c.getGalones() + e.getValue());
+                }
+                for (RegistroMf13Service.Marcha x : r.get().soloMf13()) {
+                    if (x.inicio().isBefore(d) || !x.inicio().isBefore(h)) continue;
+                    long n = id--;
+                    filas.add(new PeriodoMarcha(g.nombre(), null, n, null, x.inicio(), x.fin(), false, false, x.kwh(),
+                            null, null, null, 0, 0, 0, 0, 0, null, null, null, null, null, null));
+                    CostoCombustible c = new CostoCombustible(g.nombre(), n, x.inicio());
+                    c.setGalones(x.galones());
+                    c.setPrecioGalon(precio);
+                    c.setObservacion("Ajustado del MF-13: la aplicación registra este generador desde el "
+                            + (desdeApp == null ? "-" : desdeApp.format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"))));
+                    mapa.put(CostoCombustibleService.clave(g.nombre(), n), c);
+                }
+            }
+        }
+        filas.sort(Comparator.comparing(PeriodoMarcha::inicio).reversed());
+        combustibleMf13 = mapa;
+        filasCostos = filas;
     }
 
     private void verCostos() {
         combustible = costos.porPeriodo(periodos);
-        costosGrid.setItems(periodos);
+        cargarMf13();
+        costosGrid.setItems(filasCostos);
         // Con diesel cargado: galones, costo, horas y rendimiento por generador.
         double galones = 0, costoCargados = 0, horasCargados = 0;
         int cargados = 0;
@@ -1735,8 +1798,8 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         double costoDiesel = 0, costoRed = 0, kwhAprovechado = 0, kwhEntregado = 0, kwhGenerado = 0;
         int comparados = 0;
         List<GraficaModel.BarraCosto> barras = new ArrayList<>();
-        for (int i = periodos.size() - 1; i >= 0; i--) { // del más viejo al más nuevo (orden del gráfico)
-            PeriodoMarcha p = periodos.get(i);
+        for (int i = filasCostos.size() - 1; i >= 0; i--) { // del más viejo al más nuevo (orden del gráfico)
+            PeriodoMarcha p = filasCostos.get(i);
             CostoCombustible cc = c(p);
             if (cc == null) continue;
             cargados++;

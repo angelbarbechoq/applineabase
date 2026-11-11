@@ -83,7 +83,7 @@ public class PlanillaCombustibleService {
     private record Lectura(int fila, double kwh, double valor) {
     }
 
-    private record ArranqueGuardado(long id, LocalDateTime inicio, LocalDateTime fin, double kwhInicio, double kwhFin) {
+    public record ArranqueGuardado(long id, LocalDateTime inicio, LocalDateTime fin, double kwhInicio, double kwhFin) {
     }
 
     private final ConfigLoaderService configLoaderService;
@@ -283,7 +283,8 @@ public class PlanillaCombustibleService {
         return Math.round(v * 10) / 10.0;
     }
 
-    private List<ArranqueGuardado> arranques(String generador) {
+    /** Arranques cerrados del generador con su contador de energía al arrancar y al parar. */
+    public List<ArranqueGuardado> arranques(String generador) {
         List<ArranqueGuardado> lista = new ArrayList<>();
         String ruta = GeneradorAlmacen.rutaArranques();
         if (!new File(ruta).exists()) return lista;

@@ -109,9 +109,9 @@ public class MarcadoLotesPanel extends HorizontalLayout {
 
         producto.setPlaceholder("Producto");
         // Nombres largos: selector ancho y letra chica para que entren en una línea (también en la lista).
-        producto.setWidth("640px");
+        producto.setWidth("480px");
         producto.getStyle().set("--vaadin-input-field-value-font-size", "12px").set("font-size", "12px")
-                .set("--vaadin-combo-box-overlay-width", "720px");
+                .set("--vaadin-combo-box-overlay-width", "560px");
         producto.setRenderer(com.vaadin.flow.data.renderer.LitRenderer.<String>of(
                 "<span style='font-size:12px;white-space:nowrap'>${item.n}</span>").withProperty("n", s -> s));
         producto.setAllowCustomValue(false);
