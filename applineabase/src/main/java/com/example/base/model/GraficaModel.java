@@ -1768,13 +1768,16 @@ public class GraficaModel {
                     + "    tooltip: am5.Tooltip.new(inst.root, { labelText: 'Promedio 60 min: {valueY.formatNumber(\"#.000\")}' }) }));"
                     + "  t.strokes.template.setAll({ strokeWidth: 1.6, strokeDasharray: [10, 3, 2, 3] });"
                     + "  inst.tendencia = t;"
-                    // Promedio móvil de 60 min por tiempo (no por cantidad de puntos); empieza recién con una hora de datos.
+                    // Promedio de los últimos 60 min = energía de la ventana / tiempo que cubre (igual que el aviso del lote:
+                    // diferencia del contador / minutos). Cada punto es la energía desde la lectura anterior, así que el punto
+                    // que llega después de un corte trae la energía del hueco y también cuenta su tiempo: no hace pico.
                     + "  inst.actualizarTendencia = function() {"
-                    + "    var d = inst.seriesList[0].data.values, out = [], j = 0, suma = 0;"
-                    + "    for (var i = 0; i < d.length; i++) {"
+                    + "    var d = inst.seriesList[0].data.values, out = [], j = 1, suma = 0;"
+                    + "    for (var i = 1; i < d.length; i++) {"
                     + "      suma += d[i].value;"
-                    + "      while (d[i].date - d[j].date >= 3600000) { suma -= d[j].value; j++; }"
-                    + "      if (d[i].date - d[0].date >= 3540000) out.push({ date: d[i].date, value: suma / (i - j + 1) });"
+                    + "      while (j < i && d[i].date - d[j - 1].date > 3600000) { suma -= d[j].value; j++; }"
+                    + "      var min = (d[i].date - d[j - 1].date) / 60000;"
+                    + "      if (d[i].date - d[0].date >= 3540000 && min > 0) out.push({ date: d[i].date, value: suma / min });"
                     + "    }"
                     + "    t.data.setAll(out);"
                     + "  };"
