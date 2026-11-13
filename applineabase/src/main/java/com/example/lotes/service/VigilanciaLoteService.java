@@ -139,7 +139,8 @@ public class VigilanciaLoteService {
 
     private static String mensaje(String linea, String producto, String sentido, double prom, LineaBaseProductoService.Banda b) {
         return corto(linea.replace("Linea", "Línea ") + ": consumo " + ("sobre".equals(sentido) ? "sobre el máximo" : "bajo el mínimo")
-                + " de la línea base de " + producto + ". Promedio de la última hora " + n(prom) + " kWh/min (objetivo "
+                + " de la línea base " + (b.aplicada().dePropia() ? "del producto " + producto : "de la línea (producto " + producto + ")")
+                + ". Promedio de la última hora " + n(prom) + " kWh/min (objetivo "
                 + n(b.objetivo()) + ", " + ("sobre".equals(sentido) ? "máximo " + n(b.maximo()) : "mínimo " + n(b.minimo())) + ")");
     }
 

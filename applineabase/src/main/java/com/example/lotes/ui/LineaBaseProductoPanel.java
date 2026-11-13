@@ -3,7 +3,6 @@ package com.example.lotes.ui;
 import com.example.base.ui.MainLayout;
 import com.example.lotes.service.LineaBaseProductoService;
 import com.example.lotes.service.LineaBaseProductoService.Evaluacion;
-import com.example.lotes.service.LineaBaseProductoService.Mensual;
 import com.example.lotes.service.LineaBaseProductoService.Producto;
 import com.example.lotes.service.LotesExcelReader.LoteExcel;
 import com.example.lotes.service.Regresion;
@@ -26,13 +25,12 @@ import jakarta.annotation.security.RolesAllowed;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import static com.example.lotes.service.LineaBaseProductoService.num;
 
 /**
  * Contenido de la línea base de un producto: estado, dispersión kWh contra kg con la recta y ± 2 sigma, validez, línea
- * base, línea base mensual de la línea y lotes. Lo usan la pestaña «Línea base» de Tiempo Real (producto del lote en
+ * base, línea base de la línea y lotes. Lo usan la pestaña «Línea base» de Tiempo Real (producto del lote en
  * curso o el elegido en la franja Lote) y la pantalla Línea base por producto.
  */
 public class LineaBaseProductoPanel extends VerticalLayout {
@@ -46,7 +44,7 @@ public class LineaBaseProductoPanel extends VerticalLayout {
     private final Div grafico = new Div();
     private final Div validez = new Div();
     private final Div lineaBase = new Div();
-    private final Div mensual = new Div();
+    private final Div deLaLinea = new Div();
     private final Div lotes = new Div();
     private final HorizontalLayout fila;
     private final Div tarjetaLotes;
@@ -57,20 +55,20 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         setSpacing(false);
         setWidthFull();
         titulo.setVisible(conTitulo);
-        Div izq = tarjeta(new H2Chico("kWh contra kg procesados"), nota("Recta y banda calculadas solo con los lotes del período base. Los lotes posteriores se comparan contra ella y no la modifican."), grafico);
-        Div der = new Div(tarjeta(new H2Chico("Validez de la línea base"), validez), tarjeta(new H2Chico("Línea base"), lineaBase), tarjeta(mensual));
+        Div izq = tarjeta(new H2Chico("kWh contra kg procesados"), nota("Recta y banda calculadas solo con los lotes del año base (el año anterior). Los lotes de este año se comparan contra ella y no la modifican."), grafico);
+        Div der = new Div(tarjeta(new H2Chico("Validez de la línea base"), validez), tarjeta(new H2Chico("Línea base"), lineaBase), tarjeta(deLaLinea));
         fila = new HorizontalLayout(izq, der);
         fila.setWidthFull();
         fila.setWrap(true);
         izq.getStyle().set("flex", "1.35 1 560px").set("min-width", "0");
         der.getStyle().set("flex", "1 1 380px").set("min-width", "0");
-        tarjetaLotes = tarjeta(new H2Chico("Lotes del producto"), lotes);
+        tarjetaLotes = tarjeta(new H2Chico("Lotes"), lotes);
         Div como = tarjeta(new Html(COMO));
         add(tarjeta(titulo, estado), fila, tarjetaLotes, como);
         mensaje("Elija un producto.");
     }
 
-    /** Solo un aviso (sin producto, «Sin ítem» o producto sin lotes en el período base). */
+    /** Solo un aviso (sin línea, sin producto o sin lotes en el año base). */
     public void mensaje(String texto) {
         titulo.removeAll();
         estado.removeAll();
@@ -79,12 +77,29 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         tarjetaLotes.setVisible(false);
     }
 
-    /** Línea base del producto; comparar = agrega los lotes del año de comparación. */
+    /**
+     * La línea base que se usa para el producto elegido (Tiempo Real): la del producto, o la de su línea con el aviso de
+     * por qué no se usa la del producto.
+     */
+    public void mostrar(LineaBaseProductoService.Aplicada a, String productoElegido) {
+        String aviso = a.dePropia() ? null
+                : (productoElegido == null ? "Sin producto elegido: se muestra la línea base de la línea."
+                : "<b>" + esc(productoElegido) + "</b> no tiene línea base propia (" + a.motivo() + "); se usa la de la "
+                + a.lineaBase().linea().replace("Linea", "Línea ") + ".");
+        mostrar(a.lineaBase(), true, aviso);
+    }
+
+    /** Línea base de un producto o de una línea; comparar = agrega los lotes de este año. */
     public void mostrar(Producto p, boolean comparar) {
+        mostrar(p, comparar, null);
+    }
+
+    private void mostrar(Producto p, boolean comparar, String aviso) {
         fila.setVisible(true);
         tarjetaLotes.setVisible(true);
         titulo.removeAll();
-        titulo.add(new Html("<div style='font-size:16px;font-weight:600'>" + p.nombre() + " · " + p.linea().replace("Linea", "Línea ") + "</div>"));
+        titulo.add(new Html("<div style='font-size:16px;font-weight:600'>" + esc(p.nombre())
+                + (p.esLinea() ? "" : " · " + p.linea().replace("Linea", "Línea ")) + "</div>"));
         Evaluacion e = p.ev();
         Regresion r = e.r();
         String nl = p.linea().replace("Linea", "Línea ");
@@ -92,16 +107,21 @@ public class LineaBaseProductoPanel extends VerticalLayout {
 
         String quitados = e.atipicos().isEmpty() ? "" : " R² con todos los lotes " + num(e.r2Inicial(), 3) + " &lt; 0,75: se quitaron "
                 + e.atipicos().size() + " atípicos a más de 2 sigma (en rojo); cada uno necesita su causa.";
-        String periodo = " Período base: " + p.periodo() + (p.ampliado() ? " (ampliado porque con 2025 no alcanzaba; se comparan los lotes desde octubre de 2026)" : "") + ".";
-        String objetivo = r.origen()
-                ? num(r.m(), 4) + " kWh/kg × kg, por el origen (el intercepto no es significativo)"
-                : num(r.m(), 4) + " kWh/kg × kg + " + num(r.b(), 0) + " kWh";
+        String periodo = " Año base: " + p.anio() + ".";
         estado.removeAll();
-        estado.add(new Html(e.valida()
-                ? "<div style='" + caja("#E3F5EA", "#1d7a46") + "'><b>Línea base válida.</b> Objetivo = " + objetivo
-                + ". Máximo y mínimo: objetivo ± " + num(2 * r.se(), 0) + " kWh." + periodo + quitados + "</div>"
-                : "<div style='" + caja("#FCE4E6", "#a3222c") + "'><b>Sin referencia válida.</b> Motivo: " + e.motivo()
-                + ". Los lotes de este producto se controlan con la línea base mensual " + LineaBaseProductoService.ANIO_BASE + " de la " + nl + "." + quitados + "</div>"));
+        if (aviso != null) estado.add(new Html("<div style='" + caja("#FBF3D5", "#7a6205") + "'>" + aviso + "</div>"));
+        if (e.valida()) {
+            String objetivo = r.origen()
+                    ? num(r.m(), 4) + " kWh/kg × kg, por el origen (el intercepto no es significativo)"
+                    : num(r.m(), 4) + " kWh/kg × kg + " + num(r.b(), 0) + " kWh";
+            estado.add(new Html("<div style='" + caja("#E3F5EA", "#1d7a46") + "'><b>Línea base válida"
+                    + (p.esLinea() ? " de la " + nl : " del producto") + ".</b> Objetivo = " + objetivo
+                    + ". Máximo y mínimo: objetivo ± " + num(2 * r.se(), 0) + " kWh." + periodo + quitados + "</div>"));
+        } else {
+            estado.add(new Html("<div style='" + caja("#FCE4E6", "#a3222c") + "'><b>Sin línea base válida"
+                    + (p.esLinea() ? " de la " + nl : " del producto") + ".</b> Motivo: " + e.motivo() + "."
+                    + (p.esLinea() ? "" : " Se usa la línea base de la " + nl + ".") + periodo + quitados + "</div>"));
+        }
 
         StringBuilder v = new StringBuilder("<table style='" + TABLA + "'><tr>" + th("Prueba") + th("Resultado", true) + th("Requisito") + th("Cumple") + "</tr>");
         for (LineaBaseProductoService.Prueba x : e.pruebas()) {
@@ -123,7 +143,7 @@ public class LineaBaseProductoPanel extends VerticalLayout {
             kp.add(new String[]{"Energía fija del lote (b)", r.origen() ? "0 (por el origen)" : num(r.b(), 0) + " kWh"});
             kp.add(new String[]{"Sigma", num(r.se(), 0) + " kWh"});
             kp.add(new String[]{"CV", r.cv() == null ? "—" : num(100 * r.cv(), 1) + " %"});
-            kp.add(new String[]{"kWh/kg medio del período base", num(kwhT / kgT, 4)});
+            kp.add(new String[]{"kWh/kg medio " + p.anio(), num(kwhT / kgT, 4)});
         } else {
             kp.add(new String[]{"Recta calculada", recta(r)});
             kp.add(new String[]{"Uso", "No se usa"});
@@ -131,21 +151,27 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         lineaBase.removeAll();
         lineaBase.add(new Html(kpis(kp)));
 
-        Mensual mm = servicio.mensual(p.linea());
-        Evaluacion me = mm.ev();
-        mensual.removeAll();
-        mensual.add(new H2Chico("Línea base mensual " + LineaBaseProductoService.ANIO_BASE + " de la " + nl),
-                nota("Referencia para los productos sin línea base propia. Suma de los lotes de cada mes (" + mm.meses().size() + " meses)."),
-                new Html(kpis(List.of(new String[]{"Recta", recta(me.r())},
-                        new String[]{"R²", conF(me) ? num(me.r().r2(), 3) : "—"},
-                        new String[]{"p (F)", conF(me) ? LineaBaseProductoService.p(me.r().p()) : "—"},
-                        new String[]{"Estado", me.valida() ? "Válida" : "No válida: " + me.motivo()}))));
+        // Línea base de la línea, para comparar (solo cuando se muestra la de un producto).
+        deLaLinea.removeAll();
+        deLaLinea.setVisible(!p.esLinea());
+        if (!p.esLinea()) {
+            servicio.deLinea(p.linea()).ifPresent(l -> {
+                Evaluacion le = l.ev();
+                deLaLinea.add(new H2Chico("Línea base de la " + nl),
+                        nota("Todos los lotes de la línea en " + l.anio() + " (" + le.total() + "). Se usa para los productos sin línea base propia."),
+                        new Html(kpis(List.of(new String[]{"Recta", recta(le.r())},
+                                new String[]{"R²", conF(le) ? num(le.r().r2(), 3) : "—"},
+                                new String[]{"p (F)", conF(le) ? LineaBaseProductoService.p(le.r().p()) : "—"},
+                                new String[]{"Estado", le.valida() ? "Válida" : "No válida: " + le.motivo()}))));
+            });
+        }
 
         // Tabla de lotes
         List<LoteExcel> todos = new ArrayList<>(p.lotes());
         todos.addAll(comp);
         todos.sort((a, b) -> a.inicio().compareTo(b.inicio()));
         StringBuilder t = new StringBuilder("<div style='max-height:420px;overflow:auto'><table style='" + TABLA + "'><tr>" + th("Año") + th("Inicio") + th("Fin")
+                + (p.esLinea() ? th("Producto") : "")
                 + th("Horas", true) + th("kg", true) + th("kWh", true) + th("kWh/kg", true) + th("Esperado", true) + th("Diferencia", true) + th("Estado") + "</tr>");
         for (LoteExcel x : todos) {
             boolean base = p.lotes().contains(x);
@@ -156,14 +182,16 @@ public class LineaBaseProductoPanel extends VerticalLayout {
                 esp = num(es, 0);
                 dif = (d > 0 ? "+" : "") + num(d, 0);
                 if (atip) est = chipHtml("Atípico (quitado)", false);
+                else if (base && fueraDe2Sigma(e, x)) est = "<span style='" + CHIP + "background:#E3EEFD;color:#1f5fae;box-shadow:inset 0 0 0 2px #E0B50F'>Línea base, fuera de 2 sigma</span>";
                 else if (base) est = chipHtml("Línea base", null);
                 else if (d > 2 * r.se()) est = chipHtml("Sobre el máximo", false);
                 else if (d < -2 * r.se()) est = "<span style='" + CHIP + "background:#FBF3D5;color:#7a6205'>Bajo el mínimo</span>";
                 else est = chipHtml("Dentro", true);
             } else {
-                est = atip ? chipHtml("Atípico (quitado)", false) : base ? chipHtml("Línea base", null) : "<span style='" + CHIP + "background:#eceef3;color:#4a4f5c'>Control mensual de la línea</span>";
+                est = atip ? chipHtml("Atípico (quitado)", false) : base ? chipHtml("Línea base", null) : "<span style='" + CHIP + "background:#eceef3;color:#4a4f5c'>Sin línea base válida</span>";
             }
             t.append("<tr>").append(td(String.valueOf(x.anio()))).append(td(x.inicio().format(FH))).append(td(x.fin().format(FH)))
+                    .append(p.esLinea() ? td(esc(x.item())) : "")
                     .append(td(num(x.horas(), 1), true)).append(td(num(x.kg(), 0), true)).append(td(num(x.kwh(), 0), true))
                     .append(td(num(x.kwh() / x.kg(), 4), true)).append(td(esp, true)).append(td(dif, true)).append(td(est)).append("</tr>");
         }
@@ -171,75 +199,51 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         lotes.add(new Html(t.append("</table></div>").toString()));
 
         grafico.removeAll();
-        getElement().executeJs(AJUSTE, getElement());
-        grafico.add(new Html("<div>" + svg(p, comp) + "<div style='font-size:12px;color:#6b6f80'><span style='color:" + AZUL + "'>●</span> "
-                + "línea base " + p.periodo() + " (" + e.n() + ")"
-                + (e.atipicos().isEmpty() ? "" : " &nbsp; <span style='color:#E8505B'>●</span> atípico quitado (" + e.atipicos().size() + ")")
-                + (comp.isEmpty() ? "" : " &nbsp; <span style='color:" + NARANJA + "'>●</span> " + comp.getFirst().anio() + " en adelante: se compara (" + comp.size() + ")")
-                + "</div></div>"));
-    }
-
-    /** Dispersión kWh contra kg con la recta y ± 2 sigma (SVG). */
-    private static String svg(Producto p, List<LoteExcel> comp) {
-        Evaluacion e = p.ev();
-        Regresion r = e.r();
-        List<LoteExcel> todos = new ArrayList<>(p.lotes());
-        todos.addAll(comp);
-        double W = 640, H = 420, ml = 62, mr = 96, mt = 14, mb = 42;
-        double xm = todos.stream().mapToDouble(LoteExcel::kg).max().orElse(1) * 1.1;
-        double ym = todos.stream().mapToDouble(LoteExcel::kwh).max().orElse(1);
-        double sig = r != null && r.se() != null ? 2 * r.se() : 0;
-        if (r != null) ym = Math.max(ym, r.m() * xm + r.b() + sig);
-        ym *= 1.08;
-        double ymin = Math.min(0, r != null ? r.b() - sig : 0);
-        for (LoteExcel x : todos) ymin = Math.min(ymin, x.kwh());
-        final double fxm = xm, fym = ym, fymin = ymin;
-        java.util.function.DoubleUnaryOperator X = v -> ml + (W - ml - mr) * v / fxm;
-        java.util.function.DoubleUnaryOperator Y = v -> H - mb - (H - mt - mb) * (v - fymin) / (fym - fymin);
-        StringBuilder s = new StringBuilder("<svg viewBox='0 0 640 420' width='100%' class='lb-disp' preserveAspectRatio='xMidYMid meet' style='display:block;font-family:Segoe UI,Roboto,Arial,sans-serif'>");
-        s.append("<defs><clipPath id='clLb'><rect x='").append(ml).append("' y='").append(mt).append("' width='").append(W - ml - mr)
-                .append("' height='").append(H - mt - mb).append("'/></clipPath></defs>");
-        for (int i = 0; i <= 5; i++) {
-            double v = ymin + (ym - ymin) * i / 5, u = xm * i / 5;
-            s.append(String.format(Locale.US, "<line x1='%.1f' x2='%.1f' y1='%.1f' y2='%.1f' stroke='#eef0f4'/>", ml, W - mr, Y.applyAsDouble(v), Y.applyAsDouble(v)));
-            s.append(String.format(Locale.US, "<text x='%.1f' y='%.1f' font-size='11' text-anchor='end' fill='#6b6f80'>%s</text>", ml - 6, Y.applyAsDouble(v) + 4, num(v, 0)));
-            s.append(String.format(Locale.US, "<text x='%.1f' y='%.1f' font-size='11' text-anchor='middle' fill='#6b6f80'>%s</text>", X.applyAsDouble(u), H - mb + 16, num(u, 0)));
-        }
-        if (ymin < 0) s.append(String.format(Locale.US, "<line x1='%.1f' x2='%.1f' y1='%.1f' y2='%.1f' stroke='#c9ccd6'/>", ml, W - mr, Y.applyAsDouble(0), Y.applyAsDouble(0)));
-        s.append(String.format(Locale.US, "<text x='%.1f' y='%.1f' font-size='12' text-anchor='middle' fill='#6b6f80'>kg procesados del lote</text>", (W + ml - mr) / 2, H - 6));
-        s.append(String.format(Locale.US, "<text x='14' y='%.1f' font-size='12' fill='#6b6f80' transform='rotate(-90 14 %.1f)' text-anchor='middle'>kWh del lote</text>", H / 2, H / 2));
-        if (r != null) {
-            String col = e.valida() ? VERDE : GRIS;
-            if (e.valida()) {
-                s.append(recta(X, Y, r, xm, sig, GRIS, 1.2, true, "MÁXIMO", W - mr));
-                s.append(recta(X, Y, r, xm, -sig, GRIS, 1.2, true, "MÍNIMO", W - mr));
-            }
-            s.append(recta(X, Y, r, xm, 0, col, 2, !e.valida(), e.valida() ? "OBJETIVO" : "sin validez", W - mr));
-            if (e.valida()) {
-                s.append(String.format(Locale.US, "<text x='%.1f' y='%.1f' font-size='12' fill='#1E1E2C'>%s · R² %s</text>",
-                        ml + 8, mt + 14, recta(r), num(r.r2(), 3)));
-            }
-            if (r.b() < 0) {
-                s.append(String.format(Locale.US, "<circle cx='%.1f' cy='%.1f' r='4' fill='#E8505B'/><text x='%.1f' y='%.1f' font-size='11' fill='#a3222c'>b = %s kWh</text>",
-                        X.applyAsDouble(0), Y.applyAsDouble(r.b()), X.applyAsDouble(0) + 8, Y.applyAsDouble(r.b()) - 6, num(r.b(), 0)));
-            }
-        }
+        java.util.Map<String, Object> d = new java.util.LinkedHashMap<>();
+        d.put("valida", e.valida());
+        d.put("r", r == null ? null : java.util.Map.of("m", r.m(), "b", r.b(), "sig", r.se() != null ? 2 * r.se() : 0.0));
+        d.put("xm", todos.stream().mapToDouble(LoteExcel::kg).max().orElse(1) * 1.1);
+        d.put("texto", e.valida() ? recta(r) + " · R² " + num(r.r2(), 3) : null);
+        List<java.util.Map<String, Object>> pts = new ArrayList<>();
         for (LoteExcel x : todos) {
             boolean b0 = p.lotes().contains(x);
-            String c = !b0 ? NARANJA : e.atipico(p.lotes().indexOf(x)) ? "#E8505B" : AZUL;
-            s.append(String.format(Locale.US, "<circle cx='%.1f' cy='%.1f' r='5.5' fill='%s' stroke='#fff'><title>%d · %s a %s · %s kg · %s kWh · %s kWh/kg</title></circle>",
-                    X.applyAsDouble(x.kg()), Y.applyAsDouble(x.kwh()), c, x.anio(), x.inicio().format(FH), x.fin().format(FH),
-                    num(x.kg(), 0), num(x.kwh(), 0), num(x.kwh() / x.kg(), 4)));
+            boolean atip = b0 && e.atipico(p.lotes().indexOf(x));
+            // Tres marcas: azul = línea base; azul con borde amarillo = línea base fuera de ± 2 sigma que se mantiene (R² ya
+            // cumplía); rojo = atípico quitado. Naranja = lote de este año que se compara.
+            boolean fuera = b0 && !atip && fueraDe2Sigma(e, x);
+            String nota = atip ? " · atípico quitado" : fuera ? " · fuera de 2 sigma, se mantiene" : "";
+            pts.add(java.util.Map.of("x", x.kg(), "y", x.kwh(), "c", !b0 ? "comp" : atip ? "atip" : fuera ? "fuera" : "base",
+                    "t", x.anio() + " · " + x.item() + "\n" + x.inicio().format(FH) + " a " + x.fin().format(FH) + "\n" + num(x.kg(), 0) + " kg · "
+                            + num(x.kwh(), 0) + " kWh · " + num(x.kwh() / x.kg(), 4) + " kWh/kg" + nota));
         }
-        return s.append("</svg>").toString();
+        d.put("pts", pts);
+        d.put("ley", (e.valida() ? "<span style='color:" + VERDE + "'>━</span> objetivo &nbsp; <span style='color:" + GRIS + "'>┅</span> máximo y mínimo (± 2 sigma) &nbsp; "
+                : r != null ? "<span style='color:" + GRIS + "'>┅</span> recta sin validez &nbsp; " : "")
+                + "<span style='color:" + AZUL + "'>●</span> línea base " + p.anio() + " (" + e.n() + ")"
+                + (fueraMantenidos(p) == 0 ? "" : " &nbsp; <span style='color:" + AZUL + ";-webkit-text-stroke:1px #E0B50F'>●</span> fuera de 2 sigma, se mantiene (" + fueraMantenidos(p) + ")")
+                + (e.atipicos().isEmpty() ? "" : " &nbsp; <span style='color:#E8505B'>●</span> atípico quitado (" + e.atipicos().size() + ")")
+                + (comp.isEmpty() ? "" : " &nbsp; <span style='color:" + NARANJA + "'>●</span> " + comp.getFirst().anio() + ": se compara (" + comp.size() + ")"));
+        try {
+            grafico.getElement().executeJs(SCRIPT + "\nwindow.DispersionLB.render(this, JSON.parse($0));", JSON.writeValueAsString(d));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+            mensaje("No se pudo dibujar la dispersión: " + ex.getMessage());
+        }
     }
 
-    private static String recta(java.util.function.DoubleUnaryOperator X, java.util.function.DoubleUnaryOperator Y, Regresion r, double xm,
-                                double off, String color, double ancho, boolean guiones, String texto, double xTexto) {
-        return String.format(Locale.US, "<line clip-path='url(#clLb)' x1='%.1f' y1='%.1f' x2='%.1f' y2='%.1f' stroke='%s' stroke-width='%.1f'%s/>"
-                        + "<text x='%.1f' y='%.1f' font-size='11' fill='%s'>%s</text>",
-                X.applyAsDouble(0), Y.applyAsDouble(r.b() + off), X.applyAsDouble(xm), Y.applyAsDouble(r.m() * xm + r.b() + off), color, ancho,
-                guiones ? " stroke-dasharray='6 5'" : "", xTexto + 5, Y.applyAsDouble(r.m() * xm + r.b() + off) + 4, color, texto);
+    /** Lote fuera de ± 2 sigma de la recta (solo con línea base válida, que tiene banda). */
+    private static boolean fueraDe2Sigma(Evaluacion e, LoteExcel x) {
+        return e.valida() && e.r().se() != null && Math.abs(x.kwh() - e.objetivo(x.kg())) > 2 * e.r().se();
+    }
+
+    /** Lotes de la línea base fuera de ± 2 sigma que se mantienen (no son atípicos quitados). */
+    private static long fueraMantenidos(Producto p) {
+        long n = 0;
+        for (int i = 0; i < p.lotes().size(); i++) if (!p.ev().atipico(i) && fueraDe2Sigma(p.ev(), p.lotes().get(i))) n++;
+        return n;
+    }
+
+    private static String esc(String s) {
+        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     // ---------------- Helpers de presentación ----------------
@@ -317,50 +321,26 @@ public class LineaBaseProductoPanel extends VerticalLayout {
         }
     }
 
-    /*
-     * Auto ajuste, mismo criterio que el unifilar de Transformadores y el tablero de Generadores: la dispersión toma el alto
-     * que queda desde su borde de arriba hasta el de abajo del área visible (la ventana o el panel con barra de
-     * desplazamiento que la contiene), sin la leyenda; mínimo 380 px. Se vuelve a ajustar al cambiar el tamaño de la
-     * ventana, la escala de Windows o el zoom del navegador.
-     */
-    private static final String AJUSTE = """
-            const el = $0;
-            const ajustar = () => {
-              const svg = el.querySelector('svg.lb-disp');
-              if (!svg || !el.isConnected) return;
-              svg.style.height = '';
-              let desplazado = 0, abajo = window.innerHeight;
-              for (let n = svg; n; n = n.assignedSlot || n.parentNode || n.host) {
-                if (!(n instanceof Element)) continue;
-                const zn = n.currentCSSZoom || 1;
-                desplazado += (n.scrollTop || 0) * zn;
-                const st = getComputedStyle(n);
-                if (n !== svg && n !== document.documentElement && n !== document.body && /auto|scroll/.test(st.overflowY)) {
-                  abajo = Math.min(abajo, n.getBoundingClientRect().top + (n.clientTop + n.clientHeight - parseFloat(st.paddingBottom || 0)) * zn);
-                }
-              }
-              const r = svg.getBoundingClientRect();
-              const ley = svg.nextElementSibling ? svg.nextElementSibling.getBoundingClientRect().height : 0;
-              const disponible = abajo - (r.top + desplazado) - ley - 30;
-              const zoom = svg.currentCSSZoom || 1;
-              svg.style.height = Math.max(380, disponible / zoom) + 'px';
-            };
-            if (!el.lbAjuste) {
-              el.lbAjuste = true;
-              let espera;
-              window.addEventListener('resize', () => { clearTimeout(espera); espera = setTimeout(ajustar, 150); });
-            }
-            setTimeout(ajustar, 0);
-            """;
+    /** amCharts: ayudas comunes de SGEn + la dispersión (lineabase/*.js). */
+    static final String SCRIPT = recurso("/lineabase/sgen-graficas.js") + "\n" + recurso("/lineabase/dispersion-lb.js");
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    static String recurso(String ruta) {
+        try (java.io.InputStream in = LineaBaseProductoPanel.class.getResourceAsStream(ruta)) {
+            return in == null ? "" : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException ex) {
+            return "";
+        }
+    }
 
     private static final String COMO = "<div style='font-size:12px;color:#6b6f80'><b>Cómo se calcula.</b> Regresión lineal kWh = m × kg + b con los "
-            + "lotes del período base del producto en esa línea (ISO 50006): 2025; si con 2025 no alcanza, 2025 más enero a septiembre de 2026, y "
-            + "entonces se comparan los lotes desde octubre de 2026 (revisión de la línea base por datos insuficientes). Con R² ≥ 0,75 no se quita "
-            + "ningún lote; si R² &lt; 0,75 se quita el lote más alejado de la recta si está a más de 2 sigma y se vuelve a ajustar, hasta llegar a "
-            + "0,75 o quedar 3 lotes; cada atípico quitado debe tener su causa. La línea base se usa solo si pasa las cinco pruebas: al menos 3 lotes, "
-            + "R² ≥ 0,75, prueba F con p &lt; 0,05 (la relación kWh–kg no es casualidad), pendiente m &gt; 0 e intercepto b ≥ 0 (la energía fija "
-            + "del lote no puede ser negativa). Si solo falla el intercepto y no es distinto de cero (prueba t, p &gt; 0,05), se ajusta por el origen "
-            + "(kWh = m × kg) y se vuelven a pedir las pruebas. Si nada alcanza, el producto queda <b>sin referencia válida</b> y se controla con la "
-            + "línea base mensual de la línea; el motivo queda registrado. Objetivo = m × kg + b; máximo y mínimo = objetivo ± 2 sigma (sigma = error "
-            + "estándar de la regresión). Lotes de la hoja MEDICION_XTR de los Excel de medición (kg = total de material procesado de PRODUCCIÓN).</div>";
+            + "lotes del año base, el año calendario anterior completo (ISO 50006); los lotes de este año se comparan contra ella y nunca la "
+            + "modifican. Por producto: los lotes del producto en su línea. Por línea: todos los lotes de la línea. Se usa la del producto si es "
+            + "válida; si no, la de su línea. Con R² ≥ 0,75 no se quita ningún lote; si R² &lt; 0,75 se quita el lote más alejado de la recta si "
+            + "está a más de 2 sigma y se vuelve a ajustar, hasta llegar a 0,75 o quedar 3 lotes; cada atípico quitado debe tener su causa. Es "
+            + "válida si pasa las cinco pruebas: al menos 3 lotes, R² ≥ 0,75, prueba F con p &lt; 0,05 (la relación kWh–kg no es casualidad), "
+            + "pendiente m &gt; 0 e intercepto b ≥ 0 (la energía fija del lote no puede ser negativa). Si solo falla el intercepto y no es "
+            + "distinto de cero (prueba t, p &gt; 0,05), se ajusta por el origen (kWh = m × kg) y se vuelven a pedir las pruebas. Objetivo = "
+            + "m × kg + b; máximo y mínimo = objetivo ± 2 sigma (sigma = error estándar de la regresión). Lotes de la hoja MEDICION_XTR de los "
+            + "Excel de medición (kg = total de material procesado de PRODUCCIÓN).</div>";
 }

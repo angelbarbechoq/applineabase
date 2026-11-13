@@ -231,10 +231,11 @@ public final class MainLayout extends AppLayout {
         graficas.setExpanded(false);
         graficas.addItem(new SideNavItem("Tiempo Real", "grafica", VaadinIcon.CHART_LINE.create()));
         graficas.addItem(new SideNavItem("Histórico", "historico", VaadinIcon.CLOCK.create()));
-        if (lineaAccessService.esAdmin()) {
-            graficas.addItem(new SideNavItem("Línea base por producto", "lotes/linea-base", VaadinIcon.TRENDING_UP.create()));
-        }
         nav.addItem(graficas);
+        // SGEn: línea base e índice de consumo (por ahora solo ADMIN, pedido del usuario 2026-11-13).
+        if (lineaAccessService.esAdmin()) {
+            nav.addItem(new SideNavItem("SGEn", "sgen", VaadinIcon.TRENDING_UP.create()));
+        }
         colapsarAlSalirDelMouse(graficas);
 
         nav.addItem(new SideNavItem("Consulta de Datos", "query", VaadinIcon.LIST.create()));

@@ -75,6 +75,8 @@ public class MarcadoLotesPanel extends HorizontalLayout {
     private final com.vaadin.flow.component.html.Div control = new com.vaadin.flow.component.html.Div();
     private Registration poll;
     private com.vaadin.flow.component.html.Div destinoEnCurso;
+    // Productos de la lista sin línea base propia válida (se pintan en rojo).
+    private final java.util.Set<String> sinPropia = new java.util.HashSet<>();
     // Avisa a la vista que cambió la línea o el producto (pestaña «Línea base» de Tiempo Real).
     private Runnable alCambiarProducto = () -> { };
 
@@ -112,13 +114,17 @@ public class MarcadoLotesPanel extends HorizontalLayout {
         producto.setWidth("480px");
         producto.getStyle().set("--vaadin-input-field-value-font-size", "12px").set("font-size", "12px")
                 .set("--vaadin-combo-box-overlay-width", "560px");
+        // En rojo los productos sin línea base propia válida (se usa la de su línea).
         producto.setRenderer(com.vaadin.flow.data.renderer.LitRenderer.<String>of(
-                "<span style='font-size:12px;white-space:nowrap'>${item.n}</span>").withProperty("n", s -> s));
+                        "<span style='font-size:12px;white-space:nowrap;color:${item.c}'>${item.n}</span>")
+                .withProperty("n", s -> s)
+                .withProperty("c", s -> sinPropia.contains(s) ? "#c62828" : "inherit"));
         producto.setAllowCustomValue(false);
         producto.setClearButtonVisible(true);
         producto.addValueChangeListener(e -> {
             banda(false);
             alCambiarProducto.run();
+            if (e.isFromClient()) avisarSinPropia(e.getValue());
         });
 
         Button inicio = new Button("Validar inicio", e -> validarInicio());
@@ -210,14 +216,13 @@ public class MarcadoLotesPanel extends HorizontalLayout {
         Optional<LoteProduccion> lo = lotes.enCurso(linea);
         if (lo.isEmpty() || LotesService.SIN_ITEM.equals(lo.get().getProducto())) return;
         LoteProduccion l = lo.get();
-        Optional<LineaBaseProductoService.Producto> pr = lineaBase.producto(linea, l.getProducto());
-        if (pr.isEmpty() || !pr.get().ev().valida()) {
-            String motivo = pr.map(x -> x.ev().motivo()).orElse("sin lotes en el período base");
-            control.add(new Html("<div style='border-radius:8px;padding:6px 10px;background:#FCE4E6;color:#a3222c'><b>Sin referencia válida</b> para "
-                    + "este producto (" + motivo + "). Se controla con la línea base mensual de la línea.</div>"));
+        Optional<LineaBaseProductoService.Banda> ob = lineaBase.banda(linea, l.getProducto());
+        if (ob.isEmpty()) {
+            control.add(new Html("<div style='border-radius:8px;padding:6px 10px;background:#FCE4E6;color:#a3222c'><b>Sin línea base válida</b> "
+                    + "para este producto ni para la " + linea.replace("Linea", "Línea ") + ".</div>"));
             return;
         }
-        LineaBaseProductoService.Banda b = lineaBase.banda(linea, l.getProducto()).orElseThrow();
+        LineaBaseProductoService.Banda b = ob.get();
         // Último minuto con contador guardado (la lectura es cada 60 s).
         LocalDateTime ahora = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
         Double kwhAhora = null;
@@ -233,7 +238,8 @@ public class MarcadoLotesPanel extends HorizontalLayout {
         if (dif > rango) { fondo = "#FCE4E6"; color = "#a3222c"; texto = "Sobre el máximo"; }
         else if (dif < -rango) { fondo = "#FBF3D5"; color = "#7a6205"; texto = "Bajo el mínimo"; }
         else { fondo = "#E3F5EA"; color = "#1d7a46"; texto = "Dentro de la banda"; }
-        String kp = kpi(horas(min / 60), "transcurrido") + kpi(LineaBaseProductoService.num(kwh, 0) + " kWh", "acumulado")
+        String kp = kpi(b.aplicada().dePropia() ? "Del producto" : "De la " + linea.replace("Linea", "Línea "), "línea base usada")
+                + kpi(horas(min / 60), "transcurrido") + kpi(LineaBaseProductoService.num(kwh, 0) + " kWh", "acumulado")
                 + kpi(LineaBaseProductoService.num(kwh / min, 3) + " kWh/min", "promedio del lote")
                 + kpi(LineaBaseProductoService.num(esp, 0) + " kWh", "esperado al ritmo objetivo")
                 + kpi(LineaBaseProductoService.num(esp - rango, 0) + " a " + LineaBaseProductoService.num(esp + rango, 0), "rango aceptable (kWh)")
@@ -268,12 +274,21 @@ public class MarcadoLotesPanel extends HorizontalLayout {
         punto.getStyle().set("color", "#777");
     }
 
+    /** Al elegir un producto sin línea base propia: aviso con el motivo y la línea base que se usa. */
+    private void avisarSinPropia(String p) {
+        if (lineaBase == null || linea == null || p == null || LotesService.SIN_ITEM.equals(p)) return;
+        lineaBase.aplicable(linea, p).filter(a -> !a.dePropia()).ifPresent(a -> aviso(
+                p + " no tiene línea base propia (" + a.motivo() + "). Se usa la línea base de la " + linea.replace("Linea", "Línea ") + "."));
+    }
+
     private void cargarProductos() {
         if (linea == null) return;
         List<ProductoLinea> l = TODOS.equals(alcance.getValue()) ? catalogo.todos() : catalogo.productosDe(linea);
         idPorNombre.clear();
         for (ProductoLinea p : l) idPorNombre.putIfAbsent(p.getNombre(), p.getId());
         List<String> items = new ArrayList<>(idPorNombre.keySet());
+        sinPropia.clear();
+        if (lineaBase != null) for (String n : items) if (!lineaBase.tienePropia(linea, n)) sinPropia.add(n);
         items.add(LotesService.SIN_ITEM);
         String antes = producto.getValue();
         producto.setItems(items);

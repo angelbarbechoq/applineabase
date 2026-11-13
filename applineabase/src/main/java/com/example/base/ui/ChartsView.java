@@ -214,14 +214,12 @@ public class ChartsView extends VerticalLayout {
             return;
         }
         String producto = marcadoLotes.productoElegido();
-        String nl = linea.replace("Linea", "Línea ");
-        if (producto == null || com.example.lotes.service.LotesService.SIN_ITEM.equals(producto)) {
-            panelLineaBase.mensaje("Elija el producto en la franja «Lote» de la pestaña KWh (" + nl + ").");
-            return;
-        }
-        lineaBaseProducto.producto(linea, producto).ifPresentOrElse(p -> panelLineaBase.mostrar(p, true),
-                () -> panelLineaBase.mensaje("<b>" + producto + "</b> no tiene lotes en el período base (2025 a septiembre de 2026)"
-                        + " en la " + nl + ": sin línea base del producto. Se controla con la línea base mensual de la línea."));
+        if (com.example.lotes.service.LotesService.SIN_ITEM.equals(producto)) producto = null;
+        String elegido = producto;
+        // La del producto si es válida; si no (o sin producto), la de su línea con el aviso.
+        lineaBaseProducto.aplicable(linea, elegido).ifPresentOrElse(a -> panelLineaBase.mostrar(a, elegido),
+                () -> panelLineaBase.mensaje("La " + linea.replace("Linea", "Línea ") + " no tiene lotes en "
+                        + LineaBaseProductoService.anioBase() + ": sin línea base."));
     }
 
     private VerticalLayout crearPanelKwh() {
