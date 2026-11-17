@@ -40,6 +40,18 @@ escribe en `C:\LineaBaseX` y la app arranca con `--app.adquisicion.habilitada=fa
 sirena: `DataAcquisitionTask`). La configuracion de hardware pasa al backend (solo administrador); hoy el backend ya lee
 `C:\LineaBaseX\config` y el catalogo de medidores en cada ciclo. MySQL despues, como otro almacen.
 
+Avance: (1) hecho el 2026-11-17 (dos ciclos reales: mismas tablas, esquema y valores que la app; etiqueta git
+`antes-del-recolector` en la app = version anterior a todo esto). (2) hecho el 2026-11-17, sin probar en planta:
+`VigiaArchivosService` en la app (solo con `app.adquisicion.habilitada=false`, cada 10 s, filas nuevas del archivo del
+dia -> los mismos eventos que la lectura) y archivo `estado\equipos` del backend (comunicacion de cada linea, fecha ISO).
+Prueba: ventana corta con los generadores parados, backend con `colector.sqlite.carpeta=C:\\LineaBaseX` y la app con
+la lectura apagada.
+
+Fecha como fecha (decidido 2026-11-17): SQLite no tiene tipo fecha; recomienda texto `AAAA-MM-DD HH:MM:SS` (sqlite.org,
+Datatypes 2.2) y sus funciones no aceptan `DD-MM-AAAA`. No se convierten los archivos actuales: la correccion se hace en
+el paso a MySQL (`DATETIME`), con un solo lugar de la app que lee los datos y el importador que convierte la fecha una vez.
+Los archivos nuevos (como `estado\equipos`) ya usan el formato ISO.
+
 ## Etapas
 
 0. **Vaadin 25.3.5 + Spring Boot 4.1.2 en la app** (hecho 2026-11-17, falta la prueba del usuario).

@@ -184,6 +184,29 @@ public class DatabaseInitializationService {
     }
 
     /**
+     * Pasa las rutas de los archivos del día (diario y mensual, normal y VIP) al día de hoy, sin crear tablas: con la
+     * lectura de la app apagada los archivos los escribe el backend recolector, y las consultas de "hoy" y "lo último"
+     * (PLCDataQueryService) tienen que mirar el archivo nuevo después de medianoche. Lo llama VigiaArchivosService.
+     */
+    public void actualizarRutasDelDia() {
+        LocalDate today = LocalDate.now();
+        if (today.isEqual(lastDate)) {
+            return;
+        }
+        int month = today.getMonthValue();
+        String monthName = RutaArchivosEnergia.getNombreMes(month);
+        String dayFormatted = String.format("%02d", today.getDayOfMonth());
+        String monthPath = RutaArchivosEnergia.construirCarpetaMes(today.getYear(), month);
+        this.dailyPath = monthPath + "\\" + dayFormatted + monthName;
+        this.dailyVIPPath = monthPath + "\\" + dayFormatted + monthName + "VIP";
+        this.monthlyPath = monthPath + "\\" + monthName;
+        this.monthlyVIPPath = monthPath + "\\" + monthName + "VIP";
+        lastDate = today;
+        lastMonth = YearMonth.from(today);
+        logger.info("Rutas del dia actualizadas a {}", dailyPath);
+    }
+
+    /**
      * Lista los meses (año+mes) para los que existe una carpeta de datos en BASE_PATH,
      * ordenados de más antiguo a más reciente. Usado por el backfill del horómetro para
      * saber desde cuándo hay histórico disponible, sin asumir una fecha de inicio fija.
