@@ -39,8 +39,8 @@ Acordado con el usuario el 2026-11-17. Proyecto nuevo (colector) que lee los equ
    en el disco de esta PC (dentro del disco virtual de WSL). Licencia: Docker Desktop es gratis para uso comercial
    solo con menos de 250 empleados Y menos de USD 10 millones de ingresos al ano (docs.docker.com). Servidor de
    planta: no confirmado que Docker Desktop corra sin un usuario con sesion iniciada; decidir antes de la etapa 7.
-2. **Proyecto colector**: creado el 2026-11-17 en la carpeta hermana `backendMySQLSGEn` (puerto 8081; en el mismo
-   repositorio git que la app, raiz `LineaBaseLocal`, desde el 2026-11-17). Lee PLC, pasarelas (con calidad), mezcladores y generadores (solo la fila `{mes}Generador`, sin arranques
+2. **Proyecto colector**: creado el 2026-11-17 en la carpeta hermana `backendMySQLSGEn` (puerto 8081; repositorio
+   git propio, separado del de la app; el de la app lo ignora en `LineaBaseLocal/.gitignore`). Lee PLC, pasarelas (con calidad), mezcladores y generadores (solo la fila `{mes}Generador`, sin arranques
    ni eventos), arma las filas como el SQLite y las entrega a `AlmacenLecturas` (hoy en memoria, falta el de MySQL);
    pantalla en `/` con el ultimo ciclo, los equipos y la ultima fila de cada tabla. Sin escrituras Modbus. Original:: Spring Boot sin Vaadin, Java 21, j2mod,
    driver MySQL. Se pasan los lectores, `ModbusTcpConexion`, la lectura de `C:\LineaBaseX\config`, generadores
