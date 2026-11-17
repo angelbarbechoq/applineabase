@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recolección de datos</title>
+<style>
+  :root { --borde:#E4E6EC; --texto:#1E1E2C; --gris:#6b6f80; --verde:#d4edda; --verdeT:#155724;
+          --rojo:#f8d7da; --rojoT:#721c24; --amarillo:#fff3cd; --amarilloT:#856404; --azul:#3B8FF3; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, "Segoe UI", sans-serif; color:var(--texto); background:#f5f6f8; }
+  header { background:#fff; border-bottom:1px solid var(--borde); padding:12px 16px; display:flex; flex-wrap:wrap;
+           gap:12px 24px; align-items:center; position:sticky; top:0; z-index:2; }
+  h1 { font-size:18px; margin:0; }
+  .dato { color:var(--gris); } .dato b { color:var(--texto); }
+  button { background:var(--azul); color:#fff; border:0; border-radius:6px; padding:7px 14px; font-size:14px; cursor:pointer; }
+  button:disabled { opacity:.6; }
+  main { padding:16px; display:flex; flex-direction:column; gap:16px; }
+  section { background:#fff; border:1px solid var(--borde); border-radius:12px; padding:12px 16px; }
+  h2 { font-size:15px; margin:0 0 8px; }
+  .scroll { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { padding:4px 8px; border-bottom:1px solid var(--borde); text-align:right; white-space:nowrap; }
+  th { position:sticky; top:0; background:#fafbfc; font-weight:600; }
+  th:first-child, td:first-child, .izq { text-align:left; }
+  .ok { background:var(--verde); color:var(--verdeT); } .mal { background:var(--rojo); color:var(--rojoT); }
+  .aviso { background:var(--amarillo); color:var(--amarilloT); }
+  .chip { padding:2px 8px; border-radius:10px; font-weight:600; }
+  .vacio { color:var(--gris); }
+  .nulo { color:#c0c3cc; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Recolección de datos</h1>
+  <span class="dato">Lectura: <b id="lectura">—</b></span>
+  <span class="dato">Guardado: <b id="almacen">—</b></span>
+  <span class="dato">Último ciclo: <b id="ciclo">—</b></span>
+  <span class="dato">Próximo: <b id="proximo">—</b></span>
+  <button id="refrescar">Refrescar</button>
+</header>
+<main>
+  <section>
+    <h2>Equipos</h2>
+    <div class="scroll"><table id="equipos"></table></div>
+  </section>
+  <div id="grupos"></div>
+</main>
+<script>
+  let segundoCiclo = 30;
+
+  const fmt = v => {
+    if (v === null || v === undefined) return '<span class="nulo">—</span>';
+    if (typeof v === 'number') return Number.isInteger(v) ? v.toLocaleString('es') : v.toLocaleString('es', {maximumFractionDigits: 3});
+    return String(v).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  };
+
+  async function cargar() {
+    const boton = document.getElementById('refrescar');
+    boton.disabled = true;
+    try {
+      const r = await fetch('api/lecturas', {cache: 'no-store'});
+      const d = await r.json();
+      segundoCiclo = d.segundoCiclo;
+      document.getElementById('lectura').innerHTML = d.lecturaHabilitada
+        ? '<span class="chip ok">habilitada</span>' : '<span class="chip aviso">deshabilitada</span>';
+      document.getElementById('almacen').textContent = d.almacen;
+      const c = d.ciclo;
+      document.getElementById('ciclo').innerHTML = c
+        ? `${c.inicio.replace('T', ' ')} · ${(c.ms / 1000).toFixed(1)} s · ${c.filas} filas · ${c.guardadas} guardadas`
+          + (c.errorGuardado ? ` <span class="chip mal">${fmt(c.errorGuardado)}</span>` : '')
+        : 'todavía no hubo ciclo';
+      equipos(c ? c.estados : []);
+      grupos(d.grupos);
+    } catch (e) {
+      document.getElementById('ciclo').innerHTML = '<span class="chip mal">sin conexión con el backend</span>';
+    } finally {
+      boton.disabled = false;
+    }
+  }
+
+  function equipos(estados) {
+    const t = document.getElementById('equipos');
+    if (!estados.length) { t.innerHTML = '<tr><td class="vacio">Sin datos todavía.</td></tr>'; return; }
+    t.innerHTML = '<tr><th>Equipo</th><th class="izq">Tipo</th><th class="izq">IP</th><th>Leídos</th><th>Tiempo</th><th class="izq">Estado</th></tr>'
+      + estados.map(e => {
+          const bien = e.motivo === null && e.leidos === e.total;
+          const parcial = e.leidos > 0;
+          const clase = bien ? 'ok' : parcial ? 'aviso' : 'mal';
+          return `<tr><td>${fmt(e.nombre)}</td><td class="izq">${fmt(e.grupo)}</td><td class="izq">${fmt(e.ip)}</td>`
+            + `<td>${e.leidos} de ${e.total}</td><td>${(e.ms / 1000).toFixed(1)} s</td>`
+            + `<td class="izq"><span class="chip ${clase}">${bien ? 'leído' : fmt(e.motivo || 'incompleto')}</span></td></tr>`;
+        }).join('');
+  }
+
+  function grupos(lista) {
+    document.getElementById('grupos').innerHTML = lista.map(g => `
+      <section style="margin-bottom:16px">
+        <h2>${fmt(g.titulo)} <span class="dato">· ${g.filas.length} tablas</span></h2>
+        <div class="scroll"><table>
+          <tr><th>Tabla</th><th class="izq">Fecha</th>${g.columnas.map(c => `<th>${fmt(c)}</th>`).join('')}<th class="izq">Archivo SQLite</th></tr>
+          ${g.filas.map(f => `<tr><td>${fmt(f.tabla)}</td><td class="izq">${fmt(f.fecha)}</td>`
+              + g.columnas.map(c => `<td>${fmt(f.valores[c])}</td>`).join('')
+              + `<td class="izq vacio">${fmt(f.archivo)}</td></tr>`).join('')}
+        </table></div>
+      </section>`).join('');
+  }
+
+  // Cuenta regresiva al próximo ciclo y recarga 5 s después de que corre (cada minuto).
+  setInterval(() => {
+    const s = new Date().getSeconds();
+    const falta = (segundoCiclo - s + 60) % 60;
+    document.getElementById('proximo').textContent = falta === 0 ? 'leyendo…' : `en ${falta} s`;
+    if ((segundoCiclo + 5) % 60 === s) cargar();
+  }, 1000);
+
+  document.getElementById('refrescar').addEventListener('click', cargar);
+  cargar();
+</script>
+</body>
+</html>

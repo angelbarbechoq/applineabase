@@ -1,0 +1,106 @@
+package com.example.generador.model;
+
+/**
+ * Lista cerrada de valores que se leen de un controlador de generador. Cada modelo de
+ * controlador (generador-modelos.json) dice en qué registro está cada uno; los que un modelo no
+ * mapea quedan vacíos. La columna es el nombre en {mes}Generador (las primeras coinciden con las
+ * columnas que ya existían antes del mapa configurable).
+ */
+public enum ParametroGenerador {
+    RPM("rpm", "RPM", "rpm", false),
+    FRECUENCIA("frecuencia", "Frecuencia generador", "Hz", false),
+    V_L1N("v_l1n", "Generador V L1-N", "V", false),
+    V_L2N("v_l2n", "Generador V L2-N", "V", false),
+    V_L3N("v_l3n", "Generador V L3-N", "V", false),
+    V_L1L2("v_l1l2", "Generador V L1-L2", "V", false),
+    V_L2L3("v_l2l3", "Generador V L2-L3", "V", false),
+    V_L3L1("v_l3l1", "Generador V L3-L1", "V", false),
+    I_L1("i_l1", "Generador corriente L1", "A", false),
+    I_L2("i_l2", "Generador corriente L2", "A", false),
+    I_L3("i_l3", "Generador corriente L3", "A", false),
+    KW("kw", "Generador kW total", "kW", false),
+    KW_L1("kw_l1", "Generador kW L1", "kW", false),
+    KW_L2("kw_l2", "Generador kW L2", "kW", false),
+    KW_L3("kw_l3", "Generador kW L3", "kW", false),
+    KVAR("kvar", "Generador kVAr total", "kVAr", false),
+    KVA("kva", "Generador kVA total", "kVA", false),
+    PF("pf", "Generador PF total", "", false),
+    RED_FRECUENCIA("red_frecuencia", "Frecuencia red", "Hz", false),
+    RED_V_L1N("red_v_l1n", "Red V L1-N", "V", false),
+    RED_V_L2N("red_v_l2n", "Red V L2-N", "V", false),
+    RED_V_L3N("red_v_l3n", "Red V L3-N", "V", false),
+    RED_V_L1L2("red_v_l1l2", "Red V L1-L2", "V", false),
+    RED_V_L2L3("red_v_l2l3", "Red V L2-L3", "V", false),
+    RED_V_L3L1("red_v_l3l1", "Red V L3-L1", "V", false),
+    RED_KW("red_kw", "Red kW importados (negativo = retorno a la red)", "kW", false),
+    CARGA_KW("carga_kw", "Consumo del transformador kW (medido por el controlador)", "kW", false),
+    BATERIA("bateria", "Tensión de batería", "V", false),
+    PRESION_ACEITE("presion_aceite", "Presión de aceite", "bar", false),
+    TEMP_REFRIGERANTE("temp_refrigerante", "Temperatura refrigerante", "C", false),
+    TEMP_ACEITE("temp_aceite", "Temperatura de aceite", "C", false),
+    NIVEL_COMBUSTIBLE("nivel_combustible", "Nivel de combustible", "%", false),
+    CONSUMO_COMBUSTIBLE("consumo_combustible", "Consumo de combustible", "L/h", false),
+    KWH("kwh", "Energía generada (contador)", "kWh", true),
+    KVARH("kvarh", "Energía reactiva generada (contador)", "kVArh", true),
+    RED_KWH("red_kwh", "Energía de red (contador del controlador)", "kWh", true),
+    RED_KVARH("red_kvarh", "Energía reactiva de red (contador del controlador)", "kVArh", true),
+    HORAS_MARCHA("horas_marcha", "Horas de marcha", "h", false),
+    ARRANQUES("arranques", "Cantidad de arranques", "", true),
+    // Red e interruptores según el propio controlador (qué significa cada código o bit: SenalesRed del modelo).
+    ESTADO_INTERRUPTORES("estado_interruptores", "Estado de los interruptores (código del controlador)", "", true),
+    ENTRADAS_BINARIAS("entradas_binarias", "Entradas binarias del controlador", "", true),
+    AVISOS_RED("avisos_red", "Avisos de red del controlador", "", true),
+    PROTECCIONES_RED("protecciones_red", "Protecciones de red activas", "", true),
+    ROCOF("rocof", "ROCOF", "Hz/s", false),
+    ROCOF_MAX("rocof_max", "ROCOF máxima registrada por el controlador", "Hz/s", false),
+    SALTO_VECTOR_MAX("salto_vector_max", "Salto de vector máximo registrado por el controlador", "grados", false),
+    /** OFF, MAN, AUTO o TEST según el código (nombres en "modos" del modelo). */
+    MODO_CONTROLADOR("modo_controlador", "Modo del controlador (código)", "", true),
+    // Para el tablero de Estado actual (nombres de códigos y bits en "estadosMotor", "entradas" y "salidas" del modelo).
+    ESTADO_MOTOR("estado_motor", "Estado del motor (código del controlador)", "", true),
+    SALIDAS_BINARIAS("salidas_binarias", "Salidas binarias del controlador", "", true),
+    MANTENIMIENTO("mantenimiento", "Contador de mantenimiento 1", "h", true),
+    POTENCIA_NOMINAL("potencia_nominal", "Potencia nominal", "kW", true),
+    CORRIENTE_NOMINAL("corriente_nominal", "Corriente nominal", "A", true),
+    /** Log Bout 2 de ComAp, palabra de bits (bit 5 = Ready To AMF, ver "listoAmf" del modelo). */
+    LOG_BOUT_2("log_bout_2", "Log Bout 2 del controlador (Ready To AMF...)", "", true),
+    PARADAS_EMERGENCIA("paradas_emergencia", "Paradas de emergencia (contador)", "", true),
+    PARADAS_FALLA("paradas_falla", "Paradas por falla (Shutdowns, contador)", "", true),
+    /** Cuenta regresiva de la pantalla del controlador: cuál corre (código, nombres en "temporizadores" del modelo). */
+    TEMPORIZADOR("temporizador", "Temporizador en curso (código)", "", true),
+    TEMPORIZADOR_VALOR("temporizador_valor", "Tiempo que falta del temporizador", "s", true),
+    // Tiempos ajustados en el controlador (setpoints, solo lectura): el total de cada cuenta regresiva ("tiemposAjustados").
+    AJUSTE_DEMORA_ARRANQUE("ajuste_demora_arranque", "Demora de arranque por falla de red (Emergency Start Delay)", "s", false),
+    AJUSTE_RETORNO_RED("ajuste_retorno_red", "Espera al volver la red (Mains Return Delay)", "s", false),
+    AJUSTE_CIERRE_MCB("ajuste_cierre_mcb", "Demora de cierre del MCB (MCB Close Delay)", "s", false),
+    AJUSTE_ENFRIAMIENTO("ajuste_enfriamiento", "Tiempo de enfriamiento (Cooling Time)", "s", false);
+
+    private final String columna;
+    private final String etiqueta;
+    private final String unidad;
+    private final boolean entero;
+
+    ParametroGenerador(String columna, String etiqueta, String unidad, boolean entero) {
+        this.columna = columna;
+        this.etiqueta = etiqueta;
+        this.unidad = unidad;
+        this.entero = entero;
+    }
+
+    public String columna() {
+        return columna;
+    }
+
+    public String etiqueta() {
+        return etiqueta;
+    }
+
+    public String unidad() {
+        return unidad;
+    }
+
+    /** Contadores: se guardan como INTEGER. */
+    public boolean entero() {
+        return entero;
+    }
+}
