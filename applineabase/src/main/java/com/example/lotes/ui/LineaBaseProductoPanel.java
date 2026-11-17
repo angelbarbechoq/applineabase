@@ -107,7 +107,7 @@ public class LineaBaseProductoPanel extends VerticalLayout {
 
         String quitados = e.atipicos().isEmpty() ? "" : " R² con todos los lotes " + num(e.r2Inicial(), 3) + " &lt; 0,75: se quitaron "
                 + e.atipicos().size() + " atípicos a más de 2 sigma (en rojo); cada uno necesita su causa.";
-        String periodo = " Año base: " + p.anio() + ".";
+        String periodo = servicio.excepcion(p.linea()).map(x -> " " + x.texto() + ".").orElse(" Año base: " + p.anio() + ".");
         estado.removeAll();
         if (aviso != null) estado.add(new Html("<div style='" + caja("#FBF3D5", "#7a6205") + "'>" + aviso + "</div>"));
         if (e.valida()) {

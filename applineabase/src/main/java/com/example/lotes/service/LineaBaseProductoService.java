@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 
@@ -93,6 +94,37 @@ public class LineaBaseProductoService {
                         String error, LocalDateTime leido) {
     }
 
+    /**
+     * Período base distinto del año anterior para una línea sin datos suficientes en ese año (NCh-ISO 50006 4.4.2: línea
+     * base de menos de un año cuando faltan datos históricos). Vale solo mientras el año base sea anioBase: sus lotes de
+     * desde a hasta (del año en curso) pasan a ser la línea base de la línea y dejan de compararse; los del año anterior
+     * de esa línea no se usan.
+     */
+    public record Excepcion(int anioBase, String linea, java.time.LocalDate desde, java.time.LocalDate hasta, String motivo) {
+        public String texto() {
+            DateTimeFormatter f = DateTimeFormatter.ofPattern("d-MM-yyyy");
+            return "Período base por excepción: del " + desde.format(f) + " al " + hasta.format(f) + " (" + motivo + ")";
+        }
+    }
+
+    /** Excepciones de período base (decididas con el usuario el 2026-11-13). */
+    public static final List<Excepcion> EXCEPCIONES = List.of(
+            new Excepcion(2025, "Linea17", java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 5, 13),
+                    "en 2025 la línea operó un solo lote y opera de forma regular desde enero de 2026; período anterior al "
+                            + "aumento de velocidad del 14-05-2026 y al cambio del motor principal de agosto de 2026; "
+                            + "NCh-ISO 50006, 4.4.2"));
+
+    /** Excepción de período base vigente para la línea, si la tiene. */
+    public Optional<Excepcion> excepcion(String linea) {
+        int ab = datos().anioBase();
+        return EXCEPCIONES.stream().filter(e -> e.anioBase() == ab && e.linea().equals(linea)).findFirst();
+    }
+
+    /** Año que se muestra como base de la línea: el de la excepción si la tiene, si no el año anterior. */
+    private int anioDe(String linea) {
+        return excepcion(linea).map(e -> e.desde().getYear()).orElse(datos().anioBase());
+    }
+
     private volatile Datos datos;
     private final Map<String, Evaluacion> cache = new ConcurrentHashMap<>();
 
@@ -145,6 +177,18 @@ public class LineaBaseProductoService {
             log.warn("No se pudo leer {}: {}", fComp, e.toString());
             err.append("No se pudo leer ").append(fComp.getName()).append(": ").append(e.getMessage()).append(". ");
         }
+        // Excepciones de período base: los lotes de la ventana pasan de comparación a base; los del año anterior de esa
+        // línea dejan de usarse.
+        for (Excepcion e : EXCEPCIONES) {
+            if (e.anioBase() != anioBase) continue;
+            java.util.function.Predicate<LoteExcel> enVentana = x -> x.linea().equals(e.linea())
+                    && !x.inicio().toLocalDate().isBefore(e.desde()) && !x.inicio().toLocalDate().isAfter(e.hasta());
+            List<LoteExcel> nb = new ArrayList<>(base.stream().filter(x -> !x.linea().equals(e.linea())).toList());
+            nb.addAll(comp.stream().filter(enVentana).toList());
+            comp = comp.stream().filter(enVentana.negate()).toList();
+            base = nb;
+            log.info("Línea base: excepción {} del {} al {}", e.linea(), e.desde(), e.hasta());
+        }
         log.info("Línea base: {} lotes de {} y {} de {} ({})", base.size(), anioBase, comp.size(), aComp, archivos);
         return new Datos(anioBase, base, comp, aComp, archivos, err.isEmpty() ? null : err.toString().trim(), LocalDateTime.now());
     }
@@ -182,7 +226,7 @@ public class LineaBaseProductoService {
                 .sorted(Comparator.comparing(LoteExcel::inicio)).toList();
         if (l.isEmpty()) return Optional.empty();
         Evaluacion ev = cache.computeIfAbsent(linea + "|*", k -> evaluarConOrigen(puntos(l)));
-        return Optional.of(new Producto(linea, null, linea.replace("Linea", "Línea ") + " (todos los productos)", l, ev, datos().anioBase()));
+        return Optional.of(new Producto(linea, null, linea.replace("Linea", "Línea ") + " (todos los productos)", l, ev, anioDe(linea)));
     }
 
     /**
@@ -208,7 +252,7 @@ public class LineaBaseProductoService {
         List<LoteExcel> l = datos().base().stream().filter(x -> x.linea().equals(linea) && x.clave().equals(clave))
                 .sorted(Comparator.comparing(LoteExcel::inicio)).toList();
         Evaluacion ev = cache.computeIfAbsent(linea + "|" + clave, k -> evaluarConOrigen(puntos(l)));
-        return new Producto(linea, clave, l.getLast().item(), l, ev, datos().anioBase());
+        return new Producto(linea, clave, l.getLast().item(), l, ev, anioDe(linea));
     }
 
     private static List<double[]> puntos(List<LoteExcel> l) {
@@ -227,16 +271,18 @@ public class LineaBaseProductoService {
 
     /**
      * Banda de Tiempo Real con la línea base aplicable (la del producto o la de su línea): objetivo = m × kg/min + b /
-     * minutos del lote. kg/min y minutos del lote (duración media) salen de los lotes del producto en el año base si los
-     * tuvo; si no, de los lotes de la línea. Máximo y mínimo = ± 2 sigma / minutos. Vacío si la línea base aplicable no es
+     * minutos del lote. kg/min y minutos del lote (duración media) salen de los lotes del producto en el año base si se usa
+     * su línea base propia; si no, de los lotes de la línea. Máximo y mínimo = ± 2 sigma / minutos. Vacío si la línea base aplicable no es
      * válida.
      */
     public Optional<Banda> banda(String linea, String nombre) {
         return aplicable(linea, nombre).filter(a -> a.lineaBase().ev().valida()).map(a -> {
             Producto lb = a.lineaBase();
-            // Ritmo: los lotes del producto (sin los atípicos si su línea base es la propia), o los de la línea.
+            // Ritmo: los lotes del producto solo si se usa su línea base propia (sin los atípicos); si se usa la de la línea
+            // de producción (productos en rojo), también el ritmo de la línea, así la banda es la misma para todos ellos
+            // (pedido del usuario 2026-11-16).
             List<LoteExcel> ritmo = new ArrayList<>();
-            boolean delProducto = a.producto() != null;
+            boolean delProducto = a.dePropia();
             Producto fuente = delProducto ? a.producto() : lb;
             for (int i = 0; i < fuente.lotes().size(); i++) {
                 if (fuente.ev().valida() && fuente.ev().atipico(i)) continue;

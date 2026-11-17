@@ -74,6 +74,11 @@ public class LineaBaseProductoView extends VerticalLayout {
         linea.addValueChangeListener(e -> cargarProductos());
         producto.setWidth("560px");
         producto.setItemLabelGenerator(p -> (p.ev().valida() ? "✓ " : "✗ ") + (p.esLinea() ? "Toda la línea" : p.nombre()) + " (" + p.ev().total() + ")");
+        // En la lista, en rojo los que no tienen línea base válida (igual que en Tiempo Real), para elegir uno que sí tiene.
+        producto.setRenderer(com.vaadin.flow.data.renderer.LitRenderer.<Producto>of(
+                        "<span style='white-space:nowrap;color:${item.c}'>${item.n}</span>")
+                .withProperty("n", producto.getItemLabelGenerator()::apply)
+                .withProperty("c", p -> p.ev().valida() ? "inherit" : "#c62828"));
         producto.addValueChangeListener(e -> dibujar());
         comparar.addValueChangeListener(e -> dibujar());
         Button recargar = new Button("Volver a leer el Excel", e -> {

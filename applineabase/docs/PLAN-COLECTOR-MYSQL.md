@@ -29,6 +29,17 @@ Acordado con el usuario el 2026-11-17. Proyecto nuevo (colector) que lee los equ
   archivo a su propio mes (los mensuales se pisan en el borde, ver CONTEXTO seccion 12).
 - La sirena y la captura al segundo van al colector: tienen que funcionar aunque la pagina web este caida.
 
+## Cambio de rumbo (2026-11-17, pedido del usuario)
+
+Antes de MySQL, el backend guarda en los **mismos archivos SQLite** que la app (`AlmacenSQLite`, `colector.almacen=sqlite`)
+y la app sigue leyendolos igual. Orden acordado: (1) backend guardando en `C:\LineaBaseX-prueba` y comparar un dia
+contra la app (seccion "Comparar con la app" de la pagina del backend); (2) la app "mira" los archivos cada minuto y
+relanza los eventos internos (Tiempo Real, horometro, alarmas de planta), porque hoy salen de la lectura en vivo y no
+del SQLite; (3) arranques, eventos, isla, alarmas de los generadores y sirena pasan al backend; (4) cambio: el backend
+escribe en `C:\LineaBaseX` y la app arranca con `--app.adquisicion.habilitada=false` (apaga lectura, captura al segundo y
+sirena: `DataAcquisitionTask`). La configuracion de hardware pasa al backend (solo administrador); hoy el backend ya lee
+`C:\LineaBaseX\config` y el catalogo de medidores en cada ciclo. MySQL despues, como otro almacen.
+
 ## Etapas
 
 0. **Vaadin 25.3.5 + Spring Boot 4.1.2 en la app** (hecho 2026-11-17, falta la prueba del usuario).

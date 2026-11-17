@@ -1797,9 +1797,17 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         // Comparados: además, con costo en la red y algo aprovechado.
         double costoDiesel = 0, costoRed = 0, kwhAprovechado = 0, kwhEntregado = 0, kwhGenerado = 0;
         int comparados = 0;
+        // Energía generada en todo el periodo, también la de las marchas "Ajustado del MF-13" (coincide con Control MF-13).
+        double kwhTotal = 0, kwhTotalDevuelta = 0;
+        Map<String, Double> kwhTotalGen = new LinkedHashMap<>();
         List<GraficaModel.BarraCosto> barras = new ArrayList<>();
         for (int i = filasCostos.size() - 1; i >= 0; i--) { // del más viejo al más nuevo (orden del gráfico)
             PeriodoMarcha p = filasCostos.get(i);
+            if (p.kwhGenerado() != null) {
+                kwhTotal += p.kwhGenerado();
+                kwhTotalGen.merge(p.generador(), p.kwhGenerado(), Double::sum);
+                if (p.kwhRedExportada() != null) kwhTotalDevuelta += p.kwhRedExportada();
+            }
             CostoCombustible cc = c(p);
             if (cc == null) continue;
             cargados++;
@@ -1826,14 +1834,24 @@ public class GeneradorAnalisisView extends VerticalLayout implements BeforeEnter
         }
 
         tarjetasCostos.removeAll();
+        if (kwhTotal > 0) {
+            List<String> porGen = new ArrayList<>();
+            kwhTotalGen.forEach((g, v) -> porGen.add(g + " " + kwh(v)));
+            String detalle = "Consumida en planta " + kwh(kwhTotal - kwhTotalDevuelta) + "\nDevuelta a la red " + kwh(kwhTotalDevuelta)
+                    + (porGen.size() > 1 ? "\n" + String.join("\n", porGen) : "");
+            tarjetasCostos.add(tarjeta("Energía generada", kwh(kwhTotal), detalle));
+        }
         if (cargados == 0) {
             tarjetasCostos.add(tarjeta("Comparación con la red", "-", "ningún arranque del periodo tiene el diésel cargado"
                     + (lineaAccessService.esAdmin() ? " (botón Cargar en la tabla)" : "")));
         } else if (comparados == 0) {
             tarjetasCostos.add(tarjeta("Comparación con la red", "sin tarifa", "cargar la tarifa en Consumo por franja horaria > Tarifas"));
         } else {
-            tarjetasCostos.add(tarjeta("Costo de generar (diésel)", dinero(costoDiesel), precioKwh(costoDiesel / kwhAprovechado)
-                    + " por kWh consumido en planta; " + comparados + " de " + periodos.size() + " arranques con diésel cargado"));
+            // Todo el diésel del periodo, también el de las marchas que la aplicación no registró (filas "Ajustado del
+            // MF-13"), así coincide con Control MF-13; el $/kWh y la comparación con la red, solo de los comparados.
+            tarjetasCostos.add(tarjeta("Costo de generar (diésel)", dinero(costoCargados), precioKwh(costoDiesel / kwhAprovechado)
+                    + " por kWh consumido en planta"
+                    + (comparados < cargados ? "; comparado con la red: " + dinero(costoDiesel) + " de " + comparados + " arranques" : "")));
             tarjetasCostos.add(tarjeta("Costo equivalente en la red", dinero(costoRed), precioKwh(costoRed / kwhAprovechado)
                     + " por kWh, con el precio de la franja de cada hora"));
             double diferencia = costoDiesel - costoRed;
