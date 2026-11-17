@@ -36,11 +36,16 @@ public enum TipoAlarma {
      * el máximo o bajo el mínimo durante 30 min seguidos (VigilanciaLoteService). No se configura; no urgente; se cierra
      * sola al volver a la banda o al cerrar el lote.
      */
-    CONSUMO_LOTE;
+    CONSUMO_LOTE,
+    /**
+     * Con la lectura de la app apagada (app.adquisicion.habilitada=false), el backend recolector no contesta: no llegan
+     * datos nuevos (EstadoBackendService). No se configura; urgente; se cierra sola cuando el backend vuelve a contestar.
+     */
+    BACKEND_FUERA_DE_LINEA;
 
     /** Se configuran en Alarmas (umbral por línea); las demás las define otro módulo. */
     public boolean configurable() {
-        return !deGenerador() && this != CONSUMO_LOTE;
+        return !deGenerador() && this != CONSUMO_LOTE && this != BACKEND_FUERA_DE_LINEA;
     }
 
     /** Alarmas de los generadores: no se configuran y las ve quien tiene "Ver Generadores". */

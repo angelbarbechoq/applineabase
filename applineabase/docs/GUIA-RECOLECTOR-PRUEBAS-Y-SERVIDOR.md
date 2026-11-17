@@ -5,7 +5,7 @@ puerto 8081). Revisado en el codigo el 2026-11-17. Plan general en `PLAN-COLECTO
 
 ## 1. Banderas
 
-Una bandera se escribe al final del comando (o en IntelliJ, en **Run > Edit Configurations > Program arguments**),
+En la app las dos banderas de abajo tambien estan en `src/main/resources/application.properties` (cambiar ahi y reiniciar; dejar `true` antes de commitear o empaquetar). Una bandera se escribe al final del comando (o en IntelliJ, en **Run > Edit Configurations > Program arguments**),
 separadas por espacio. Lo que no se escribe toma el valor de `application.properties`.
 
 ### App (applineabase)
@@ -13,6 +13,7 @@ separadas por espacio. Lo que no se escribe toma el valor de `application.proper
 | Bandera | Valor por defecto | Que hace |
 |---|---|---|
 | `--app.adquisicion.habilitada=false` | `true` | Apaga la lectura de equipos de la app (`DataAcquisitionTask`: lectura de 60 s, captura al segundo y sirena) y enciende el vigia de archivos (`VigiaArchivosService`), que toma lo en vivo de los archivos que escribe el backend. Sin la bandera, la app lee los equipos como siempre. |
+| `--app.backend.url=http://localhost:8081` | `http://localhost:8081` | Solo con la lectura apagada: donde la app pregunta cada 5 s si el backend trabaja (`/api/estado`). Etiqueta arriba a la derecha: "Datos del backend: en línea" (verde), "sin leer" (amarillo), "fuera de línea" (rojo; con 30 s sin respuesta, alarma urgente que se cierra sola). Sin la bandera dice "La app lee los equipos" (gris). La ve quien ve las alarmas. |
 | `--server.port=8080` | `8080` | Puerto de la app. |
 
 Comprobado el 2026-11-17: el ejecutable empaquetado `applineabase.exe` recibe las banderas escritas despues de el.
@@ -24,7 +25,7 @@ Comprobado el 2026-11-17: el ejecutable empaquetado `applineabase.exe` recibe la
 | `--colector.sqlite.carpeta=C:\LineaBaseX` | `C:\LineaBaseX-prueba` | Donde escribe los archivos SQLite y el archivo de estado `estado\equipos`. |
 | `--colector.lectura.habilitada=false` | `true` | Apaga la lectura de equipos del backend (la pagina sigue abierta). |
 | `--colector.almacen=sqlite` | `sqlite` | `sqlite` = mismos archivos que la app; `memoria` = no guarda nada. |
-| `--colector.ciclo.segundo=30` | `30` | Segundo de cada minuto en que lee. |
+| `--colector.ciclo.segundo=30` | `30` | Segundo de cada minuto en que lee (por el reloj de la PC). Al arrancar, si faltan 30 s o mas para esa lectura, hace una lectura de prueba que no guarda nada (se ve en su pagina y en la etiqueta de la app); si faltan menos, espera la del reloj. |
 | `--colector.comparar.carpeta=C:\LineaBaseX` | `C:\LineaBaseX` | Carpeta de la app, solo para "Comparar con la app" (solo lectura). |
 | `--server.port=8081` | `8081` | Puerto de la pagina del backend. |
 
@@ -47,11 +48,14 @@ H2 de la app (`C:\LineaBaseX\data\lineabase`, solo lectura).
 
 | | App | Backend | Uso |
 |---|---|---|---|
-| **A. Normal (como hoy)** | sin bandera | apagado, o con su carpeta por defecto (`C:\LineaBaseX-prueba`) | Produccion. Con el backend en la carpeta de prueba se puede comparar en su pagina, seccion "Comparar con la app". Los equipos reciben dos lecturas por minuto. |
+| **A. Normal (como hoy)** | sin bandera | apagado (la app lo cierra si esta abierto) | Produccion. |
 | **B. Backend recolecta** | `--app.adquisicion.habilitada=false` | `--colector.sqlite.carpeta=C:\LineaBaseX` | Lo nuevo. La app grafica y analiza lo que guarda el backend. |
 | **Volver a A** | quitar la bandera y reiniciar | detener, o reiniciar sin la bandera de carpeta | Vuelta atras inmediata. |
 
 **Nunca:** la app sin bandera y el backend en `C:\LineaBaseX` al mismo tiempo. Los dos escribirian los mismos archivos.
+Proteccion: la app sin bandera (lee los equipos) le pide al backend que se cierre al arrancar y despues cada minuto
+(`POST /api/cerrar` en `app.backend.url`; el backend solo lo acepta desde la misma PC). Si el backend no esta corriendo
+no pasa nada. Por eso con la app sin bandera el backend no puede quedar abierto, ni siquiera en `C:\LineaBaseX-prueba`.
 
 **Hasta terminar el paso 3, en la forma B no funcionan** (en la PC donde la app tiene la bandera): arranques, historial
 de eventos, isla, alarmas de los generadores, captura al segundo y sirena. Graficas, horometro, alarmas de planta y

@@ -129,6 +129,7 @@ public class AlarmasConfigView extends VerticalLayout {
             case POTENCIA_GENERADOR -> "límite de cada generador en generador-config.json";
             case MODO_GENERADOR -> "la define el selector del tablero del generador";
             case CONSUMO_LOTE -> "la define la línea base por producto del lote en curso";
+            case BACKEND_FUERA_DE_LINEA -> "el backend recolector no contesta";
         };
     }
 

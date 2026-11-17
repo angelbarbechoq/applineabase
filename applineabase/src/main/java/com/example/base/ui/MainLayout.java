@@ -2,6 +2,7 @@ package com.example.base.ui;
 
 import com.example.alarmas.model.AlarmaEvento;
 import com.example.alarmas.repository.AlarmaEventoRepository;
+import com.example.dataacquisition.service.EstadoBackendService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
@@ -28,6 +29,7 @@ import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 import jakarta.annotation.security.PermitAll;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,6 +42,9 @@ public final class MainLayout extends AppLayout {
     // más seguido que eso no aporta nada nuevo; 30s da como máximo esa misma latencia
     // sin duplicar las peticiones del cliente en cada ciclo de lectura.
     private static final int ALARMA_POLL_INTERVAL_MS = 30000;
+    // Con la etiqueta del backend visible (lectura de la app apagada) se revisa más seguido, para que el cambio de estado
+    // del backend (por ejemplo su lectura de prueba al arrancar) se vea enseguida. La consulta de alarmas es liviana.
+    private static final int BACKEND_POLL_INTERVAL_MS = 5000;
 
     private Div statusIndicator;
     private Div ultimoClickCard;
@@ -49,9 +54,17 @@ public final class MainLayout extends AppLayout {
     private final LineaAccessService lineaAccessService;
     private final AlarmaEventoRepository alarmaEventoRepository;
     private LocalDateTime ultimaRevisionAlarmas = LocalDateTime.now();
+    // De dónde salen los datos: la app lee los equipos, o (app.adquisicion.habilitada=false) los toma del backend
+    // recolector; en ese caso, su estado. Solo para quien ve las alarmas.
+    private final boolean verOrigenDatos;
+    private final EstadoBackendService estadoBackend;
+    private final Span backendLabel = new Span();
 
     MainLayout(AuthenticationContext authenticationContext, LineaAccessService lineaAccessService,
-               AlarmaEventoRepository alarmaEventoRepository) {
+               AlarmaEventoRepository alarmaEventoRepository, ObjectProvider<EstadoBackendService> estadoBackend) {
+        // Lo ve quien ve las alarmas (ADMIN y zona Mantenimiento), igual que la alarma de backend fuera de línea.
+        this.verOrigenDatos = lineaAccessService.puedeVerAlarmas();
+        this.estadoBackend = estadoBackend.getIfAvailable();
         this.authenticationContext = authenticationContext;
         this.lineaAccessService = lineaAccessService;
         this.alarmaEventoRepository = alarmaEventoRepository;
@@ -119,7 +132,11 @@ public final class MainLayout extends AppLayout {
         Button logoutBtn = new Button("Salir", e -> authenticationContext.logout());
         logoutBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
 
-        HorizontalLayout statusLayout = new HorizontalLayout(statusIndicator, userSpan, logoutBtn);
+        backendLabel.getStyle().set("font-size", "12px").set("font-weight", "600").set("margin-right", "12px")
+                .set("padding", "2px 8px").set("border-radius", "10px");
+        backendLabel.setVisible(verOrigenDatos);
+        actualizarEstadoBackend();
+        HorizontalLayout statusLayout = new HorizontalLayout(backendLabel, statusIndicator, userSpan, logoutBtn);
         statusLayout.setAlignItems(Alignment.CENTER);
         statusLayout.setSpacing(false);
         statusLayout.setPadding(false);
@@ -138,10 +155,36 @@ public final class MainLayout extends AppLayout {
         if (lineaAccessService.puedeVerAlarmas() || lineaAccessService.puedeVerGeneradores()) {
             addAttachListener(e -> {
                 UI ui = e.getUI();
-                ui.setPollInterval(ALARMA_POLL_INTERVAL_MS);
-                ui.addPollListener(pollEvent -> revisarAlarmasNuevas());
+                ui.setPollInterval(verOrigenDatos && this.estadoBackend != null ? BACKEND_POLL_INTERVAL_MS : ALARMA_POLL_INTERVAL_MS);
+                ui.addPollListener(pollEvent -> {
+                    revisarAlarmasNuevas();
+                    actualizarEstadoBackend();
+                });
             });
         }
+    }
+
+    /**
+     * Origen de los datos: gris si la app lee los equipos; si los toma del backend, verde en línea, amarillo sin leer y
+     * rojo fuera de línea, con el detalle al pasar el mouse.
+     */
+    private void actualizarEstadoBackend() {
+        if (!verOrigenDatos) return;
+        if (estadoBackend == null) {
+            backendLabel.setText("La app lee los equipos");
+            backendLabel.getStyle().set("background-color", "#e2e3e5").set("color", "#383d41");
+            backendLabel.setTitle("Los datos los lee y guarda esta aplicación");
+            return;
+        }
+        EstadoBackendService.Estado e = estadoBackend.estado();
+        String[] c = switch (e.nivel()) {
+            case EN_LINEA -> new String[]{"Datos del backend: en línea", "#d4edda", "#155724"};
+            case SIN_LEER -> new String[]{"Datos del backend: sin leer", "#fff3cd", "#856404"};
+            case FUERA_DE_LINEA -> new String[]{"Datos del backend: fuera de línea", "#f8d7da", "#721c24"};
+        };
+        backendLabel.setText(c[0]);
+        backendLabel.getStyle().set("background-color", c[1]).set("color", c[2]);
+        backendLabel.setTitle(e.detalle());
     }
 
     private void revisarAlarmasNuevas() {
