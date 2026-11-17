@@ -46,6 +46,6 @@ test.describe('Alarmas', () => {
     const chunks = [];
     for await (const chunk of stream) chunks.push(chunk);
     const contenido = Buffer.concat(chunks).toString('utf8');
-    expect(contenido).toContain('Inicio;Línea/Máquina;Tipo;Estado;Detalle');
+    expect(contenido).toContain('Inicio;Línea/Máquina;Tipo;Estado;Urgente;Detalle');
   });
 });

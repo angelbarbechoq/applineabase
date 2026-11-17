@@ -179,6 +179,11 @@ public class HistoricoView extends VerticalLayout {
     // filtrada cuando hay dudas de si el filtro está ocultando algo real). Cada una vive en su
     // propio contenedor amCharts — un mismo id no puede tener dos gráficos independientes.
     private static final String ID_CHART_FILTRADO = "chartdiv_historico_filtrado";
+    // Vaadin no manda al navegador el contenido de la pestaña no elegida del TabSheet (lo deja apagado hasta que se
+    // elige): su contenedor no existe y amCharts no puede dibujar ahí ("Could not find HTML element with id ...").
+    // Los scripts de ese gráfico se guardan y se ejecutan recién al elegir su pestaña (ver js(...)).
+    private String idGraficoVisible = ID_CHART_CRUDO; // "Sin filtrar" es la primera pestaña
+    private final Map<String, List<String>> scriptsPendientes = new java.util.HashMap<>();
     private static final String ID_CHART_CRUDO = "chartdiv_historico_crudo";
     // Cuando el usuario cambia de pestaña, si esa pestaña nunca recibió datos porque estaba
     // oculta la última vez que se consultó (amCharts no puede dimensionarse en un contenedor
@@ -293,9 +298,12 @@ public class HistoricoView extends VerticalLayout {
         // de repetir la consulta completa a la base de datos (los datos ya están cargados en el
         // gráfico, no hace falta volver a pedirlos ni volver a calcular atípicos/media móvil).
         tabSheetFiltro.addSelectedChangeListener(e -> {
+            idGraficoVisible = tabSheetFiltro.getSelectedIndex() == 1 ? ID_CHART_FILTRADO : ID_CHART_CRUDO;
+            // Lo que se dibujó mientras la pestaña no estaba: ahora que su contenedor existe.
+            List<String> pendientes = scriptsPendientes.remove(idGraficoVisible);
+            if (pendientes != null) pendientes.forEach(getElement()::executeJs);
             if (huboConsultaExitosa && graficaActiva != null) {
-                getElement().executeJs(graficaActiva.getResizeScript(ID_CHART_FILTRADO));
-                getElement().executeJs(graficaActiva.getResizeScript(ID_CHART_CRUDO));
+                getElement().executeJs(graficaActiva.getResizeScript(idGraficoVisible));
             }
         });
         add(tabSheetFiltro);
@@ -805,8 +813,8 @@ public class HistoricoView extends VerticalLayout {
             if (datos.isEmpty()) {
                 mensajeSpan.setText("No hay datos en el rango seleccionado");
                 graficaTemperatura.setMaxY(TEMPERATURA_MAX_Y_DEFAULT);
-                getElement().executeJs(graficaTemperatura.getInitScript2(ID_CHART_FILTRADO));
-                getElement().executeJs(graficaTemperatura.getInitScript2(ID_CHART_CRUDO));
+                js(ID_CHART_FILTRADO, graficaTemperatura.getInitScript2(ID_CHART_FILTRADO), true);
+                js(ID_CHART_CRUDO, graficaTemperatura.getInitScript2(ID_CHART_CRUDO), true);
                 return;
             }
 
@@ -895,21 +903,21 @@ public class HistoricoView extends VerticalLayout {
                 // que haya quedado de la última consulta exitosa sobre esta misma instancia.
                 graficaKWh.setMinY(0.0);
                 graficaKWh.aplicarRangosPredefinidos(maquina);
-                getElement().executeJs(graficaKWh.getInitScript2(ID_CHART_FILTRADO));
-                getElement().executeJs(graficaKWh.getInitScript2(ID_CHART_CRUDO));
+                js(ID_CHART_FILTRADO, graficaKWh.getInitScript2(ID_CHART_FILTRADO), true);
+                js(ID_CHART_CRUDO, graficaKWh.getInitScript2(ID_CHART_CRUDO), true);
                 return;
             }
 
             GraficaModel.ResultadoGrafica filtrado = graficaKWh.graficarSerieKWh(
                     ID_CHART_FILTRADO, datos, conDiferencia, maquina, new String[]{"Datos"}, false,
                     true, aplicaMediaMovil(maquina), ventanaMediaMovilActual());
-            getElement().executeJs(filtrado.script());
-            getElement().executeJs(graficaKWh.getZoomXInicialScript(ID_CHART_FILTRADO, filtrado.puntosGraficados()));
+            js(ID_CHART_FILTRADO, filtrado.script(), true);
+            js(ID_CHART_FILTRADO, graficaKWh.getZoomXInicialScript(ID_CHART_FILTRADO, filtrado.puntosGraficados()), false);
 
             GraficaModel.ResultadoGrafica crudo = graficaKWh.graficarSerieKWh(
                     ID_CHART_CRUDO, datos, conDiferencia, maquina, new String[]{"Datos"}, false, true, false);
-            getElement().executeJs(crudo.script());
-            getElement().executeJs(graficaKWh.getZoomXInicialScript(ID_CHART_CRUDO, crudo.puntosGraficados()));
+            js(ID_CHART_CRUDO, crudo.script(), true);
+            js(ID_CHART_CRUDO, graficaKWh.getZoomXInicialScript(ID_CHART_CRUDO, crudo.puntosGraficados()), false);
 
             mensajeSpan.setText("");
             huboConsultaExitosa = true;
@@ -933,8 +941,8 @@ public class HistoricoView extends VerticalLayout {
                 // Resetear al piso por defecto: si no, el gráfico vacío hereda el zoom que
                 // haya quedado de la última consulta exitosa sobre esta misma instancia.
                 graficaActiva.setMaxY(maxYDefaultPorTipo(tipoVar));
-                getElement().executeJs(graficaActiva.getInitScript2(ID_CHART_FILTRADO));
-                getElement().executeJs(graficaActiva.getInitScript2(ID_CHART_CRUDO));
+                js(ID_CHART_FILTRADO, graficaActiva.getInitScript2(ID_CHART_FILTRADO), true);
+                js(ID_CHART_CRUDO, graficaActiva.getInitScript2(ID_CHART_CRUDO), true);
                 return;
             }
 
@@ -1030,7 +1038,7 @@ public class HistoricoView extends VerticalLayout {
         // No recorta ni descarta puntos: solo cambia qué ventana del rango completo se ve
         // primero (el resto queda navegable con el scrollbar horizontal).
         script.append(graficaActiva.getZoomXInicialScript(containerId, timestamps.size()));
-        getElement().executeJs(script.toString());
+        js(containerId, script.toString(), true);
     }
 
     /** Ver comentario de maquinasSinMediaMovil: Mezcladores/Molino/Pulverizador quedan afuera del suavizado. */
@@ -1089,8 +1097,8 @@ public class HistoricoView extends VerticalLayout {
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
-        getElement().executeJs(graficaActiva.getInitScript2(ID_CHART_FILTRADO));
-        getElement().executeJs(graficaActiva.getInitScript2(ID_CHART_CRUDO));
+        js(ID_CHART_FILTRADO, graficaActiva.getInitScript2(ID_CHART_FILTRADO), true);
+        js(ID_CHART_CRUDO, graficaActiva.getInitScript2(ID_CHART_CRUDO), true);
 
         this.getUI().ifPresent(ui -> TarjetasEstadoActual.mostrarUltimoClickCard(ui, true));
         limpiarTarjetas();
@@ -1103,8 +1111,22 @@ public class HistoricoView extends VerticalLayout {
     }
 
     private void resetZoom() {
-        getElement().executeJs(graficaActiva.getResetZoomScript(ID_CHART_FILTRADO));
-        getElement().executeJs(graficaActiva.getResetZoomScript(ID_CHART_CRUDO));
+        js(ID_CHART_FILTRADO, graficaActiva.getResetZoomScript(ID_CHART_FILTRADO), false);
+        js(ID_CHART_CRUDO, graficaActiva.getResetZoomScript(ID_CHART_CRUDO), false);
+    }
+
+    /**
+     * Ejecuta un script de uno de los dos gráficos: enseguida si su pestaña está a la vista; si no, lo guarda para
+     * cuando se elija. {@code nuevo} = el script crea el gráfico de cero (lo guardado antes ya no sirve).
+     */
+    private void js(String idGrafico, String script, boolean nuevo) {
+        if (idGrafico.equals(idGraficoVisible)) {
+            getElement().executeJs(script);
+            return;
+        }
+        List<String> pendientes = scriptsPendientes.computeIfAbsent(idGrafico, k -> new ArrayList<>());
+        if (nuevo) pendientes.clear();
+        pendientes.add(script);
     }
 
     @ClientCallable
