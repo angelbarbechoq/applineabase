@@ -45,7 +45,7 @@ Avance: (1) hecho el 2026-11-17 (dos ciclos reales: mismas tablas, esquema y val
 `VigiaArchivosService` en la app (solo con `app.adquisicion.habilitada=false`, cada 10 s, filas nuevas del archivo del
 dia -> los mismos eventos que la lectura) y archivo `estado\equipos` del backend (comunicacion de cada linea, fecha ISO).
 Prueba: ventana corta con los generadores parados, backend con `colector.sqlite.carpeta=C:\\LineaBaseX` y la app con
-la lectura apagada.
+la lectura apagada. Banderas, carpetas, prueba y paso al servidor: `GUIA-RECOLECTOR-PRUEBAS-Y-SERVIDOR.md`.
 
 Fecha como fecha (decidido 2026-11-17): SQLite no tiene tipo fecha; recomienda texto `AAAA-MM-DD HH:MM:SS` (sqlite.org,
 Datatypes 2.2) y sus funciones no aceptan `DD-MM-AAAA`. No se convierten los archivos actuales: la correccion se hace en
