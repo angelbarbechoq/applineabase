@@ -69,6 +69,16 @@ public class DataAcquisitionTask {
         return secondCounter;
     }
 
+    /** Segundos que faltan para la próxima lectura (1 a 60), para la cuenta regresiva de la franja de arriba. */
+    public int segundosParaProximaLectura() {
+        return Math.max(1, CYCLE_INTERVAL - secondCounter);
+    }
+
+    /** true mientras corre el ciclo de lectura. */
+    public boolean leyendo() {
+        return cicloEnCurso.get();
+    }
+
     /**
      * Captura al segundo de los generadores (CapturaSegundoService): un tic aparte del de acquire, porque el ciclo de 60 s
      * corre dentro de acquire y mientras dura no hay tics. Solo lanza las lecturas en sus propios hilos y vuelve enseguida:

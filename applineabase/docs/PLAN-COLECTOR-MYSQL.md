@@ -46,6 +46,17 @@ Avance: (1) hecho el 2026-11-17 (dos ciclos reales: mismas tablas, esquema y val
 dia -> los mismos eventos que la lectura) y archivo `estado\equipos` del backend (comunicacion de cada linea, fecha ISO).
 Prueba: ventana corta con los generadores parados, backend con `colector.sqlite.carpeta=C:\\LineaBaseX` y la app con
 la lectura apagada. Banderas, carpetas, prueba y paso al servidor: `GUIA-RECOLECTOR-PRUEBAS-Y-SERVIDOR.md`.
+(3) en curso desde el 2026-11-17. Criterio acordado con el usuario: el backend solo guarda; anotar cuando arranca o para
+un generador o cuando aparece una alarma es guardar un hecho (se ve solo al leer), no analizar; el analisis queda en la
+app. Hecho: arranques (`generador\arranques`) y historial de eventos (`generador\eventos`) en el backend
+(`ArranquesArchivo`, `HistorialEventosArchivo`, llamados desde `LectorGeneradores`), mismo formato que la app (columnas
+cotejadas); la lectura de prueba al arrancar no anota nada. Probado el 2026-11-18 con la prueba semanal del Caterpillar
+(arranque 142, 16:45:38 a 16:51:35) y el paro de emergencia del GenPower (E-STOP hasta el reset). El 2026-11-18 tambien
+los eventos de red e interruptores y del selector (`RedControladorArchivo`, `ModoSelectorArchivo`, copias de
+`RedControladorService` y `ModoFuncionamientoService` sin las alarmas de H2), sin probar con un corte real; criterio del
+usuario: el backend guarda todo lo necesario para que la app, al abrirse, tenga la informacion completa. La isla por el
+medidor del transformador (`IslaService`) queda en la app: los dos modelos tienen senales de red y solo sirve para lo
+guardado antes. Falta: alarmas de los generadores en la app a partir de lo anotado, captura al segundo y sirena.
 
 Fecha como fecha (decidido 2026-11-17): SQLite no tiene tipo fecha; recomienda texto `AAAA-MM-DD HH:MM:SS` (sqlite.org,
 Datatypes 2.2) y sus funciones no aceptan `DD-MM-AAAA`. No se convierten los archivos actuales: la correccion se hace en

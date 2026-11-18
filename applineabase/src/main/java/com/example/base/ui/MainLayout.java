@@ -2,6 +2,7 @@ package com.example.base.ui;
 
 import com.example.alarmas.model.AlarmaEvento;
 import com.example.alarmas.repository.AlarmaEventoRepository;
+import com.example.dataacquisition.service.DataAcquisitionTask;
 import com.example.dataacquisition.service.EstadoBackendService;
 import com.example.security.LineaAccessService;
 import com.vaadin.flow.component.Component;
@@ -42,8 +43,8 @@ public final class MainLayout extends AppLayout {
     // más seguido que eso no aporta nada nuevo; 30s da como máximo esa misma latencia
     // sin duplicar las peticiones del cliente en cada ciclo de lectura.
     private static final int ALARMA_POLL_INTERVAL_MS = 30000;
-    // Con la etiqueta del backend visible (lectura de la app apagada) se revisa más seguido, para que el cambio de estado
-    // del backend (por ejemplo su lectura de prueba al arrancar) se vea enseguida. La consulta de alarmas es liviana.
+    // Con la etiqueta de origen de datos y la cuenta regresiva visibles se revisa más seguido, para que el estado del
+    // backend y el "Leyendo..." se corrijan enseguida. La consulta de alarmas es liviana.
     private static final int BACKEND_POLL_INTERVAL_MS = 5000;
 
     private Div statusIndicator;
@@ -59,9 +60,16 @@ public final class MainLayout extends AppLayout {
     private final boolean verOrigenDatos;
     private final EstadoBackendService estadoBackend;
     private final Span backendLabel = new Span();
+    // Cuenta regresiva hasta la próxima lectura (de la app o del backend); la baja el navegador de a un segundo y se
+    // corrige con cada revisión del servidor.
+    private final DataAcquisitionTask lecturaApp;
+    private final Span proximaLectura = new Span();
+    private boolean cercaDeLeer;
 
     MainLayout(AuthenticationContext authenticationContext, LineaAccessService lineaAccessService,
-               AlarmaEventoRepository alarmaEventoRepository, ObjectProvider<EstadoBackendService> estadoBackend) {
+               AlarmaEventoRepository alarmaEventoRepository, ObjectProvider<EstadoBackendService> estadoBackend,
+               ObjectProvider<DataAcquisitionTask> lecturaApp) {
+        this.lecturaApp = lecturaApp.getIfAvailable();
         // Lo ve quien ve las alarmas (ADMIN y zona Mantenimiento), igual que la alarma de backend fuera de línea.
         this.verOrigenDatos = lineaAccessService.puedeVerAlarmas();
         this.estadoBackend = estadoBackend.getIfAvailable();
@@ -136,7 +144,10 @@ public final class MainLayout extends AppLayout {
                 .set("padding", "2px 8px").set("border-radius", "10px");
         backendLabel.setVisible(verOrigenDatos);
         actualizarEstadoBackend();
-        HorizontalLayout statusLayout = new HorizontalLayout(backendLabel, statusIndicator, userSpan, logoutBtn);
+        proximaLectura.getStyle().set("font-size", "12px").set("color", "#666").set("margin-right", "12px")
+                .set("min-width", "150px");
+        proximaLectura.setVisible(false);
+        HorizontalLayout statusLayout = new HorizontalLayout(backendLabel, proximaLectura, statusIndicator, userSpan, logoutBtn);
         statusLayout.setAlignItems(Alignment.CENTER);
         statusLayout.setSpacing(false);
         statusLayout.setPadding(false);
@@ -155,10 +166,12 @@ public final class MainLayout extends AppLayout {
         if (lineaAccessService.puedeVerAlarmas() || lineaAccessService.puedeVerGeneradores()) {
             addAttachListener(e -> {
                 UI ui = e.getUI();
-                ui.setPollInterval(verOrigenDatos && this.estadoBackend != null ? BACKEND_POLL_INTERVAL_MS : ALARMA_POLL_INTERVAL_MS);
+                ui.setPollInterval(verOrigenDatos ? BACKEND_POLL_INTERVAL_MS : ALARMA_POLL_INTERVAL_MS);
                 ui.addPollListener(pollEvent -> {
                     revisarAlarmasNuevas();
                     actualizarEstadoBackend();
+                    // Mientras se lee (o falta 1 s), refrescar cada segundo para que el fin de la lectura se vea enseguida.
+                    if (verOrigenDatos) ui.setPollInterval(cercaDeLeer ? 1000 : BACKEND_POLL_INTERVAL_MS);
                 });
             });
         }
@@ -174,6 +187,7 @@ public final class MainLayout extends AppLayout {
             backendLabel.setText("La app lee los equipos");
             backendLabel.getStyle().set("background-color", "#e2e3e5").set("color", "#383d41");
             backendLabel.setTitle("Los datos los lee y guarda esta aplicación");
+            if (lecturaApp != null) cuentaRegresiva(lecturaApp.segundosParaProximaLectura(), lecturaApp.leyendo());
             return;
         }
         EstadoBackendService.Estado e = estadoBackend.estado();
@@ -185,6 +199,28 @@ public final class MainLayout extends AppLayout {
         backendLabel.setText(c[0]);
         backendLabel.getStyle().set("background-color", c[1]).set("color", c[2]);
         backendLabel.setTitle(e.detalle());
+        Integer segundos = e.nivel() == EstadoBackendService.Nivel.FUERA_DE_LINEA ? null : e.segundosAhora();
+        cuentaRegresiva(segundos, e.leyendo());
+    }
+
+    /**
+     * "Próxima lectura en N s": el navegador la baja de a un segundo; en 0, o si el servidor dice que está leyendo,
+     * "Leyendo...". Si se queda ahí, la lectura no llega. null = no se sabe (se oculta).
+     */
+    private void cuentaRegresiva(Integer segundos, boolean leyendo) {
+        cercaDeLeer = segundos != null && (leyendo || segundos <= 1);
+        proximaLectura.setVisible(segundos != null);
+        if (segundos == null) return;
+        proximaLectura.getElement().executeJs(
+                "const el = this;"
+                        + "el.__fin = Date.now() + $0 * 1000; el.__leyendo = $1;"
+                        + "const pintar = () => {"
+                        + "  const s = Math.ceil((el.__fin - Date.now()) / 1000);"
+                        + "  el.textContent = (el.__leyendo || s <= 0) ? 'Leyendo...' : 'Próxima lectura en ' + s + ' s';"
+                        + "};"
+                        + "pintar();"
+                        + "if (!el.__timer) el.__timer = setInterval(pintar, 250);",
+                segundos, leyendo);
     }
 
     private void revisarAlarmasNuevas() {

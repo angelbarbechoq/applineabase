@@ -21,7 +21,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 
 /**
- * Con la lectura de equipos de la app apagada ({@code app.adquisicion.habilitada=false}), pregunta cada 5 s al backend
+ * Con la lectura de equipos de la app apagada ({@code app.adquisicion.habilitada=false}), pregunta cada 5 s (cada segundo mientras lee) al backend
  * recolector ({@code app.backend.url}, por defecto http://localhost:8081) en {@code /api/estado} si está trabajando:
  * <ul>
  *   <li>EN_LINEA: contestó, la lectura está prendida y el último ciclo es de hace menos de 3 min.</li>
@@ -39,12 +39,29 @@ public class EstadoBackendService {
     private static final Logger logger = LoggerFactory.getLogger(EstadoBackendService.class);
     private static final String LINEA = "Backend";
     private static final long MAXIMO_SEGUNDOS_SIN_CICLO = 180;
-    private static final int FALLAS_PARA_ALARMA = 6; // 30 s sin respuesta
+    private static final long MS_SIN_RESPUESTA_PARA_ALARMA = 30_000;
+    /** Ritmo normal de consulta; mientras el backend lee (o está por leer) se consulta cada segundo. */
+    private static final long MS_ENTRE_CONSULTAS = 5_000;
 
     public enum Nivel { EN_LINEA, SIN_LEER, FUERA_DE_LINEA }
 
-    /** @param detalle texto para el tooltip de la franja */
-    public record Estado(Nivel nivel, String detalle, LocalDateTime revisado) {
+    /**
+     * @param detalle            texto para el tooltip de la franja
+     * @param segundosParaLectura los que faltaban para la próxima lectura del backend al preguntarle (null = no se sabe)
+     * @param leyendo            el backend estaba leyendo al preguntarle
+     * @param recibidoMs         cuándo llegó la respuesta (System.currentTimeMillis), para descontar el tiempo pasado
+     */
+    public record Estado(Nivel nivel, String detalle, LocalDateTime revisado, Integer segundosParaLectura, boolean leyendo,
+                         long recibidoMs) {
+        Estado(Nivel nivel, String detalle, LocalDateTime revisado) {
+            this(nivel, detalle, revisado, null, false, System.currentTimeMillis());
+        }
+
+        /** Segundos que faltan ahora para la próxima lectura, o null si no se sabe. */
+        public Integer segundosAhora() {
+            if (segundosParaLectura == null) return null;
+            return (int) Math.max(0, segundosParaLectura - (System.currentTimeMillis() - recibidoMs) / 1000);
+        }
     }
 
     private final String url;
@@ -54,7 +71,9 @@ public class EstadoBackendService {
     private final ObjectMapper json = new ObjectMapper();
 
     private volatile Estado estado = new Estado(Nivel.SIN_LEER, "Todavía no se preguntó al backend", LocalDateTime.now());
-    private int fallasSeguidas;
+    /** Desde cuándo no contesta (0 = contesta). */
+    private long sinRespuestaDesdeMs;
+    private long proximaConsultaMs;
 
     public EstadoBackendService(@Value("${app.backend.url:http://localhost:8081}") String url,
                                 AlarmaEventoRepository eventos, AlarmaTrayNotifierService bandeja) {
@@ -67,8 +86,18 @@ public class EstadoBackendService {
         return estado;
     }
 
-    @Scheduled(fixedDelay = 5_000, initialDelay = 3_000)
+    /**
+     * Cada segundo decide si pregunta: cada 5 s normalmente, y cada segundo mientras el backend lee o le falta 1 s
+     * para leer, así el fin de la lectura se ve enseguida.
+     */
+    @Scheduled(fixedDelay = 1_000, initialDelay = 3_000)
     public void revisar() {
+        long ms = System.currentTimeMillis();
+        Estado actual = estado;
+        Integer falta = actual.segundosAhora();
+        boolean cercaDeLeer = actual.leyendo() || (falta != null && falta <= 1);
+        if (ms < proximaConsultaMs && !cercaDeLeer) return;
+        proximaConsultaMs = ms + MS_ENTRE_CONSULTAS;
         LocalDateTime ahora = LocalDateTime.now().withNano(0);
         JsonNode r;
         try {
@@ -77,31 +106,34 @@ public class EstadoBackendService {
             if (resp.statusCode() != 200) throw new IllegalStateException("respondió " + resp.statusCode());
             r = json.readTree(resp.body());
         } catch (Exception e) {
-            fallasSeguidas++;
+            if (sinRespuestaDesdeMs == 0) sinRespuestaDesdeMs = ms;
             String motivo = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             estado = new Estado(Nivel.FUERA_DE_LINEA, "El backend no contesta en " + url + " (" + motivo + ")", ahora);
-            if (fallasSeguidas >= FALLAS_PARA_ALARMA) abrirAlarma(ahora);
+            if (ms - sinRespuestaDesdeMs >= MS_SIN_RESPUESTA_PARA_ALARMA) abrirAlarma(ahora);
             return;
         }
-        fallasSeguidas = 0;
+        sinRespuestaDesdeMs = 0;
         cerrarAlarma(ahora);
+        Integer segundos = r.has("segundosParaProximaLectura") ? r.path("segundosParaProximaLectura").asInt() : null;
+        boolean leyendo = r.path("leyendo").asBoolean(false);
+        long recibido = System.currentTimeMillis();
 
         if (!r.path("lecturaHabilitada").asBoolean(false)) {
-            estado = new Estado(Nivel.SIN_LEER, "El backend contesta, pero tiene la lectura apagada", ahora);
+            estado = new Estado(Nivel.SIN_LEER, "El backend contesta, pero tiene la lectura apagada", ahora, segundos, leyendo, recibido);
         } else if (!r.has("ultimoCiclo")) {
-            estado = new Estado(Nivel.SIN_LEER, "El backend contesta y espera su primer ciclo de lectura", ahora);
+            estado = new Estado(Nivel.SIN_LEER, "El backend contesta y espera su primer ciclo de lectura", ahora, segundos, leyendo, recibido);
         } else if (r.path("segundosDesdeUltimoCiclo").asLong() > MAXIMO_SEGUNDOS_SIN_CICLO) {
             estado = new Estado(Nivel.SIN_LEER, "El backend contesta, pero su último ciclo de lectura fue a las "
-                    + hora(r.path("ultimoCiclo").asText()), ahora);
+                    + hora(r.path("ultimoCiclo").asText()), ahora, segundos, leyendo, recibido);
         } else if (!r.path("errorGuardado").isNull() && !r.path("errorGuardado").isMissingNode()) {
-            estado = new Estado(Nivel.SIN_LEER, "El backend lee, pero falló al guardar: " + r.path("errorGuardado").asText(), ahora);
+            estado = new Estado(Nivel.SIN_LEER, "El backend lee, pero falló al guardar: " + r.path("errorGuardado").asText(), ahora, segundos, leyendo, recibido);
         } else if (r.path("prueba").asBoolean(false)) {
             // Al arrancar, el backend hace una lectura de prueba que no guarda: los equipos contestan, todavía sin datos nuevos.
             estado = new Estado(Nivel.EN_LINEA, "Lectura de prueba al arrancar a las " + hora(r.path("ultimoCiclo").asText())
-                    + ": " + r.path("filas").asInt() + " filas leídas, sin guardar; la primera lectura guardada es la del reloj", ahora);
+                    + ": " + r.path("filas").asInt() + " filas leídas, sin guardar; la primera lectura guardada es la del reloj", ahora, segundos, leyendo, recibido);
         } else {
             estado = new Estado(Nivel.EN_LINEA, "Último ciclo a las " + hora(r.path("ultimoCiclo").asText()) + ": "
-                    + r.path("guardadas").asInt() + " filas guardadas", ahora);
+                    + r.path("guardadas").asInt() + " filas guardadas", ahora, segundos, leyendo, recibido);
         }
     }
 
